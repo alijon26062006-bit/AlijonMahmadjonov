@@ -183,6 +183,9 @@ def run_pending(conn: sqlite3.Connection, config: Config, supplier, payment_id: 
                     product_id=item["product_id"], quantity=item.get("quantity", 1), fields=item.get("fields") or {},
                     client_idem_key=f"quick-{p['id']}-{i}", source="quick")
             except orders.OrderError as exc:
+                if exc.code == "friday_break":   # пятница 13–14: деньги на балансе, заказ оформим после 14:00
+                    error = "retry"
+                    break
                 error = str(exc)
                 break
             except Exception:  # noqa: BLE001 — сбой сети поставщика: этот заказ повторим на следующем круге

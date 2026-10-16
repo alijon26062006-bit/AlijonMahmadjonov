@@ -106,3 +106,11 @@ RECEIPT = {"receipt": ("chek.png", RECEIPT_PNG, "image/png")}
 def add_receipt(conn, pid: int) -> None:
     """Заявке, созданной напрямую, — чек в базе: без него зачислить нельзя."""
     conn.execute("UPDATE payments SET receipt_file = 'test.png' WHERE id = ?", (pid,))
+
+
+@pytest.fixture(autouse=True)
+def _not_friday_break(monkeypatch):
+    """Тесты не должны падать, если их запустили в пятницу 13–14 по Душанбе: «сейчас» — не перерыв."""
+    from donatix import jumuah
+    real = jumuah.closed
+    monkeypatch.setattr(jumuah, "closed", lambda config, now=None: real(config, now) if now else False)

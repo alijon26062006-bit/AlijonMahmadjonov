@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 
-from . import accounts, cache, catalog, db, orders, popular, promo, referrals, sitecfg
+from . import accounts, cache, catalog, db, jumuah, orders, popular, promo, referrals, sitecfg
 from .config import PAY_METHODS, Config
 from .deps import (INDEXABLE, LoginRequired, TelegramRequired, check_csrf, flash, get_config, get_conn, render,
                    session_user)
@@ -1995,6 +1995,9 @@ def panel_numbers_buy(request: Request, service: str = Form(""), country: str = 
     from . import fivesim
     if not fivesim.enabled(config):
         return _redirect("/panel")
+    if jumuah.blocks(config, user):
+        flash(request, jumuah.MESSAGE, "error")
+        return _redirect(f"/panel/numbers?service={service}")
     if request.app.state.limiter.hit("orders", f"vnum{user['id']}") is not None:
         flash(request, "Слишком много покупок подряд — подождите минуту.", "error")
         return _redirect(f"/panel/numbers?service={service}")
@@ -2078,6 +2081,9 @@ def panel_glory_buy(request: Request, region: str = Form(""), clan_id: str = For
         return _redirect("/panel")
     if not agree:
         flash(request, "Отметьте, что вы прочитали условия.", "error")
+        return _redirect("/panel/glory")
+    if jumuah.blocks(config, user):
+        flash(request, jumuah.MESSAGE, "error")
         return _redirect("/panel/glory")
     if request.app.state.limiter.hit("orders", f"glory{user['id']}") is not None:
         flash(request, "Слишком много запусков подряд — подождите минуту.", "error")

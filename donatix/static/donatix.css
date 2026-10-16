@@ -2476,3 +2476,7 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
   .promo-timer > span { min-width: 0; flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .promo-glow, .promo-art svg { animation: none; } }
+
+/* Пятница 13–14 — покупки закрыты (jumuah.py) */
+.friday-break { padding: 10px 16px; text-align: center; font-weight: 600; font-size: .92rem; color: #052e16;
+  background: linear-gradient(90deg, #86efac, #34d399); }

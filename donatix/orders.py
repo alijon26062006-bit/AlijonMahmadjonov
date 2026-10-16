@@ -179,6 +179,9 @@ def create_order(
     source: str = "api",
 ) -> tuple[sqlite3.Row, bool]:
     """Возвращает (заказ, повтор_ли). Повтор — тот же Idempotency-Key, новый заказ не создан."""
+    from . import jumuah
+    if jumuah.blocks(config, user, source):   # пятница 13–14: сайт и свой бот не продают, API — да
+        raise OrderError(jumuah.MESSAGE, "friday_break", 503)
     if user["status"] != "active":
         raise OrderError("Аккаунт не активирован. Дождитесь одобрения.", "account_inactive", 403)
     product = get_product(conn, product_id)

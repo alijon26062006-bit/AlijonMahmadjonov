@@ -351,6 +351,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         finally:
             pool.release(c)
     ctx["tz_label"] = timez.label(ctx["tz"])
+    from . import jumuah
+    ctx["friday_break"] = jumuah.MESSAGE if jumuah.closed(config) else ""
     from datetime import datetime, timezone
     ctx["now_utc"] = datetime.now(timezone.utc)
     ctx["tz_zones"] = timez.ZONES
