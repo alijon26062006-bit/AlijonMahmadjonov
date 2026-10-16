@@ -19,6 +19,10 @@ from .config import Config
 
 KEY = "promo.v1"
 MAX_DAYS = 30
+# Недополученное по акции (обычная цена − цена акции) возвращаем надбавкой на остальные товары сайта:
+# не больше RECOUP_PCT %, пока не вернём всё, но не дольше RECOUP_DAYS после конца акции.
+RECOUP_PCT = Decimal("3")
+RECOUP_DAYS = 7
 
 
 def get(conn: sqlite3.Connection) -> dict[str, Any] | None:
@@ -69,6 +73,7 @@ def stop(conn: sqlite3.Connection) -> None:
     p = get(conn)
     if p:
         p["on"] = False
+        p["ends"] = min(float(p.get("ends", 0)), time.time())   # надбавка считает 7 дней от остановки
         db.set_setting(conn, KEY, json.dumps(p, ensure_ascii=False))
         cache.clear_everywhere(conn)
 
@@ -114,6 +119,66 @@ def unit_usd(config: Config, user: Any, product_id: str) -> Decimal | None:
     return (Decimal(p["price_tjs"]) / rate).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
 
 
+# ── Возврат «минуса» акции ──────────────────────────────────
+
+
+def _ensure(conn: sqlite3.Connection) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS promo_ledger (
+        order_id INTEGER PRIMARY KEY,   -- заказ, по которому записали
+        promo    TEXT NOT NULL,         -- какая акция (время её начала)
+        micro    INTEGER NOT NULL       -- > 0 недополучили (ваучер дешевле), < 0 вернули надбавкой
+    )""")
+
+
+def _promo_id(p: dict[str, Any]) -> str:
+    return str(int(float(p.get("starts", 0))))
+
+
+def record(conn: sqlite3.Connection, order_id: int, micro: int) -> None:
+    """Записать в той же транзакции, что и заказ: минус ваучера (+) или возврат надбавкой (−)."""
+    p = get(conn)
+    if not p or not micro:
+        return
+    _ensure(conn)
+    conn.execute("INSERT OR REPLACE INTO promo_ledger (order_id, promo, micro) VALUES (?, ?, ?)",
+                 (order_id, _promo_id(p), int(micro)))
+
+
+def totals(conn: sqlite3.Connection, p: dict[str, Any] | None = None) -> dict[str, int]:
+    """Сколько недополучили, сколько вернули, сколько осталось (микро-доллары). Отменённые заказы не в счёт."""
+    p = p or get(conn)
+    if not p:
+        return {"lost": 0, "back": 0, "left": 0, "sold": 0}
+    _ensure(conn)
+    row = conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN l.micro > 0 THEN l.micro END), 0) AS lost, "
+        "COALESCE(-SUM(CASE WHEN l.micro < 0 THEN l.micro END), 0) AS back, "
+        "COUNT(CASE WHEN l.micro > 0 THEN 1 END) AS sold "
+        "FROM promo_ledger l JOIN orders o ON o.id = l.order_id WHERE l.promo = ? AND o.status != 'failed'",
+        (_promo_id(p),)).fetchone()
+    lost, back = int(row["lost"]), int(row["back"])
+    return {"lost": lost, "back": back, "left": max(0, lost - back), "sold": int(row["sold"])}
+
+
+def recoup_pct(config: Config, user: Any) -> Decimal | None:
+    """Надбавка в % на остальные товары, пока минус акции не вернули; None — не нужна (или покупка по API)."""
+    from .accounts import is_api
+    if user is not None and is_api(user):
+        return None
+
+    def load():
+        pool = db.pool(config.db_path)
+        c = pool.acquire()
+        try:
+            p = get(c)
+            if not p or time.time() >= float(p.get("ends", 0)) + RECOUP_DAYS * 86400:
+                return None
+            return totals(c, p)["left"] > 0
+        finally:
+            pool.release(c)
+    return RECOUP_PCT if cache.get_or_set("promo:recoup", 5, load) else None
+
+
 def banner(conn: sqlite3.Connection, config: Config) -> dict[str, Any] | None:
     """Всё для баннера на главной: товар, старая и новая цена, когда конец."""
     p = active(conn)
@@ -157,4 +222,9 @@ def admin_view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     options = [{"id": r["id"], "label": f"{r['category_name']} · {r['region'] or '—'} · {packs.label(r['name'])}",
                 "cost": str((Decimal(str(r["base_price"])) * rate).quantize(Decimal("0.01")))}
                for r in rows if packs.group(r["name"]) == 1]
-    return {"promo": p, "live": active(conn) is not None, "cost_tjs": cost, "options": options}
+    t = totals(conn, p) if p else {"lost": 0, "back": 0, "left": 0, "sold": 0}
+    tjs = {k: (Decimal(v) / 10_000 * rate).quantize(Decimal("0.01")) for k, v in t.items() if k != "sold"}
+    recouping = bool(p) and t["left"] > 0 and time.time() < float(p.get("ends", 0)) + RECOUP_DAYS * 86400
+    return {"promo": p, "live": active(conn) is not None, "cost_tjs": cost, "options": options,
+            "sold": t["sold"], "lost_tjs": tjs["lost"], "back_tjs": tjs["back"], "left_tjs": tjs["left"],
+            "recouping": recouping, "recoup_pct": RECOUP_PCT, "recoup_days": RECOUP_DAYS}

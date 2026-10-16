@@ -140,10 +140,18 @@ def _clean_quantity(product: dict[str, Any], quantity: Any) -> int:
 
 def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Decimal | int) -> dict[str, Any]:
     from . import promo
+    regular = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
     unit = promo.unit_usd(config, user, product.get("id", ""))   # акция — только сайт и свой бот, не API
-    if unit is None:
-        unit = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
-    return {"unit_price": unit, "total_micro": order_total_micro(unit, units)}
+    promo_micro = 0   # > 0 недополучили по акции, < 0 вернули надбавкой (promo_ledger)
+    if unit is not None:
+        promo_micro = max(0, order_total_micro(regular, units) - order_total_micro(unit, units))
+    else:
+        unit = regular
+        pct = promo.recoup_pct(config, user)
+        if pct:
+            unit = apply_markup(regular, pct)
+            promo_micro = order_total_micro(regular, units) - order_total_micro(unit, units)
+    return {"unit_price": unit, "total_micro": order_total_micro(unit, units), "promo_micro": promo_micro}
 
 
 # Сомони → доллары при пополнении и смена курса дают «копеечную» нехватку: на экране 15.61 с. и цена 15.61 с.,
@@ -232,6 +240,9 @@ def create_order(
             if gap:
                 accounts.post_ledger(conn, user["id"], gap, "Округление курса сомони", order_id=order_id)
             accounts.post_ledger(conn, user["id"], -q["total_micro"], f"Заказ {public_id}", order_id=order_id)
+            if q["promo_micro"]:
+                from . import promo
+                promo.record(conn, order_id, q["promo_micro"])
     except accounts.InsufficientBalance as exc:
         raise OrderError(
             f"Недостаточно средств: нужно ${fmt(exc.need)}, на балансе ${fmt(exc.have)}.",

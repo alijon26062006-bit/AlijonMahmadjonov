@@ -957,8 +957,9 @@ def panel_catalog(
         # Цена «от» — уже с наценкой клиента, закупочную не показываем
         games = [
             {**dict(c), "regions": sorted(filter(None, (c["regions"] or "").split(","))),
-             "from_price": _cents(apply_markup(to_decimal(str(c["from_price"])),
-                                               accounts.markup_for(user, config, c["kind"])))}
+             "from_price": _cents(apply_markup(apply_markup(to_decimal(str(c["from_price"])),
+                                                           accounts.markup_for(user, config, c["kind"])),
+                                              promo.recoup_pct(config, user) or 0))}
             for c in _cached(f"cats:{kind}", q, lambda: [dict(c) for c in catalog.categories(conn, kind=kind, q=q)])
         ]
         return render(request, "panel/catalog.html", {
@@ -998,7 +999,7 @@ def _telegram_ctx(conn, config: Config, user, tab: str, **extra) -> dict:
     """Одна страница «Telegram», как у FazerCards: вкладки Звёзды / Premium, получатель, пакет."""
     def view(kind: str) -> list[dict]:
         markup = accounts.markup_for(user, config, kind)
-        return [catalog.public_view(p, markup) for p in catalog.list_products(conn, kind=kind)]
+        return [catalog.public_view(p, markup, config=config, user=user) for p in catalog.list_products(conn, kind=kind)]
     stars = next(iter(view("telegram_stars")), None)
     plans = sorted(view("telegram_premium"), key=lambda p: to_decimal(p["price_usd"]))
     for pl in plans:
