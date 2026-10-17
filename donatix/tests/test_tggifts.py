@@ -4,6 +4,7 @@ import hmac
 import json
 import time
 from dataclasses import replace
+from decimal import Decimal
 from urllib.parse import urlencode
 
 import pytest
@@ -74,10 +75,11 @@ def test_sync_hides_premium_and_sold_out(conn, gcfg, fake):
 def test_price_follows_star_price(conn, gcfg, fake):
     tggifts.sync(conn, gcfg, force=True)
     u = _user(conn)
-    p15 = tggifts.price_micro(conn, gcfg, u, 15)
-    assert p15 == pytest.approx(int(tggifts.star_price_usd(conn, gcfg, u) * 15 * 10_000), abs=1)
-    db.set_setting(conn, "gifts.markup_pct", "10")
-    assert tggifts.price_micro(conn, gcfg, u, 15) > p15
+    base = tggifts.star_price_usd(conn, gcfg, u) * 15 * 10_000
+    # по умолчанию +10% сверх цены Stars на сайте
+    assert tggifts.price_micro(conn, gcfg, u, 15) == pytest.approx(int(base * Decimal("1.1")), abs=1)
+    db.set_setting(conn, "gifts.markup_pct", "0")
+    assert tggifts.price_micro(conn, gcfg, u, 15) == pytest.approx(int(base), abs=1)
 
 
 def test_buy_self_and_send(conn, gcfg, fake):

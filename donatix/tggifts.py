@@ -226,7 +226,7 @@ def settings(conn: sqlite3.Connection) -> dict[str, Decimal]:
             return Decimal(db.get_setting(conn, key) or default)
         except Exception:  # noqa: BLE001
             return Decimal(default)
-    return {"markup_pct": num("gifts.markup_pct", "0"),        # сверх цены Stars на сайте
+    return {"markup_pct": num("gifts.markup_pct", "10"),        # сверх цены Stars на сайте
             "star_cost_usd": num("gifts.star_cost_usd", "0.013"),  # почём вам обходится 1 Star (для прибыли)
             "low_stars": num("gifts.low_stars", "100")}
 

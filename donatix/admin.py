@@ -752,7 +752,7 @@ def gifts_admin(request: Request, status: str = "", admin=Depends(admin_user), c
 
 
 @router.post("/gifts", dependencies=[Depends(check_csrf)])
-def gifts_save(request: Request, markup_pct: str = Form("0"), star_cost_usd: str = Form("0.013"),
+def gifts_save(request: Request, markup_pct: str = Form("10"), star_cost_usd: str = Form("0.013"),
                low_stars: str = Form("100"), admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import tggifts
     try:
