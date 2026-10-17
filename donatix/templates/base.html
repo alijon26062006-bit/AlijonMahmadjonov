@@ -52,9 +52,13 @@
       } catch (e) {}
     })();
     // Валюта показа: USD или TJS по курсу оплат. Внутри всё в долларах — это только вывод.
-    window.DX_CUR = {code: "{{ cur_code }}", rate: {{ cur_rate or 0 }}};
+    window.DX_CUR = {code: "{{ cur_code }}", rate: {{ cur_rate or 0 }}, sym: "{{ cur_sym }}", digits: {{ cur_digits }}};
     window.dxMoney = function (usd, digits) {
       var c = window.DX_CUR;
+      if (c.code !== "TJS" && c.sym && c.rate) {   // валюта СНГ — вверх, как на сервере
+        var k2 = Math.pow(10, c.digits), v = Math.ceil(usd * c.rate * k2 - 1e-9) / k2;
+        return v.toLocaleString("ru-RU", {minimumFractionDigits: c.digits, maximumFractionDigits: c.digits}) + "\u00a0" + c.sym;
+      }
       if (c.code !== "TJS" || !c.rate) return "$" + usd.toFixed(digits || 4);
       var t = usd * c.rate, d = (t > 0 && t < 1) ? 4 : 2, k = Math.pow(10, d);
       return (Math.round(t * k + 1e-9) / k).toFixed(d) + " с.";

@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("bank-listen")
     relink = sub.add_parser("glory-relink")
     relink.add_argument("order_id", nargs="?", type=int, default=None)
+    sub.add_parser("geo-update")   # скачать базу «IP → страна» и курсы СНГ сейчас, не дожидаясь воркера
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
     args = parser.parse_args(argv)
@@ -133,6 +134,10 @@ def main(argv: list[str] | None = None) -> int:
             lines = glory.relink(conn, config, args.order_id) or ["Нет заказов «Не запустилась» за последние 3 дня"]
             print("\n".join(lines))
             return 0
+        elif args.cmd == "geo-update":
+            from . import fx, geo
+            print("База стран:", "обновлена" if geo.update(config, force=True) else "не скачалась")
+            print("Курсы СНГ:", "обновлены" if fx.refresh(conn, force=True) else "не обновились")
         elif args.cmd == "check":
             supplier = make_supplier(config)
             try:

@@ -761,6 +761,19 @@ def logout(request: Request, conn=Depends(get_conn)):
     return _redirect("/")
 
 
+def _crypto_only(request: Request) -> bool:
+    """Посетитель из СНГ (не Таджикистан): местных способов оплаты у нас нет — только крипта (USDT)."""
+    from . import geo
+    cc = geo.country(request.app.state.config, _ip(request))
+    return bool(cc) and cc != "TJ"
+
+
+def _pay_methods(request: Request, conn, config: Config) -> list[dict]:
+    from . import payments
+    ms = payments.methods(conn, config)
+    return [m for m in ms if m.get("network")] if _crypto_only(request) else ms
+
+
 def _ip(request: Request) -> str:
     # Настоящий адрес уже подставил uvicorn (proxy_headers от nginx на 127.0.0.1).
     # Первое значение X-Forwarded-For пишет сам клиент — по нему лимит входа обходился бы.
@@ -1368,7 +1381,8 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
         "buy": buy,
         "dcv": dcv, "dcv_src": dcvideo.src(config, dcv) if dcv else "",
         "pre_method": request.query_params.get("m", ""),
-        "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
+        "user": user, "methods": _pay_methods(request, conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
+        "crypto_only": _crypto_only(request),
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: payments.method_label(m) for m in conf["stored"] + conf["all_methods"]},
     })
@@ -1592,8 +1606,10 @@ async def binance_webhook(request: Request, conn=Depends(get_conn), config: Conf
 
 @router.get("/currency/{code}")
 def set_currency(code: str, request: Request):
-    """Переключатель USD / TJS: только показ сумм, запоминается в браузере на год."""
-    code = "TJS" if code.upper() == "TJS" else "USD"
+    """Переключатель USD / TJS / валюта СНГ: только показ сумм, запоминается в браузере на год."""
+    from . import fx
+    code = code.upper()
+    code = code if code in ("TJS", *fx.CURRENCIES) else "USD"
     from urllib.parse import urlsplit
     ref = urlsplit(request.headers.get("referer") or "")
     back = (ref.path or "/panel") + (f"?{ref.query}" if ref.query else "")
@@ -1625,6 +1641,9 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     from .tgbot import send_receipt
     from . import rates
     data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
+    if _crypto_only(request) and not any(m["code"] == method for m in _pay_methods(request, conn, config)):
+        flash(request, "Из вашей страны оплата только криптой (USDT) — выберите сеть.", "error")
+        return _redirect("/panel/balance")
     if not data and not payments.is_auto(conn, config, method):
         flash(request, "Прикрепите чек об оплате — фото или PDF. Без чека заявку не проверить.", "error")
         return _redirect("/panel/balance")

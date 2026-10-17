@@ -132,6 +132,10 @@ def _money(ctx, value, digits: int | None = None):
     usd = Decimal(int(value)) / 10_000 if isinstance(value, int) else Decimal(str(value or 0))
     usd_text = fmt(int(value)) if isinstance(value, int) else str(value)
     if ctx.get("cur_code") != "TJS" or not ctx.get("cur_rate"):
+        from . import fx
+        if ctx.get("cur_code") in fx.CURRENCIES and ctx.get("cur_rate"):
+            shown = fx.fmt(usd, ctx["cur_code"], Decimal(str(ctx["cur_rate"])))
+            return Markup(f'<span class="cur-tjs" title="${escape(usd_text)}">{shown}</span>')
         return f"${usd_text}"
     tjs = usd * Decimal(str(ctx["cur_rate"]))
     places = Decimal("0.0001") if digits == 4 or (digits is None and 0 < abs(tjs) < 1) else Decimal("0.01")
@@ -149,6 +153,8 @@ def _dprice(ctx, usd: float) -> str:
     value, sign = float(usd or 0), "$"
     if ctx.get("cur_code") == "TJS" and ctx.get("cur_rate"):
         value, sign = value * float(ctx["cur_rate"]), " с."
+    elif ctx.get("cur_rate") and ctx.get("cur_sym"):
+        value, sign = value * float(ctx["cur_rate"]), " " + ctx["cur_sym"]
     places = 4 if value <= 0 else max(2, min(12, 2 - math.floor(math.log10(value))))
     text = f"{value:.{places}f}"
     return f"${text}" if sign == "$" else f"{text}{sign}"
@@ -317,8 +323,13 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
     ctx["unread"] = 0
     ctx["low_balance_micro"] = 0
-    ctx["cur_code"] = "USD" if request.cookies.get("dx_cur") == "USD" else "TJS"   # по умолчанию сомони
-    ctx["cur_rate"] = None
+    from . import fx, geo
+    ctx["country"] = geo.country(config, request.client.host if request.client else "")
+    ctx["cur_local"] = fx.for_country(ctx["country"])   # посетитель из СНГ — его валюта (только показ)
+    chosen = request.cookies.get("dx_cur", "")
+    ctx["cur_code"] = chosen if chosen in ("USD", "TJS", *fx.CURRENCIES) else (ctx["cur_local"] or "TJS")
+    ctx["cur_rate"] = fx.rate(config, ctx["cur_code"])   # для TJS — ниже, по курсу оплат
+    ctx["cur_sym"], ctx["cur_digits"] = fx.symbol(ctx["cur_code"]), fx.digits(ctx["cur_code"])
     from . import timez
     ctx["tz"], ctx["tz_choice"] = timez.resolve(None, None, request.cookies.get("dx_tz"))
     if ctx.get("user") is not None:

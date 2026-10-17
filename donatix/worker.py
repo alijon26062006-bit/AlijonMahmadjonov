@@ -161,6 +161,12 @@ class Worker:
                         bots.backup_all(self.config)   # раз в сутки — копия базы каждого бота партнёра
                     except Exception:
                         log.exception("копия баз ботов")
+                    try:
+                        from . import fx, geo
+                        fx.refresh(conn)              # раз в сутки — курсы валют СНГ (только показ цен)
+                        geo.update(self.config)       # раз в месяц — база «IP → страна»
+                    except Exception:
+                        log.exception("валюты СНГ / база стран")
                     last_watch = now
                 try:
                     from . import quickbuy

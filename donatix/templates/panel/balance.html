@@ -72,6 +72,8 @@
       <p class="hint" style="margin:8px 0 14px">После оплаты заказ оформится сам — регистрироваться не нужно.</p>
       {% endif %}
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
+      {% if crypto_only %}<div class="flash" role="status"><span>Из вашей страны оплата — <b>криптой (USDT)</b>.
+        Цены показаны в вашей валюте для удобства, списание — в долларах по курсу.</span></div>{% endif %}
       {% if methods %}
       {% set codes = methods | map(attribute='code') | list %}
       {% set pre = pre_method if pre_method in codes else codes[0] %}
