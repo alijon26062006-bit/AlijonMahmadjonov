@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from . import accounts, catalog, db, jumuah, orders, tggifts
+from . import accounts, catalog, db, jumuah, orders, refs, tggifts, tgnotify
 from .config import Config
 from .deps import get_config, get_conn, templates
 from .support_app import check_init
@@ -172,7 +172,7 @@ async def api_history(request: Request, conn=Depends(get_conn), config: Config =
     for g in tggifts.orders(conn, user_id=user["id"], limit=30):
         items.append({"title": f"{g['emoji'] or '🎁'} Gift ⭐{g['star_count']} → {g['recipient'] or '…'}",
                       "price": g["price_micro"], "status": g["status"], "status_title": g["status_title"],
-                      "at": g["created_at"], "ref": f"G{g['id']}",
+                      "at": g["created_at"], "ref": refs.ref("gift", g["id"]),
                       "link": f"https://t.me/{db.get_setting(conn, 'gifts.bot_username') or ''}?start=g_{g['link_token']}"
                       if g["status"] == "awaiting_recipient" else ""})
     items.sort(key=lambda x: x["at"], reverse=True)
@@ -241,7 +241,9 @@ async def api_buy(request: Request, conn=Depends(get_conn), config: Config = Dep
             total = orders.quote(config, user, p, qty)["total_micro"]
             return _need(user, total)
         return {"ok": False, "error": str(exc)}
-    return {"ok": True, "message": "✅ Фармоиш қабул шуд — дар 1–5 дақиқа мерасад. / Заказ принят.",
+    tgnotify.add(conn, "order", order["id"], tg)
+    return {"ok": True, "message": f"✅ Фармоиш № {order['public_id']} қабул шуд — дар 1–5 дақиқа мерасад. "
+                                   f"/ Заказ № {order['public_id']} принят.",
             "order": order["public_id"], "balance": accounts.get_user(conn, user["id"])["balance_micro"]}
 
 
@@ -260,14 +262,16 @@ def _buy_gift(conn, config: Config, user, tg: dict[str, Any], body: dict, to_fri
             g = conn.execute("SELECT star_count FROM tg_gifts WHERE id = ?", (gift_id,)).fetchone()
             return _need(user, tggifts.price_micro(conn, config, user, g["star_count"]) if g else 0)
         return {"ok": False, "error": str(exc)}
+    tgnotify.add(conn, "gift", o["id"], tg)
     bot = db.get_setting(conn, "gifts.bot_username") or ""
-    out = {"ok": True, "balance": accounts.get_user(conn, user["id"])["balance_micro"]}
+    out = {"ok": True, "balance": accounts.get_user(conn, user["id"])["balance_micro"], "ref": refs.ref("gift", o["id"])}
     if o["status"] == "awaiting_recipient":
         out["link"] = f"https://t.me/{bot}?start=g_{o['link_token']}"
-        out["message"] = ("🎁 Пардохт шуд! Ин пайвандро ба дӯстатон фиристед — ӯ Start-ро пахш кунад, тӯҳфа мерасад. "
+        out["message"] = (f"🎁 № {out['ref']}. Пардохт шуд! Ин пайвандро ба дӯстатон фиристед — ӯ Start-ро пахш кунад, тӯҳфа мерасад. "
                           "/ Оплачено! Отправьте ссылку другу — он нажмёт Start и получит подарок.")
     else:
-        out["message"] = "🎁 Тӯҳфа фиристода мешавад — дар чанд сония мерасад. / Подарок отправляется."
+        out["message"] = (f"🎁 № {out['ref']}. Тӯҳфа фиристода мешавад — дар чанд сония мерасад. "
+                          "/ Подарок отправляется.")
     return out
 
 
@@ -344,6 +348,7 @@ async def api_topup(request: Request, conn=Depends(get_conn), config: Config = D
         payments.start_auto(conn, config, pid)
     except payments.PaymentError as exc:
         return {"ok": False, "error": str(exc)}
+    tgnotify.add(conn, "pay", pid, tg)
     row = conn.execute("SELECT auto_kind FROM payments WHERE id = ?", (pid,)).fetchone()
     if not row["auto_kind"]:
         send_receipt(conn, config, pid)

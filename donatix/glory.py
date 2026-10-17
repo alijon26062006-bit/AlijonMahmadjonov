@@ -25,6 +25,7 @@ from typing import Any
 import httpx
 
 from . import accounts, cache, db
+from .refs import ref
 from .config import Config
 
 log = logging.getLogger(__name__)
@@ -193,15 +194,16 @@ def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, region: str
                     (clan_id,)).fetchone():
         raise GloryError("Для этого клана уже работает группа — дождитесь, пока она закончит.")
     with db.tx(conn):
-        try:
-            accounts.post_ledger(conn, user["id"], -reg["price_micro"], f"Glory для клана {clan_id} ({reg['title']})")
-        except accounts.InsufficientBalance:
-            raise GloryError("На балансе не хватает денег — пополните баланс.") from None
         gid = int(conn.execute(
             "INSERT INTO glory_orders (user_id, region, tier, clan_id, price_micro, cost_usd, status, created_at, "
             "updated_at) VALUES (?, ?, ?, ?, ?, ?, 'starting', ?, ?)",
             (user["id"], reg["id"], reg["tier"], clan_id, reg["price_micro"], str(reg["cost"]), db.now(),
              db.now())).lastrowid)
+        try:   # не хватило денег — транзакция откатит и заказ
+            accounts.post_ledger(conn, user["id"], -reg["price_micro"],
+                                 f"Glory для клана {clan_id} ({reg['title']}), заказ {ref('glory', gid)}")
+        except accounts.InsufficientBalance:
+            raise GloryError("На балансе не хватает денег — пополните баланс.") from None
     group_id, bots, err = "", 0, None
     try:
         res = _call(config, "POST", "/api/client/auto-clan-group", {"region": reg["id"], "clan_id": clan_id})
@@ -246,7 +248,7 @@ def _refund(conn: sqlite3.Connection, gid: int, why: str) -> bool:
             return False
         conn.execute("UPDATE glory_orders SET refunded = 1, status = 'failed', note = ?, updated_at = ? WHERE id = ?",
                      (why[:200], db.now(), gid))
-        accounts.post_ledger(conn, g["user_id"], g["price_micro"], f"Возврат: Glory для клана {g['clan_id']}")
+        accounts.post_ledger(conn, g["user_id"], g["price_micro"], f"Возврат: Glory для клана {g['clan_id']}, заказ {ref('glory', g['id'])}")
     return True
 
 

@@ -6,6 +6,7 @@
   <a class="back" href="/admin/users">{{ icon('arrow-left', 18) }}Клиенты</a>
   <h1>{% if guest_code_of and is_guest_account(c) %}Гость {{ guest_code_of }}{% else %}{{ c.login }}{% endif %}</h1>
   <p>{% if guest_code_of %}<span class="badge accent">🛒 купил без регистрации · код {{ guest_code_of }}</span> {% endif %}{{ '' if is_guest_account(c) else c.email ~ ' · ' }}с {{ c.created_at | dt('%d.%m.%Y') }}{% if c.project %} · {{ c.project }}{% endif %}</p>
+  {% for t in telegram %}<p class="small">✈️ Telegram: ID <b>{{ t.tg_id }}</b>{% if t.username %} · <a href="https://t.me/{{ t.username }}" target="_blank" rel="noopener">@{{ t.username }}</a>{% endif %}{% if t.name %} · {{ t.name }}{% endif %}{% if t.last_seen %} · был {{ t.last_seen | dt }}{% endif %}</p>{% endfor %}
 </section>
 <div class="grid two">
   <div class="card reveal">
@@ -73,5 +74,16 @@
     <td><span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span></td>
     <td class="small">{{ o.created_at | dt }}</td></tr>
   {% else %}<tr><td colspan="5" class="muted">Заказов нет.</td></tr>{% endfor %}
+</table></div>
+
+<h2 style="margin-top:28px" id="purchases">Glory, виртуальные номера, подарки Telegram</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Заказ</th><th>Что</th><th class="num">Сумма</th><th>Статус</th><th>Создан</th></tr>
+  {% for o in other %}
+  <tr><td><b>{{ o.ref }}</b></td><td>{{ o.title }}{% if o.note %}<div class="small muted">{{ o.note }}</div>{% endif %}</td>
+    <td class="num">${{ fmt(o.price_micro) }}</td>
+    <td><span class="badge {{ 'bad' if o.bad else ('ok' if o.ok else 'warn') }}">{{ o.status }}</span>{% if o.refunded %} <span class="badge">деньги вернули</span>{% endif %}</td>
+    <td class="small">{{ o.created_at | dt }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Нет.</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

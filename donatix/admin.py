@@ -320,7 +320,10 @@ def users(request: Request, status: str = "", q: str = "", admin=Depends(admin_u
         args.append(status)
     if q:
         from .quickbuy import by_code
+        from . import refs
         guest = by_code(conn, q)   # код покупателя без регистрации: G-7K3M9Q
+        # номер заказа GL-/VN-/GF-, Telegram ID или @ник — сразу в профиль клиента
+        guest = guest if guest is not None else refs.owner(conn, q) or refs.user_by_telegram(conn, q)
         if guest is not None:
             return _back(f"/admin/users/{guest}")
         where += " AND (email LIKE ? OR login LIKE ?)"
@@ -339,8 +342,10 @@ def user_detail(user_id: int, request: Request, admin=Depends(admin_user), conn=
     if client is None:
         flash(request, "Нет такого пользователя.", "error")
         return _back("/admin/users")
+    from . import refs
     from .quickbuy import code_of
     return render(request, "admin/user.html", {
+        "other": refs.history(conn, user_id), "telegram": refs.telegram_of(conn, user_id),
         "user": admin, "c": client, "tiers": TIERS, "markups": config.markups, "guest_code_of": code_of(conn, user_id),
         "effective_markup": accounts.markup_for(client, config),
         "txs": conn.execute("SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT 30",
@@ -432,6 +437,10 @@ def orders_list(request: Request, status: str = "", q: str = "", period: str = "
         where += " AND o.status = ?"
         args.append(status)
     if q:
+        from . import refs
+        owner = refs.owner(conn, q)   # GL-/VN-/GF- — эти покупки в профиле клиента
+        if owner is not None:
+            return _back(f"/admin/users/{owner}#purchases")
         where += " AND (o.public_id LIKE ? OR o.supplier_order_id LIKE ? OR o.product_name LIKE ? OR u.login LIKE ?)"
         args += [f"%{q}%"] * 4
     # Сначала «требуют внимания», потом свежие. Двумя запросами по индексам — без сортировки всей таблицы

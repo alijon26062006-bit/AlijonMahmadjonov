@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-hero"><h1>Заказы</h1></section>
 <form class="card" method="get"><div class="filters">
-  <div class="full"><input type="search" aria-label="Поиск" id="q" name="q" value="{{ q }}" placeholder="dx-…, ord-…, товар, клиент"></div>
+  <div class="full"><input type="search" aria-label="Поиск" id="q" name="q" value="{{ q }}" placeholder="dx-…, GL-…, VN-…, GF-…, ord-…, товар, клиент"></div>
   <div><label class="label-caps" for="status">Статус</label>
     <select id="status" name="status"><option value="">Все</option>
       {% for s in ['attention', 'processing', 'completed', 'failed'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ status_titles[s] }}</option>{% endfor %}

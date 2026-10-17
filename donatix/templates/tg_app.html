@@ -555,7 +555,7 @@ async function history() {
   const sh = sheet(`<h3>${t("hist")}</h3><div id="hl"><div class="skel"></div></div>`);
   const r = await api("history");
   sh.querySelector("#hl").innerHTML = (r.items || []).length ? r.items.map(i => `<div class="hist-i"><div><b>${esc(i.title)}</b>
-      <div class="mut">${ago(i.at)} · ${esc(i.status_title || i.status)}</div>${i.link ? `<button class="chip" style="width:auto;padding:0 12px;margin-top:6px" data-act="share" data-v="${esc(i.link)}">${t("share")}</button>` : ""}</div>
+      <div class="mut">№ ${esc(i.ref)} · ${ago(i.at)} · ${esc(i.status_title || i.status)}</div>${i.link ? `<button class="chip" style="width:auto;padding:0 12px;margin-top:6px" data-act="share" data-v="${esc(i.link)}">${t("share")}</button>` : ""}</div>
       <b class="num">${microTjs(i.price)}</b></div>`).join("") : `<p class="mut">${t("empty")}</p>`;
 }
 

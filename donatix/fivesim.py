@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from . import accounts, cache, db
+from .refs import ref
 from .config import Config
 
 log = logging.getLogger(__name__)
@@ -242,15 +243,15 @@ def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, service: st
         raise FiveSimError("В этой стране сейчас нет номеров — выберите другую.")
     title = f"{product_title(service)} · {country_title(country)}"
     with db.tx(conn):
-        try:
-            accounts.post_ledger(conn, user["id"], -q["price_micro"], f"Виртуальный номер {title}")
-        except accounts.InsufficientBalance:
-            raise FiveSimError("На балансе не хватает денег — пополните баланс.") from None
         vid = int(conn.execute(
             "INSERT INTO vnumbers (user_id, service, country, price_micro, cost, status, kind, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)",
             (user["id"], service, country, q["price_micro"], str(q["cost"]), "hosting" if rent else "activation",
              db.now(), db.now())).lastrowid)
+        try:   # не хватило денег — транзакция откатит и заказ
+            accounts.post_ledger(conn, user["id"], -q["price_micro"], f"Виртуальный номер {title}, заказ {ref('vnum', vid)}")
+        except accounts.InsufficientBalance:
+            raise FiveSimError("На балансе не хватает денег — пополните баланс.") from None
     try:
         if rent:   # аренда — у самого дешёвого оператора из свежей цены: заплатим ровно то, что видел клиент
             res = _get(config, f"/user/buy/hosting/{country}/{q['operator']}/{service}")
@@ -280,7 +281,7 @@ def _refund(conn: sqlite3.Connection, vid: int, why: str, status: str) -> bool:
         conn.execute("UPDATE vnumbers SET refunded = 1, status = ?, note = ?, updated_at = ? WHERE id = ?",
                      (status, why[:200], db.now(), vid))
         accounts.post_ledger(conn, v["user_id"], v["price_micro"],
-                             f"Возврат: виртуальный номер {product_title(v['service'])} — {why[:80]}")
+                             f"Возврат: виртуальный номер {product_title(v['service'])}, заказ {ref('vnum', vid)} — {why[:80]}")
     from .notify import notify
     notify(conn, None, v["user_id"], f"Номер {v['phone'] or ''} — код не пришёл, деньги вернулись на баланс.",
            f"/panel/numbers/{vid}")

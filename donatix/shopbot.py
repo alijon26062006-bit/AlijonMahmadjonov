@@ -634,9 +634,10 @@ def broadcast(config: Config, text: str, api: Callable[..., Any] | None = None) 
 # ── Бот ──
 
 class ShopBot:
-    def __init__(self, config: Config, supplier: Any, api: Callable[..., Any] | None = None):
+    def __init__(self, config: Config, supplier: Any, api: Callable[..., Any] | None = None, gift: Any = None):
         from .tgbot import TelegramApi
         self.config = config
+        self.gift = gift   # GiftBot на том же токене: кнопка меню → мини-приложение, подарки, /topup
         self.supplier = supplier
         self.api = api or TelegramApi(config.shop_bot_token)
         self.state: dict[int, dict[str, Any]] = {}
@@ -742,11 +743,14 @@ class ShopBot:
             log.info("бот-магазин запущен: @%s", me.get("username"))
         except Exception as exc:
             log.warning("бот-магазин: %s", exc)
+        if self.gift is not None:
+            self.gift.setup(commands=False)   # синяя кнопка меню открывает мини-приложение
+        allowed = ["message", "callback_query"] + (["pre_checkout_query"] if self.gift is not None else [])
         try:
             while not self._stop.is_set():
                 try:
                     updates = self.api("getUpdates", offset=offset, timeout=POLL_SECONDS,
-                                       allowed_updates=["message", "callback_query"]) or []
+                                       allowed_updates=allowed) or []
                 except Exception as exc:
                     log.warning("бот-магазин: %s", exc)
                     self._stop.wait(10)
@@ -785,6 +789,8 @@ class ShopBot:
 
     # входящие
     def handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
+        if self.gift is not None and self.gift.special(conn, upd):   # подарок по ссылке, оплата Stars, /topup
+            return
         if "callback_query" in upd:
             cq = upd["callback_query"]
             msg = cq.get("message") or {}

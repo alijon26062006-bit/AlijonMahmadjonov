@@ -235,17 +235,19 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 support = TicketBot(config)
                 support.start()
                 started.append(support)
+            # Один токен у бота-магазина и мини-приложения: сообщения читает бот-магазин (на /start — игры,
+            # как раньше), мини-приложение открывается синей кнопкой меню, подарки и /topup он передаёт GiftBot.
+            shared = bool(config.gift_bot_token) and config.gift_bot_token == config.shop_bot_token
+            gbot = None
             if config.gift_bot_token:
                 from .giftbot import GiftBot   # мини-приложение Stars / Premium / Подарки
                 gbot = GiftBot(config)
-                gbot.start()
-                started.append(gbot)
-            if config.shop_bot_token and config.shop_bot_token == config.gift_bot_token:
-                # Один токен на два бота — они перехватывают сообщения друг у друга. Оставляем мини-приложение.
-                log.warning("DONATIX_SHOP_BOT_TOKEN совпадает с DONATIX_GIFT_BOT_TOKEN — бот-магазин не запущен")
-            elif config.shop_bot_token:
+                if not shared:
+                    gbot.start()
+                    started.append(gbot)
+            if config.shop_bot_token:
                 from .shopbot import ShopBot
-                shop = ShopBot(config, supplier)
+                shop = ShopBot(config, supplier, gift=gbot if shared else None)
                 shop.start()
                 started.append(shop)
             if config.run_bots:

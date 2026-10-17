@@ -3,7 +3,7 @@
 {% block title %}Номер {{ n.phone }} — {{ site_name }}{% endblock %}
 {% block content %}
 <a class="back" href="/panel/numbers">{{ icon('arrow-left', 18) }}Виртуальные номера</a>
-<section class="page-hero vn-head">{% if n.rent %}<span class="vn-rent-big" aria-hidden="true">⏱</span>{% else %}{{ service_logo(n.service_key, 44) }}{% endif %}<h1>{{ n.service }} · <span aria-hidden="true">{{ n.flag }}</span> {{ n.country }}</h1></section>
+<section class="page-hero vn-head">{% if n.rent %}<span class="vn-rent-big" aria-hidden="true">⏱</span>{% else %}{{ service_logo(n.service_key, 44) }}{% endif %}<h1>{{ n.service }} · <span aria-hidden="true">{{ n.flag }}</span> {{ n.country }}</h1><p class="muted small">Заказ № VN-{{ n.id }}</p></section>
 
 <div class="card vn-card" id="vn" data-id="{{ n.id }}" data-open="{{ 1 if n.open else 0 }}">
   <div class="label-caps">Номер</div>

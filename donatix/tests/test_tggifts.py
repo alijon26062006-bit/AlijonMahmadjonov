@@ -316,3 +316,100 @@ def test_admin_topup_link(client, conn, monkeypatch, app, gcfg):
     assert seen["method"] == "createInvoiceLink" and seen["currency"] == "XTR" and seen["prices"][0]["amount"] == 250
     r = client.post("/admin/gifts/topup", data={"csrf": token, "stars": "0"}, follow_redirects=False)
     assert r.headers["location"].endswith("/admin/gifts")
+
+
+def test_mini_app_notifies_topup_and_order(tgclient, conn, gcfg, fake, monkeypatch):
+    """Решили заявку / выполнили заказ — бот мини-приложения сам пишет человеку."""
+    from donatix import payments, tgnotify
+    msgs = []
+    orig = fake.__call__
+
+    def call(config, method, _timeout=20, **p):
+        if method == "sendMessage":
+            msgs.append(p)
+            return {}
+        return orig(config, method, _timeout, **p)
+    monkeypatch.setattr(tggifts, "call", call)
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    monkeypatch.setattr(payments, "read_receipt", lambda *a, **k: None)
+    payments.save_methods(conn, [
+        {"code": "dc", "title": "Душанбе Сити", "currency": "TJS", "details": "Карта 4444 5555 6666 7777", "enabled": True}])
+    h = {"X-Tg-Init": _init(TOKEN, {"id": 9201, "first_name": "N", "language_code": "ru"})}
+    def topup(i):
+        r = tgclient.post("/tg/api/topup", data={"method": "dc", "amount_tjs": "20"}, headers=h,
+                          files={"receipt": ("chek.png", b"\x89PNG\r\n\x1a\n" + bytes([i]) * 64, "image/png")}).json()
+        assert r["ok"], r
+        return conn.execute("SELECT max(id) FROM payments").fetchone()[0]
+    p1 = topup(1)
+    assert tgnotify.tick(conn, gcfg) == 0 and msgs == []                      # пока ждём — молчим
+    admin = accounts.create_user(conn, email="adm@example.com", login="adm", password="password123", status="active")
+    assert payments.confirm(conn, gcfg, p1, admin)
+    assert len(msgs) == 1 and msgs[0]["chat_id"] == 9201 and "Оплата принята" in msgs[0]["text"]
+    p2 = topup(2)
+    assert payments.reject(conn, gcfg, p2, admin, "Чек не тот")
+    assert len(msgs) == 2 and "отклонена" in msgs[1]["text"] and "Чек не тот" in msgs[1]["text"]
+    assert tgnotify.tick(conn, gcfg) == 0 and len(msgs) == 2                 # второй раз не пишем
+    # подарок себе — после отправки «подарок отправлен»
+    tggifts.sync(conn, gcfg, force=True)
+    assert tgclient.post("/tg/api/buy", json={"type": "gift", "gift_id": "g15"}, headers=h).json()["ok"]
+    tggifts.send_pending(conn, gcfg)
+    assert tgnotify.tick(conn, gcfg) == 1 and "Подарок" in msgs[-1]["text"]
+
+
+def test_every_purchase_has_number_and_admin_finds_client(app, tgclient, conn, gcfg, fake):
+    """GF-/GL-/VN- номер у каждой покупки; админ находит клиента по номеру, Telegram ID и @нику."""
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import refs
+    assert refs.parse("gl12") == ("glory", 12) and refs.parse("#VN-7") == ("vnum", 7) and refs.parse("dx-1") is None
+    tggifts.sync(conn, gcfg, force=True)
+    h = {"X-Tg-Init": _init(TOKEN, {"id": 9301, "first_name": "Ali", "username": "Ali_Buyer"})}
+    tgclient.post("/tg/api/init", json={}, headers=h)
+    uid = conn.execute("SELECT user_id FROM shop_users WHERE tg_id = 9301").fetchone()[0]
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
+    r = tgclient.post("/tg/api/buy", json={"type": "gift", "gift_id": "g15"}, headers=h).json()
+    assert r["ok"] and r["ref"].startswith("GF-") and r["ref"] in r["message"]
+    note = conn.execute("SELECT note FROM transactions WHERE user_id = ? ORDER BY id DESC", (uid,)).fetchone()[0]
+    assert r["ref"] in note                                                   # номер и в истории баланса
+    hist = tgclient.post("/tg/api/history", json={}, headers=h).json()["items"]
+    assert hist[0]["ref"] == r["ref"]
+    adm = TestClient(app)
+    web_login(adm, "admin@example.com", "adminpass123")
+    for q in (r["ref"], r["ref"].lower(), "9301", "@ali_buyer"):
+        page = adm.get("/admin/users", params={"q": q})
+        assert page.url.path == f"/admin/users/{uid}", q
+    page = adm.get(f"/admin/users/{uid}").text
+    assert r["ref"] in page and "9301" in page and "@ali_buyer" in page
+    assert adm.get("/admin/orders", params={"q": r["ref"]}).url.path == f"/admin/users/{uid}"
+
+
+def test_shared_token_start_shows_shop_gifts_still_work(conn, gcfg, fake, supplier):
+    """Один токен у бота-магазина и мини-приложения: /start — меню с играми (как раньше),
+    ссылка на подарок и оплата Stars (/topup) — у GiftBot, мини-приложение — синей кнопкой меню."""
+    from donatix import giftbot, shopbot
+    calls = []
+
+    class Api:
+        def __call__(self, method, **p):
+            calls.append((method, p))
+            return {"message_id": 1} if method == "sendMessage" else {}
+    cfg = replace(gcfg, shop_bot_token=TOKEN)
+    gb = giftbot.GiftBot(cfg)
+    gift_calls = []
+    gb.api = lambda method, **p: gift_calls.append((method, p)) or {}
+    bot = shopbot.ShopBot(cfg, supplier, api=Api(), gift=gb)
+    chat = {"id": 7001, "type": "private"}
+    frm = {"id": 7001, "first_name": "Ali", "username": "ali7001"}
+    bot.handle(conn, {"update_id": 1, "message": {"chat": chat, "from": frm, "text": "/start"}})
+    assert calls and not gift_calls                       # на /start ответил бот-магазин
+    assert tggifts.find_username(conn, "@ali7001")["tg_id"] == 7001
+    calls.clear()
+    bot.handle(conn, {"update_id": 2, "pre_checkout_query": {"id": "q1", "invoice_payload": tggifts.payload_topup(50)}})
+    assert gift_calls[-1][0] == "answerPreCheckoutQuery" and gift_calls[-1][1]["ok"] and not calls
+    bot.handle(conn, {"update_id": 3, "message": {"chat": chat, "from": frm, "text": "/start g_nope"}})
+    assert not calls                                      # ссылка на подарок — не меню магазина
+    gb.setup(commands=False)
+    assert any(m == "setChatMenuButton" and p["menu_button"]["web_app"]["url"].endswith("/tg") for m, p in gift_calls)
+    assert not any(m in ("setMyCommands", "deleteWebhook") for m, p in gift_calls)

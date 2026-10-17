@@ -69,8 +69,13 @@ class GiftBot:
         return tggifts.call(self.config, method, _timeout=POLL_SECONDS + 10, **payload)
 
     def _setup(self) -> None:
+        self.setup()
+
+    def setup(self, commands: bool = True) -> None:
+        """commands=False — бот общий с ботом-магазином: его команды и вебхук не трогаем."""
         try:
-            self.api("deleteWebhook", drop_pending_updates=False)
+            if commands:
+                self.api("deleteWebhook", drop_pending_updates=False)
             me = self.api("getMe") or {}
             conn = db.connect(self.config.db_path)
             try:
@@ -81,7 +86,8 @@ class GiftBot:
             # Кнопка меню бота сразу открывает мини-приложение
             self.api("setChatMenuButton", menu_button={"type": "web_app", "text": "Donatix",
                                                        "web_app": {"url": app_url(self.config)}})
-            self.api("setMyCommands", commands=[{"command": "start", "description": "Мағоза / Магазин"}])
+            if commands:
+                self.api("setMyCommands", commands=[{"command": "start", "description": "Мағоза / Магазин"}])
             log.info("бот мини-приложения запущен: @%s", me.get("username"))
         except Exception as exc:  # noqa: BLE001
             log.warning("бот мини-приложения: %s", exc)
@@ -112,6 +118,35 @@ class GiftBot:
             conn.close()
 
     # ── входящие ──
+    def special(self, conn, upd: dict[str, Any]) -> bool:
+        """Для общего с ботом-магазином токена: забрать только своё — оплату Stars (/topup),
+        ссылку на подарок /start g_… и /topup. Остальное (обычный /start и т.д.) — бот-магазину."""
+        tggifts.ensure(conn)
+        if "pre_checkout_query" in upd:
+            self.handle(conn, upd)
+            return True
+        msg = upd.get("message") or {}
+        if (msg.get("chat") or {}).get("type") != "private":
+            return False
+        tggifts.remember_user(conn, msg.get("from") or {})   # @ник → ID: подарок другу по нику
+        text = (msg.get("text") or "").strip()
+        if msg.get("successful_payment") and self._topup_payload(msg["successful_payment"].get("invoice_payload")) is not None:
+            self.handle(conn, upd)
+            return True
+        if text.startswith("/topup"):
+            self.handle(conn, upd)
+            return True
+        if text.startswith("/start g_"):
+            tg = msg.get("from") or {}
+            o = tggifts.claim_link(conn, text.split(maxsplit=1)[1][2:], tg)
+            lang = lang_of(tg)
+            if o:
+                self.api("sendMessage", chat_id=msg["chat"]["id"],
+                         text=T[lang]["claimed"].format(name=tg.get("first_name") or "", stars=o["star_count"])
+                         if o.get("claimed") else T[lang]["claim_old"])
+            return True
+        return False
+
     def handle(self, conn, upd: dict[str, Any]) -> None:
         if "pre_checkout_query" in upd:
             q = upd["pre_checkout_query"]

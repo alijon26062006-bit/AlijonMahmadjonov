@@ -30,6 +30,7 @@ from typing import Any
 import httpx
 
 from . import accounts, db
+from .refs import ref
 from .config import Config
 
 log = logging.getLogger("donatix.gifts")
@@ -301,15 +302,15 @@ def buy(conn: sqlite3.Connection, config: Config, user: Any, gift_id: str, *, re
     status = "paid" if recipient_id else "awaiting_recipient"
     now = db.now()
     with db.tx(conn):
-        try:
-            accounts.post_ledger(conn, user["id"], -price, f"Подарок Telegram ⭐{g['star_count']}")
-        except accounts.InsufficientBalance:
-            raise GiftError("На балансе не хватает денег — пополните баланс.") from None
         oid = int(conn.execute(
             "INSERT INTO gift_orders (user_id, gift_id, star_count, price_micro, cost_micro, recipient_id, recipient, "
             "text, link_token, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user["id"], g["id"], g["star_count"], price, cost, recipient_id, recipient[:64] or None, text or None,
              token, status, now, now)).lastrowid)
+        try:   # не хватило денег — транзакция откатит и заказ
+            accounts.post_ledger(conn, user["id"], -price, f"Подарок Telegram ⭐{g['star_count']}, заказ {ref('gift', oid)}")
+        except accounts.InsufficientBalance:
+            raise GiftError("На балансе не хватает денег — пополните баланс.") from None
     return get(conn, oid)
 
 
@@ -343,7 +344,7 @@ def refund(conn: sqlite3.Connection, oid: int, reason: str, *, status: str = "re
                             f"WHERE id = ? AND status IN ({','.join('?' * len(allowed))})",
                             (status, reason, db.now(), oid, *allowed)).rowcount:
             return False
-        accounts.post_ledger(conn, o["user_id"], o["price_micro"], f"Возврат: подарок Telegram #{oid}")
+        accounts.post_ledger(conn, o["user_id"], o["price_micro"], f"Возврат: подарок Telegram, заказ {ref('gift', oid)}")
     return True
 
 

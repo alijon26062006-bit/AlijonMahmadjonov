@@ -174,6 +174,11 @@ class Worker:
                 except Exception:
                     log.exception("подарки Telegram")
                 try:
+                    from . import tgnotify
+                    tgnotify.tick(conn, self.config)  # мини-приложение: «оплата принята / отклонена», «заказ готов»
+                except Exception:
+                    log.exception("уведомления мини-приложения")
+                try:
                     from . import quickbuy
                     quickbuy.run_pending(conn, self.config, self.supplier)   # оплатили покупку — оформить заказ
                 except Exception:

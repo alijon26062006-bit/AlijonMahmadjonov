@@ -62,7 +62,7 @@
   {% for n in mine %}
   <a class="item" href="/panel/numbers/{{ n.id }}">
     {% if n.rent %}<span class="vn-rent-ico" aria-hidden="true">⏱</span>{% else %}{{ service_logo(n.service_key, 32, 'vn-item-logo') }}{% endif %}
-    <span class="grow"><b>{{ n.flag }} {{ n.service }} · {{ n.country }}</b><span class="sub">{{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
+    <span class="grow"><b>{{ n.flag }} {{ n.service }} · {{ n.country }}</b><span class="sub">№ VN-{{ n.id }} · {{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
     <span class="amount">{{ money(n.price_micro) }}</span>
   </a>
   {% endfor %}

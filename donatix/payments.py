@@ -499,6 +499,12 @@ def _tell_shop_buyer(conn: sqlite3.Connection, config: Config, payment_id: int) 
     except Exception:  # noqa: BLE001 — сообщение в бот не должно мешать зачислению
         import logging
         logging.getLogger(__name__).exception("бот-магазин: уведомление о заявке #%s", payment_id)
+    try:
+        from .tgnotify import push
+        push(conn, config, "pay", payment_id)   # мини-приложение /tg
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("мини-приложение: уведомление о заявке #%s", payment_id)
 
 
 def mark_fake(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, *, who: str = "") -> int:
