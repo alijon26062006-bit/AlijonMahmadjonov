@@ -155,6 +155,7 @@ async def api_init(request: Request, conn=Depends(get_conn), config: Config = De
                 "link": f"https://t.me/{bot}?start=r_{referrals.code_for(conn, user['id'])}" if bot else ""},
         "bot": bot,
         "friday": jumuah.MESSAGE if jumuah.closed(config) else "",
+        "pay": _pay_info(request, conn, config, user),
     }
 
 
@@ -268,3 +269,123 @@ def _buy_gift(conn, config: Config, user, tg: dict[str, Any], body: dict, to_fri
     else:
         out["message"] = "🎁 Тӯҳфа фиристода мешавад — дар чанд сония мерасад. / Подарок отправляется."
     return out
+
+
+# ── Пополнение прямо в мини-приложении (без перехода на сайт) ──────────────
+
+
+def _pay_info(request: Request, conn, config: Config, user) -> dict[str, Any]:
+    """Способы оплаты как на сайте (из СНГ — только крипта), курс и минимум."""
+    from . import dcvideo, payments
+    from .web import _crypto_only, _pay_methods
+    conf = payments.settings(conn, config)
+    methods = [{"code": m["code"], "title": m["title"], "icon": m["icon_url"], "auto": m["auto"],
+                "currency": m["currency"], "net": m["net_short"], "network": m["network"],
+                "details": "" if m["auto"] else m["details"], "min_usd": m["min_usd"], "max_usd": m["max_usd"]}
+               for m in _pay_methods(request, conn, config)]
+    video = dcvideo.needed(conn, user["id"], "site")
+    return {"methods": methods, "min_tjs": str(conf["min_tjs"]), "min_usd": str(conf["min_usd"]),
+            "crypto_only": _crypto_only(request),
+            "dc_video": dcvideo.src(config, video) if video else ""}
+
+
+def _pay_view(conn, config: Config, pid: int) -> dict[str, Any]:
+    from . import cryptopay, dcbank, payments
+    row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    p = payments.public(conn, config, row)
+    p["left"] = cryptopay.seconds_left(row["created_at"]) if row["auto_kind"] in ("trc20", "bybit") else 0
+    p["receipt_after"] = dcbank.receipt_after_min(conn) * 60 if row["auto_kind"] == "dcbank" else 0
+    return p
+
+
+@router.post("/api/topup/info")
+async def api_topup_info(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    return _pay_info(request, conn, config, _account(conn, tg))
+
+
+@router.post("/api/topup")
+async def api_topup(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Создать заявку: автоплатёж (крипта, «Душанбе Сити · авто») — экран оплаты; обычный перевод — сразу с чеком."""
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    from . import dcvideo, payments, rates
+    from .tgbot import send_receipt
+    from .web import _pay_methods
+    form = await request.form()
+    user = _account(conn, tg)
+    method = str(form.get("method") or "")
+    if not any(m["code"] == method for m in _pay_methods(request, conn, config)):
+        return {"ok": False, "error": "Способ оплаты недоступен."}
+    file = form.get("receipt")
+    data = await file.read(payments.MAX_RECEIPT_BYTES + 1) if file is not None and getattr(file, "filename", "") else b""
+    auto = payments.is_auto(conn, config, method)
+    if auto:
+        data = b""
+        chosen = next((m for m in payments.methods(conn, config) if m["code"] == method), {})
+        if chosen.get("auto") == "dcbank" and dcvideo.needed(conn, user["id"], "site"):
+            if form.get("agree") != "1":
+                return {"ok": False, "error": "Сначала посмотрите видео и отметьте, что поняли.", "video": True}
+            dcvideo.ack(conn, user["id"], "site")
+    elif not data:
+        return {"ok": False, "error": "Прикрепите чек об оплате — фото или PDF."}
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)
+    details = payments.settings(conn, config)["details"].get(method, "")
+    seen = payments.read_receipt(config, data, details) if data else None
+    try:
+        with db.tx(conn):
+            pid = payments.create(conn, config, user, method, str(form.get("amount") or ""), "",
+                                  amount_tjs=str(form.get("amount_tjs") or ""))
+            if data:
+                payments.attach_receipt(conn, config, user["id"], pid, data, seen=seen)
+        payments.start_auto(conn, config, pid)
+    except payments.PaymentError as exc:
+        return {"ok": False, "error": str(exc)}
+    row = conn.execute("SELECT auto_kind FROM payments WHERE id = ?", (pid,)).fetchone()
+    if not row["auto_kind"]:
+        send_receipt(conn, config, pid)
+        return {"ok": True, "done": True, "message": "✅ Чек гирифта шуд — пас аз санҷиш баланс пур мешавад. "
+                                                      "/ Чек получен — после проверки баланс пополнится."}
+    return {"ok": True, "pay": _pay_view(conn, config, pid)}
+
+
+@router.post("/api/topup/status")
+async def api_topup_status(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    from . import cryptopay
+    user = _account(conn, tg)
+    pid = int((await request.json()).get("id") or 0)
+    row = conn.execute("SELECT status, auto_kind FROM payments WHERE id = ? AND user_id = ?", (pid, user["id"])).fetchone()
+    if row is None:
+        return {"status": "missing"}
+    if row["status"] == "pending" and row["auto_kind"]:
+        cryptopay.check_all(conn, config)
+        cryptopay.expire(conn, pid)
+        row = conn.execute("SELECT status FROM payments WHERE id = ?", (pid,)).fetchone()
+    return {"status": row["status"], "balance": accounts.get_user(conn, user["id"])["balance_micro"]}
+
+
+@router.post("/api/topup/receipt")
+async def api_topup_receipt(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """«Душанбе Сити»: перевод не нашёлся сам — клиент присылает чек, админ проверит."""
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    from . import payments
+    from .tgbot import send_receipt
+    form = await request.form()
+    user = _account(conn, tg)
+    pid = int(form.get("id") or 0)
+    file = form.get("receipt")
+    data = await file.read(payments.MAX_RECEIPT_BYTES + 1) if file is not None and getattr(file, "filename", "") else b""
+    try:
+        payments.attach_receipt(conn, config, user["id"], pid, data)
+    except payments.PaymentError as exc:
+        return {"ok": False, "error": str(exc)}
+    send_receipt(conn, config, pid)
+    return {"ok": True, "message": "✅ Чек гирифта шуд — санҷида баланс пур мекунем. / Чек получен, проверим и пополним."}

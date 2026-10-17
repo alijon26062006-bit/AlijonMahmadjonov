@@ -269,3 +269,27 @@ def test_get_updates_passes_telegram_timeout(gcfg, monkeypatch):
     monkeypatch.setattr(tggifts.httpx, "post", post)
     assert giftbot.GiftBot(gcfg).api("getUpdates", offset=0, timeout=25, allowed_updates=["message"]) == []
     assert sent["body"]["timeout"] == 25 and sent["http_timeout"] == giftbot.POLL_SECONDS + 10
+
+
+def test_topup_inside_mini_app(tgclient, conn, gcfg, fake, monkeypatch):
+    from donatix import payments
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    monkeypatch.setattr(payments, "read_receipt", lambda *a, **k: None)
+    payments.save_methods(conn, [
+        {"code": "dc", "title": "Душанбе Сити", "currency": "TJS", "details": "Карта 4444 5555 6666 7777", "enabled": True}])
+    h = {"X-Tg-Init": _init(TOKEN, {"id": 9101, "first_name": "Top", "username": "topper"})}
+    info = tgclient.post("/tg/api/topup/info", json={}, headers=h).json()
+    assert [m["code"] for m in info["methods"]] == ["dc"] and "4444" in info["methods"][0]["details"]
+    r = tgclient.post("/tg/api/topup", data={"method": "dc", "amount_tjs": "20"}, headers=h).json()
+    assert r["ok"] is False and "чек" in r["error"]                         # без чека — нельзя
+    r = tgclient.post("/tg/api/topup", data={"method": "dc", "amount_tjs": "20"}, headers=h,
+                      files={"receipt": ("chek.png", b"\x89PNG\r\n\x1a\n" + b"0" * 64, "image/png")}).json()
+    assert r["ok"] and r["done"], r
+    uid = conn.execute("SELECT user_id FROM shop_users WHERE tg_id = 9101").fetchone()[0]
+    p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (uid,)).fetchone()
+    assert p["pay_amount"] == "20.00" and p["receipt_file"]
+    assert tgclient.post("/tg/api/topup/status", json={"id": p["id"]}, headers=h).json()["status"] == "pending"
+    other = {"X-Tg-Init": _init(TOKEN, {"id": 9102, "first_name": "Other"})}
+    assert tgclient.post("/tg/api/topup/status", json={"id": p["id"]}, headers=other).json()["status"] == "missing"
+    r = tgclient.post("/tg/api/topup", data={"method": "nope", "amount_tjs": "20"}, headers=h).json()
+    assert r["ok"] is False

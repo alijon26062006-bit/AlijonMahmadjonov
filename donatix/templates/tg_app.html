@@ -178,6 +178,24 @@ nav.tabs button.on svg { transform: translateY(-1px); }
 @keyframes sk { to { background-position: -200% 0; } }
 .hist-i { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .hist-i:last-child { border-bottom: 0; }
+.pm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pm button { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 12px; text-align: left;
+  border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.pm button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pm img { width: 36px; height: 36px; border-radius: 10px; object-fit: contain; flex: none; background: var(--surface-2); }
+.pm b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; } .pm small { color: var(--muted); font-size: 12px; }
+.copyrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; margin-top: 10px;
+  border-radius: var(--r-sm); background: var(--surface-2); }
+.copyrow .v { font-weight: 700; font-size: 17px; word-break: break-all; } .copyrow small { display: block; color: var(--muted); font-size: 13px; }
+.copybtn { flex: none; min-height: 40px; padding: 0 12px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 14px; }
+.status { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-size: 14px; }
+.status.ok { background: var(--ok-soft); color: var(--ok); }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: rot .8s linear infinite; flex: none; }
+@keyframes rot { to { transform: rotate(360deg); } }
+.file { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; margin-top: 12px; border-radius: var(--r);
+  border: 1.5px dashed var(--line-strong); color: var(--muted); font-weight: 600; cursor: pointer; }
+.file input { display: none; }
+.note { font-size: 14px; color: var(--muted); margin: 10px 2px 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -223,7 +241,14 @@ const L = {
     need: "Маблағ кифоя нест: боз {s} сомонӣ лозим. Пур кунем?", yes: "Пур кардан", no: "Не",
     ref_text: "Пайванди шумо — дӯстон аз он ворид шаванд, аз ҳар хариди онҳо {p}% ба баланси шумо:", invited: "Даъватшудагон",
     friend_link: "Пайвандро ба дӯстатон фиристед:", empty: "Ҳоло холӣ", ago_m: "{n} дақ пеш", ago_h: "{n} соат пеш", ago_d: "{n} рӯз пеш", now: "ҳозир",
-    indep: "Donatix — хизматрасонии мустақил, бо Telegram алоқаманд нест.", gift_to: "Тӯҳфа" },
+    indep: "Donatix — хизматрасонии мустақил, бо Telegram алоқаманд нест.", gift_to: "Тӯҳфа",
+    pay_method: "Тарзи пардохт", sum_tjs: "Маблағ, сомонӣ", sum_usd: "Маблағ, USDT", next: "Идома", min: "Камаш {v}",
+    crypto_only: "Аз кишвари шумо пардохт танҳо бо крипто (USDT).", to_pay_exact: "Маҳз ин маблағро фиристед",
+    address: "Суроға", network: "Шабака", amount: "Маблағ", left_t: "Вақт: {t}", waiting: "Пардохтро интизорем…",
+    paid_ok: "✅ Баланс пур шуд!", go_pay: "Гузаштан ба пардохт", i_paid: "Ман пардохт кардам", searching: "Пардохтро ҷустуҷӯ мекунем…",
+    receipt: "Чекро бор кунед (акс ё PDF)", send_receipt: "Фиристодани чек", details: "Реквизитҳо", transfer: "Ба ин реквизитҳо гузаронед ва чекро бор кунед",
+    not_found: "Пардохт ҳоло ёфт нашуд. Агар пардохт карда бошед — чекро фиристед.", watch: "Видео-дастур", agree: "Видеоро дидам, фаҳмидам",
+    expired: "Вақт гузашт — дархости нав кунед.", choose: "Интихоб кунед" },
   ru: { hi: "Привет,", t_home: "Главная", t_gifts: "Подарки", t_profile: "Профиль", balance: "Ваш баланс", som: "сомони",
     topup: "Пополнить", history: "История", fast: "Мгновенно", months: "3 · 6 · 12 мес", from_bot: "От имени бота",
     invite: "Пригласите друзей", invite_sub: "{p}% с каждой покупки друга — вам", recent: "Последние покупки",
@@ -238,7 +263,14 @@ const L = {
     need: "Не хватает {s} сомони. Пополнить баланс?", yes: "Пополнить", no: "Нет",
     ref_text: "Ваша ссылка — друзья заходят по ней, и {p}% с каждой их покупки идёт вам на баланс:", invited: "Приглашено",
     friend_link: "Отправьте ссылку другу:", empty: "Пока пусто", ago_m: "{n} мин назад", ago_h: "{n} ч назад", ago_d: "{n} дн назад", now: "сейчас",
-    indep: "Donatix — независимый сервис, не связан с Telegram.", gift_to: "Подарок" },
+    indep: "Donatix — независимый сервис, не связан с Telegram.", gift_to: "Подарок",
+    pay_method: "Способ оплаты", sum_tjs: "Сумма, сомони", sum_usd: "Сумма, USDT", next: "Продолжить", min: "Минимум {v}",
+    crypto_only: "Из вашей страны оплата только криптой (USDT).", to_pay_exact: "Переведите ровно эту сумму",
+    address: "Адрес", network: "Сеть", amount: "Сумма", left_t: "Осталось: {t}", waiting: "Ждём оплату…",
+    paid_ok: "✅ Баланс пополнен!", go_pay: "Перейти к оплате", i_paid: "Я оплатил", searching: "Ищем ваш платёж…",
+    receipt: "Прикрепите чек (фото или PDF)", send_receipt: "Отправить чек", details: "Реквизиты", transfer: "Переведите по реквизитам и прикрепите чек",
+    not_found: "Платёж пока не найден. Если вы оплатили — отправьте чек.", watch: "Видео-инструкция", agree: "Посмотрел видео, всё понятно",
+    expired: "Время вышло — создайте новую заявку.", choose: "Выберите" },
 };
 const t = (k, v) => (L[LANG][k] || k).replace(/\{(\w+)\}/g, (_, x) => (v && v[x] !== undefined ? v[x] : ""));
 document.querySelectorAll("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
@@ -366,7 +398,7 @@ function profile() {
   </div>`;
 }
 
-const VIEWS = {home, stars, premium, gifts, profile};
+const VIEWS = {home, stars, premium, gifts, profile, topup: topupView};
 function render() {
   $("#view").innerHTML = VIEWS[TAB]();
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
@@ -425,9 +457,98 @@ async function done(r) {
   toast(r.error || "Хато", "err");
 }
 
-async function topup(need) {
-  const r = await api("session", {need: need || ""});
-  if (r.url) location.href = r.url; else toast(r.error || "Хато", "err");
+// ── пополнение в мини-приложении ──
+const P = {method: null, amount: "", pay: null, poll: null, agree: false};
+function topup(need) {
+  closeSheet();
+  P.method = P.method || (D.pay.methods[0] || {}).code || null; P.pay = null;
+  if (need) { const tjs = Math.ceil(+need / 10000 * rate()); P.amount = String(Math.max(tjs, +D.pay.min_tjs || 0)); }
+  TAB = "topup"; render(); window.scrollTo({top: 0});
+}
+const curM = () => D.pay.methods.find(m => m.code === P.method) || {};
+const isCrypto = m => !!m.network;
+function topupView() {
+  if (P.pay) return payView();
+  const m = curM(), cr = isCrypto(m);
+  const methods = D.pay.methods.map(x => `<button class="${x.code === P.method ? "on" : ""}" data-act="pm" data-v="${esc(x.code)}">
+      ${x.icon ? `<img src="${esc(x.icon)}" alt="">` : `<span class="ic" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)">${IC.card}</span>`}
+      <span><b>${esc(x.title)}</b><small>${x.net ? esc(x.net) + " · " : ""}${x.auto ? "⚡ авто" : (LANG === "ru" ? "чек" : "чек")}</small></span></button>`).join("");
+  const chips = cr ? [5, 10, 25, 50] : [20, 50, 100, 200];
+  const min = cr ? (m.min_usd || D.pay.min_usd) : D.pay.min_tjs;
+  return `<div class="ph"><div class="ic" style="background:var(--accent-soft);color:var(--accent)">${IC.card}</div><div><h1>${t("topup_bal")}</h1><p>${t("balance")}: ${microTjs(D.me.balance)} ${t("som")}</p></div></div>
+    ${D.pay.crypto_only ? `<div class="friday" style="background:var(--accent-soft);color:var(--accent)">${t("crypto_only")}</div>` : ""}
+    <h2 class="sec-title" style="margin-top:8px">${t("pay_method")}</h2><div class="pm">${methods || `<p class="mut">${t("empty")}</p>`}</div>
+    ${m.code ? `<section class="card mt"><label class="label" for="tamt">${cr ? t("sum_usd") : t("sum_tjs")}</label>
+      <div class="field"><input id="tamt" type="number" inputmode="decimal" placeholder="${esc(min)}" value="${esc(P.amount)}"></div>
+      <div class="chips">${chips.map(n => `<button class="chip" data-act="tchip" data-v="${n}">${n}</button>`).join("")}</div>
+      <p class="hint">${t("min", {v: (min || "") + (cr ? " USDT" : " " + t("som"))})}</p>
+      ${!m.auto ? `<div class="copyrow"><div><small>${t("details")}</small><span class="v">${esc(m.details)}</span></div>
+          <button class="copybtn" data-act="copy" data-v="${esc(m.details)}">${t("copy")}</button></div>
+        <p class="note">${t("transfer")}</p>
+        <label class="file"><input type="file" id="trc" accept="image/*,application/pdf">${IC.plus}<span id="trcn">${t("receipt")}</span></label>` : ""}
+      ${m.auto === "dcbank" && D.pay.dc_video ? `<p class="note"><a href="#" data-act="video" style="color:var(--accent)">▶ ${t("watch")}</a></p>
+        <label class="note" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="tagree" ${P.agree ? "checked" : ""}> ${t("agree")}</label>` : ""}
+      <button class="btn primary full mt" data-act="tgo">${m.auto ? t("next") : t("send_receipt")}</button></section>` : ""}`;
+}
+function payView() {
+  const p = P.pay, m = curM();
+  const done = p.status === "paid";
+  let body = "";
+  if (done) body = `<div class="status ok">${t("paid_ok")}</div><button class="btn primary full mt" data-tab="home">OK</button>`;
+  else if (p.status !== "pending") body = `<div class="status" style="background:var(--bad-soft);color:var(--bad)">${t("expired")}</div><button class="btn soft full mt" data-act="tnew">${t("topup")}</button>`;
+  else if (p.auto === "dcbank") body = `
+    <div class="copyrow"><div><small>${t("to_pay_exact")}</small><span class="v num">${esc(p.pay_amount)} ${t("som")}</span></div>
+      <button class="copybtn" data-act="copy" data-v="${esc(p.pay_amount)}">${t("copy")}</button></div>
+    ${p.pay_url ? `<button class="btn primary full mt" data-act="open" data-v="${esc(p.pay_url)}">${t("go_pay")} →</button>` : ""}
+    <button class="btn soft full mt" data-act="tpaid">✓ ${t("i_paid")}</button>
+    <div class="status" id="tstat"><span class="spin"></span>${t("waiting")}</div>
+    <div id="trcbox" class="${P.showReceipt ? "" : "hidden"}"><p class="note">${t("not_found")}</p>
+      <label class="file"><input type="file" id="trc2" accept="image/*,application/pdf">${IC.plus}<span id="trcn2">${t("receipt")}</span></label>
+      <button class="btn primary full mt" data-act="trc2">${t("send_receipt")}</button></div>`;
+  else body = `
+    <div class="copyrow"><div><small>${t("to_pay_exact")}</small><span class="v num">${esc(p.pay_amount)} ${esc(p.pay_currency)}</span></div>
+      <button class="copybtn" data-act="copy" data-v="${esc(p.pay_amount)}">${t("copy")}</button></div>
+    ${p.address ? `<div class="copyrow"><div><small>${t("address")}${p.network_short ? " · " + esc(p.network_short) : ""}</small><span class="v" style="font-size:14px">${esc(p.address)}</span></div>
+      <button class="copybtn" data-act="copy" data-v="${esc(p.address)}">${t("copy")}</button></div>` : ""}
+    ${p.memo ? `<div class="copyrow"><div><small>Memo</small><span class="v">${esc(p.memo)}</span></div><button class="copybtn" data-act="copy" data-v="${esc(p.memo)}">${t("copy")}</button></div>` : ""}
+    ${p.pay_url ? `<button class="btn primary full mt" data-act="open" data-v="${esc(p.pay_url)}">${t("go_pay")} →</button>` : ""}
+    <p class="note">${esc(p.auto_note)}${p.network_note ? " " + esc(p.network_note) : ""}</p>
+    <div class="status" id="tstat"><span class="spin"></span><span>${t("waiting")}</span>${p.left ? ` <b id="tleft" class="num" style="margin-left:auto"></b>` : ""}</div>`;
+  return `<div class="ph"><div class="ic" style="background:var(--accent-soft);color:var(--accent)">${IC.card}</div><div><h1>${esc(p.method_title || m.title || "")}</h1><p>#${p.id}</p></div></div>
+    <section class="card">${body}</section>`;
+}
+function startPoll() {
+  clearInterval(P.poll); if (!P.pay || P.pay.status !== "pending") return;
+  const started = Date.now();
+  P.poll = setInterval(async () => {
+    if (TAB !== "topup" || !P.pay) { clearInterval(P.poll); return; }
+    if (P.pay.left) { const l = Math.max(0, P.pay.left - Math.floor((Date.now() - started) / 1000));
+      const el = document.getElementById("tleft"); if (el) el.textContent = Math.floor(l / 60) + ":" + String(l % 60).padStart(2, "0"); }
+    const r = await api("topup/status", {id: P.pay.id});
+    if (r.status && r.status !== "pending") { P.pay.status = r.status; if (r.balance != null) D.me.balance = r.balance;
+      clearInterval(P.poll); haptic("medium"); render(); }
+  }, 3000);
+}
+async function topupGo(btn) {
+  const m = curM(), cr = isCrypto(m);
+  const v = (document.getElementById("tamt") || {}).value || ""; P.amount = v;
+  const fd = new FormData(); fd.append("method", m.code); fd.append(cr ? "amount" : "amount_tjs", v);
+  const ag = document.getElementById("tagree"); if (ag && ag.checked) fd.append("agree", "1");
+  const f = document.getElementById("trc"); if (f && f.files[0]) fd.append("receipt", f.files[0]);
+  btn.disabled = true;
+  const r = await fetch("/tg/api/topup", {method: "POST", headers: {"X-Tg-Init": INIT}, body: fd}).then(x => x.json()).catch(() => ({error: "Хато"}));
+  btn.disabled = false;
+  if (!r.ok) { toast(r.error || "Хато", "err"); return; }
+  if (r.done) { toast(r.message, "ok"); go("home"); return; }
+  P.pay = r.pay; P.showReceipt = false; render(); startPoll();
+}
+async function sendLateReceipt(btn) {
+  const f = document.getElementById("trc2"); if (!f || !f.files[0]) { toast(t("receipt"), "err"); return; }
+  const fd = new FormData(); fd.append("id", P.pay.id); fd.append("receipt", f.files[0]);
+  btn.disabled = true;
+  const r = await fetch("/tg/api/topup/receipt", {method: "POST", headers: {"X-Tg-Init": INIT}, body: fd}).then(x => x.json()).catch(() => ({}));
+  btn.disabled = false;
+  if (r.ok) { toast(r.message, "ok"); clearInterval(P.poll); P.pay = null; go("home"); } else toast(r.error || "Хато", "err");
 }
 
 async function history() {
@@ -467,6 +588,15 @@ document.addEventListener("click", async (e) => {
   else if (act === "p-to") { S.premTo = v; render(); }
   else if (act === "plan") { S.plan = v; haptic(); render(); }
   else if (act === "gift") giftSheet(v);
+  else if (act === "pm") { P.method = v; P.amount = (document.getElementById("tamt") || {}).value || ""; haptic(); render(); }
+  else if (act === "tchip") { const el = document.getElementById("tamt"); if (el) el.value = v; P.amount = v; haptic(); }
+  else if (act === "tgo") topupGo(a);
+  else if (act === "tnew") { P.pay = null; render(); }
+  else if (act === "open") { tg && tg.openLink ? tg.openLink(v) : window.open(v); }
+  else if (act === "video") { e.preventDefault(); tg && tg.openLink ? tg.openLink(location.origin + D.pay.dc_video) : window.open(D.pay.dc_video); }
+  else if (act === "tpaid") { P.showReceipt = false; const st = document.getElementById("tstat"); if (st) st.lastChild.textContent = t("searching");
+      setTimeout(() => { if (P.pay && P.pay.status === "pending") { P.showReceipt = true; const b = document.getElementById("trcbox"); if (b) b.classList.remove("hidden"); } }, 90000); }
+  else if (act === "trc2") sendLateReceipt(a);
   else if (act === "buy-stars" || act === "buy-premium") {
     const stars_ = act === "buy-stars", pre = stars_ ? "s" : "p";
     const friendEl = document.getElementById(pre + "-friend");
@@ -476,6 +606,10 @@ document.addEventListener("click", async (e) => {
       : {type: "premium", product_id: S.plan, to, username: friendEl ? friendEl.value : "", idem: crypto.randomUUID()});
     a.disabled = false; done(r);
   }
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "trc" || e.target.id === "trc2") { const n = document.getElementById(e.target.id === "trc" ? "trcn" : "trcn2");
+    if (n && e.target.files[0]) n.textContent = "📎 " + e.target.files[0].name; }
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "sq") {
