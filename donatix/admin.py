@@ -747,6 +747,7 @@ def gifts_admin(request: Request, status: str = "", admin=Depends(admin_user), c
         "bot": db.get_setting(conn, "gifts.bot_username") or "", "s": tggifts.settings(conn), "status": status,
         "titles": tggifts.STATUS_TITLES, "counts": counts, "orders": tggifts.orders(conn, status=status, limit=200),
         "gifts": conn.execute("SELECT * FROM tg_gifts ORDER BY active DESC, star_count, sort").fetchall(),
+        "topups": tggifts.topups(conn),
     })
 
 
@@ -760,6 +761,20 @@ def gifts_save(request: Request, markup_pct: str = Form("0"), star_cost_usd: str
     except ValueError as exc:
         flash(request, str(exc), "error")
     return _back("/admin/gifts")
+
+
+@router.post("/gifts/topup", dependencies=[Depends(check_csrf)])
+def gifts_topup(request: Request, stars: str = Form(""), admin=Depends(admin_user), config: Config = Depends(get_config)):
+    """Пополнить Stars бота: счёт в Telegram на N ⭐ — открывается сразу, оплата с вашего аккаунта Telegram."""
+    from fastapi.responses import RedirectResponse
+
+    from . import tggifts
+    try:
+        link = tggifts.topup_link(config, int(stars.strip() or "0"))
+    except (ValueError, tggifts.GiftError) as exc:
+        flash(request, str(exc) if isinstance(exc, tggifts.GiftError) else "Число Stars — цифрами.", "error")
+        return _back("/admin/gifts")
+    return RedirectResponse(link, status_code=303)
 
 
 @router.post("/gifts/sync", dependencies=[Depends(check_csrf)])

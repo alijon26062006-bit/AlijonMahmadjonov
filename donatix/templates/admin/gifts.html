@@ -19,6 +19,20 @@
     <div class="muted small">ошибок: {{ counts.failed or 0 }} · возвратов: {{ counts.refunded or 0 }}</div></div>
 </div>
 
+<form class="card" method="post" action="/admin/gifts/topup" style="margin-top:14px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3 style="margin:0 0 6px">⭐ Пополнить Stars бота</h3>
+  <p class="muted small" style="margin:0 0 10px">Впишите, сколько Stars, и нажмите кнопку — откроется оплата в Telegram.
+    Stars спишутся с вашего аккаунта Telegram и придут на баланс бота{% if bot %} @{{ bot }}{% endif %}.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input name="stars" inputmode="numeric" placeholder="например, 500" style="max-width:180px" required>
+    {% for n in (100, 500, 1000) %}<button class="btn sm" type="button" onclick="this.form.stars.value={{ n }}">{{ n }} ⭐</button>{% endfor %}
+    <button class="btn primary" {{ 'disabled' if not on }}>Пополнить</button>
+  </div>
+  {% if topups %}<div class="muted small" style="margin-top:12px">Последние пополнения:
+    {% for t in topups[:5] %}<span style="margin-right:10px">⭐{{ t.stars }} · {{ t.created_at | dt }}</span>{% endfor %}</div>{% endif %}
+</form>
+
 <form class="card" method="post" action="/admin/gifts" style="margin-top:14px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="grid three" style="gap:12px">

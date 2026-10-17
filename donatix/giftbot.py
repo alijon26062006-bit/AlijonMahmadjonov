@@ -20,7 +20,7 @@ from .config import Config
 
 log = logging.getLogger("donatix.giftbot")
 POLL_SECONDS = 25
-TOPUP_MAX = 10_000
+TOPUP_MAX = tggifts.TOPUP_MAX
 
 
 def admin_ids(config: Config) -> set[str]:
@@ -115,7 +115,8 @@ class GiftBot:
     def handle(self, conn, upd: dict[str, Any]) -> None:
         if "pre_checkout_query" in upd:
             q = upd["pre_checkout_query"]
-            ok = self._topup_payload(q.get("invoice_payload")) is not None and str(q["from"]["id"]) in admin_ids(self.config)
+            # Счёт на пополнение бота: платящий отдаёт свои Stars боту — принимаем от кого угодно (себе во вред не сделать)
+            ok = self._topup_payload(q.get("invoice_payload")) is not None
             self.api("answerPreCheckoutQuery", pre_checkout_query_id=q["id"], ok=ok,
                      error_message=None if ok else "Счёт устарел.")
             return
@@ -130,6 +131,8 @@ class GiftBot:
             sp = msg["successful_payment"]
             n = self._topup_payload(sp.get("invoice_payload"))
             if n is not None:
+                tggifts.record_topup(conn, str(sp.get("telegram_payment_charge_id") or ""), int(tg.get("id") or 0),
+                                     int(sp.get("total_amount") or n))
                 bal = tggifts.star_balance(self.config)
                 self.api("sendMessage", chat_id=chat["id"],
                          text=f"✅ Баланс бота пополнен на ⭐{sp.get('total_amount', n)}."

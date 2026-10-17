@@ -82,6 +82,12 @@ CREATE TABLE IF NOT EXISTS gift_users (          -- кто нажимал Start 
     updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS gift_users_username ON gift_users(username);
+CREATE TABLE IF NOT EXISTS gift_topups (          -- пополнения баланса Stars бота (счёт в XTR)
+    charge_id   TEXT PRIMARY KEY,                    -- telegram_payment_charge_id — один платёж один раз
+    tg_id       INTEGER NOT NULL,
+    stars       INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gift_tx (             -- исходящие покупки подарков из истории Stars бота
     tx_id       TEXT PRIMARY KEY,
     user_id     INTEGER NOT NULL,
@@ -524,3 +530,30 @@ def save_settings(conn: sqlite3.Connection, markup_pct: str, star_cost_usd: str,
 
 def payload_topup(n: int) -> str:
     return json.dumps({"t": "topup", "n": n})
+
+
+TOPUP_MAX = 10_000
+
+
+def topup_link(config: Config, n: int) -> str:
+    """Ссылка на счёт в Stars (XTR): открыл в Telegram, оплатил — Stars ушли с вашего аккаунта на баланс бота."""
+    if not 1 <= n <= TOPUP_MAX:
+        raise GiftError(f"Сколько Stars — от 1 до {TOPUP_MAX}.")
+    try:
+        return str(call(config, "createInvoiceLink", title=f"Пополнение бота на {n} ⭐",
+                        description="Stars для отправки подарков покупателям Donatix.",
+                        payload=payload_topup(n), provider_token="", currency="XTR",
+                        prices=[{"label": f"{n} Stars", "amount": n}]))
+    except (NetError, ApiError) as exc:
+        raise GiftError(f"Telegram не выставил счёт: {exc}") from None
+
+
+def record_topup(conn: sqlite3.Connection, charge_id: str, tg_id: int, stars: int) -> bool:
+    ensure(conn)
+    return bool(conn.execute("INSERT OR IGNORE INTO gift_topups (charge_id, tg_id, stars, created_at) VALUES (?, ?, ?, ?)",
+                             (charge_id or secrets.token_hex(8), tg_id, stars, db.now())).rowcount)
+
+
+def topups(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    ensure(conn)
+    return conn.execute("SELECT * FROM gift_topups ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()

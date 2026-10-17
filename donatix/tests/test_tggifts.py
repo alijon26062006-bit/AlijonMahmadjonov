@@ -236,8 +236,12 @@ def test_bot_topup_only_admin_and_precheckout(conn, gcfg, fake):
     assert inv["currency"] == "XTR" and inv["provider_token"] == "" and inv["prices"][0]["amount"] == 500
     b.handle(conn, {"pre_checkout_query": {"id": "q1", "from": {"id": 111}, "invoice_payload": inv["payload"]}})
     assert ("answerPreCheckoutQuery", {"pre_checkout_query_id": "q1", "ok": True, "error_message": None}) in calls
-    b.handle(conn, {"pre_checkout_query": {"id": "q2", "from": {"id": 222}, "invoice_payload": inv["payload"]}})
-    assert any(m == "answerPreCheckoutQuery" and p["ok"] is False for m, p in calls)
+    b.handle(conn, {"pre_checkout_query": {"id": "q2", "from": {"id": 222}, "invoice_payload": "чужой"}})
+    assert any(m == "answerPreCheckoutQuery" and p["ok"] is False for m, p in calls)    # не наш счёт — отказ
+    b.handle(conn, {"message": {"chat": {"id": 111, "type": "private"}, "from": {"id": 111},
+                                "successful_payment": {"invoice_payload": inv["payload"], "total_amount": 500,
+                                                       "telegram_payment_charge_id": "ch1"}}})
+    assert tggifts.topups(conn)[0]["stars"] == 500
 
 
 def test_bot_start_claims_gift(conn, gcfg, fake):
@@ -293,3 +297,20 @@ def test_topup_inside_mini_app(tgclient, conn, gcfg, fake, monkeypatch):
     assert tgclient.post("/tg/api/topup/status", json={"id": p["id"]}, headers=other).json()["status"] == "missing"
     r = tgclient.post("/tg/api/topup", data={"method": "nope", "amount_tjs": "20"}, headers=h).json()
     assert r["ok"] is False
+
+
+def test_admin_topup_link(client, conn, monkeypatch, app, gcfg):
+    from conftest import web_login
+    app.state.config = gcfg
+    seen = {}
+
+    def fake_call(config, method, _timeout=20, **p):
+        seen.update(method=method, **p)
+        return "https://t.me/$invoice123"
+    monkeypatch.setattr(tggifts, "call", fake_call)
+    token = web_login(client, "admin@example.com", "adminpass123")
+    r = client.post("/admin/gifts/topup", data={"csrf": token, "stars": "250"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "https://t.me/$invoice123"
+    assert seen["method"] == "createInvoiceLink" and seen["currency"] == "XTR" and seen["prices"][0]["amount"] == 250
+    r = client.post("/admin/gifts/topup", data={"csrf": token, "stars": "0"}, follow_redirects=False)
+    assert r.headers["location"].endswith("/admin/gifts")
