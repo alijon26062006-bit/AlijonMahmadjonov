@@ -35,4 +35,37 @@
   {% endif %}
 </div>
 </div>
+
+<div class="card an-card" style="margin-top:16px">
+  <div class="an-head"><h3>Откуда продажи</h3><span class="muted small">{{ a.periods[a.period] }} · выполненные заказы</span></div>
+  <div class="an-rows">
+    {% for c in a.channels %}
+    <div><span>{{ c.title }} <small>{{ c.note }} · {{ c.done }} заказов{% if c.created != c.done %} из {{ c.created }}{% endif %}</small></span>
+      <b>{{ money(c.turnover) }} <small class="muted">· {{ c.share }}% · прибыль {{ money(c.profit) }}</small></b></div>
+    {% endfor %}
+  </div>
+  {% set tot = a.channels | sum(attribute='turnover') %}
+  {% if tot %}
+  <div class="ch-bar" role="img" aria-label="Доли каналов в выручке">
+    {% for c in a.channels if c.turnover %}<span class="ch-{{ c.key }}" style="width: {{ c.share }}%" title="{{ c.title }} {{ c.share }}%"></span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card an-card" style="margin-top:16px">
+  <div class="an-head"><h3>Партнёры: боты и API</h3><span class="muted small">{{ a.periods[a.period] }}</span></div>
+  {% if a.partners %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Партнёр</th><th>Через что</th><th>Заказов</th><th>Выручка</th><th>Прибыль</th></tr></thead>
+    <tbody>
+    {% for p in a.partners %}
+      <tr><td><a href="/admin/users/{{ p.user_id }}">{{ p.login }}</a></td>
+        <td>{% if p.ch == 'pbots' %}🧩 @{{ p.bot or '—' }}{% else %}🔑 {{ p.key_name or 'API-ключ' }}{% endif %}</td>
+        <td>{{ p.done or 0 }}{% if p.created != p.done %} <small class="muted">из {{ p.created }}</small>{% endif %}</td>
+        <td><b>{{ money(p.turnover) }}</b></td><td class="c-done">{{ money(p.profit) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">За этот период партнёры ничего не продали.</p>{% endif %}
+</div>
 {% endblock %}

@@ -76,13 +76,57 @@ def build(conn: sqlite3.Connection, period: str, *, user_id: int | None = None, 
         "COALESCE(SUM(CASE WHEN status = 'completed' THEN total_micro END), 0) AS turnover "
         f"FROM orders WHERE {where} GROUP BY kind ORDER BY turnover DESC", args).fetchall()
 
+    channels, partners = (_channels(conn, where, args) if user_id is None else ([], []))
+
     return {
+        "channels": channels, "partners": partners,
         "period": period, "periods": {k: v[0] for k, v in PERIODS.items()}, "tz_hours": tz_hours,
         "created": t["created"] or 0, "done": t["done"] or 0, "refunded": t["refunded"] or 0,
         "turnover": t["turnover"], "profit": t["profit"], "topped": topped,
         "series": series, "chart": chart(series),
         "by_kind": [{**dict(r), "title": KIND_TITLES.get(r["kind"], r["kind"])} for r in by_kind],
     }
+
+
+# Откуда пришёл заказ: сайт, наш бот, бот партнёра (конструктор) или чужой сайт/бот по API-ключу
+CHANNELS = (("site", "🌐 Сайт", "donatix.tj и мини-приложение"),
+            ("ourbot", "🤖 Наш бот", "бот-магазин Donatix"),
+            ("pbots", "🧩 Боты партнёров", "запущены в конструкторе Donatix"),
+            ("api", "🔑 API партнёров", "их сайты и боты по API-ключу"))
+_CHANNEL_SQL = ("CASE WHEN source IN ('panel', 'quick') THEN 'site' WHEN source = 'shopbot' THEN 'ourbot' "
+                "WHEN api_key_id IN (SELECT api_key_id FROM bots WHERE api_key_id IS NOT NULL) THEN 'pbots' "
+                "WHEN source = 'api' OR api_key_id IS NOT NULL THEN 'api' ELSE 'site' END")
+
+
+def _channels(conn: sqlite3.Connection, where: str, args: list) -> tuple[list[dict], list[dict]]:
+    """Продажи по каналам и по партнёрам (только для админа)."""
+    rows = {r["ch"]: r for r in conn.execute(
+        f"SELECT {_CHANNEL_SQL} AS ch, COUNT(*) AS created, SUM(status = 'completed') AS done, "
+        "COALESCE(SUM(CASE WHEN status = 'completed' THEN total_micro END), 0) AS turnover, "
+        "COALESCE(SUM(CASE WHEN status = 'completed' THEN total_micro - cost_micro END), 0) AS profit "
+        f"FROM orders WHERE {where} GROUP BY ch", args)}
+    total = sum(r["turnover"] for r in rows.values()) or 0
+    channels = []
+    for key, title, note in CHANNELS:
+        r = rows.get(key)
+        turnover = r["turnover"] if r else 0
+        channels.append({"key": key, "title": title, "note": note, "created": r["created"] if r else 0,
+                         "done": (r["done"] or 0) if r else 0, "turnover": turnover,
+                         "profit": r["profit"] if r else 0,
+                         "share": round(turnover / total * 100, 1) if total else 0})
+    pw = " AND ".join(f"o.{part.strip()}" if part.strip().startswith(("created_at", "user_id")) else part
+                      for part in where.split(" AND "))
+    partners = [dict(r) for r in conn.execute(
+        "SELECT o.user_id, u.login, k.name AS key_name, b.username AS bot, "
+        "CASE WHEN b.id IS NOT NULL THEN 'pbots' ELSE 'api' END AS ch, "
+        "COUNT(*) AS created, SUM(o.status = 'completed') AS done, "
+        "COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_micro END), 0) AS turnover, "
+        "COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_micro - o.cost_micro END), 0) AS profit "
+        "FROM orders o JOIN users u ON u.id = o.user_id LEFT JOIN api_keys k ON k.id = o.api_key_id "
+        "LEFT JOIN bots b ON b.api_key_id = o.api_key_id "
+        f"WHERE {pw} AND o.api_key_id IS NOT NULL "
+        "GROUP BY o.user_id, o.api_key_id ORDER BY turnover DESC, created DESC LIMIT 30", args)]
+    return channels, partners
 
 
 def chart(series: list[dict[str, Any]], w: int = 720, h: int = 260) -> dict[str, Any]:

@@ -2480,3 +2480,8 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 /* Пятница 13–14 — покупки закрыты (jumuah.py) */
 .friday-break { padding: 10px 16px; text-align: center; font-weight: 600; font-size: .92rem; color: #052e16;
   background: linear-gradient(90deg, #86efac, #34d399); }
+
+/* Аналитика: доли каналов продаж */
+.ch-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 12px; background: var(--line); }
+.ch-bar span { display: block; height: 100%; }
+.ch-site { background: #6d5efc; } .ch-ourbot { background: #22c55e; } .ch-pbots { background: #ff8a3d; } .ch-api { background: #ec4899; }
