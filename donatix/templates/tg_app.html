@@ -8,170 +8,183 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
 <style>
+/* Цвета и шрифт — как на donatix.tj (static/donatix.css); тема — как у Telegram (светлая / тёмная) */
 :root {
-  --bg: #0e0a1d; --bg2: #140d2a; --card: #1c1438; --card2: #241a47; --line: rgba(255,255,255,.08);
-  --text: #f4f1ff; --mut: #a39cc4; --gold: #ffc94a; --gold2: #ffb020;
-  --acc1: #ff8a3d; --acc2: #ff3d7f; --vio: #7c5cff; --ok: #22c55e; --bad: #ff5c7a;
-  --r: 22px;
+  --bg: #f5f6fa; --surface: #ffffff; --surface-2: #f1f2f7; --field: #f7f8fb; --line: #e7e9f0; --line-strong: #d6d9e3;
+  --text: #121521; --muted: #5e6577;
+  --accent: #4f46e5; --accent-hover: #4338ca; --accent-ink: #ffffff; --accent-soft: #eef0ff; --accent-line: #cdd1fb;
+  --tg: #2481cc; --tg-soft: #e7f2fb; --star: #e8a400; --star-soft: #fdf5e5;
+  --ok: #157347; --ok-soft: #e8f6ee; --bad: #c42b2b; --bad-soft: #fdeeee;
+  --shadow-1: 0 1px 2px rgb(18 21 33 / .04), 0 2px 8px -2px rgb(18 21 33 / .06);
+  --shadow-2: 0 2px 4px rgb(18 21 33 / .04), 0 12px 28px -12px rgb(18 21 33 / .16);
+  --shadow-accent: 0 8px 20px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+  --r-lg: 20px; --r: 16px; --r-sm: 12px;
+  --font: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0e1016; --surface: #161922; --surface-2: #1d212c; --field: #12151d; --line: #262b37; --line-strong: #353b49;
+  --text: #eceef3; --muted: #9ba2b1;
+  --accent: #8b8cf8; --accent-hover: #a5a6fa; --accent-ink: #11122a; --accent-soft: #1e2040; --accent-line: #34376c;
+  --tg: #5cb3f0; --tg-soft: #13253a; --star: #f5b942; --star-soft: #2a2110;
+  --ok: #4ade80; --ok-soft: #12261b; --bad: #f87171; --bad-soft: #2b1616;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .3); --shadow-2: 0 12px 28px -12px rgb(0 0 0 / .6);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 "Onest", system-ui, sans-serif; }
-body { min-height: 100vh; padding: 0 16px calc(110px + env(safe-area-inset-bottom)); overflow-x: hidden;
-  background: radial-gradient(120% 60% at 50% -10%, #2a1660 0%, var(--bg) 55%) fixed; }
-button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); }
+body { min-height: 100dvh; padding: 0 16px calc(104px + env(safe-area-inset-bottom)); overflow-x: hidden; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, textarea { font: inherit; color: var(--text); }
-.h-font { font-family: "Unbounded", "Onest", sans-serif; letter-spacing: -.01em; }
-.mut { color: var(--mut); }
-.gold { color: var(--gold); }
+.num { font-variant-numeric: tabular-nums; }
+.mut { color: var(--muted); }
 .hidden { display: none !important; }
+.star-c { color: var(--star); }
 
-/* шапка */
-.hello { display: flex; align-items: center; gap: 14px; padding: 18px 2px 14px; }
-.ava { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center;
-  font: 700 20px "Unbounded"; color: #1a0b2e; background: linear-gradient(135deg, var(--gold), var(--acc1)); }
-.ava.big { width: 104px; height: 104px; font-size: 38px; margin: 0 auto; box-shadow: 0 0 0 4px #2b1f55, 0 0 0 6px var(--gold); }
-.hello small { display: block; color: var(--mut); font-size: 14px; }
-.hello b { font: 700 22px "Unbounded"; }
+/* шапка: логотип Donatix слева, аватар справа */
+.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 2px 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.brand img { width: 32px; height: 32px; }
+.ava { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center;
+  font-weight: 700; color: var(--accent-ink); background: var(--accent); }
+.ava.big { width: 88px; height: 88px; font-size: 34px; margin: 0 auto; box-shadow: 0 0 0 4px var(--accent-soft); }
+.greet { margin: 4px 2px 14px; font-size: 15px; color: var(--muted); }
+.greet b { color: var(--text); }
 
-/* карточки */
-.card { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line);
-  border-radius: var(--r); padding: 18px; }
-.mt { margin-top: 14px; }
-.sec-title { font: 700 22px "Unbounded"; margin: 26px 2px 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; box-shadow: var(--shadow-1); }
+.mt { margin-top: 12px; }
+.sec-title { font-size: 20px; font-weight: 700; margin: 24px 2px 10px; }
 
-/* главная: баланс */
-.bal { position: relative; overflow: hidden; padding: 22px; border-radius: 26px;
-  background: radial-gradient(120% 120% at 100% 0%, #5b3fd6 0%, #2a1a63 45%, #1a1240 100%);
-  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px -25px rgba(124,92,255,.8); }
-.bal .stars-bg { position: absolute; inset: 0; pointer-events: none; opacity: .9; }
-.bal .lbl { color: #cfc6ff; font-size: 14px; }
-.bal .sum { font: 800 44px/1.1 "Unbounded"; margin: 6px 0 18px; }
-.bal .sum small { font-size: 18px; color: #cfc6ff; font-weight: 700; margin-left: 6px; }
+/* баланс */
+.bal .lbl { color: var(--muted); font-size: 14px; }
+.bal .sum { font-size: 36px; font-weight: 700; line-height: 1.15; margin: 4px 0 16px; letter-spacing: -.02em; }
+.bal .sum small { font-size: 16px; color: var(--muted); font-weight: 600; margin-left: 6px; }
 .row { display: flex; gap: 10px; align-items: center; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 18px;
-  border-radius: 16px; font-weight: 700; font-size: 16px; }
-.btn.gold { background: linear-gradient(90deg, var(--gold), var(--gold2)); color: #1a0b2e; flex: 1; }
-.btn.glass { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); }
-.btn.full { width: 100%; }
-.btn.grad { background: linear-gradient(90deg, var(--gold), var(--acc1)); color: #1a0b2e; width: 100%; height: 56px; font-size: 17px; }
-.btn:disabled { opacity: .45; }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-.tile { text-align: left; padding: 16px 14px; border-radius: 20px; border: 1px solid var(--line);
-  background: linear-gradient(160deg, #2c2150, #1b1338); }
-.tile .ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 18px;
-  background: rgba(255,201,74,.16); color: var(--gold); }
-.tile b { display: block; font: 700 17px "Unbounded"; }
-.tile span { color: var(--mut); font-size: 13px; }
-.invite { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; margin-top: 14px; }
-.invite .ic { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; flex: none;
-  background: rgba(124,92,255,.2); color: #c6b8ff; }
-.invite b { display: block; font-size: 17px; }
-.feed { display: grid; gap: 10px; }
-.fi { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
-.fi .ava { width: 44px; height: 44px; font-size: 16px; }
-.fi .grow { flex: 1; min-width: 0; }
-.fi b { display: block; }
-.fi .what { color: var(--gold); font-size: 14px; }
-.fi time { color: var(--mut); font-size: 13px; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px;
+  border-radius: var(--r); font-weight: 600; font-size: 16px; transition: background .15s var(--ease), transform .1s; }
+.btn:active { transform: scale(.98); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-accent); }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.soft { background: var(--surface-2); border: 1px solid var(--line); }
+.btn.grow { flex: 1; }
+.btn.full { width: 100%; min-height: 54px; font-size: 17px; }
+.btn:disabled { opacity: .45; box-shadow: none; }
+
+/* разделы списком: иконка Telegram-голубая */
+.menu { display: grid; gap: 10px; margin-top: 12px; }
+.mi { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+.mi .ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex: none; background: var(--tg-soft); color: var(--tg); }
+.mi .ic.st { background: var(--star-soft); color: var(--star); }
+.mi .ic.ac { background: var(--accent-soft); color: var(--accent); }
+.mi .grow { flex: 1; min-width: 0; } .mi b { display: block; font-weight: 600; } .mi span { color: var(--muted); font-size: 14px; }
+.mi .go { color: var(--muted); }
+.feed { display: grid; gap: 8px; }
+.fi { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }
+.fi .ava { width: 38px; height: 38px; font-size: 15px; background: var(--accent-soft); color: var(--accent); }
+.fi .grow { flex: 1; min-width: 0; } .fi b { display: block; font-weight: 600; font-size: 15px; }
+.fi .what { color: var(--muted); font-size: 14px; } .fi time { color: var(--muted); font-size: 13px; white-space: nowrap; }
 
 /* заголовок раздела */
-.ph { display: flex; gap: 14px; align-items: center; margin: 6px 2px 16px; }
-.ph .ic { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; flex: none;
-  background: rgba(255,201,74,.14); color: var(--gold); }
-.ph h1 { font: 800 26px/1.1 "Unbounded"; margin: 0 0 4px; }
-.ph p { margin: 0; color: var(--mut); font-size: 14px; }
+.ph { display: flex; gap: 14px; align-items: center; margin: 4px 2px 14px; }
+.ph .ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none; background: var(--tg-soft); color: var(--tg); }
+.ph h1 { font-size: 22px; font-weight: 700; margin: 0; line-height: 1.2; }
+.ph p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 
 /* формы */
-.field { display: flex; align-items: center; gap: 10px; height: 58px; padding: 0 16px; border-radius: 16px;
-  background: rgba(0,0,0,.25); border: 1px solid var(--line); }
-.field input { flex: 1; background: none; border: 0; outline: 0; font-size: 18px; min-width: 0; }
-.field input::placeholder { color: var(--mut); }
+.label { display: block; font-size: 14px; font-weight: 600; color: var(--muted); margin: 0 2px 6px; }
+.field { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border-radius: var(--r);
+  background: var(--field); border: 1px solid var(--line-strong); }
+.field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field input { flex: 1; background: none; border: 0; outline: 0; font-size: 17px; min-width: 0; }
+.field input::placeholder, textarea::placeholder { color: var(--muted); }
 .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-.chip { height: 44px; border-radius: 13px; background: rgba(255,255,255,.07); color: var(--gold); font-weight: 700; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.seg button { height: 50px; border-radius: 14px; background: rgba(255,255,255,.06); font-weight: 600; }
-.seg button.on { background: rgba(255,201,74,.16); color: var(--gold); box-shadow: inset 0 0 0 1px rgba(255,201,74,.35); }
-.hint { color: var(--mut); font-size: 14px; margin: 10px 2px 0; }
-.total { display: flex; justify-content: space-between; align-items: center; margin: 18px 2px 14px; }
-.total span { color: var(--mut); font-size: 16px; }
-.total b { font: 800 26px "Unbounded"; }
-textarea.field { height: auto; min-height: 70px; padding: 14px 16px; width: 100%; resize: none; outline: 0; margin-top: 10px; }
+.chip { min-height: 44px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 14px; padding: 4px; border-radius: var(--r); background: var(--surface-2); }
+.seg button { min-height: 44px; border-radius: var(--r-sm); font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.hint { color: var(--muted); font-size: 14px; margin: 8px 2px 0; }
+.total { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 2px 12px; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
+.total span { color: var(--muted); }
+.total b { font-size: 24px; font-weight: 700; }
+textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none; outline: 0; margin-top: 10px; display: block; }
 
 /* сетки */
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.pack { padding: 16px 8px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); text-align: center; }
-.pack .s { color: var(--gold); font-size: 15px; }
-.pack b { display: block; font: 800 24px "Unbounded"; margin: 4px 0 6px; }
-.pack span { color: var(--gold); font-weight: 700; }
-.gift { padding: 14px 6px 12px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); text-align: center; }
-.gift .pic { width: 84px; height: 84px; margin: 0 auto 6px; display: grid; place-items: center; font-size: 56px; }
+.pack { padding: 14px 6px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow-1); }
+.pack b { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 20px; font-weight: 700; }
+.pack span { display: block; margin-top: 4px; color: var(--accent); font-weight: 600; font-size: 15px; }
+.pack .star-c { display: inline; margin: 0; color: var(--star); font-size: 15px; }
+.pack.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.gift { padding: 12px 6px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow-1); }
+.gift .pic { width: 72px; height: 72px; margin: 0 auto 6px; display: grid; place-items: center; font-size: 48px; }
 .gift .pic img { width: 100%; height: 100%; object-fit: contain; }
-.gift .st { font-weight: 700; }
-.gift .pr { color: var(--gold); font-weight: 700; font-size: 15px; }
-.gift .left { font-size: 11px; color: var(--acc2); }
+.gift .st { font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.gift .pr { color: var(--accent); font-weight: 700; }
+.gift .left { font-size: 12px; color: var(--bad); }
 
 /* Premium */
-.plan { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px;
-  border-radius: 20px; background: var(--card); border: 1px solid var(--line); margin-bottom: 10px; }
-.plan.on { box-shadow: inset 0 0 0 2px var(--gold); }
-.plan .m { width: 62px; height: 62px; border-radius: 15px; background: rgba(255,255,255,.07); display: grid; place-items: center; flex: none; }
-.plan .m b { font: 800 26px/1 "Unbounded"; color: var(--gold); } .plan .m small { font-size: 11px; color: var(--gold); display: block; }
-.plan .grow { flex: 1; }
-.plan .grow b { display: block; font-size: 16px; }
-.badge { display: inline-block; margin-top: 4px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
-  color: var(--gold); background: rgba(255,201,74,.14); }
-.plan .p { text-align: right; } .plan .p b { display: block; font: 800 22px "Unbounded"; } .plan .p small { color: var(--mut); }
+.plan { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px 16px;
+  border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); margin-bottom: 10px; box-shadow: var(--shadow-1); }
+.plan.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.plan .m { width: 52px; height: 52px; border-radius: 14px; background: var(--tg-soft); color: var(--tg); display: grid; place-items: center; flex: none; text-align: center; }
+.plan .m b { font-size: 20px; font-weight: 700; line-height: 1; } .plan .m small { font-size: 11px; display: block; }
+.plan .grow { flex: 1; } .plan .grow b { display: block; font-weight: 600; }
+.badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  color: var(--ok); background: var(--ok-soft); }
+.plan .p { text-align: right; } .plan .p b { display: block; font-size: 18px; font-weight: 700; } .plan .p small { color: var(--muted); font-size: 13px; }
 
 /* профиль */
 .prof { text-align: center; }
-.prof h2 { font: 800 26px "Unbounded"; margin: 14px 0 2px; }
-.idpill { display: inline-flex; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 16px; border-radius: 999px;
-  background: rgba(255,255,255,.07); font-weight: 700; }
-.balrow { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 16px; border-radius: 18px; background: rgba(0,0,0,.25); text-align: left; }
-.balrow .grow { flex: 1; } .balrow b { font: 800 26px "Unbounded"; display: block; }
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-.stat { padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
-.stat b { font: 800 26px "Unbounded"; display: block; }
-.list { margin-top: 14px; border-radius: 20px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
-.li { display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px; text-align: left; border-bottom: 1px solid var(--line); font-size: 17px; }
-.li:last-child { border-bottom: 0; }
-.li .grow { flex: 1; } .li .val { color: var(--mut); }
+.prof h2 { font-size: 22px; font-weight: 700; margin: 12px 0 0; }
+.idpill { display: inline-flex; gap: 8px; align-items: center; margin-top: 10px; min-height: 36px; padding: 0 14px; border-radius: 999px;
+  background: var(--surface-2); font-weight: 600; font-size: 14px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.stat { padding: 14px 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.stat b { font-size: 22px; font-weight: 700; display: block; } .stat span { color: var(--muted); font-size: 14px; }
 
 /* нижнее меню */
-nav.tabs { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20;
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 8px; border-radius: 26px;
-  background: rgba(24,17,48,.92); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1);
-  box-shadow: 0 10px 40px -10px rgba(0,0,0,.8); }
-nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 2px; border-radius: 18px;
-  color: var(--mut); font-size: 12px; font-weight: 600; }
-nav.tabs button.on { color: var(--gold); background: rgba(255,201,74,.12); }
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
+nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; justify-content: center;
+  color: var(--muted); font-size: 12px; font-weight: 600; border-radius: var(--r-sm); }
+nav.tabs button.on { color: var(--accent); }
+nav.tabs button.on svg { transform: translateY(-1px); }
 
 /* окно снизу и тосты */
-.sheet-bg { position: fixed; inset: 0; background: rgba(5,3,12,.6); z-index: 30; }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 88vh; overflow: auto;
-  padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); border-radius: 26px 26px 0 0;
-  background: linear-gradient(180deg, #24194a, #150f2e); border-top: 1px solid rgba(255,255,255,.12); animation: up .22s ease; }
-@keyframes up { from { transform: translateY(40px); opacity: 0; } }
-.sheet .grab { width: 44px; height: 5px; border-radius: 9px; background: rgba(255,255,255,.2); margin: 0 auto 14px; }
-.sheet h3 { font: 800 20px "Unbounded"; margin: 0 0 8px; }
-.toast { position: fixed; left: 16px; right: 16px; top: calc(14px + env(safe-area-inset-top)); z-index: 50; padding: 14px 16px;
-  border-radius: 16px; background: #1f1640; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
-.toast.err { border-color: rgba(255,92,122,.5); } .toast.ok { border-color: rgba(34,197,94,.5); }
-.linkbox { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding: 12px; border-radius: 14px; background: rgba(0,0,0,.3);
+.sheet-bg { position: fixed; inset: 0; background: rgb(0 0 0 / .5); z-index: 30; animation: fade .2s var(--ease); }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 88dvh; overflow: auto;
+  padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: var(--surface);
+  box-shadow: var(--shadow-2); animation: up .24s var(--ease); }
+@keyframes up { from { transform: translateY(32px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+.sheet .grab { width: 40px; height: 5px; border-radius: 9px; background: var(--line-strong); margin: 0 auto 14px; }
+.sheet h3 { font-size: 19px; font-weight: 700; margin: 0 0 6px; }
+.toast { position: fixed; left: 16px; right: 16px; top: calc(12px + env(safe-area-inset-top)); z-index: 50; padding: 12px 14px;
+  border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-2); font-size: 15px; }
+.toast.err { border-color: var(--bad); color: var(--bad); } .toast.ok { border-color: var(--ok); }
+.linkbox { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2);
   word-break: break-all; font-size: 13px; }
-.friday { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(34,197,94,.14); color: #a7f3c0; font-size: 14px; }
-.foot { text-align: center; color: var(--mut); font-size: 12px; margin: 24px 0 0; }
-.skel { height: 120px; border-radius: 22px; background: linear-gradient(90deg, #1c1438, #261b4b, #1c1438); background-size: 200% 100%;
-  animation: sk 1.2s infinite linear; margin-top: 14px; }
+.linkbox .grow { flex: 1; }
+.friday { margin: 0 0 12px; padding: 12px 14px; border-radius: var(--r); background: var(--ok-soft); color: var(--ok); font-size: 14px; }
+.foot { text-align: center; color: var(--muted); font-size: 12px; margin: 24px 0 0; }
+.skel { height: 110px; border-radius: var(--r-lg); background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
+  background-size: 200% 100%; animation: sk 1.2s infinite linear; margin-top: 12px; }
 @keyframes sk { to { background-position: -200% 0; } }
 .hist-i { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .hist-i:last-child { border-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<header class="hello" id="hello"><div class="ava" id="hava">D</div><div><small data-t="hi"></small><b id="hname">…</b></div></header>
+<header class="top"><div class="brand"><img src="/static/logo.svg" alt="" width="32" height="32">Donatix</div>
+  <button aria-label="Профиль" data-tab="profile"><div class="ava" id="hava">D</div></button></header>
+<p class="greet"><span data-t="hi"></span> <b id="hname">…</b></p>
 <div id="friday" class="friday hidden"></div>
 <main id="view"><div class="skel"></div><div class="skel"></div></main>
 <p class="foot" data-t="indep"></p>
@@ -187,7 +200,9 @@ nav.tabs button.on { color: var(--gold); background: rgba(255,201,74,.12); }
 <script>
 (function () {
 const tg = window.Telegram && Telegram.WebApp;
-if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#0e0a1d"); tg.setBackgroundColor("#0e0a1d"); } catch (e) {} }
+const DARK = tg ? tg.colorScheme !== "light" : matchMedia("(prefers-color-scheme: dark)").matches;
+document.documentElement.dataset.theme = DARK ? "dark" : "light";   // тема — как у Telegram
+if (tg) { tg.ready(); tg.expand(); try { const c = DARK ? "#0e1016" : "#f5f6fa"; tg.setHeaderColor(c); tg.setBackgroundColor(c); } catch (e) {} }
 const INIT = tg ? tg.initData : "";
 const START = tg && tg.initDataUnsafe ? (tg.initDataUnsafe.start_param || "") : "";
 const LANG = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && (tg.initDataUnsafe.user.language_code || "").startsWith("ru")) ? "ru" : "tj";
@@ -271,26 +286,20 @@ const IC = {
   plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   target: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>',
 };
-const CONST = '<svg class="stars-bg" viewBox="0 0 400 260" preserveAspectRatio="xMaxYMin slice"><g fill="#fff" opacity=".55">' +
-  Array.from({length: 26}, (_, i) => `<circle cx="${(i * 97) % 400}" cy="${(i * 53) % 260}" r="${i % 3 ? .8 : 1.4}"/>`).join("") +
-  '</g><g stroke="#ffc94a" stroke-width="1.6" opacity=".75" fill="none"><path d="M250 40 L295 70 L340 52 L375 85 L345 138 L290 128 Z"/></g><g fill="#ffc94a">' +
-  '<circle cx="250" cy="40" r="4"/><circle cx="295" cy="70" r="4"/><circle cx="340" cy="52" r="6"/><circle cx="375" cy="85" r="4"/><circle cx="345" cy="138" r="4"/><circle cx="290" cy="128" r="4"/></g></svg>';
-
 // ── вкладки ──
 function home() {
   const feed = D.feed.length ? D.feed.map(f => `<div class="fi">${ava(f.who)}<div class="grow"><b>${esc(f.who)}</b><div class="what">${esc(f.what)}</div></div><time>${ago(f.at)}</time></div>`).join("")
     : `<p class="mut">${t("empty")}</p>`;
-  return `<section class="bal">${CONST}<div style="position:relative"><div class="lbl">${t("balance")}</div>
-    <div class="sum">${microTjs(D.me.balance)}<small>${t("som")}</small></div>
-    <div class="row"><button class="btn gold" data-act="topup">${IC.plus} ${t("topup")}</button>
-    <button class="btn glass" data-act="history">${IC.clock} ${t("history")}</button></div></div></section>
-  <div class="tiles">
-    <button class="tile" data-tab="stars"><div class="ic">${IC.star}</div><b>Stars</b><span>${t("fast")}</span></button>
-    <button class="tile" data-tab="premium"><div class="ic">${IC.gem}</div><b>Premium</b><span>${t("months")}</span></button>
-    <button class="tile" data-tab="gifts"><div class="ic">${IC.gift}</div><b>${t("gift_to")}</b><span>${t("from_bot")}</span></button>
+  return `<section class="card bal"><div class="lbl">${t("balance")}</div>
+    <div class="sum num">${microTjs(D.me.balance)}<small>${t("som")}</small></div>
+    <div class="row"><button class="btn primary grow" data-act="topup">${IC.plus} ${t("topup")}</button>
+    <button class="btn soft" data-act="history">${IC.clock} ${t("history")}</button></div></section>
+  <div class="menu">
+    <button class="mi" data-tab="stars"><div class="ic st">${IC.star}</div><div class="grow"><b>Telegram Stars</b><span>${t("fast")}</span></div><span class="go">›</span></button>
+    <button class="mi" data-tab="premium"><div class="ic">${IC.gem}</div><div class="grow"><b>Telegram Premium</b><span>${t("months")}</span></div><span class="go">›</span></button>
+    <button class="mi" data-tab="gifts"><div class="ic">${IC.gift}</div><div class="grow"><b>${t("gifts_title")}</b><span>${t("from_bot")}</span></div><span class="go">›</span></button>
+    <button class="mi" data-act="refs"><div class="ic ac">${IC.users}</div><div class="grow"><b>${t("invite")}</b><span>${t("invite_sub", {p: D.ref.percent})}</span></div><span class="go">›</span></button>
   </div>
-  <button class="card invite" data-act="refs"><div class="ic">${IC.users}</div><div class="grow"><b>${t("invite")}</b>
-    <span class="mut">${t("invite_sub", {p: D.ref.percent})}</span></div><span class="mut">›</span></button>
   <h2 class="sec-title">${t("recent")}</h2><div class="feed">${feed}</div>`;
 }
 
@@ -307,14 +316,14 @@ function stars() {
   if (!st) return `<p class="mut">${t("empty")}</p>`;
   const unit = parseFloat(st.unit_usd);
   const q = S.starsQty, sum = q ? fmt(q * unit * rate()) : "0";
-  return `<div class="ph"><div class="ic">${IC.star}</div><div><h1>Telegram Stars</h1><p>${t("stars_sub", {r: fmt(unit * rate()), min: st.min, max: st.max.toLocaleString("ru-RU")})}</p></div></div>
-  <section class="card"><div class="field"><input id="sq" type="number" inputmode="numeric" placeholder="${t("amount")}" value="${q || ""}"><span class="gold">${IC.star}</span></div>
+  return `<div class="ph"><div class="ic" style="background:var(--star-soft);color:var(--star)">${IC.star}</div><div><h1>Telegram Stars</h1><p>${t("stars_sub", {r: fmt(unit * rate()), min: st.min, max: st.max.toLocaleString("ru-RU")})}</p></div></div>
+  <section class="card"><label class="label" for="sq">${t("amount")}</label><div class="field"><input id="sq" type="number" inputmode="numeric" placeholder="50" value="${q || ""}"><span class="star-c">${IC.star}</span></div>
     <div class="chips">${[50, 100, 500, 1000].map(n => `<button class="chip" data-act="sadd" data-v="${n}">+${n}</button>`).join("")}</div>
     ${toBlock("s", S.starsTo, S.starsFriend)}
     <div class="total"><span>${t("pay")}</span><b id="ssum">${sum}</b></div>
-    <button class="btn grad" data-act="buy-stars" ${q >= st.min ? "" : "disabled"}>${t("buy")}</button></section>
+    <button class="btn primary full" data-act="buy-stars" ${q >= st.min ? "" : "disabled"}>${t("buy")}</button></section>
   <h2 class="sec-title">${t("ready")}</h2>
-  <div class="grid3">${st.packs.map(n => `<button class="pack" data-act="spack" data-v="${n}"><div class="s">★</div><b>${n}</b><span>${fmt(n * unit * rate())}</span></button>`).join("")}</div>`;
+  <div class="grid3">${st.packs.map(n => `<button class="pack ${q === n ? "on" : ""}" data-act="spack" data-v="${n}"><b class="num"><span class="star-c">★</span>${n}</b><span class="num">${fmt(n * unit * rate())}</span></button>`).join("")}</div>`;
 }
 
 function premium() {
@@ -327,13 +336,13 @@ function premium() {
   ${plans || `<p class="mut">${t("empty")}</p>`}
   <section class="card">${toBlock("p", S.premTo, S.premFriend)}
     <div class="total"><span>${t("pay")}</span><b>${chosen ? usdTjs(chosen.price_usd) : "—"}</b></div>
-    <button class="btn grad" data-act="buy-premium" ${chosen ? "" : "disabled"}>${chosen ? t("buy") : t("choose_plan")}</button></section>`;
+    <button class="btn primary full" data-act="buy-premium" ${chosen ? "" : "disabled"}>${chosen ? t("buy") : t("choose_plan")}</button></section>`;
 }
 
 function gifts() {
   const items = D.gifts.map(g => `<button class="gift" data-act="gift" data-v="${esc(g.id)}">
       <div class="pic">${g.img ? `<img src="${g.img}" alt="" loading="lazy">` : esc(g.emoji)}</div>
-      <div class="st">${g.stars} <span class="gold">★</span></div><div class="pr">${microTjs(g.price_micro)}</div>
+      <div class="st num">${g.stars} <span class="star-c">★</span></div><div class="pr">${microTjs(g.price_micro)}</div>
       ${g.left != null ? `<div class="left">${t("left", {n: g.left})}</div>` : ""}</button>`).join("");
   return `<div class="ph"><div class="ic">${IC.gift}</div><div><h1>${t("gifts_title")}</h1><p>${t("gifts_sub")}</p></div></div>
     ${items ? `<div class="grid3">${items}</div>` : `<p class="mut">${t("no_gifts")}</p>`}`;
@@ -343,18 +352,17 @@ function profile() {
   const s = D.stats;
   return `<section class="card prof">${ava(D.me.name, D.me.photo, "big")}<h2>${esc(D.me.name)}</h2>
     ${D.me.username ? `<div class="mut">@${esc(D.me.username)}</div>` : ""}
-    <button class="idpill" data-act="copy" data-v="${D.me.id}">ID ${D.me.id} ${IC.copy}</button>
-    <div class="balrow"><div class="grow"><span class="mut">${t("balance")}</span><b>${microTjs(D.me.balance)} ${t("som")}</b></div>
-      <button class="btn gold" style="flex:none" data-act="topup">${t("topup")}</button></div></section>
-  <div class="stats"><div class="stat"><b>${s.orders}</b><span class="mut">${t("orders")}</span></div>
-    <div class="stat"><b class="gold">${s.stars}</b><span class="mut">${t("stars_got")}</span></div>
-    <div class="stat"><b>${microTjs(s.spent)}</b><span class="mut">${t("spent")}</span></div>
-    <div class="stat"><b>${microTjs(s.topped)}</b><span class="mut">${t("topped")}</span></div></div>
-  <div class="list">
-    <button class="li" data-act="history">${IC.clock}<span class="grow">${t("hist")}</span><span class="val">›</span></button>
-    <button class="li" data-act="refs">${IC.users}<span class="grow">${t("refs")}</span><span class="val">${D.ref.invited}</span></button>
-    <button class="li" data-act="topup">${IC.card}<span class="grow">${t("topup_bal")}</span><span class="val">›</span></button>
-    <button class="li" data-act="support">${IC.help}<span class="grow">${t("support")}</span><span class="val">${esc(SUPPORT || "")}</span></button>
+    <button class="idpill num" data-act="copy" data-v="${D.me.id}">ID ${D.me.id} ${IC.copy}</button></section>
+  <section class="card bal mt"><div class="lbl">${t("balance")}</div><div class="sum num">${microTjs(D.me.balance)}<small>${t("som")}</small></div>
+    <button class="btn primary full" data-act="topup">${IC.plus} ${t("topup_bal")}</button></section>
+  <div class="stats"><div class="stat"><b class="num">${s.orders}</b><span>${t("orders")}</span></div>
+    <div class="stat"><b class="num">${s.stars} <span class="star-c">★</span></b><span>${t("stars_got")}</span></div>
+    <div class="stat"><b class="num">${microTjs(s.spent)}</b><span>${t("spent")}</span></div>
+    <div class="stat"><b class="num">${microTjs(s.topped)}</b><span>${t("topped")}</span></div></div>
+  <div class="menu">
+    <button class="mi" data-act="history"><div class="ic ac">${IC.clock}</div><div class="grow"><b>${t("hist")}</b></div><span class="go">›</span></button>
+    <button class="mi" data-act="refs"><div class="ic ac">${IC.users}</div><div class="grow"><b>${t("refs")}</b><span>${t("invited")}: ${D.ref.invited}</span></div><span class="go">›</span></button>
+    <button class="mi" data-act="support"><div class="ic">${IC.help}</div><div class="grow"><b>${t("support")}</b><span>${esc(SUPPORT || "")}</span></div><span class="go">›</span></button>
   </div>`;
 }
 
@@ -376,7 +384,7 @@ function sheet(html) {
 function closeSheet() { document.querySelectorAll(".sheet, .sheet-bg").forEach(e => e.remove()); }
 function linkBox(link) {
   return `<div class="linkbox"><span class="grow">${esc(link)}</span><button class="chip" style="width:auto;padding:0 12px" data-act="copy" data-v="${esc(link)}">${t("copy")}</button></div>
-    <button class="btn grad mt" data-act="share" data-v="${esc(link)}">${t("share")}</button>`;
+    <button class="btn primary full mt" data-act="share" data-v="${esc(link)}">${t("share")}</button>`;
 }
 
 function giftSheet(id) {
@@ -389,7 +397,7 @@ function giftSheet(id) {
       ${toBlock("g", st.to, st.friend)}
       <textarea class="field" id="gtext" maxlength="128" placeholder="${t("gift_msg")}"></textarea>
       <div class="total"><span>${t("pay")}</span><b>${microTjs(g.price_micro)}</b></div>
-      <button class="btn grad" id="gbuy">${t("buy")}</button>`);
+      <button class="btn primary full" id="gbuy">${t("buy")}</button>`);
     sh.querySelectorAll('[data-act="g-to"]').forEach(b => b.onclick = () => { st.to = b.dataset.v; st.friend = (sh.querySelector("#g-friend") || {}).value || st.friend; draw(); });
     sh.querySelector("#gbuy").onclick = async (e) => {
       const friend = (sh.querySelector("#g-friend") || {}).value || "";
@@ -427,7 +435,7 @@ async function history() {
   const r = await api("history");
   sh.querySelector("#hl").innerHTML = (r.items || []).length ? r.items.map(i => `<div class="hist-i"><div><b>${esc(i.title)}</b>
       <div class="mut">${ago(i.at)} · ${esc(i.status_title || i.status)}</div>${i.link ? `<button class="chip" style="width:auto;padding:0 12px;margin-top:6px" data-act="share" data-v="${esc(i.link)}">${t("share")}</button>` : ""}</div>
-      <b class="gold">${microTjs(i.price)}</b></div>`).join("") : `<p class="mut">${t("empty")}</p>`;
+      <b class="num">${microTjs(i.price)}</b></div>`).join("") : `<p class="mut">${t("empty")}</p>`;
 }
 
 function refs() {
@@ -486,7 +494,7 @@ async function refresh() {
   if (r.error) { $("#view").innerHTML = `<div class="card mt"><p>${esc(r.error)}</p></div>`; return; }
   D = r;
   $("#hname").textContent = D.me.name || "Donatix";
-  $("#hava").outerHTML = ava(D.me.name, D.me.photo).replace('class="ava', 'id="hava" class="ava');
+  $("#hava").outerHTML = ava(D.me.name, D.me.photo).replace(/class="ava/, 'id="hava" class="ava');
   if (D.friday) { $("#friday").textContent = D.friday; $("#friday").classList.remove("hidden"); }
   render();
 }
