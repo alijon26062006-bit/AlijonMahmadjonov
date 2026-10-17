@@ -496,10 +496,23 @@ class BotRunner:
         self._thread.start()
 
     def stop(self) -> None:
+        """Остановить всех ботов сразу: сигнал всем, общее ожидание до STOP_WAIT секунд, кто не успел — kill.
+        Раньше ждали каждого по очереди до 10 с — перезапуск сайта с 15 ботами тянулся минутами."""
         self._stop.set()
         with self._lock:
-            for bot_id in list(self.procs):
-                self._kill(bot_id)
+            procs = [p for p in self.procs.values() if p.poll() is None]
+            self.procs.clear()
+        for p in procs:
+            try:
+                p.terminate()
+            except OSError:
+                pass
+        deadline = time.monotonic() + STOP_WAIT
+        for p in procs:
+            try:
+                p.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                p.kill()
 
     def poke(self) -> None:
         """Проверить таблицу сейчас, не дожидаясь очередного круга."""
@@ -632,6 +645,9 @@ class BotRunner:
             p.wait(timeout=10)
         except subprocess.TimeoutExpired:
             p.kill()
+
+
+STOP_WAIT = 5   # секунд на остановку всех ботов вместе
 
 
 def _kill_stale(pidfile: Path) -> None:

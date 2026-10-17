@@ -52,7 +52,7 @@ def release(name: str) -> None:
             f.close()
 
 
-def become_leader(config: Any, start: Callable[[], None], stop_event: threading.Event, every: float = 15) -> bool:
+def become_leader(config: Any, start: Callable[[], None], stop_event: threading.Event, every: float = 3) -> bool:
     """Стать ведущим сейчас или позже (если ведущий процесс упадёт). True — стали сразу."""
     if try_lock(config, "leader"):
         start()
