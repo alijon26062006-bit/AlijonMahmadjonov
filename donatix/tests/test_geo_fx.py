@@ -33,7 +33,7 @@ def test_country_lookup(geodb):
     assert geo.country(geodb, UZ_IP) == "UZ"
     assert geo.country(geodb, RU_IP) == "RU"
     assert geo.country(geodb, TJ_IP) == "TJ"
-    assert geo.country(geodb, "8.8.8.8") == ""
+    assert geo.country(geodb, "8.8.8.8") == geo.OTHER
     assert geo.country(geodb, "127.0.0.1") == "" and geo.country(geodb, "nonsense") == ""
 
 
@@ -87,3 +87,21 @@ def test_crypto_only_for_cis(app, geodb, conn):
     assert all(m.get("network") for m in web._pay_methods(req, conn, app.state.config))
     req_tj = Request({"type": "http", "client": (TJ_IP, 1), "app": app, "headers": []})
     assert not web._crypto_only(req_tj)
+
+
+def test_other_country_usd_and_crypto(app, geodb, conn):
+    assert geo.country(geodb, "8.8.8.8") == geo.OTHER
+    html = _client_from(app, "8.8.8.8").get("/").text
+    assert 'code: "USD"' in html
+    from donatix import web
+    from starlette.requests import Request
+    req = Request({"type": "http", "client": ("8.8.8.8", 1), "app": app, "headers": []})
+    assert web._crypto_only(req)
+
+
+def test_tjs_only_for_tajik_ip(app, geodb):
+    c = _client_from(app, RU_IP)
+    c.cookies.set("dx_cur", "TJS")
+    assert 'code: "RUB"' in c.get("/").text          # сомони не из Таджикистана не показываем
+    assert fx.allowed("TJ") == ("TJS", "USD") and fx.allowed("RU") == ("RUB", "USD")
+    assert fx.allowed(geo.OTHER) == ("USD",) and fx.allowed("") == ("TJS", "USD")

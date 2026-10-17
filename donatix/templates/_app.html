@@ -9,7 +9,7 @@
       {% if user.guest %}
       {% set here = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
       <span class="cur-switch" role="group" aria-label="Валюта">
-        <a href="/currency/USD" class="{{ 'on' if cur_code == 'USD' }}">USD</a><a href="/currency/TJS" class="{{ 'on' if cur_code == 'TJS' }}">TJS</a>{% set _loc = cur_local or (cur_code if cur_code not in ('USD', 'TJS') else '') %}{% if _loc %}<a href="/currency/{{ _loc }}" class="{{ 'on' if cur_code == _loc }}">{{ _loc }}</a>{% endif %}
+        {% for c in cur_choices | reverse %}<a href="/currency/{{ c }}" class="{{ 'on' if cur_code == c }}">{{ c }}</a>{% endfor %}
       </span>
       <a class="btn sm hide-sm" href="/login?next={{ here | urlencode }}">Войти</a>
       <a class="btn sm primary" href="/register?next={{ here | urlencode }}">Регистрация</a>
@@ -17,7 +17,7 @@
       <span class="hide-sm hide-app muted small" style="margin-right:6px">{{ 'Гость' if is_guest_account(user) else user.login }}</span>
       <a class="icon-btn bell" id="dx-bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
       <span class="cur-switch" role="group" aria-label="Валюта">
-        <a href="/currency/USD" class="{{ 'on' if cur_code == 'USD' }}">USD</a><a href="/currency/TJS" class="{{ 'on' if cur_code == 'TJS' }}">TJS</a>{% set _loc = cur_local or (cur_code if cur_code not in ('USD', 'TJS') else '') %}{% if _loc %}<a href="/currency/{{ _loc }}" class="{{ 'on' if cur_code == _loc }}">{{ _loc }}</a>{% endif %}
+        {% for c in cur_choices | reverse %}<a href="/currency/{{ c }}" class="{{ 'on' if cur_code == c }}">{{ c }}</a>{% endfor %}
       </span>
       {{ theme_button() }}
       <form class="inline hide-app" method="post" action="/logout">

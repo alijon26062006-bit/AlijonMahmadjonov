@@ -40,6 +40,15 @@ def for_country(cc: str) -> str:
     return BY_COUNTRY.get(cc or "", "")
 
 
+def allowed(cc: str) -> tuple[str, ...]:
+    """Какие валюты показать посетителю: сомони — только из Таджикистана (или пока страну не знаем),
+    из СНГ — его валюта и доллар, из остальных стран — доллар."""
+    if cc in ("", "TJ"):
+        return ("TJS", "USD")
+    local = for_country(cc)
+    return (local, "USD") if local else ("USD",)
+
+
 def symbol(code: str) -> str:
     return CURRENCIES[code][1] if code in CURRENCIES else ""
 

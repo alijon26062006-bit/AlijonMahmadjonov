@@ -325,9 +325,9 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["low_balance_micro"] = 0
     from . import fx, geo
     ctx["country"] = geo.country(config, request.client.host if request.client else "")
-    ctx["cur_local"] = fx.for_country(ctx["country"])   # посетитель из СНГ — его валюта (только показ)
+    ctx["cur_choices"] = fx.allowed(ctx["country"])   # сомони — только из Таджикистана; СНГ — своя валюта
     chosen = request.cookies.get("dx_cur", "")
-    ctx["cur_code"] = chosen if chosen in ("USD", "TJS", *fx.CURRENCIES) else (ctx["cur_local"] or "TJS")
+    ctx["cur_code"] = chosen if chosen in ctx["cur_choices"] else ctx["cur_choices"][0]
     ctx["cur_rate"] = fx.rate(config, ctx["cur_code"])   # для TJS — ниже, по курсу оплат
     ctx["cur_sym"], ctx["cur_digits"] = fx.symbol(ctx["cur_code"]), fx.digits(ctx["cur_code"])
     from . import timez

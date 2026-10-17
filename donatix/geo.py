@@ -57,8 +57,15 @@ def _load(config: Config) -> dict[str, Any]:
     return _cache
 
 
+OTHER = "XX"   # база есть, а адреса в ней нет — страна не из СНГ
+
+
+def ready(config: Config) -> bool:
+    return bool(_load(config)["v4"][0])
+
+
 def country(config: Config, ip: str | None) -> str:
-    """Код страны (TJ, UZ, RU…) или "" — не знаем или не СНГ."""
+    """Код страны (TJ, UZ, RU…), OTHER — не СНГ, "" — не знаем (нет базы, свой адрес)."""
     try:
         addr = ipaddress.ip_address((ip or "").strip())
     except ValueError:
@@ -70,7 +77,7 @@ def country(config: Config, ip: str | None) -> str:
     i = bisect.bisect_right(starts, n) - 1
     if i >= 0 and rows[i][0] <= n <= rows[i][1]:
         return str(rows[i][2])
-    return ""
+    return OTHER if starts or ready(config) else ""
 
 
 def build(csv_text: str) -> dict[str, list]:

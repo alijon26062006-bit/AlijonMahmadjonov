@@ -36,7 +36,9 @@
 <div class="grid two" style="align-items:start">
   <div class="stack">
     {% if not buy %}<div class="stat reveal"><div class="label">Доступно</div><div class="value" data-live="balance">{{ money(user.balance_micro) }}</div>
-      <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>{% endif %}
+      {% if cur_code == 'TJS' %}<div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div>
+      {% elif cur_sym and cur_rate %}<div class="note">Курс: 1 USD = <b>{{ money(10000) }}</b> · оплата криптой (USDT)</div>
+      {% else %}<div class="note">Оплата криптой (USDT), суммы в долларах</div>{% endif %}</div>{% endif %}
 
     {% if waiting %}
     <div class="card reveal wait-card" id="wait" data-id="{{ waiting.id }}" role="status" aria-live="polite">
@@ -405,8 +407,10 @@
     if (document.hidden) return;
     fetch("/panel/data/rate", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
       var nr = parseFloat(d.tjs_rate); if (!nr) return;
-      rate = nr; document.getElementById("rate").textContent = d.tjs_rate;
-      var t = new Date(); document.getElementById("rate-at").textContent = "· обновлён в " + t.toLocaleTimeString("ru-RU");
+      rate = nr;
+      var re = document.getElementById("rate"), ra = document.getElementById("rate-at");
+      if (re) re.textContent = d.tjs_rate;
+      if (ra) ra.textContent = "· обновлён в " + new Date().toLocaleTimeString("ru-RU");
       upd();
     }).catch(function () {});
   }, 30000);

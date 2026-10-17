@@ -765,7 +765,7 @@ def _crypto_only(request: Request) -> bool:
     """Посетитель из СНГ (не Таджикистан): местных способов оплаты у нас нет — только крипта (USDT)."""
     from . import geo
     cc = geo.country(request.app.state.config, _ip(request))
-    return bool(cc) and cc != "TJ"
+    return bool(cc) and cc != "TJ"   # СНГ и остальные страны; "" — страну не знаем, как раньше
 
 
 def _pay_methods(request: Request, conn, config: Config) -> list[dict]:
