@@ -240,7 +240,10 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 gbot = GiftBot(config)
                 gbot.start()
                 started.append(gbot)
-            if config.shop_bot_token:
+            if config.shop_bot_token and config.shop_bot_token == config.gift_bot_token:
+                # Один токен на два бота — они перехватывают сообщения друг у друга. Оставляем мини-приложение.
+                log.warning("DONATIX_SHOP_BOT_TOKEN совпадает с DONATIX_GIFT_BOT_TOKEN — бот-магазин не запущен")
+            elif config.shop_bot_token:
                 from .shopbot import ShopBot
                 shop = ShopBot(config, supplier)
                 shop.start()
