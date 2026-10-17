@@ -31,10 +31,27 @@ def notify_admin(config: Config, text: str, buttons: list | None = None, *, html
         payload["parse_mode"] = "HTML"
     if buttons:
         payload["reply_markup"] = keyboard(buttons)
+    # Кассирам с полными правами — те же уведомления, кроме кода входа на сайт (он только владельцу)
+    chats = [config.alert_telegram_chat_id] + ([] if secret else _full_admins(config))
+    for chat in chats:
+        try:
+            httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/sendMessage",
+                       json=payload | {"chat_id": chat}, timeout=10)
+        except httpx.HTTPError as exc:
+            log.warning("не удалось отправить уведомление: %s", exc)
+
+
+def _full_admins(config: Config) -> list[int]:
     try:
-        httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/sendMessage", json=payload, timeout=10)
-    except httpx.HTTPError as exc:
-        log.warning("не удалось отправить уведомление: %s", exc)
+        from .cashiers import full_admins
+        pool = db.pool(config.db_path)
+        c = pool.acquire()
+        try:
+            return [t for t in full_admins(c) if str(t) != str(config.alert_telegram_chat_id).strip()]
+        finally:
+            pool.release(c)
+    except Exception:  # noqa: BLE001 — уведомление владельцу важнее
+        return []
 
 
 def notify_event(conn, config: Config, event: tuple[str, list]) -> None:

@@ -179,6 +179,8 @@ class AdminBot:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._admins: dict[str, tuple[float, bool]] = {}   # кто админ в группе-чате админки (кэш на 5 мин)
+        self.acting: sqlite3.Row | None = None   # кассир с полными правами, чьё сообщение сейчас разбираем
+        self._co_state: dict[str, tuple[Any, Any]] = {}   # его шаги мастера и ввод суммы — отдельно от ваших
 
     # отправка
     def send(self, text: str, buttons: Buttons | None = None, **extra: Any) -> None:
@@ -251,6 +253,26 @@ class AdminBot:
         return ok
 
     def handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
+        """Кассир с полными правами пишет из своей лички — бот работает с ним как с владельцем:
+        на время разбора его сообщения «чат админки» — его личка."""
+        cq = upd.get("callback_query") or {}
+        msg = cq.get("message") or upd.get("message") or {}
+        co = self._cashier(conn, msg, cq.get("from") if cq else msg.get("from"))
+        if not cashiers.is_full(co) or str(co["tg_id"]) == self.chat_id:
+            self._handle(conn, upd)
+            return
+        chat = str(co["tg_id"])
+        saved = (self.chat_id, self.wizard, self.ask)
+        self.chat_id, self.acting = chat, co
+        self.wizard, self.ask = self._co_state.get(chat, (None, None))
+        try:
+            self._handle(conn, upd)
+        finally:
+            self._co_state[chat] = (self.wizard, self.ask)
+            self.chat_id, self.wizard, self.ask = saved
+            self.acting = None
+
+    def _handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
         if "callback_query" in upd:
             cq = upd["callback_query"]
             msg = cq.get("message") or {}
@@ -405,6 +427,8 @@ class AdminBot:
                         tg_id: int | None = None) -> str:
         """Зачислить или отклонить — один раз. Итог сразу видят все: админ и кассиры."""
         admin_id = _admin_id(conn)
+        if tg_id is None and self.acting is not None:   # решил кассир с полными правами — видно, кто именно
+            who, tg_id = f"{self.acting['name']} (админ)", self.acting["tg_id"]
         label = f"кассир {who}" if tg_id is not None else "админ (Telegram)"
         if approve:
             try:
@@ -1334,10 +1358,14 @@ def screen_cashier(conn: sqlite3.Connection, config: Config, tg_id: int, note: s
     text = (note + f"🧾 <b>{_e(c['name'])}</b> · ID <code>{c['tg_id']}</code>\n"
             f"Статус: {'🟢 работает' if c['active'] else '⏸ отключён — чеки не приходят'}\n"
             f"Банки: {_e(cashiers.banks_label(conn, config, c))}\n"
-            f"Доля: <b>{c['percent']}%</b> · вам {100 - c['percent']}%\n\n"
+            f"Доля: <b>{c['percent']}%</b> · вам {100 - c['percent']}%\n"
+            + ("👑 <b>Полные права админа</b>: пользуется этим ботом как вы. Коды входа на сайт — только вам.\n"
+               if cashiers.is_full(c) else "")
+            + "\n"
             + cashiers.income_text(conn, config, tg_id))
     return text, [
         [("🏦 Банки", f"ks:banks:{tg_id}")],
+        [("👑 Полные права: ВКЛ" if cashiers.is_full(c) else "👑 Дать полные права админа", f"ks:full:{tg_id}")],
         [("−5%", f"ks:pdn:{tg_id}"), (f"{c['percent']}%", f"ks:view:{tg_id}"), ("+5%", f"ks:pup:{tg_id}")],
         [("⏸ Отключить" if c["active"] else "▶️ Включить", f"ks:tog:{tg_id}"), ("🗑 Удалить", f"ks:del:{tg_id}")],
         _back("ks:list:0"),
@@ -1369,7 +1397,11 @@ def _cashiers(bot: AdminBot, conn: sqlite3.Connection, action: str, tg_id: int) 
                 [[("Отмена", "ks:list:0")]])
     if cashiers.get(conn, tg_id) is None:
         return screen_cashiers(conn, cfg)
-    if action in ("pup", "pdn"):
+    if action == "full":
+        if bot.acting is not None:   # права раздаёт только владелец
+            return screen_cashier(conn, cfg, tg_id, note="⛔ Права админа меняет только владелец.\n\n")
+        cashiers.set_full(conn, tg_id, not cashiers.is_full(cashiers.get(conn, tg_id)))
+    elif action in ("pup", "pdn"):
         cashiers.bump_percent(conn, tg_id, 5 if action == "pup" else -5)
     elif action == "tog":
         c = cashiers.get(conn, tg_id)

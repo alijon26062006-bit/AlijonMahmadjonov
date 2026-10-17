@@ -82,6 +82,23 @@ def set_active(conn: sqlite3.Connection, tg_id: int, on: bool) -> None:
     conn.execute("UPDATE cashiers SET active = ? WHERE tg_id = ?", (1 if on else 0, tg_id))
 
 
+def set_full(conn: sqlite3.Connection, tg_id: int, on: bool) -> None:
+    """Полные права админа в админ-боте (как у владельца). Коды входа на сайт ему не приходят."""
+    conn.execute("UPDATE cashiers SET full = ? WHERE tg_id = ?", (1 if on else 0, tg_id))
+
+
+def is_full(row: sqlite3.Row | None) -> bool:
+    return bool(row is not None and row["active"] and "full" in row.keys() and row["full"])
+
+
+def full_admins(conn: sqlite3.Connection) -> list[int]:
+    """Telegram ID кассиров с полными правами (включённых)."""
+    try:
+        return [r[0] for r in conn.execute("SELECT tg_id FROM cashiers WHERE active = 1 AND full = 1")]
+    except sqlite3.OperationalError:   # старая база без колонки full
+        return []
+
+
 def bump_percent(conn: sqlite3.Connection, tg_id: int, delta: int) -> None:
     conn.execute("UPDATE cashiers SET percent = MAX(0, MIN(100, percent + ?)) WHERE tg_id = ?", (delta, tg_id))
 
@@ -129,6 +146,8 @@ def toggle_method(conn: sqlite3.Connection, config: Config, tg_id: int, code: st
 def handles(conn: sqlite3.Connection, config: Config, row: sqlite3.Row | None, method: str) -> bool:
     if row is None or not row["active"]:
         return False
+    if is_full(row):   # полные права — все чеки, как у владельца
+        return True
     if _is_auto(conn, config, method):   # автоплатежи (крипта) проверяет блокчейн — кассиру их не решать
         return False
     codes = codes_of(row)

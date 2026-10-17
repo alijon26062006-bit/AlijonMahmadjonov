@@ -411,6 +411,9 @@ def init(path: Path | str) -> None:
                          "WHERE ext_id IS NOT NULL")
         except sqlite3.IntegrityError:   # в старой базе уже есть повтор — сайт не роняем, админ проверит вручную
             logging.getLogger(__name__).warning("payments.ext_id: есть повторы — уникальный индекс не создан")
+        cs_cols = {r[1] for r in conn.execute("PRAGMA table_info(cashiers)")}
+        if cs_cols and "full" not in cs_cols:   # кассир с полными правами админа в админ-боте
+            conn.execute("ALTER TABLE cashiers ADD COLUMN full INTEGER NOT NULL DEFAULT 0")
         vn_cols = {r[1] for r in conn.execute("PRAGMA table_info(vnumbers)")}
         if vn_cols and "kind" not in vn_cols:   # аренда номера на срок (5sim hosting) и все её СМС
             conn.execute("ALTER TABLE vnumbers ADD COLUMN kind TEXT NOT NULL DEFAULT 'activation'")

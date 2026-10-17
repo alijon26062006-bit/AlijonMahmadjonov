@@ -158,3 +158,45 @@ def test_cashier_home_screen_and_resend(config, conn, monkeypatch):
     cashiers.set_active(conn, ALI, False)                                # отключён — доступа нет
     _press(bot, conn, ALI, f"pay:ok:{pid}")
     assert calls[-1][1]["text"] == "Нет доступа" and balance(conn, uid) == 0
+
+
+def test_full_admin_cashier_uses_bot_like_owner_but_no_login_codes(config, conn, monkeypatch):
+    """«👑 Полные права»: кассир пользуется админ-ботом как владелец (меню, заявки),
+    получает уведомления, но код входа на сайт уходит только владельцу. Права раздаёт только владелец."""
+    from donatix import db, worker
+    calls = []
+    bot = _bot(config, calls)
+    with db.tx(conn):
+        cashiers.add(conn, ALI, "Али", ADMIN_CHAT)
+    _say(bot, conn, ALI, "/menu")
+    assert "Все разделы" not in _texts(calls) and not any("📊" in str(p.get("reply_markup")) for m, p in calls
+                                                          if p.get("chat_id") == str(ALI))  # пока обычный кассир
+    _press(bot, conn, int(ADMIN_CHAT), f"ks:full:{ALI}")
+    assert cashiers.is_full(cashiers.get(conn, ALI))
+    calls.clear()
+    _say(bot, conn, ALI, "/menu")                         # теперь — меню владельца, в его личку
+    assert calls and all(p.get("chat_id") == str(ALI) for m, p in calls if m == "sendMessage")
+    assert _texts(calls) and "служебный бот" not in _texts(calls)
+    menu = calls[-1][1]
+    calls.clear()
+    _say(bot, conn, int(ADMIN_CHAT), "/menu")             # владельцу — как раньше
+    assert calls[-1][1]["text"] == menu["text"] and calls[-1][1]["chat_id"] == ADMIN_CHAT
+    calls.clear()
+    _press(bot, conn, ALI, f"ks:full:{ALI}")              # сам себе права не меняет
+    assert cashiers.is_full(cashiers.get(conn, ALI)) and "только владелец" in str(calls)
+    # чеки по любому банку, решение подписано его именем
+    uid, _ = make_client(conn, "payer1", balance="0")
+    pid = _payment(conn, uid, method="dc")
+    assert cashiers.handles(conn, config, cashiers.get(conn, ALI), "dc")
+    _press(bot, conn, ALI, f"pay:ok:{pid}")
+    p = conn.execute("SELECT status, resolved_who FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert p["status"] == "paid" and "Али" in p["resolved_who"]
+    # уведомления — ему тоже, код входа — только владельцу
+    sent = []
+    monkeypatch.setattr(worker.httpx, "post", lambda url, json, timeout: sent.append(json["chat_id"]))
+    config.alert_telegram_token = "t"
+    worker.notify_admin(config, "новый заказ")
+    assert set(map(str, sent)) == {ADMIN_CHAT, str(ALI)}
+    sent.clear()
+    worker.notify_admin(config, "🔐 Код входа: 123456", secret=True)
+    assert list(map(str, sent)) == [ADMIN_CHAT]
