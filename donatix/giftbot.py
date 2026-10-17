@@ -66,7 +66,7 @@ class GiftBot:
         self._stop.set()
 
     def api(self, method: str, **payload: Any) -> Any:
-        return tggifts.call(self.config, method, timeout=POLL_SECONDS + 10, **payload)
+        return tggifts.call(self.config, method, _timeout=POLL_SECONDS + 10, **payload)
 
     def _setup(self) -> None:
         try:

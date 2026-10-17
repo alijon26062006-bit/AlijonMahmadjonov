@@ -23,7 +23,7 @@ class FakeTG:
     def __init__(self):
         self.balance, self.sent, self.txs, self.mode = 1000, [], [], "ok"
 
-    def __call__(self, config, method, timeout=20, **p):
+    def __call__(self, config, method, _timeout=20, **p):
         if method == "getAvailableGifts":
             return {"gifts": GIFTS}
         if method == "getMyStarBalance":
@@ -249,3 +249,23 @@ def test_bot_start_claims_gift(conn, gcfg, fake):
                                                 "text": f"/start g_{o['link_token']}"}})
     assert tggifts.get(conn, o["id"])["recipient_id"] == 31
     assert any(m == "sendMessage" and "web_app" in json.dumps(p) for m, p in calls)   # кнопка «Открыть магазин»
+
+
+def test_get_updates_passes_telegram_timeout(gcfg, monkeypatch):
+    """getUpdates шлёт Telegram свой timeout — он не должен спорить с таймаутом соединения."""
+    from donatix import giftbot
+    sent = {}
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"ok": True, "result": []}
+
+    def post(url, json=None, timeout=None):
+        sent.update(url=url, body=json, http_timeout=timeout)
+        return R()
+
+    monkeypatch.setattr(tggifts.httpx, "post", post)
+    assert giftbot.GiftBot(gcfg).api("getUpdates", offset=0, timeout=25, allowed_updates=["message"]) == []
+    assert sent["body"]["timeout"] == 25 and sent["http_timeout"] == giftbot.POLL_SECONDS + 10

@@ -112,11 +112,12 @@ class ApiError(Exception):
         self.code, self.description, self.retry_after = code, description, retry_after
 
 
-def call(config: Config, method: str, timeout: float = 20, **payload: Any) -> Any:
+def call(config: Config, method: str, _timeout: float = 20, **payload: Any) -> Any:
     """Вызов Bot API бота мини-приложения. Ошибки — по error_code (тексты Telegram не документированы)."""
     payload = {k: v for k, v in payload.items() if v is not None}
     try:
-        r = httpx.post(f"https://api.telegram.org/bot{config.gift_bot_token}/{method}", json=payload, timeout=timeout)
+        # _timeout — сколько ждать ответа; timeout в payload — параметр самого Telegram (getUpdates)
+        r = httpx.post(f"https://api.telegram.org/bot{config.gift_bot_token}/{method}", json=payload, timeout=_timeout)
     except httpx.HTTPError as exc:
         raise NetError(exc.__class__.__name__) from None
     if r.status_code >= 500:
@@ -136,7 +137,7 @@ def call(config: Config, method: str, timeout: float = 20, **payload: Any) -> An
 
 def star_balance(config: Config) -> int | None:
     try:
-        return int((call(config, "getMyStarBalance", timeout=10) or {}).get("amount") or 0)
+        return int((call(config, "getMyStarBalance", _timeout=10) or {}).get("amount") or 0)
     except (NetError, ApiError) as exc:
         log.warning("баланс Stars бота: %s", exc)
         return None
