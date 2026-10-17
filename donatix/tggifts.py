@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import gzip
+import io
 import json
 import logging
 import secrets
@@ -183,6 +185,56 @@ def _download_preview(config: Config, gift: dict[str, Any]) -> str | None:
     return None
 
 
+ANIM_MAX = 1_500_000   # распакованная анимация (Lottie JSON) — не больше
+
+
+def _safe_name(gift: dict[str, Any]) -> str:
+    return "".join(ch for ch in str(gift["id"]) if ch.isalnum())[:40]
+
+
+def anim_name(config: Config, gid: str) -> str:
+    """Есть ли у подарка анимация на сервере: «<id>.json» (Lottie) или «<id>.webm» (видео-стикер)."""
+    base = "".join(ch for ch in str(gid) if ch.isalnum())[:40]
+    for ext in ("json", "webm"):
+        if (img_dir(config) / f"{base}.{ext}").exists():
+            return f"{base}.{ext}"
+    return ""
+
+
+def _download_anim(config: Config, gift: dict[str, Any]) -> str | None:
+    """Сам стикер — анимация как в Telegram. .tgs — это сжатый (gzip) Lottie JSON: распаковываем здесь,
+    браузеру отдаём готовый JSON. Видео-стикер (.webm) — как есть. Не вышло — остаётся картинка."""
+    sticker = gift.get("sticker") or {}
+    if not sticker.get("file_id") or not (sticker.get("is_animated") or sticker.get("is_video")):
+        return None
+    folder = img_dir(config)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{_safe_name(gift)}.{'webm' if sticker.get('is_video') else 'json'}"
+    path = folder / name
+    if path.exists() and path.stat().st_size > 0:
+        return name
+    try:
+        info = call(config, "getFile", file_id=sticker["file_id"]) or {}
+        r = httpx.get(f"https://api.telegram.org/file/bot{config.gift_bot_token}/{info.get('file_path', '')}",
+                      timeout=20)
+        if r.status_code != 200 or not 0 < len(r.content) < 2_000_000:
+            return None
+        data = r.content
+        if not sticker.get("is_video"):
+            with gzip.GzipFile(fileobj=io.BytesIO(data)) as f:
+                data = f.read(ANIM_MAX + 1)
+            if len(data) > ANIM_MAX:
+                return None
+            json.loads(data)   # битый файл не сохраняем
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+        return name
+    except (NetError, ApiError, httpx.HTTPError, OSError, ValueError, EOFError) as exc:
+        log.warning("анимация подарка %s: %s", gift.get("id"), exc.__class__.__name__)
+    return None
+
+
 def sync(conn: sqlite3.Connection, config: Config, *, force: bool = False) -> int:
     """Каталог подарков из Telegram. Премиальные и распроданные — не показываем. Вернёт, сколько в продаже."""
     ensure(conn)
@@ -204,6 +256,7 @@ def sync(conn: sqlite3.Connection, config: Config, *, force: bool = False) -> in
         seen.append(gid)
         sold_out = g.get("remaining_count") is not None and int(g["remaining_count"]) <= 0
         img = _download_preview(config, g)
+        _download_anim(config, g)
         conn.execute(
             "INSERT INTO tg_gifts (id, star_count, emoji, remaining, total, premium, img, active, sort, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET star_count = excluded.star_count, "
@@ -255,6 +308,7 @@ def listing(conn: sqlite3.Connection, config: Config, user: Any) -> list[dict[st
     rows = conn.execute("SELECT * FROM tg_gifts WHERE active = 1 AND hidden = 0 ORDER BY star_count, sort").fetchall()
     return [{"id": r["id"], "stars": r["star_count"], "emoji": r["emoji"] or "🎁",
              "img": f"/tg/gift/{r['img']}" if r["img"] else "", "left": r["remaining"], "total": r["total"],
+             "anim": f"/tg/gift/{a}" if (a := anim_name(config, r["id"])) else "",
              "price_micro": price_micro(conn, config, user, r["star_count"])} for r in rows]
 
 

@@ -413,3 +413,33 @@ def test_shared_token_start_shows_shop_gifts_still_work(conn, gcfg, fake, suppli
     gb.setup(commands=False)
     assert any(m == "setChatMenuButton" and p["menu_button"]["web_app"]["url"].endswith("/tg") for m, p in gift_calls)
     assert not any(m in ("setMyCommands", "deleteWebhook") for m, p in gift_calls)
+
+
+def test_gift_animation_downloaded_and_served(conn, gcfg, fake, monkeypatch, tgclient):
+    """Анимированный стикер (.tgs = gzip Lottie) — распакован на сервере и отдан как JSON."""
+    import gzip
+    import json as _json
+    lottie = {"v": "5.5.2", "fr": 60, "ip": 0, "op": 60, "w": 512, "h": 512, "layers": []}
+    gift = {"id": "anim1", "star_count": 15, "sticker": {"file_id": "F1", "is_animated": True, "emoji": "💝",
+                                                         "thumbnail": {"file_id": "T1"}}}
+
+    class R:
+        def __init__(self, content):
+            self.status_code, self.content = 200, content
+    monkeypatch.setattr(tggifts.httpx, "get", lambda url, timeout: R(
+        gzip.compress(_json.dumps(lottie).encode()) if url.endswith("F1.tgs") else b"RIFFwebp"))
+    orig = fake.__call__
+
+    def call(config, method, _timeout=20, **p):
+        if method == "getFile":
+            return {"file_path": f"stickers/{p['file_id']}.{'tgs' if p['file_id'] == 'F1' else 'webp'}"}
+        if method == "getAvailableGifts":
+            return {"gifts": [gift]}
+        return orig(config, method, _timeout, **p)
+    monkeypatch.setattr(tggifts, "call", call)
+    tggifts.sync(conn, gcfg, force=True)
+    g = tggifts.listing(conn, gcfg, _user(conn))[0]
+    assert g["anim"] == "/tg/gift/anim1.json" and g["img"] == "/tg/gift/anim1.webp"
+    r = tgclient.get(g["anim"])
+    assert r.status_code == 200 and r.json()["op"] == 60 and r.headers["content-type"].startswith("application/json")
+    assert tgclient.get("/tg/gift/..%2Fx.json").status_code == 404

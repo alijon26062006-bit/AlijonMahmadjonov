@@ -125,12 +125,14 @@ def page(request: Request, config: Config = Depends(get_config)):
 
 @router.get("/gift/{name}")
 def gift_img(name: str, config: Config = Depends(get_config)):
-    if not re.fullmatch(r"[A-Za-z0-9]{1,40}\.webp", name):
+    m = re.fullmatch(r"[A-Za-z0-9]{1,40}\.(webp|json|webm)", name)
+    if not m:
         return Response(status_code=404)
     path = tggifts.img_dir(config) / name
     if not path.exists():
         return Response(status_code=404)
-    return FileResponse(path, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
+    kind = {"webp": "image/webp", "json": "application/json", "webm": "video/webm"}[m.group(1)]
+    return FileResponse(path, media_type=kind, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.post("/api/init")

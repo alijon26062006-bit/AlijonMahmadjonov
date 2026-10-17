@@ -123,6 +123,10 @@ textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none
 .gift { padding: 12px 6px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow-1); }
 .gift .pic { width: 72px; height: 72px; margin: 0 auto 6px; display: grid; place-items: center; font-size: 48px; }
 .gift .pic img { width: 100%; height: 100%; object-fit: contain; }
+.gift .pic { position: relative; }
+.gift .pic .anim { position: absolute; inset: 0; }
+.gift .pic .anim svg, .gift .pic video { width: 100% !important; height: 100% !important; }
+.gift .pic.playing > img { visibility: hidden; }
 .gift .st { font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 3px; }
 .gift .pr { color: var(--accent); font-weight: 700; }
 .gift .left { font-size: 12px; color: var(--bad); }
@@ -373,7 +377,7 @@ function premium() {
 
 function gifts() {
   const items = D.gifts.map(g => `<button class="gift" data-act="gift" data-v="${esc(g.id)}">
-      <div class="pic">${g.img ? `<img src="${g.img}" alt="" loading="lazy">` : esc(g.emoji)}</div>
+      <div class="pic"${g.anim ? ` data-anim="${esc(g.anim)}"` : ""}>${g.img ? `<img src="${g.img}" alt="" loading="lazy">` : esc(g.emoji)}</div>
       <div class="st num">${g.stars} <span class="star-c">★</span></div><div class="pr">${microTjs(g.price_micro)}</div>
       ${g.left != null ? `<div class="left">${t("left", {n: g.left})}</div>` : ""}</button>`).join("");
   return `<div class="ph"><div class="ic">${IC.gift}</div><div><h1>${t("gifts_title")}</h1><p>${t("gifts_sub")}</p></div></div>
@@ -423,7 +427,7 @@ function giftSheet(id) {
   const g = D.gifts.find(x => x.id === id); if (!g) return;
   const st = {to: "self", friend: ""};
   const draw = () => {
-    const sh = sheet(`<div style="text-align:center"><div class="gift" style="border:0;background:none"><div class="pic" style="width:120px;height:120px;font-size:84px">
+    const sh = sheet(`<div style="text-align:center"><div class="gift" style="border:0;background:none"><div class="pic" style="width:120px;height:120px;font-size:84px"${g.anim ? ` data-anim="${esc(g.anim)}"` : ""}>
         ${g.img ? `<img src="${g.img}" alt="">` : esc(g.emoji)}</div></div>
       <h3>${g.stars} ★ · ${microTjs(g.price_micro)} ${t("som")}</h3><p class="mut" style="margin:0">${t("from_bot")}</p></div>
       ${toBlock("g", st.to, st.friend)}
@@ -634,6 +638,45 @@ async function refresh() {
 }
 refresh();
 })();
+
+// ── Анимация подарков как в Telegram: Lottie (из .tgs) или видео-стикер. Пока не загрузилась — картинка.
+// Играют только те, что видно на экране; ушли за край — пауза (батарея и плавность).
+const LOTTIE = "/static/vendor/lottie_light-5.12.2.min.js";   // lottie-web 5.12.2, MIT
+let lottieP = null;
+const loadLottie = () => lottieP || (lottieP = new Promise((ok, no) => {
+  const s = document.createElement("script"); s.src = LOTTIE; s.async = true;
+  s.onload = () => ok(window.lottie); s.onerror = no; document.head.appendChild(s);
+}));
+const animCache = {};
+const animSeen = new IntersectionObserver(es => es.forEach(e => {
+  const p = e.target._player; if (!p) { if (e.isIntersecting) startAnim(e.target); return; }
+  e.isIntersecting ? p.play() : p.pause();
+}), {rootMargin: "80px"});
+async function startAnim(el) {
+  if (el._busy) return; el._busy = true;
+  const url = el.dataset.anim;
+  try {
+    if (url.endsWith(".webm")) {
+      const v = document.createElement("video");
+      Object.assign(v, {src: url, autoplay: true, loop: true, muted: true, playsInline: true});
+      v.className = "anim"; v.setAttribute("playsinline", "");
+      v.oncanplay = () => el.classList.add("playing"); v.onerror = () => v.remove();
+      el.appendChild(v); el._player = v; return;
+    }
+    const [lottie, data] = await Promise.all([loadLottie(),
+      animCache[url] || (animCache[url] = fetch(url).then(r => { if (!r.ok) throw 0; return r.json(); }))]);
+    if (!el.isConnected) return;
+    const box = document.createElement("div"); box.className = "anim"; el.appendChild(box);
+    el._player = lottie.loadAnimation({container: box, renderer: "svg", loop: true, autoplay: true,
+      animationData: JSON.parse(JSON.stringify(data)), rendererSettings: {progressiveLoad: true}});
+    el._player.addEventListener("DOMLoaded", () => el.classList.add("playing"));
+  } catch (_) { el._busy = false; delete animCache[url]; }   // не вышло — остаётся картинка
+}
+const watchAnims = () => document.querySelectorAll(".pic[data-anim]:not([data-seen])").forEach(el => {
+  el.setAttribute("data-seen", ""); animSeen.observe(el);
+});
+new MutationObserver(watchAnims).observe(document.body, {childList: true, subtree: true});
+watchAnims();
 </script>
 </body>
 </html>
