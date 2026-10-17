@@ -134,6 +134,7 @@ class Config:
     android_package: str = ""       # приложение для Android (TWA): имя пакета, например tj.donatix.app
     android_sha256: str = ""        # отпечатки ключа подписи APK через запятую — для /.well-known/assetlinks.json
     shop_bot_token: str = ""        # бот-магазин проекта (покупки кнопками в Telegram)
+    gift_bot_token: str = ""        # бот мини-приложения Stars / Premium / Подарки (подарки — с его баланса Stars)
     openai_api_key: str = ""
     support_model: str = "gpt-4o-mini"
     receipt_model: str = "gpt-4o"      # читает чеки пополнений (модель с «зрением»)
@@ -265,6 +266,7 @@ class Config:
             low_balance_usd=Decimal(_env("DONATIX_LOW_BALANCE_USD", "10")),
             support_bot_token=_env("DONATIX_SUPPORT_BOT_TOKEN"),
             shop_bot_token=_env("DONATIX_SHOP_BOT_TOKEN"),
+            gift_bot_token=_env("DONATIX_GIFT_BOT_TOKEN"),
             shop_admin_ids=_env("DONATIX_SHOP_ADMIN_IDS"),
             android_package=_env("DONATIX_ANDROID_PACKAGE"),
             android_sha256=_env("DONATIX_ANDROID_SHA256"),

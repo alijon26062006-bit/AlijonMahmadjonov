@@ -735,6 +735,63 @@ def shopbot_broadcast(request: Request, text: str = Form(""), admin=Depends(admi
 # ── Отзывы ───────────────────────────────────────────────
 
 
+@router.get("/gifts")
+def gifts_admin(request: Request, status: str = "", admin=Depends(admin_user), conn=Depends(get_conn),
+                config: Config = Depends(get_config)):
+    from . import tggifts
+    tggifts.ensure(conn)
+    status = status if status in tggifts.STATUS_TITLES else ""
+    counts = {r["status"]: r["n"] for r in conn.execute("SELECT status, COUNT(*) AS n FROM gift_orders GROUP BY status")}
+    return render(request, "admin/gifts.html", {
+        "user": admin, "on": tggifts.enabled(config), "balance": tggifts.star_balance(config) if tggifts.enabled(config) else None,
+        "bot": db.get_setting(conn, "gifts.bot_username") or "", "s": tggifts.settings(conn), "status": status,
+        "titles": tggifts.STATUS_TITLES, "counts": counts, "orders": tggifts.orders(conn, status=status, limit=200),
+        "gifts": conn.execute("SELECT * FROM tg_gifts ORDER BY active DESC, star_count, sort").fetchall(),
+    })
+
+
+@router.post("/gifts", dependencies=[Depends(check_csrf)])
+def gifts_save(request: Request, markup_pct: str = Form("0"), star_cost_usd: str = Form("0.013"),
+               low_stars: str = Form("100"), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import tggifts
+    try:
+        tggifts.save_settings(conn, markup_pct, star_cost_usd, low_stars)
+        flash(request, "Настройки подарков сохранены.")
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+    return _back("/admin/gifts")
+
+
+@router.post("/gifts/sync", dependencies=[Depends(check_csrf)])
+def gifts_sync(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+               config: Config = Depends(get_config)):
+    from . import tggifts
+    n = tggifts.sync(conn, config, force=True)
+    flash(request, f"Каталог подарков обновлён: в продаже {n}." if n >= 0 else "Telegram не ответил — попробуйте позже.",
+          "ok" if n >= 0 else "error")
+    return _back("/admin/gifts")
+
+
+@router.post("/gifts/{gid}/hide", dependencies=[Depends(check_csrf)])
+def gifts_hide(gid: str, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    conn.execute("UPDATE tg_gifts SET hidden = 1 - hidden WHERE id = ?", (gid,))
+    return _back("/admin/gifts")
+
+
+@router.post("/gifts/order/{oid:int}/{action}", dependencies=[Depends(check_csrf)])
+def gifts_order(oid: int, action: str, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import tggifts
+    if action == "retry":
+        ok = tggifts.retry(conn, oid)
+        flash(request, f"Заказ #{oid} снова в очереди." if ok else "Повторить можно только ошибку или «проверяем».",
+              "ok" if ok else "error")
+    elif action == "refund":
+        ok = tggifts.refund(conn, oid, "возврат из админки")
+        flash(request, f"Заказ #{oid}: деньги вернулись клиенту." if ok else "Этот заказ вернуть нельзя (уже отправлен или возвращён).",
+              "ok" if ok else "error")
+    return _back("/admin/gifts")
+
+
 @router.get("/promo")
 def promo_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                 config: Config = Depends(get_config)):

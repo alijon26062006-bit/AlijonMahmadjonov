@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="tg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>{{ site_name }} — Stars · Premium · Тӯҳфа</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap">
+<style>
+:root {
+  --bg: #0e0a1d; --bg2: #140d2a; --card: #1c1438; --card2: #241a47; --line: rgba(255,255,255,.08);
+  --text: #f4f1ff; --mut: #a39cc4; --gold: #ffc94a; --gold2: #ffb020;
+  --acc1: #ff8a3d; --acc2: #ff3d7f; --vio: #7c5cff; --ok: #22c55e; --bad: #ff5c7a;
+  --r: 22px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 "Onest", system-ui, sans-serif; }
+body { min-height: 100vh; padding: 0 16px calc(110px + env(safe-area-inset-bottom)); overflow-x: hidden;
+  background: radial-gradient(120% 60% at 50% -10%, #2a1660 0%, var(--bg) 55%) fixed; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+input, textarea { font: inherit; color: var(--text); }
+.h-font { font-family: "Unbounded", "Onest", sans-serif; letter-spacing: -.01em; }
+.mut { color: var(--mut); }
+.gold { color: var(--gold); }
+.hidden { display: none !important; }
+
+/* шапка */
+.hello { display: flex; align-items: center; gap: 14px; padding: 18px 2px 14px; }
+.ava { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center;
+  font: 700 20px "Unbounded"; color: #1a0b2e; background: linear-gradient(135deg, var(--gold), var(--acc1)); }
+.ava.big { width: 104px; height: 104px; font-size: 38px; margin: 0 auto; box-shadow: 0 0 0 4px #2b1f55, 0 0 0 6px var(--gold); }
+.hello small { display: block; color: var(--mut); font-size: 14px; }
+.hello b { font: 700 22px "Unbounded"; }
+
+/* карточки */
+.card { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 18px; }
+.mt { margin-top: 14px; }
+.sec-title { font: 700 22px "Unbounded"; margin: 26px 2px 12px; }
+
+/* главная: баланс */
+.bal { position: relative; overflow: hidden; padding: 22px; border-radius: 26px;
+  background: radial-gradient(120% 120% at 100% 0%, #5b3fd6 0%, #2a1a63 45%, #1a1240 100%);
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px -25px rgba(124,92,255,.8); }
+.bal .stars-bg { position: absolute; inset: 0; pointer-events: none; opacity: .9; }
+.bal .lbl { color: #cfc6ff; font-size: 14px; }
+.bal .sum { font: 800 44px/1.1 "Unbounded"; margin: 6px 0 18px; }
+.bal .sum small { font-size: 18px; color: #cfc6ff; font-weight: 700; margin-left: 6px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 18px;
+  border-radius: 16px; font-weight: 700; font-size: 16px; }
+.btn.gold { background: linear-gradient(90deg, var(--gold), var(--gold2)); color: #1a0b2e; flex: 1; }
+.btn.glass { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); }
+.btn.full { width: 100%; }
+.btn.grad { background: linear-gradient(90deg, var(--gold), var(--acc1)); color: #1a0b2e; width: 100%; height: 56px; font-size: 17px; }
+.btn:disabled { opacity: .45; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.tile { text-align: left; padding: 16px 14px; border-radius: 20px; border: 1px solid var(--line);
+  background: linear-gradient(160deg, #2c2150, #1b1338); }
+.tile .ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 18px;
+  background: rgba(255,201,74,.16); color: var(--gold); }
+.tile b { display: block; font: 700 17px "Unbounded"; }
+.tile span { color: var(--mut); font-size: 13px; }
+.invite { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; margin-top: 14px; }
+.invite .ic { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; flex: none;
+  background: rgba(124,92,255,.2); color: #c6b8ff; }
+.invite b { display: block; font-size: 17px; }
+.feed { display: grid; gap: 10px; }
+.fi { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+.fi .ava { width: 44px; height: 44px; font-size: 16px; }
+.fi .grow { flex: 1; min-width: 0; }
+.fi b { display: block; }
+.fi .what { color: var(--gold); font-size: 14px; }
+.fi time { color: var(--mut); font-size: 13px; white-space: nowrap; }
+
+/* заголовок раздела */
+.ph { display: flex; gap: 14px; align-items: center; margin: 6px 2px 16px; }
+.ph .ic { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; flex: none;
+  background: rgba(255,201,74,.14); color: var(--gold); }
+.ph h1 { font: 800 26px/1.1 "Unbounded"; margin: 0 0 4px; }
+.ph p { margin: 0; color: var(--mut); font-size: 14px; }
+
+/* формы */
+.field { display: flex; align-items: center; gap: 10px; height: 58px; padding: 0 16px; border-radius: 16px;
+  background: rgba(0,0,0,.25); border: 1px solid var(--line); }
+.field input { flex: 1; background: none; border: 0; outline: 0; font-size: 18px; min-width: 0; }
+.field input::placeholder { color: var(--mut); }
+.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.chip { height: 44px; border-radius: 13px; background: rgba(255,255,255,.07); color: var(--gold); font-weight: 700; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.seg button { height: 50px; border-radius: 14px; background: rgba(255,255,255,.06); font-weight: 600; }
+.seg button.on { background: rgba(255,201,74,.16); color: var(--gold); box-shadow: inset 0 0 0 1px rgba(255,201,74,.35); }
+.hint { color: var(--mut); font-size: 14px; margin: 10px 2px 0; }
+.total { display: flex; justify-content: space-between; align-items: center; margin: 18px 2px 14px; }
+.total span { color: var(--mut); font-size: 16px; }
+.total b { font: 800 26px "Unbounded"; }
+textarea.field { height: auto; min-height: 70px; padding: 14px 16px; width: 100%; resize: none; outline: 0; margin-top: 10px; }
+
+/* сетки */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pack { padding: 16px 8px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); text-align: center; }
+.pack .s { color: var(--gold); font-size: 15px; }
+.pack b { display: block; font: 800 24px "Unbounded"; margin: 4px 0 6px; }
+.pack span { color: var(--gold); font-weight: 700; }
+.gift { padding: 14px 6px 12px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); text-align: center; }
+.gift .pic { width: 84px; height: 84px; margin: 0 auto 6px; display: grid; place-items: center; font-size: 56px; }
+.gift .pic img { width: 100%; height: 100%; object-fit: contain; }
+.gift .st { font-weight: 700; }
+.gift .pr { color: var(--gold); font-weight: 700; font-size: 15px; }
+.gift .left { font-size: 11px; color: var(--acc2); }
+
+/* Premium */
+.plan { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px;
+  border-radius: 20px; background: var(--card); border: 1px solid var(--line); margin-bottom: 10px; }
+.plan.on { box-shadow: inset 0 0 0 2px var(--gold); }
+.plan .m { width: 62px; height: 62px; border-radius: 15px; background: rgba(255,255,255,.07); display: grid; place-items: center; flex: none; }
+.plan .m b { font: 800 26px/1 "Unbounded"; color: var(--gold); } .plan .m small { font-size: 11px; color: var(--gold); display: block; }
+.plan .grow { flex: 1; }
+.plan .grow b { display: block; font-size: 16px; }
+.badge { display: inline-block; margin-top: 4px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  color: var(--gold); background: rgba(255,201,74,.14); }
+.plan .p { text-align: right; } .plan .p b { display: block; font: 800 22px "Unbounded"; } .plan .p small { color: var(--mut); }
+
+/* профиль */
+.prof { text-align: center; }
+.prof h2 { font: 800 26px "Unbounded"; margin: 14px 0 2px; }
+.idpill { display: inline-flex; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 16px; border-radius: 999px;
+  background: rgba(255,255,255,.07); font-weight: 700; }
+.balrow { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 16px; border-radius: 18px; background: rgba(0,0,0,.25); text-align: left; }
+.balrow .grow { flex: 1; } .balrow b { font: 800 26px "Unbounded"; display: block; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.stat { padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+.stat b { font: 800 26px "Unbounded"; display: block; }
+.list { margin-top: 14px; border-radius: 20px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
+.li { display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px; text-align: left; border-bottom: 1px solid var(--line); font-size: 17px; }
+.li:last-child { border-bottom: 0; }
+.li .grow { flex: 1; } .li .val { color: var(--mut); }
+
+/* нижнее меню */
+nav.tabs { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 8px; border-radius: 26px;
+  background: rgba(24,17,48,.92); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,.8); }
+nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 2px; border-radius: 18px;
+  color: var(--mut); font-size: 12px; font-weight: 600; }
+nav.tabs button.on { color: var(--gold); background: rgba(255,201,74,.12); }
+
+/* окно снизу и тосты */
+.sheet-bg { position: fixed; inset: 0; background: rgba(5,3,12,.6); z-index: 30; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 88vh; overflow: auto;
+  padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); border-radius: 26px 26px 0 0;
+  background: linear-gradient(180deg, #24194a, #150f2e); border-top: 1px solid rgba(255,255,255,.12); animation: up .22s ease; }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } }
+.sheet .grab { width: 44px; height: 5px; border-radius: 9px; background: rgba(255,255,255,.2); margin: 0 auto 14px; }
+.sheet h3 { font: 800 20px "Unbounded"; margin: 0 0 8px; }
+.toast { position: fixed; left: 16px; right: 16px; top: calc(14px + env(safe-area-inset-top)); z-index: 50; padding: 14px 16px;
+  border-radius: 16px; background: #1f1640; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+.toast.err { border-color: rgba(255,92,122,.5); } .toast.ok { border-color: rgba(34,197,94,.5); }
+.linkbox { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding: 12px; border-radius: 14px; background: rgba(0,0,0,.3);
+  word-break: break-all; font-size: 13px; }
+.friday { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(34,197,94,.14); color: #a7f3c0; font-size: 14px; }
+.foot { text-align: center; color: var(--mut); font-size: 12px; margin: 24px 0 0; }
+.skel { height: 120px; border-radius: 22px; background: linear-gradient(90deg, #1c1438, #261b4b, #1c1438); background-size: 200% 100%;
+  animation: sk 1.2s infinite linear; margin-top: 14px; }
+@keyframes sk { to { background-position: -200% 0; } }
+.hist-i { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.hist-i:last-child { border-bottom: 0; }
+</style>
+</head>
+<body>
+<header class="hello" id="hello"><div class="ava" id="hava">D</div><div><small data-t="hi"></small><b id="hname">…</b></div></header>
+<div id="friday" class="friday hidden"></div>
+<main id="view"><div class="skel"></div><div class="skel"></div></main>
+<p class="foot" data-t="indep"></p>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="home"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span data-t="t_home"></span></button>
+  <button data-tab="stars"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.5 2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg><span>Stars</span></button>
+  <button data-tab="premium"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 18 3-18"/></svg><span>Premium</span></button>
+  <button data-tab="gifts"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13M12 8S10 3 7.5 3 5 5.5 7.5 7 12 8 12 8s2-5 4.5-5S19 5.5 16.5 7 12 8 12 8"/></svg><span data-t="t_gifts"></span></button>
+  <button data-tab="profile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span data-t="t_profile"></span></button>
+</nav>
+
+<script>
+(function () {
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#0e0a1d"); tg.setBackgroundColor("#0e0a1d"); } catch (e) {} }
+const INIT = tg ? tg.initData : "";
+const START = tg && tg.initDataUnsafe ? (tg.initDataUnsafe.start_param || "") : "";
+const LANG = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && (tg.initDataUnsafe.user.language_code || "").startsWith("ru")) ? "ru" : "tj";
+const SUPPORT = {{ support | tojson }};
+
+const L = {
+  tj: { hi: "Салом,", t_home: "Асосӣ", t_gifts: "Тӯҳфа", t_profile: "Профил", balance: "Баланси шумо", som: "сомонӣ",
+    topup: "Пур кардан", history: "Таърих", fast: "Фаврӣ", months: "3 · 6 · 12 моҳ", from_bot: "Аз номи бот",
+    invite: "Дӯстонро даъват кунед", invite_sub: "Аз ҳар хариди дӯстатон {p}% ба шумо", recent: "Харидҳои охирин",
+    stars_sub: "1 ⭐ = {r} сомонӣ · аз {min} то {max}", amount: "Миқдор", self: "Ба худам", friend: "Ба дӯстам",
+    to_self: "Ба @{u} фиристода мешавад", to_self_noname: "Дар Telegram username гузоред", friend_ph: "@username-и дӯст",
+    pay: "Ба пардохт", buy: "Харидан", ready: "Бастаҳои тайёр", prem_sub: "Ба худ ё ҳамчун тӯҳфа ба дӯстатон",
+    month: "моҳ", per_month: "/ моҳ", choose_plan: "Тарифро интихоб кунед", save: "−{p}% арзонтар", instant: "Фаврӣ",
+    gifts_title: "Тӯҳфаҳо", gifts_sub: "Аз номи бот · ба худ ё ба дӯст", no_gifts: "Тӯҳфаҳо ҳоло нестанд — баъдтар бинед.",
+    left: "{n} монд", gift_msg: "Паём ба тӯҳфа (ихтиёрӣ)", orders: "Фармоишҳо", stars_got: "Stars гирифта шуд",
+    spent: "Харҷ шуд", topped: "Пур карда шуд", hist: "Таърихи фармоишҳо", refs: "Барномаи рефералӣ",
+    topup_bal: "Пур кардани баланс", support: "Дастгирӣ", copy: "Нусха", copied: "Нусха шуд ✓", share: "Фиристодан",
+    need: "Маблағ кифоя нест: боз {s} сомонӣ лозим. Пур кунем?", yes: "Пур кардан", no: "Не",
+    ref_text: "Пайванди шумо — дӯстон аз он ворид шаванд, аз ҳар хариди онҳо {p}% ба баланси шумо:", invited: "Даъватшудагон",
+    friend_link: "Пайвандро ба дӯстатон фиристед:", empty: "Ҳоло холӣ", ago_m: "{n} дақ пеш", ago_h: "{n} соат пеш", ago_d: "{n} рӯз пеш", now: "ҳозир",
+    indep: "Donatix — хизматрасонии мустақил, бо Telegram алоқаманд нест.", gift_to: "Тӯҳфа" },
+  ru: { hi: "Привет,", t_home: "Главная", t_gifts: "Подарки", t_profile: "Профиль", balance: "Ваш баланс", som: "сомони",
+    topup: "Пополнить", history: "История", fast: "Мгновенно", months: "3 · 6 · 12 мес", from_bot: "От имени бота",
+    invite: "Пригласите друзей", invite_sub: "{p}% с каждой покупки друга — вам", recent: "Последние покупки",
+    stars_sub: "1 ⭐ = {r} сомони · от {min} до {max}", amount: "Количество", self: "Себе", friend: "Другу",
+    to_self: "Отправим на @{u}", to_self_noname: "Задайте username в настройках Telegram", friend_ph: "@username друга",
+    pay: "К оплате", buy: "Купить", ready: "Готовые пакеты", prem_sub: "Себе или в подарок другу",
+    month: "мес", per_month: "/ мес", choose_plan: "Выберите тариф", save: "−{p}% выгоднее", instant: "Мгновенно",
+    gifts_title: "Подарки", gifts_sub: "От имени бота · себе или другу", no_gifts: "Подарков пока нет — загляните позже.",
+    left: "осталось {n}", gift_msg: "Подпись к подарку (необязательно)", orders: "Заказов", stars_got: "Получено Stars",
+    spent: "Потрачено", topped: "Пополнено", hist: "История заказов", refs: "Реферальная программа",
+    topup_bal: "Пополнить баланс", support: "Поддержка", copy: "Копировать", copied: "Скопировано ✓", share: "Отправить",
+    need: "Не хватает {s} сомони. Пополнить баланс?", yes: "Пополнить", no: "Нет",
+    ref_text: "Ваша ссылка — друзья заходят по ней, и {p}% с каждой их покупки идёт вам на баланс:", invited: "Приглашено",
+    friend_link: "Отправьте ссылку другу:", empty: "Пока пусто", ago_m: "{n} мин назад", ago_h: "{n} ч назад", ago_d: "{n} дн назад", now: "сейчас",
+    indep: "Donatix — независимый сервис, не связан с Telegram.", gift_to: "Подарок" },
+};
+const t = (k, v) => (L[LANG][k] || k).replace(/\{(\w+)\}/g, (_, x) => (v && v[x] !== undefined ? v[x] : ""));
+document.querySelectorAll("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
+document.documentElement.lang = LANG === "ru" ? "ru" : "tg";
+
+let D = null, TAB = "home";
+const S = { starsQty: 0, starsTo: "self", starsFriend: "", plan: null, premTo: "self", premFriend: "" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const rate = () => parseFloat(D.rate) || 0;
+function fmt(tjs) { const v = (Math.ceil(tjs * 100 - 1e-6) / 100).toFixed(2).split("."); return v[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ") + "," + v[1]; }
+const microTjs = m => fmt(m / 10000 * rate());
+const usdTjs = u => fmt(parseFloat(u) * rate());
+const haptic = k => { try { tg.HapticFeedback.impactOccurred(k || "light"); } catch (e) {} };
+
+async function api(path, body) {
+  const r = await fetch("/tg/api/" + path, {method: "POST", headers: {"Content-Type": "application/json", "X-Tg-Init": INIT},
+    body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok && !j.error) j.error = "Хато / Ошибка " + r.status;
+  return j;
+}
+function toast(text, kind) {
+  const el = document.createElement("div"); el.className = "toast " + (kind || ""); el.textContent = text;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 4200);
+}
+function ago(at) {
+  const s = (Date.now() - Date.parse(at.endsWith("Z") ? at : at + "Z")) / 1000;
+  if (s < 60) return t("now"); if (s < 3600) return t("ago_m", {n: Math.floor(s / 60)});
+  if (s < 86400) return t("ago_h", {n: Math.floor(s / 3600)}); return t("ago_d", {n: Math.floor(s / 86400)});
+}
+function ava(name, photo, cls) {
+  if (photo) return `<img class="ava ${cls || ""}" src="${esc(photo)}" alt="">`;
+  return `<div class="ava ${cls || ""}">${esc((name || "?").trim().charAt(0).toUpperCase() || "?")}</div>`;
+}
+const IC = {
+  star: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.5 2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>',
+  gem: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 18 3-18"/></svg>',
+  gift: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13M12 8S10 3 7.5 3 5 5.5 7.5 7 12 8 12 8s2-5 4.5-5S19 5.5 16.5 7 12 8 12 8"/></svg>',
+  users: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 15c1.6.6 2.6 2.2 3 5"/></svg>',
+  clock: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  card: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
+  help: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/></svg>',
+  copy: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>',
+  plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  target: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>',
+};
+const CONST = '<svg class="stars-bg" viewBox="0 0 400 260" preserveAspectRatio="xMaxYMin slice"><g fill="#fff" opacity=".55">' +
+  Array.from({length: 26}, (_, i) => `<circle cx="${(i * 97) % 400}" cy="${(i * 53) % 260}" r="${i % 3 ? .8 : 1.4}"/>`).join("") +
+  '</g><g stroke="#ffc94a" stroke-width="1.6" opacity=".75" fill="none"><path d="M250 40 L295 70 L340 52 L375 85 L345 138 L290 128 Z"/></g><g fill="#ffc94a">' +
+  '<circle cx="250" cy="40" r="4"/><circle cx="295" cy="70" r="4"/><circle cx="340" cy="52" r="6"/><circle cx="375" cy="85" r="4"/><circle cx="345" cy="138" r="4"/><circle cx="290" cy="128" r="4"/></g></svg>';
+
+// ── вкладки ──
+function home() {
+  const feed = D.feed.length ? D.feed.map(f => `<div class="fi">${ava(f.who)}<div class="grow"><b>${esc(f.who)}</b><div class="what">${esc(f.what)}</div></div><time>${ago(f.at)}</time></div>`).join("")
+    : `<p class="mut">${t("empty")}</p>`;
+  return `<section class="bal">${CONST}<div style="position:relative"><div class="lbl">${t("balance")}</div>
+    <div class="sum">${microTjs(D.me.balance)}<small>${t("som")}</small></div>
+    <div class="row"><button class="btn gold" data-act="topup">${IC.plus} ${t("topup")}</button>
+    <button class="btn glass" data-act="history">${IC.clock} ${t("history")}</button></div></div></section>
+  <div class="tiles">
+    <button class="tile" data-tab="stars"><div class="ic">${IC.star}</div><b>Stars</b><span>${t("fast")}</span></button>
+    <button class="tile" data-tab="premium"><div class="ic">${IC.gem}</div><b>Premium</b><span>${t("months")}</span></button>
+    <button class="tile" data-tab="gifts"><div class="ic">${IC.gift}</div><b>${t("gift_to")}</b><span>${t("from_bot")}</span></button>
+  </div>
+  <button class="card invite" data-act="refs"><div class="ic">${IC.users}</div><div class="grow"><b>${t("invite")}</b>
+    <span class="mut">${t("invite_sub", {p: D.ref.percent})}</span></div><span class="mut">›</span></button>
+  <h2 class="sec-title">${t("recent")}</h2><div class="feed">${feed}</div>`;
+}
+
+function toBlock(prefix, to, friend) {
+  const u = D.me.username;
+  return `<div class="seg"><button class="${to === "self" ? "on" : ""}" data-act="${prefix}-to" data-v="self">${t("self")}</button>
+    <button class="${to === "friend" ? "on" : ""}" data-act="${prefix}-to" data-v="friend">${t("friend")}</button></div>
+    ${to === "friend" ? `<div class="field mt"><input id="${prefix}-friend" placeholder="${t("friend_ph")}" value="${esc(friend)}" autocomplete="off" autocapitalize="off"></div>`
+      : `<p class="hint">${u ? t("to_self", {u: esc(u)}) : t("to_self_noname")}</p>`}`;
+}
+
+function stars() {
+  const st = D.stars;
+  if (!st) return `<p class="mut">${t("empty")}</p>`;
+  const unit = parseFloat(st.unit_usd);
+  const q = S.starsQty, sum = q ? fmt(q * unit * rate()) : "0";
+  return `<div class="ph"><div class="ic">${IC.star}</div><div><h1>Telegram Stars</h1><p>${t("stars_sub", {r: fmt(unit * rate()), min: st.min, max: st.max.toLocaleString("ru-RU")})}</p></div></div>
+  <section class="card"><div class="field"><input id="sq" type="number" inputmode="numeric" placeholder="${t("amount")}" value="${q || ""}"><span class="gold">${IC.star}</span></div>
+    <div class="chips">${[50, 100, 500, 1000].map(n => `<button class="chip" data-act="sadd" data-v="${n}">+${n}</button>`).join("")}</div>
+    ${toBlock("s", S.starsTo, S.starsFriend)}
+    <div class="total"><span>${t("pay")}</span><b id="ssum">${sum}</b></div>
+    <button class="btn grad" data-act="buy-stars" ${q >= st.min ? "" : "disabled"}>${t("buy")}</button></section>
+  <h2 class="sec-title">${t("ready")}</h2>
+  <div class="grid3">${st.packs.map(n => `<button class="pack" data-act="spack" data-v="${n}"><div class="s">★</div><b>${n}</b><span>${fmt(n * unit * rate())}</span></button>`).join("")}</div>`;
+}
+
+function premium() {
+  const plans = D.premium.map(p => `<button class="plan ${S.plan === p.product_id ? "on" : ""}" data-act="plan" data-v="${p.product_id}">
+      <div class="m"><div><b>${p.months}</b><small>${t("month")}</small></div></div>
+      <div class="grow"><b>${p.months} ${LANG === "ru" ? "мес" : "моҳи"} Premium</b>${p.save ? `<span class="badge">${t("save", {p: p.save})}</span>` : `<span class="mut">${t("instant")}</span>`}</div>
+      <div class="p"><b>${usdTjs(p.price_usd)}</b><small>${fmt(parseFloat(p.price_usd) * rate() / p.months)} ${t("per_month")}</small></div></button>`).join("");
+  const chosen = D.premium.find(p => p.product_id === S.plan);
+  return `<div class="ph"><div class="ic">${IC.gem}</div><div><h1>Telegram Premium</h1><p>${t("prem_sub")}</p></div></div>
+  ${plans || `<p class="mut">${t("empty")}</p>`}
+  <section class="card">${toBlock("p", S.premTo, S.premFriend)}
+    <div class="total"><span>${t("pay")}</span><b>${chosen ? usdTjs(chosen.price_usd) : "—"}</b></div>
+    <button class="btn grad" data-act="buy-premium" ${chosen ? "" : "disabled"}>${chosen ? t("buy") : t("choose_plan")}</button></section>`;
+}
+
+function gifts() {
+  const items = D.gifts.map(g => `<button class="gift" data-act="gift" data-v="${esc(g.id)}">
+      <div class="pic">${g.img ? `<img src="${g.img}" alt="" loading="lazy">` : esc(g.emoji)}</div>
+      <div class="st">${g.stars} <span class="gold">★</span></div><div class="pr">${microTjs(g.price_micro)}</div>
+      ${g.left != null ? `<div class="left">${t("left", {n: g.left})}</div>` : ""}</button>`).join("");
+  return `<div class="ph"><div class="ic">${IC.gift}</div><div><h1>${t("gifts_title")}</h1><p>${t("gifts_sub")}</p></div></div>
+    ${items ? `<div class="grid3">${items}</div>` : `<p class="mut">${t("no_gifts")}</p>`}`;
+}
+
+function profile() {
+  const s = D.stats;
+  return `<section class="card prof">${ava(D.me.name, D.me.photo, "big")}<h2>${esc(D.me.name)}</h2>
+    ${D.me.username ? `<div class="mut">@${esc(D.me.username)}</div>` : ""}
+    <button class="idpill" data-act="copy" data-v="${D.me.id}">ID ${D.me.id} ${IC.copy}</button>
+    <div class="balrow"><div class="grow"><span class="mut">${t("balance")}</span><b>${microTjs(D.me.balance)} ${t("som")}</b></div>
+      <button class="btn gold" style="flex:none" data-act="topup">${t("topup")}</button></div></section>
+  <div class="stats"><div class="stat"><b>${s.orders}</b><span class="mut">${t("orders")}</span></div>
+    <div class="stat"><b class="gold">${s.stars}</b><span class="mut">${t("stars_got")}</span></div>
+    <div class="stat"><b>${microTjs(s.spent)}</b><span class="mut">${t("spent")}</span></div>
+    <div class="stat"><b>${microTjs(s.topped)}</b><span class="mut">${t("topped")}</span></div></div>
+  <div class="list">
+    <button class="li" data-act="history">${IC.clock}<span class="grow">${t("hist")}</span><span class="val">›</span></button>
+    <button class="li" data-act="refs">${IC.users}<span class="grow">${t("refs")}</span><span class="val">${D.ref.invited}</span></button>
+    <button class="li" data-act="topup">${IC.card}<span class="grow">${t("topup_bal")}</span><span class="val">›</span></button>
+    <button class="li" data-act="support">${IC.help}<span class="grow">${t("support")}</span><span class="val">${esc(SUPPORT || "")}</span></button>
+  </div>`;
+}
+
+const VIEWS = {home, stars, premium, gifts, profile};
+function render() {
+  $("#view").innerHTML = VIEWS[TAB]();
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
+  if (tg && tg.BackButton) { TAB === "home" ? tg.BackButton.hide() : tg.BackButton.show(); }
+}
+function go(tab) { TAB = tab; haptic(); render(); window.scrollTo({top: 0, behavior: "instant"}); }
+
+// ── окна ──
+function sheet(html) {
+  closeSheet();
+  const bg = document.createElement("div"); bg.className = "sheet-bg"; bg.onclick = closeSheet;
+  const sh = document.createElement("div"); sh.className = "sheet"; sh.innerHTML = '<div class="grab"></div>' + html;
+  document.body.append(bg, sh); return sh;
+}
+function closeSheet() { document.querySelectorAll(".sheet, .sheet-bg").forEach(e => e.remove()); }
+function linkBox(link) {
+  return `<div class="linkbox"><span class="grow">${esc(link)}</span><button class="chip" style="width:auto;padding:0 12px" data-act="copy" data-v="${esc(link)}">${t("copy")}</button></div>
+    <button class="btn grad mt" data-act="share" data-v="${esc(link)}">${t("share")}</button>`;
+}
+
+function giftSheet(id) {
+  const g = D.gifts.find(x => x.id === id); if (!g) return;
+  const st = {to: "self", friend: ""};
+  const draw = () => {
+    const sh = sheet(`<div style="text-align:center"><div class="gift" style="border:0;background:none"><div class="pic" style="width:120px;height:120px;font-size:84px">
+        ${g.img ? `<img src="${g.img}" alt="">` : esc(g.emoji)}</div></div>
+      <h3>${g.stars} ★ · ${microTjs(g.price_micro)} ${t("som")}</h3><p class="mut" style="margin:0">${t("from_bot")}</p></div>
+      ${toBlock("g", st.to, st.friend)}
+      <textarea class="field" id="gtext" maxlength="128" placeholder="${t("gift_msg")}"></textarea>
+      <div class="total"><span>${t("pay")}</span><b>${microTjs(g.price_micro)}</b></div>
+      <button class="btn grad" id="gbuy">${t("buy")}</button>`);
+    sh.querySelectorAll('[data-act="g-to"]').forEach(b => b.onclick = () => { st.to = b.dataset.v; st.friend = (sh.querySelector("#g-friend") || {}).value || st.friend; draw(); });
+    sh.querySelector("#gbuy").onclick = async (e) => {
+      const friend = (sh.querySelector("#g-friend") || {}).value || "";
+      e.target.disabled = true;
+      const r = await api("buy", {type: "gift", gift_id: g.id, to: st.to, username: friend, text: sh.querySelector("#gtext").value});
+      e.target.disabled = false;
+      done(r);
+    };
+  };
+  draw();
+}
+
+async function done(r) {
+  if (r.ok) {
+    haptic("medium"); if (r.balance != null) D.me.balance = r.balance;
+    if (r.link) { sheet(`<h3>🎁</h3><p>${esc(r.message)}</p><p class="mut">${t("friend_link")}</p>${linkBox(r.link)}`); }
+    else { closeSheet(); toast(r.message, "ok"); }
+    refresh(); return;
+  }
+  if (r.need != null && r.need > 0) {
+    const sh = sheet(`<h3>${t("topup")}</h3><p>${t("need", {s: microTjs(r.need)})}</p>
+      <div class="seg"><button data-act="close">${t("no")}</button><button class="on" data-act="topup" data-v="${r.need}">${t("yes")}</button></div>`);
+    return;
+  }
+  toast(r.error || "Хато", "err");
+}
+
+async function topup(need) {
+  const r = await api("session", {need: need || ""});
+  if (r.url) location.href = r.url; else toast(r.error || "Хато", "err");
+}
+
+async function history() {
+  const sh = sheet(`<h3>${t("hist")}</h3><div id="hl"><div class="skel"></div></div>`);
+  const r = await api("history");
+  sh.querySelector("#hl").innerHTML = (r.items || []).length ? r.items.map(i => `<div class="hist-i"><div><b>${esc(i.title)}</b>
+      <div class="mut">${ago(i.at)} · ${esc(i.status_title || i.status)}</div>${i.link ? `<button class="chip" style="width:auto;padding:0 12px;margin-top:6px" data-act="share" data-v="${esc(i.link)}">${t("share")}</button>` : ""}</div>
+      <b class="gold">${microTjs(i.price)}</b></div>`).join("") : `<p class="mut">${t("empty")}</p>`;
+}
+
+function refs() {
+  sheet(`<h3>${t("refs")}</h3><p class="mut">${t("ref_text", {p: D.ref.percent})}</p>${D.ref.link ? linkBox(D.ref.link) : ""}
+    <p class="mut">${t("invited")}: <b>${D.ref.invited}</b></p>`);
+}
+
+function copy(text) {
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast(t("copied"), "ok"), () => {});
+  haptic();
+}
+
+// ── клики ──
+document.addEventListener("click", async (e) => {
+  const tabBtn = e.target.closest("[data-tab]");
+  if (tabBtn) { go(tabBtn.dataset.tab); return; }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  const act = a.dataset.act, v = a.dataset.v;
+  if (act === "topup") topup(v);
+  else if (act === "history") history();
+  else if (act === "refs") refs();
+  else if (act === "close") closeSheet();
+  else if (act === "copy") copy(v);
+  else if (act === "share") { const u = "https://t.me/share/url?url=" + encodeURIComponent(v); tg && tg.openTelegramLink ? tg.openTelegramLink(u) : window.open(u); }
+  else if (act === "support") { if (SUPPORT && SUPPORT.startsWith("@") && tg) tg.openTelegramLink("https://t.me/" + SUPPORT.slice(1)); }
+  else if (act === "sadd") { S.starsQty = (S.starsQty || 0) + +v; haptic(); render(); }
+  else if (act === "spack") { S.starsQty = +v; haptic(); render(); }
+  else if (act === "s-to") { S.starsTo = v; render(); }
+  else if (act === "p-to") { S.premTo = v; render(); }
+  else if (act === "plan") { S.plan = v; haptic(); render(); }
+  else if (act === "gift") giftSheet(v);
+  else if (act === "buy-stars" || act === "buy-premium") {
+    const stars_ = act === "buy-stars", pre = stars_ ? "s" : "p";
+    const friendEl = document.getElementById(pre + "-friend");
+    const to = stars_ ? S.starsTo : S.premTo;
+    a.disabled = true;
+    const r = await api("buy", stars_ ? {type: "stars", qty: S.starsQty, to, username: friendEl ? friendEl.value : "", idem: crypto.randomUUID()}
+      : {type: "premium", product_id: S.plan, to, username: friendEl ? friendEl.value : "", idem: crypto.randomUUID()});
+    a.disabled = false; done(r);
+  }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "sq") {
+    S.starsQty = Math.max(0, Math.min(parseInt(e.target.value || "0", 10) || 0, D.stars.max));
+    const unit = parseFloat(D.stars.unit_usd);
+    $("#ssum").textContent = S.starsQty ? fmt(S.starsQty * unit * rate()) : "0";
+    const b = document.querySelector('[data-act="buy-stars"]'); if (b) b.disabled = S.starsQty < D.stars.min;
+  }
+  if (e.target.id === "s-friend") S.starsFriend = e.target.value;
+  if (e.target.id === "p-friend") S.premFriend = e.target.value;
+});
+if (tg && tg.BackButton) tg.BackButton.onClick(() => { if (document.querySelector(".sheet")) closeSheet(); else go("home"); });
+
+async function refresh() {
+  const r = await api("init", {start: START});
+  if (r.error) { $("#view").innerHTML = `<div class="card mt"><p>${esc(r.error)}</p></div>`; return; }
+  D = r;
+  $("#hname").textContent = D.me.name || "Donatix";
+  $("#hava").outerHTML = ava(D.me.name, D.me.photo).replace('class="ava', 'id="hava" class="ava');
+  if (D.friday) { $("#friday").textContent = D.friday; $("#friday").classList.remove("hidden"); }
+  render();
+}
+refresh();
+})();
+</script>
+</body>
+</html>

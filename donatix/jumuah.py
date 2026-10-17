@@ -15,7 +15,7 @@ START_HOUR, END_HOUR = 13, 14
 FRIDAY = 4
 MESSAGE = ("Пятница, 13:00–14:00 — время джума-намаза. Покупки закрыты до 14:00 по Душанбе. "
            "Пополнить баланс можно, заказ оформите после 14:00.")
-SITE_SOURCES = ("panel", "shopbot", "quick")
+SITE_SOURCES = ("panel", "shopbot", "quick", "tgapp")
 
 
 def _local(config: Config, now: datetime | None = None) -> datetime:

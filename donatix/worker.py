@@ -169,6 +169,11 @@ class Worker:
                         log.exception("валюты СНГ / база стран")
                     last_watch = now
                 try:
+                    from . import tggifts
+                    tggifts.tick(conn, self.config)   # подарки Telegram: каталог, отправка, сверка, возвраты
+                except Exception:
+                    log.exception("подарки Telegram")
+                try:
                     from . import quickbuy
                     quickbuy.run_pending(conn, self.config, self.supplier)   # оплатили покупку — оформить заказ
                 except Exception:

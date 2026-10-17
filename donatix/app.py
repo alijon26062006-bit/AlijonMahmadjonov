@@ -235,6 +235,11 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 support = TicketBot(config)
                 support.start()
                 started.append(support)
+            if config.gift_bot_token:
+                from .giftbot import GiftBot   # мини-приложение Stars / Premium / Подарки
+                gbot = GiftBot(config)
+                gbot.start()
+                started.append(gbot)
             if config.shop_bot_token:
                 from .shopbot import ShopBot
                 shop = ShopBot(config, supplier)
@@ -309,6 +314,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.include_router(admin.router)
     from . import support_app
     app.include_router(support_app.router)
+    from . import tgapp
+    app.include_router(tgapp.router)
 
     @app.exception_handler(api.ApiError)
     async def _api_error(request: Request, exc: api.ApiError):

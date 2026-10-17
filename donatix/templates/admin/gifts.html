@@ -1,0 +1,73 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Подарки Telegram — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Подарки Telegram</h1>
+  <p>Мини-приложение <code>/tg</code> (Stars · Premium · Подарки). Подарки уходят с баланса Stars бота{% if bot %} @{{ bot }}{% endif %}.
+    Пополнить бота: напишите ему <code>/topup 500</code> и оплатите счёт в Stars.</p></section>
+
+{% if not on %}<div class="flash error"><span>Бот мини-приложения не подключён: добавьте <code>DONATIX_GIFT_BOT_TOKEN</code> в <code>.env</code>
+  на сервере и перезапустите сайт.</span></div>{% endif %}
+
+<div class="grid three" style="gap:12px">
+  <div class="card"><div class="muted small">Баланс Stars бота</div>
+    <b style="font-size:1.6rem">{% if balance is not none %}⭐ {{ balance }}{% else %}—{% endif %}</b>
+    {% if balance is not none and balance < s.low_stars %}<div class="muted small" style="color:#ff5c7a">мало — пополните: /topup 500</div>{% endif %}</div>
+  <div class="card"><div class="muted small">Ждут отправки</div><b style="font-size:1.6rem">{{ (counts.paid or 0) + (counts.sending or 0) + (counts.unknown or 0) }}</b>
+    <div class="muted small">ждут получателя: {{ counts.awaiting_recipient or 0 }}</div></div>
+  <div class="card"><div class="muted small">Отправлено</div><b style="font-size:1.6rem">{{ counts.sent or 0 }}</b>
+    <div class="muted small">ошибок: {{ counts.failed or 0 }} · возвратов: {{ counts.refunded or 0 }}</div></div>
+</div>
+
+<form class="card" method="post" action="/admin/gifts" style="margin-top:14px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="grid three" style="gap:12px">
+    <div><label for="mk">Наценка на подарки, % <small class="muted">сверх цены Stars на сайте</small></label>
+      <input id="mk" name="markup_pct" inputmode="decimal" value="{{ s.markup_pct }}"></div>
+    <div><label for="sc">Ваша цена 1 Star, $ <small class="muted">для расчёта прибыли</small></label>
+      <input id="sc" name="star_cost_usd" inputmode="decimal" value="{{ s.star_cost_usd }}"></div>
+    <div><label for="lw">Тревога, если Stars меньше</label><input id="lw" name="low_stars" inputmode="numeric" value="{{ s.low_stars }}"></div>
+  </div>
+  <p class="muted small">Цена подарка = звёзды × цена 1 Star в каталоге (как на вкладке Stars) + наценка.</p>
+  <button class="btn primary" style="margin-top:8px">Сохранить</button>
+</form>
+
+<h2 class="section-title">Заказы</h2>
+<div class="chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+  <a class="btn sm {{ 'primary' if not status }}" href="/admin/gifts">Все</a>
+  {% for k, v in titles.items() %}<a class="btn sm {{ 'primary' if status == k }}" href="/admin/gifts?status={{ k }}">{{ v }} · {{ counts[k] or 0 }}</a>{% endfor %}
+</div>
+<div class="table-wrap card"><table>
+  <thead><tr><th>#</th><th>Подарок</th><th>Покупатель → получатель</th><th>Цена</th><th>Статус</th><th></th></tr></thead>
+  <tbody>
+  {% for o in orders %}
+    <tr><td>{{ o.id }}</td><td>{{ o.emoji or '🎁' }} ⭐{{ o.star_count }}</td>
+      <td>{{ o.login }} → {{ o.recipient or '…' }}{% if o.recipient_id %} <small class="muted">({{ o.recipient_id }})</small>{% endif %}</td>
+      <td>{{ money(o.price_micro) }}</td>
+      <td>{{ o.status_title }}{% if o.error %}<div class="muted small">{{ o.error }}</div>{% endif %}<div class="muted small">{{ o.created_at | dt }}</div></td>
+      <td style="white-space:nowrap">
+        {% if o.status in ('failed', 'unknown') and o.recipient_id %}<form method="post" action="/admin/gifts/order/{{ o.id }}/retry" style="display:inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Повторить</button></form>{% endif %}
+        {% if o.status in ('awaiting_recipient', 'paid', 'unknown') %}<form method="post" action="/admin/gifts/order/{{ o.id }}/refund" style="display:inline"
+          onsubmit="return confirm('Вернуть деньги клиенту?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Возврат</button></form>{% endif %}
+      </td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Заказов нет.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+
+<h2 class="section-title">Каталог подарков</h2>
+<form method="post" action="/admin/gifts/sync" style="margin-bottom:10px"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn sm">{{ icon('refresh', 16) }} Обновить из Telegram</button></form>
+<div class="table-wrap card"><table>
+  <thead><tr><th></th><th>Звёзд</th><th>Осталось</th><th>В продаже</th><th></th></tr></thead>
+  <tbody>
+  {% for g in gifts %}
+    <tr><td>{% if g.img %}<img src="/tg/gift/{{ g.img }}" alt="" width="36" height="36">{% else %}{{ g.emoji or '🎁' }}{% endif %}</td>
+      <td>⭐{{ g.star_count }}</td><td>{{ g.remaining if g.remaining is not none else '∞' }}</td>
+      <td>{% if not g.active %}нет{% if g.premium %} (премиум){% endif %}{% elif g.hidden %}скрыт{% else %}да{% endif %}</td>
+      <td><form method="post" action="/admin/gifts/{{ g.id }}/hide"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn sm">{{ 'Показать' if g.hidden else 'Скрыть' }}</button></form></td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Каталог пуст — нажмите «Обновить из Telegram».</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

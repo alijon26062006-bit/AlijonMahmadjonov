@@ -90,10 +90,10 @@ def build(conn: sqlite3.Connection, period: str, *, user_id: int | None = None, 
 
 # Откуда пришёл заказ: сайт, наш бот, бот партнёра (конструктор) или чужой сайт/бот по API-ключу
 CHANNELS = (("site", "🌐 Сайт", "donatix.tj и мини-приложение"),
-            ("ourbot", "🤖 Наш бот", "бот-магазин Donatix"),
+            ("ourbot", "🤖 Наш бот", "бот-магазин и мини-приложение Stars"),
             ("pbots", "🧩 Боты партнёров", "запущены в конструкторе Donatix"),
             ("api", "🔑 API партнёров", "их сайты и боты по API-ключу"))
-_CHANNEL_SQL = ("CASE WHEN source IN ('panel', 'quick') THEN 'site' WHEN source = 'shopbot' THEN 'ourbot' "
+_CHANNEL_SQL = ("CASE WHEN source IN ('panel', 'quick') THEN 'site' WHEN source IN ('shopbot', 'tgapp') THEN 'ourbot' "
                 "WHEN api_key_id IN (SELECT api_key_id FROM bots WHERE api_key_id IS NOT NULL) THEN 'pbots' "
                 "WHEN source = 'api' OR api_key_id IS NOT NULL THEN 'api' ELSE 'site' END")
 
