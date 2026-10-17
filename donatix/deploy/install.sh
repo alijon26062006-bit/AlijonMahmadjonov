@@ -115,6 +115,8 @@ WorkingDirectory=$APP_DIR
 ExecStart=$APP_DIR/.venv/bin/python -m donatix serve --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=3
+TimeoutStopSec=10
+KillMode=mixed
 
 [Install]
 WantedBy=multi-user.target
