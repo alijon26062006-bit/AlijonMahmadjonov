@@ -1086,7 +1086,18 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
         "user": user, "p": catalog.public_view(p, markup, config=config, user=user), "siblings": siblings, "idem": str(uuid.uuid4()),
         "can_check": account_check.can_check(request.app.state.supplier, p), "form": {},
         "delivery_note": catalog.delivery_note(p.get("category_name")), **extra,
+        "promo_used": _promo_used(conn, user, p),
     }
+
+
+def _promo_used(conn, user, p: dict) -> dict | None:
+    """Клиент уже купил этот товар по акции — объясняем, почему сейчас обычная цена."""
+    from . import promo
+    a = promo.active(conn)
+    if not a or a["product_id"] != p["id"] or user is None or "id" not in user.keys():
+        return None
+    order = promo.used(conn, user["id"], a)
+    return {"order": order, "reason": promo.LIMIT_REASON} if order else None
 
 
 def _start_guest(request: Request, conn) -> sqlite3.Row:

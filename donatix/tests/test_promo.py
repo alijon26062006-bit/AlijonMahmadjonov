@@ -195,3 +195,47 @@ def test_take_never_empties_pool(conn):
     pool = dcoin.state(conn)["pool"]
     taken = dcoin.take_for_promo(conn, pool * 10)
     assert taken == int(pool * dcoin.PROMO_MAX_TAKE) and dcoin.state(conn)["pool"] > 0
+
+
+def test_one_promo_voucher_per_buyer(conn, config, supplier, monkeypatch):
+    """По акции — 1 раз на покупателя (аккаунт сайта или бота; покупки до правила тоже в счёт).
+    Дальше — обычная цена с объяснением; 2 шт. сразу — отказ с причиной; другой покупатель — по акции."""
+    pid = _ff(conn)
+    _start(conn, pid)
+    product = catalog.get_product(conn, pid)
+
+    def make(login):
+        uid = accounts.create_user(conn, email=f"{login}@example.com", login=login, password="password123",
+                                   status="active")
+        with db.tx(conn):
+            accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
+        return uid
+
+    def buy(uid, key, qty=1):
+        fields = {f["key"]: "111222333" for f in product["fields"]}
+        order, _ = orders.create_order(conn, config, supplier, accounts.get_user(conn, uid), product_id=pid,
+                                       quantity=qty, fields=fields, client_idem_key=key, source="panel")
+        cache.clear()
+        return order
+    unit = int(promo.unit_usd(config, None, pid) * 10_000)
+    a, b = make("promo_a"), make("promo_b")
+    first = buy(a, "k1")
+    assert first["total_micro"] == unit and promo.used(conn, a) == first["public_id"]
+    assert promo.unit_usd(config, accounts.get_user(conn, a), pid) is None      # ему — уже обычная цена
+    assert buy(a, "k2")["total_micro"] != unit                                  # купил, но не по цене акции
+    assert buy(b, "k3")["total_micro"] == unit                                  # тот же игровой ID — можно
+    # Два заказа разом (корзина): цена ещё «акционная» в кеше — второй отказ с причиной, деньги целы
+    c = make("promo_c")
+    fields = {f["key"]: "111222333" for f in product["fields"]}
+    orders.create_order(conn, config, supplier, accounts.get_user(conn, c), product_id=pid, quantity=1,
+                        fields=fields, client_idem_key="c1", source="panel")
+    left = balance(conn, c)
+    monkeypatch.setattr(promo, "_used_cached", lambda *a: False)   # как будто кеш ещё не знает о покупке
+    try:
+        orders.create_order(conn, config, supplier, accounts.get_user(conn, c), product_id=pid, quantity=1,
+                            fields=fields, client_idem_key="c2", source="panel")
+        raise AssertionError("должен быть отказ")
+    except orders.OrderError as exc:
+        assert exc.code == "promo_limit" and "1 раз" in str(exc) and "dx-" in str(exc)
+    assert balance(conn, c) == left
+    assert promo.banner(conn, config)["limit"]

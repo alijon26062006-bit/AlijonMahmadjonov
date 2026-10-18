@@ -128,6 +128,7 @@
         {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
         {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
         <div id="s-price"><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>{% if p.promo %}<s class="promo-old">{{ money(p.regular_usd | price) }}</s> <b class="promo-tag">Акция</b> {% endif %}{{ money(p.price_usd | price(p.unit)) }}</span></div>
+        {% if promo_used %}<p class="hint" style="margin:6px 0">ℹ️ Акцию вы уже использовали (заказ {{ promo_used.order }}), поэтому сейчас обычная цена. {{ promo_used.reason.split(' / ')[0] }}</p>{% endif %}
         {% if not user.guest %}<div><span>Ваш баланс</span><span>{{ money(user.balance_micro) }}</span></div>{% endif %}
         <div class="total"><span>К оплате</span><span id="s-total">{{ money(p.price_usd | price) }}</span></div>
       </div>

@@ -19,6 +19,11 @@ from .config import Config
 
 KEY = "promo.v1"
 MAX_DAYS = 30
+# По акции — 1 штука на одного покупателя (аккаунт на сайте или в боте; засчитываются и покупки до этого правила):
+# цена акции должна достаться как можно большему числу игроков, а не перекупщикам.
+LIMIT_REASON = ("По акции ваучер можно купить только 1 раз на одного покупателя — так низкая цена "
+                "достанется как можно большему числу игроков, а не перекупщикам. "
+                "/ Бо нархи аксия ваучерро ҳар харидор танҳо 1 маротиба харида метавонад.")
 
 
 def get(conn: sqlite3.Connection) -> dict[str, Any] | None:
@@ -102,12 +107,15 @@ def _rate(config: Config) -> Decimal:
 
 
 def unit_usd(config: Config, user: Any, product_id: str) -> Decimal | None:
-    """Цена за 1 шт. по акции в долларах — или None (акции нет, товар другой, покупка через API).
+    """Цена за 1 шт. по акции в долларах — или None (акции нет, товар другой, покупка через API,
+    клиент уже купил по этой акции — дальше обычная цена).
 
     Вниз до 0.0001 $: 49 / 10.9 → 4.4954 $ → на экране и к оплате ровно 49.00 с., а не 49.01."""
     from .accounts import is_api
     p = _current(config)
     if p is None or p["product_id"] != product_id or (user is not None and is_api(user)):
+        return None
+    if user is not None and _used_cached(config, p, int(user["id"])):
         return None
     rate = _rate(config)
     if rate <= 0:
@@ -137,10 +145,47 @@ def _promo_id(p: dict[str, Any]) -> str:
     return str(int(float(p.get("starts", 0))))
 
 
+def used(conn: sqlite3.Connection, user_id: int, p: dict[str, Any] | None = None) -> str | None:
+    """Номер заказа, если клиент уже купил по этой акции (неуспешные не в счёт)."""
+    p = p or get(conn)
+    if not p:
+        return None
+    _ensure(conn)
+    row = conn.execute("SELECT o.public_id FROM promo_ledger l JOIN orders o ON o.id = l.order_id "
+                       "WHERE l.promo = ? AND o.user_id = ? AND o.status != 'failed' ORDER BY o.id LIMIT 1",
+                       (_promo_id(p), user_id)).fetchone()
+    return row[0] if row else None
+
+
+def _used_cached(config: Config, p: dict[str, Any], user_id: int) -> bool:
+    def load():
+        pool = db.pool(config.db_path)
+        c = pool.acquire()
+        try:
+            return used(c, user_id, p) is not None
+        finally:
+            pool.release(c)
+    return bool(cache.get_or_set(f"promo:used:{_promo_id(p)}:{user_id}", 5, load))
+
+
+def check(conn: sqlite3.Connection, user_id: int, qty: Any) -> None:
+    """Перед заказом по цене акции: 1 штука и 1 раз на покупателя. Иначе — ValueError с причиной."""
+    p = get(conn)
+    try:
+        many = Decimal(str(qty)) > 1
+    except InvalidOperation:
+        many = False
+    if many:
+        raise ValueError(LIMIT_REASON)
+    done = used(conn, user_id, p)
+    if done:
+        raise ValueError(f"{LIMIT_REASON} Уже куплено: заказ {done}.")
+
+
 def record(conn: sqlite3.Connection, order_id: int, micro: int) -> None:
     """Записать в той же транзакции, что и заказ, сколько недополучили по акции."""
     p = get(conn)
-    if not p or micro <= 0:
+    if not p or micro < 0:   # 0 — без минуса, но покупку по акции помним (лимит «1 раз на покупателя»)
         return
     _ensure(conn)
     conn.execute("INSERT OR REPLACE INTO promo_ledger (order_id, promo, micro) VALUES (?, ?, ?)",
@@ -179,7 +224,7 @@ def totals(conn: sqlite3.Connection, p: dict[str, Any] | None = None) -> dict[st
     row = conn.execute(
         "SELECT COALESCE(SUM(l.micro), 0) AS lost, COALESCE(SUM(l.taken), 0) AS back, COUNT(*) AS sold "
         "FROM promo_ledger l JOIN orders o ON o.id = l.order_id "
-        "WHERE l.promo = ? AND l.micro > 0 AND o.status != 'failed'", (_promo_id(p),)).fetchone()
+        "WHERE l.promo = ? AND o.status != 'failed'", (_promo_id(p),)).fetchone()
     lost, back = int(row["lost"]), int(row["back"])
     return {"lost": lost, "back": back, "left": max(0, lost - back), "sold": int(row["sold"])}
 
@@ -208,6 +253,7 @@ def banner(conn: sqlite3.Connection, config: Config) -> dict[str, Any] | None:
         "region_title": region_title(product.get("region")) if product.get("region") else "", "image": product.get("image_url"),
         "price": f"{new_tjs:.2f}".removesuffix(".00"), "old": str(old_tjs) if off >= 5 else "", "off": off if off >= 5 else 0,
         "ends": int(float(p["ends"])),
+        "limit": "1 раз на покупателя",
     }
 
 

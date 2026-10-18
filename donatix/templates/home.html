@@ -62,7 +62,7 @@
       <span class="promo-body">
         <span class="promo-kicker">{{ icon('flame', 16) }} Акция · <span data-promo-end>ограниченное время</span></span>
         <span class="promo-title">{{ promo.title }}</span>
-        <span class="promo-game">{{ promo.game }}{% if promo.region_title %} · {{ promo.region_title }}{% endif %}</span>
+        <span class="promo-game">{{ promo.game }}{% if promo.region_title %} · {{ promo.region_title }}{% endif %}{% if promo.limit %} · {{ promo.limit }}{% endif %}</span>
         <span class="promo-prices">
           <b class="promo-price">{{ promo.price }}<small> сомони</small></b>
           {% if promo.old %}<s class="promo-was">{{ promo.old }} с.</s><span class="promo-off">−{{ promo.off }}%</span>{% endif %}

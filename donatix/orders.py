@@ -143,11 +143,13 @@ def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Dec
     regular = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
     unit = promo.unit_usd(config, user, product.get("id", ""))   # акция — только сайт и свой бот, не API
     promo_micro = 0   # сколько недополучили по акции (обычная цена − цена акции) — заберём из копилки D-коина
-    if unit is not None:
+    is_promo = unit is not None
+    if is_promo:
         promo_micro = max(0, order_total_micro(regular, units) - order_total_micro(unit, units))
     else:
         unit = regular
-    return {"unit_price": unit, "total_micro": order_total_micro(unit, units), "promo_micro": promo_micro}
+    return {"unit_price": unit, "total_micro": order_total_micro(unit, units), "promo_micro": promo_micro,
+            "promo": is_promo}
 
 
 # Сомони → доллары при пополнении и смена курса дают «копеечную» нехватку: на экране 15.61 с. и цена 15.61 с.,
@@ -239,8 +241,12 @@ def create_order(
             if gap:
                 accounts.post_ledger(conn, user["id"], gap, "Округление курса сомони", order_id=order_id)
             accounts.post_ledger(conn, user["id"], -q["total_micro"], f"Заказ {public_id}", order_id=order_id)
-            if q["promo_micro"]:
+            if q["promo"]:   # по цене акции — даже если она не ниже обычной: лимит «1 раз» всё равно действует
                 from . import promo
+                try:   # внутри транзакции: два заказа разом не проскочат
+                    promo.check(conn, user["id"], qty)
+                except ValueError as exc:
+                    raise OrderError(str(exc), "promo_limit", 409) from None
                 promo.record(conn, order_id, q["promo_micro"])
     except accounts.InsufficientBalance as exc:
         raise OrderError(
