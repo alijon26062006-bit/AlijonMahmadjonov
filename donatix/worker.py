@@ -196,6 +196,11 @@ class Worker:
                 except Exception:
                     log.exception("уведомления мини-приложения")
                 try:
+                    from . import buyernotify
+                    buyernotify.tick(conn, self.config)  # всем с Telegram: заказ выполнен / возврат, пополнение
+                except Exception:
+                    log.exception("уведомления покупателям")
+                try:
                     from . import quickbuy
                     quickbuy.run_pending(conn, self.config, self.supplier)   # оплатили покупку — оформить заказ
                 except Exception:

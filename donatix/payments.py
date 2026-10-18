@@ -505,6 +505,12 @@ def _tell_shop_buyer(conn: sqlite3.Connection, config: Config, payment_id: int) 
     except Exception:  # noqa: BLE001
         import logging
         logging.getLogger(__name__).exception("мини-приложение: уведомление о заявке #%s", payment_id)
+    try:
+        from .buyernotify import push_payment
+        push_payment(conn, config, payment_id)   # купил на сайте, но Telegram связан — тоже пишем
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("уведомление покупателю о заявке #%s", payment_id)
 
 
 def mark_fake(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, *, who: str = "") -> int:

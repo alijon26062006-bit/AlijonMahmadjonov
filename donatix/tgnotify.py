@@ -139,6 +139,10 @@ def tick(conn: sqlite3.Connection, config: Config, *, kind: str = "", obj_id: in
         # Забираем запись первой — второй процесс то же сообщение не пришлёт
         if not conn.execute("DELETE FROM tgapp_watch WHERE id = ?", (w["id"],)).rowcount or not text:
             continue
+        if w["kind"] in ("order", "pay"):
+            from .buyernotify import mark
+            if not mark(conn, w["kind"], w["obj_id"]):   # уже написали (одно событие — одно сообщение)
+                continue
         t = T.get(w["lang"], T["tj"])
         try:
             tggifts.call(config, "sendMessage", chat_id=w["tg_id"], text=text,

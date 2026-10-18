@@ -1886,7 +1886,9 @@ class ShopBot:
                     continue
                 rows_kb = [[(tr(w["lang"], "repeat"), f"rp:{o['public_id']}", "success")],
                            [(tr(w["lang"], "home"), "h")]]
-                self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb)
+                from .buyernotify import mark
+                if mark(conn, "order", o["id"]):   # одно событие — одно сообщение
+                    self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb)
             else:
                 p = conn.execute("SELECT * FROM payments WHERE id = ?", (w["obj_id"],)).fetchone()
                 if p is None or p["status"] == "pending":
@@ -1895,6 +1897,10 @@ class ShopBot:
                     continue
                 # Забираем запись первой: о заявке пишет кто-то один — этот цикл или payment_push
                 if not conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],)).rowcount:
+                    continue
+                from .buyernotify import mark
+                # «пополнить и сразу купить» — заказ оформляем всегда; просто сообщение — если ещё не писали
+                if not mark(conn, "pay", p["id"]) and not w["intent"]:
                     continue
                 self.payment_result(conn, w, p)
                 done += 1
@@ -1979,12 +1985,16 @@ def payment_push(conn: sqlite3.Connection, config: Config, payment_id: int, api:
                         "WHERE w.kind = 'pay' AND w.obj_id = ?", (payment_id,)).fetchall()
     if any(w["intent"] for w in rows):
         return 0
+    from .buyernotify import mark
     from .tgbot import TelegramApi
     api = api or TelegramApi(config.shop_bot_token)
     sent = 0
+    first = bool(rows) and mark(conn, "pay", payment_id)   # одно событие — одно сообщение
     for w in rows:
         if not conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],)).rowcount:
             continue   # уже ответил бот
+        if not first:
+            continue
         lang = w["lang"]
         text = payment_text(conn, config, lang, p, w["user_id"])
         rows_kb = ([[(tr(lang, "home"), "h")]] if p["status"] == "paid"
