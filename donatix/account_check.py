@@ -236,6 +236,26 @@ def check(supplier: Supplier, product: dict[str, Any], fields: dict[str, str]) -
     return result
 
 
+def peek(supplier: Supplier, product: dict[str, Any], fields: dict[str, str]) -> dict[str, Any] | None:
+    """Ответ без похода к поставщику: из памяти или базы. None — ещё не проверяли (тогда — check() в фоне)."""
+    keys = [f["key"] for f in product.get("fields") or []]
+    if keys:
+        fields = {k: str(fields.get(k, "")).strip()[:100] for k in keys}
+        if not all(fields.values()):
+            return None
+    key = _store_key(supplier, product, fields)
+    with _lock:
+        hit = _results.get(key)
+        if hit and time.monotonic() - hit[0] < 300:
+            return hit[1]
+    row = _saved(key)
+    if row is None:
+        return None
+    if row["valid"] or time.time() - row["checked_at"] < NOT_FOUND_TTL:
+        return _from_saved(row)
+    return None
+
+
 def reset() -> None:
     global _supported
     with _lock:

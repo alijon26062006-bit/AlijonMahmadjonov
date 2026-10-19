@@ -39,7 +39,7 @@ PACKS = 24                    # пакетов на странице
 MSG_LIMIT = (30, 10)          # не больше 30 действий за 10 секунд
 WATCH_EVERY = 4               # как часто проверять статусы заказов и пополнений, сек
 POLL_SECONDS = 25             # долгий опрос Telegram: новое сообщение приходит сразу, без пустых запросов
-HANDLERS = 8                  # сколько покупателей обслуживаем одновременно
+HANDLERS = 32                 # сколько покупателей обслуживаем одновременно (ждут поставщика — не держат остальных)
 CHAT_QUEUE = 20               # больше сообщений одного покупателя в очереди не держим
 FINAL = ("completed", "failed", "cancelled", "refunded")
 
@@ -118,6 +118,7 @@ T: dict[str, tuple[str, str]] = {
                 "🧾 <b>Фармоишро санҷед</b>\n\n{product}\n{fields}\n💵 Пардохт: <b>{total}</b>\n"
                 "💰 Дар баланс: {balance}"),
     "pay": ("✅ Оплатить", "✅ Пардохт"),
+    "placing": ("⏳ <b>Оформляю заказ…</b>", "⏳ <b>Фармоиш расмӣ мешавад…</b>"),
     "cancel": ("❌ Отмена", "❌ Бекор"),
     "pay_cancel": ("❌ Отменить заявку", "❌ Бекор кардани дархост"),
     "pay_open": ("⏳ <b>Заявка #{id}</b> на {amount} ждёт оплаты или проверки.\nПередумали — отмените её кнопкой ниже.",
@@ -1293,7 +1294,8 @@ class ShopBot:
         name = p["name"] + (f" × {qty}" if qty > 1 else "")
         lines = "\n".join(f"• {_e(s.get('label') or s['key'])}: <b>{_e(fields.get(s['key'], ''))}</b>"
                           for s in p["fields"])
-        lines += self.nick_line(p, fields, lang)
+        nick, later = self.nick_line(p, fields, lang)
+        lines += nick
         text = tr(lang, "confirm", product=f"<b>{_e(name)}</b>", fields=lines, total=money(total, rate),
                   balance=money(user["balance_micro"], rate))
         if user["balance_micro"] < total and not orders.rounding_gap(user["balance_micro"], total, "shopbot"):
@@ -1304,22 +1306,58 @@ class ShopBot:
         else:
             rows = [[(tr(lang, "pay"), "ok", "success")], [(tr(lang, "cancel"), "x", "danger")]]
         st["msg"] = self.show(tg_id, text, rows, edit=st.get("msg"))
+        if later and st["msg"]:   # ник ещё не знаем — экран уже показан, ник допишем, когда ответит поставщик
+            threading.Thread(target=self._nick_later, args=(tg_id, st, p, fields, lang, text, rows),
+                             name="donatix-shop-nick", daemon=True).start()
 
-    def nick_line(self, p: dict[str, Any], fields: dict[str, str], lang: str) -> str:
-        """Ник игрока по ID — чтобы человек убедился, что донат уйдёт на его аккаунт."""
+    def nick_line(self, p: dict[str, Any], fields: dict[str, str], lang: str) -> tuple[str, bool]:
+        """Ник игрока по ID — чтобы человек убедился, что донат уйдёт на его аккаунт.
+        Только то, что уже известно (без ожидания поставщика). Второе значение — нужно ли спросить в фоне."""
         from . import account_check
         try:
             if not fields or not account_check.can_check(self.supplier, p):
-                return ""
-            r = account_check.check(self.supplier, p, fields)
+                return "", False
+            r = account_check.peek(self.supplier, p, fields)
         except Exception:  # noqa: BLE001 — проверка — подсказка, покупке не мешает
             log.exception("бот-магазин: проверка ника")
-            return ""
+            return "", False
+        if r is None:
+            return "", True
+        return self._nick_text(r, lang), False
+
+    @staticmethod
+    def _nick_text(r: dict[str, Any], lang: str) -> str:
         if r.get("valid") and r.get("player_name"):
             return "\n" + tr(lang, "nick_ok", name=_e(r["player_name"]))
         if r.get("valid") is False:
             return "\n" + tr(lang, "nick_bad")
         return ""
+
+    def _nick_later(self, tg_id: int, st: dict[str, Any], p: dict[str, Any], fields: dict[str, str], lang: str,
+                    text: str, rows: list) -> None:
+        """Спросить ник у поставщика и дописать его в уже показанный экран подтверждения."""
+        from . import account_check
+        try:
+            nick = self._nick_text(account_check.check(self.supplier, p, fields), lang)
+        except Exception:  # noqa: BLE001
+            log.exception("бот-магазин: проверка ника")
+            return
+        # человек мог уже нажать «Оплатить» или уйти с экрана — тогда не трогаем
+        if not nick or self.state.get(tg_id) is not st or st.get("step") != "confirm":
+            return
+        try:
+            self.show(tg_id, self._with_nick(text, nick), rows, edit=st.get("msg"))
+        except Exception:  # noqa: BLE001
+            pass
+
+    @staticmethod
+    def _with_nick(text: str, nick: str) -> str:
+        """Ник — сразу после строк с данными (перед «К оплате»), а если формат неизвестен — в конец."""
+        lines = text.split("\n")
+        last = max((i for i, line in enumerate(lines) if line.startswith("• ")), default=None)
+        if last is None:
+            return text + nick
+        return "\n".join(lines[:last + 1] + [nick.lstrip("\n")] + lines[last + 1:])
 
     def buy(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None) -> None:
         tg_id, lang = su["tg_id"], su["lang"]
@@ -1328,6 +1366,11 @@ class ShopBot:
         if p is None:
             self.screen_home(conn, su, edit)
             return
+        if edit:   # сразу видно, что нажатие принято: поставщик может отвечать несколько секунд
+            try:
+                self.show(tg_id, tr(lang, "placing"), None, edit=edit)
+            except Exception:  # noqa: BLE001
+                pass
         try:
             order, _ = orders.create_order(conn, self.config, self.supplier, self._user(conn, su),
                                            product_id=p["id"], quantity=st["qty"], fields=st["fields"],

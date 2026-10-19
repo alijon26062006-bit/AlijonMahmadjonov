@@ -464,3 +464,39 @@ def test_buyers_are_served_in_parallel_but_each_in_order(config, supplier, monke
     assert done.index((2, "fast")) < done.index((1, "slow"))          # второй не ждал первого
     assert done.index((1, "slow")) < done.index((1, "after"))         # у одного — по порядку
     bot._pool.shutdown()
+
+
+def test_id_answer_is_instant_nick_added_later(app, config, conn, supplier, monkeypatch):
+    """ID прислали — экран подтверждения сразу, без ожидания поставщика; ник дописывается в то же сообщение.
+    «Оплатить» — сразу «Оформляю заказ…»."""
+    import threading
+
+    from donatix import account_check
+    gate = threading.Event()
+    monkeypatch.setattr(account_check, "can_check", lambda *a: True)
+    monkeypatch.setattr(account_check, "peek", lambda *a: None)              # ещё не проверяли
+
+    def slow_check(*a):
+        gate.wait(5)                                                         # поставщик «думает»
+        return {"valid": True, "player_name": "ProGamer", "strict": True}
+    monkeypatch.setattr(account_check, "check", slow_check)
+    bot = _bot(config, supplier)
+    su = _start(bot, conn)
+    _fund(conn, su["user_id"])
+    bot.handle(conn, press("g:games:0"))
+    bot.handle(conn, press(bot.api.button("PUBG")))
+    bot.handle(conn, press(bot.api.last_buttons()[0]["callback_data"]))
+    bot.handle(conn, msg("5123456789"))                                      # ответ не ждёт поставщика
+    first = bot.api.last_text()
+    assert "Проверьте заказ" in first and "ProGamer" not in first
+    gate.set()
+    for t in threading.enumerate():
+        if t.name == "donatix-shop-nick":
+            t.join(5)
+    edited = [p for m, p in bot.api.calls if m == "editMessageText" and "ProGamer" in p.get("text", "")]
+    assert edited and "5123456789" in edited[-1]["text"] and "К оплате" in edited[-1]["text"]
+    assert edited[-1]["text"].index("ProGamer") < edited[-1]["text"].index("К оплате")
+    bot.handle(conn, press("ok"))
+    texts = [p.get("text", "") for m, p in bot.api.calls]
+    assert any("Оформляю заказ" in t for t in texts)
+    assert texts.index(next(t for t in texts if "Оформляю" in t)) < texts.index(next(t for t in texts if "принят" in t))
