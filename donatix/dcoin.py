@@ -120,6 +120,7 @@ RESERVE0 = 1_000_000_000 * UNIT   # от этого считается пред�
 DRIFT = 0.002                     # каждая покупка: +0.2%
 UP_K = 0.0404                     # рост: × ln(во сколько раз больше)
 DOWN_K = 0.0493                   # падение: × ln(во сколько раз меньше) — вместе с DRIFT выходит чуть меньше роста
+MIN_POOL = 100                   # копилка меньше цента и запас на пределе — график «застрял», см. steer()
 WICK = 0.4                        # тень свечи: цена «простреливает» на 40% дальше и откатывается назад
 
 
@@ -304,14 +305,25 @@ def steer(cur: dict[str, int], units: int, to_pool: int, cap: int, ratio: float)
     coins = supply + reserve
     if pool <= 0 or coins <= 0:                         # первая покупка — цена START_PRICE
         return to_pool, _start_reserve(to_pool, supply + units)
+    limit = max(RESERVE0, supply) * 4                   # запас не раздувается без предела
     target = pool / coins * (1 + move_for(ratio))
     new_reserve = int((pool + to_pool) / target) - (supply + units)
     if new_reserve >= 0:
-        limit = max(RESERVE0, supply) * 4               # запас не раздувается без предела
         if new_reserve <= limit:
             return to_pool, new_reserve
-        # копилка растёт быстрее, чем запас успевает сдержать цену, — кладём меньше (экономия сайта)
-        return max(0, min(to_pool, int(target * (supply + units + limit)) - pool)), limit
+        # Запас на пределе: цену держит сама копилка. Рост — кладём меньше (экономия сайта); падение — сайт
+        # забирает из копилки ровно столько, чтобы цена опустилась на шаг (не больше MAX_STEP копилки).
+        kept = min(to_pool, int(target * (supply + units + limit)) - pool)
+        kept = max(kept, -int(pool * MAX_STEP))
+        if kept > 0 or to_pool <= 0 or pool >= MIN_POOL:
+            return kept, limit
+        # Копилку почти до нуля забрала акция, а запас на пределе: покупка не может положить в копилку
+        # даже микроцент, и график стоит. Начинаем от «настоящей» цены (копилка ÷ монеты людей): один
+        # зелёный скачок вверх, дальше — обычные шаги, а доля прибыли снова копится в копилке.
+        target = pool / supply * (1 + move_for(ratio)) if supply > 0 else 0
+        if target > 0:
+            return to_pool, max(0, min(limit, int((pool + to_pool) / target) - (supply + units)))
+        return to_pool, 0
     return smooth(pool, supply, units, to_pool, cap), 0
 
 

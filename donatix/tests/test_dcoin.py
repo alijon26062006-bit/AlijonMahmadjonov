@@ -313,6 +313,7 @@ def test_too_many_zeros_rebased_once_with_history(conn, monkeypatch):
     uid = _user(conn)
     db.set_setting(conn, "dcoin.rebase1", "skip")                       # как было на сервере: цена в нулях
     monkeypatch.setattr(dcoin, "START_PRICE", 1e-11)
+    monkeypatch.setattr(dcoin, "MIN_POOL", 0)                           # выход из «застоя» здесь не нужен
     for total in (30_000, 50_000, 40_000):
         _buy(conn, uid, total)
     before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
@@ -346,3 +347,24 @@ def test_change_resets_at_midnight_and_past_days_kept(conn):
     past = dcoin.days(conn)
     assert past and past[0]["day"].date() == (today - timedelta(days=1)).date()           # вчера в истории
     assert past[0]["high"] >= past[0]["close"] and past[0]["low"] <= past[0]["open"]
+
+
+def test_stuck_after_promo_drained_pool_moves_again(conn):
+    """Акция выбрала копилку почти до нуля, запас на пределе — покупки не двигали цену (стояла на 2.5e-14).
+    Теперь: один скачок к «настоящей» цене, дальше цена снова растёт с каждой покупкой, копилка копится."""
+    uid = _user(conn)
+    _buy(conn, uid, 50_000)
+    s = dcoin.state(conn)
+    limit = max(dcoin.RESERVE0, s["supply"]) * 4
+    dcoin._point(conn, 1, s["supply"], "promo", reserve=limit)            # как на сервере: копилка $0.0001
+    stuck = dcoin.price(conn)
+    prices = []
+    for _ in range(5):
+        _buy(conn, uid, 50_000)
+        prices.append(dcoin.price(conn))
+    assert prices[0] > stuck * 100                                         # вышли из «нуля»
+    assert all(b > a for a, b in pairwise(prices))                         # и дальше растёт с каждой покупкой
+    for a, b in pairwise(prices):
+        assert (b - a) / a <= 0.0401
+    s = dcoin.state(conn)
+    assert s["pool"] > 1 and dcoin.quote(conn, s["supply"]) <= s["pool"]  # копилка снова копится, без минуса

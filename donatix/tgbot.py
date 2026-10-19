@@ -79,6 +79,10 @@ class TelegramApi:
         resp = self._client.post(method, json=payload)
         data = resp.json()
         if not data.get("ok"):
+            # Нажатие кнопки ждало в очереди дольше, чем Telegram ждёт ответа (например, во время перезапуска):
+            # «часики» на кнопке уже погасли сами — это не повод бросать обработку нажатия
+            if method == "answerCallbackQuery" and "query is too old" in str(data.get("description")):
+                return None
             raise RuntimeError(f"telegram {method}: {data.get('description')}")
         return data.get("result")
 
