@@ -135,8 +135,8 @@ def test_each_purchase_moves_price_softly(conn):
     for total, cost in ((10_000, 9_900), (500_000, 200_000), (3_000, 2_990), (90_000, 60_000), (1_000, 1_000)):
         _buy(conn, uid, total, cost)
     prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason != 'peak' ORDER BY id")]
-    for a, b in pairwise(prices[1:]):                          # после первой покупки — шаги не больше 3%
-        assert abs(b - a) / a <= 0.0301, (a, b)
+    for a, b in pairwise(prices[1:]):                          # после первой покупки — шаги не больше 4%
+        assert abs(b - a) / a <= 0.0401, (a, b)
     profit = conn.execute("SELECT SUM(total_micro - cost_micro) FROM orders").fetchone()[0]
     assert dcoin.state(conn)["pool"] <= profit * 20 // 100
 
@@ -166,9 +166,9 @@ def test_launch_price_starts_near_zero_and_grows_softly(conn, monkeypatch):
     for _ in range(300):
         _buy(conn, uid, 100_000)                                       # $10 каждая
     prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason = 'buy' ORDER BY id")]
-    assert prices[-1] > first * 3                                     # растёт по мере покупок
+    assert prices[-1] > first * 1.5                                   # растёт по мере покупок (+0.2% за каждую)
     for a, b in pairwise(prices[1:]):
-        assert abs(b - a) / a <= 0.0301                                 # и мягко, без скачков
+        assert abs(b - a) / a <= 0.0401                                 # и мягко, без скачков
     s = dcoin.state(conn)
     everything = dcoin.quote(conn, s["supply"])
     assert everything <= s["pool"]                                     # людям — не больше копилки
@@ -199,8 +199,11 @@ def test_price_follows_previous_purchase(conn):
     _buy(conn, uid, 60_000)                                            # $6 после $4 — снова вверх
     p3 = dcoin.price(conn)
     assert p1 > p0 and p2 < p1 and p3 > p2
-    for a, b in ((p0, p1), (p1, p2), (p2, p3)):
-        assert 0.0099 <= abs(b - a) / a <= 0.0301                        # от 1% до 3% — видно, но мягко
+    # по проценту разницы с предыдущей покупкой; падение чуть мягче роста
+    for (a, b), ratio in zip(((p0, p1), (p1, p2), (p2, p3)), (5 / 3, 4 / 5, 6 / 4)):
+        assert abs((b - a) / a - dcoin.move_for(ratio)) < 0.001, (a, b, ratio)
+    assert round(dcoin.move_for(5 / 4) * 100, 1) == 1.1 and round(dcoin.move_for(4 / 5) * 100, 1) == -0.9
+    assert round(dcoin.move_for(1) * 100, 1) == 0.2 and dcoin.move_for(0.1) == -dcoin.MAX_STEP
 
 
 def test_history_for_scrolling_back(conn):
