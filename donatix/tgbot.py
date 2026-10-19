@@ -621,6 +621,7 @@ class AdminBot:
                    + receipt_text(conn, self.config, pid))
         buttons: Buttons = [[(f"✅ Принять ${fmt(p['amount_micro'])}", f"q:ok:{pid}"), ("❌ Отклонить", f"q:no:{pid}")],
                             [("⏭ Следующая" if len(ids) > 1 else "🔄 Обновить", f"q:next:{pid}")]]
+        buttons += dup_buttons(conn, pid)
         path = receipts_dir(self.config) / p["receipt_file"]
         mid = cashiers.send_file(self.config, chat_id, caption, buttons, path,
                                  photo=not p["receipt_file"].endswith(".pdf")) if path.exists() else None
@@ -644,6 +645,10 @@ class AdminBot:
             self.api("answerCallbackQuery", callback_query_id=cq["id"])
             current = db.get_setting(conn, self._queue_key(chat_id)) or ""
             self.show_queue(conn, chat_id, cashier, replace=int(current) if current.isdigit() else None)
+            return
+        if action == "show":   # «этот чек уже был» — открыть старую заявку
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            self.find(conn, chat_id, f"#{pid}", cashier)
             return
         if action == "find":
             self.api("answerCallbackQuery", callback_query_id=cq["id"])
@@ -688,7 +693,7 @@ class AdminBot:
             caption = receipt_text(conn, self.config, pid) + "\n\n" + status_line(conn, self.config, pid)
             can_decide = p["status"] == "pending" and p["receipt_file"] and (
                 cashier is None or pid in queue_ids(conn, self.config, cashier))   # свой банк и не своя заявка
-            buttons = payment_event(conn, pid, self.config)[1] if can_decide else None
+            buttons = (payment_event(conn, pid, self.config)[1] if can_decide else []) + dup_buttons(conn, pid) or None
             if p["status"] == "pending" and p["receipt_file"] and not can_decide:
                 caption += "\n<i>Эту заявку решает кассир другого банка или админ.</i>"
             path = receipts_dir(self.config) / p["receipt_file"] if p["receipt_file"] else None
@@ -781,6 +786,7 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     if not p or not p["receipt_file"]:
         return
     _, buttons = payment_event(conn, payment_id, config)
+    buttons = buttons + dup_buttons(conn, payment_id)
     caption = (note + "\n\n" if note else "") + receipt_text(conn, config, payment_id)
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
@@ -792,6 +798,16 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
             continue
         mid = cashiers.send_file(config, c["tg_id"], caption, buttons, path, photo=photo)
         cashiers.remember(conn, payment_id, c["tg_id"], mid, caption)
+
+
+def dup_buttons(conn: sqlite3.Connection, payment_id: int) -> Buttons:
+    """Чек уже присылали к другой заявке — кнопка, чтобы открыть ту, старую."""
+    row = conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    try:
+        old = int((json.loads(row["receipt_ai"]) if row and row["receipt_ai"] else {}).get("dup_of") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return []
+    return [[(f"🔎 Этот чек уже был — открыть заявку #{old}", f"q:show:{old}")]] if old else []
 
 
 def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> str:

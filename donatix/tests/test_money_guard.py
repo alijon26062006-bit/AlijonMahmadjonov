@@ -1,6 +1,8 @@
 """Защита денег: атаки из аудита безопасности больше не проходят."""
 from datetime import datetime, timezone
 
+import pytest
+
 from conftest import balance
 
 from donatix import accounts, db, dcbank, orders, payments
@@ -27,8 +29,8 @@ def _notice(amount, kod):
             f"Otpravitel 9990000***1111\nKod {kod}\nKarta 9999000011115678\nBalans 3 686.07 TJS")
 
 
-def test_dc_auto_paid_receipt_reuse_is_flagged(app, config, conn):
-    """Перевод зачислен автоматически по уведомлению банка, потом тот же чек — ко второй заявке: «ЭТОТ ЧЕК УЖЕ БЫЛ»."""
+def test_dc_auto_paid_receipt_reuse_is_blocked(app, config, conn):
+    """Перевод зачислен автоматически по уведомлению банка, потом тот же чек — ко второй заявке: не принимаем."""
     _dc(config, conn)
     uid, user = _user(conn)
     with db.tx(conn):
@@ -51,12 +53,10 @@ def test_dc_auto_paid_receipt_reuse_is_flagged(app, config, conn):
     seen = {"is_receipt": True, "bank": "Душанбе Сити", "amount": 100.00, "currency": "TJS",
             "datetime": now_local, "txn_id": "555001", "recipient": "5058 **** **** 5678", "status": "success",
             "recipient_ok": "yes", "forgery": "real", "signs": []}
-    payments.attach_receipt(conn, config, uid, p2, PNG1, seen=seen)
-    r2 = conn.execute("SELECT * FROM payments WHERE id=?", (p2,)).fetchone()
-    import json
-    ai = json.loads(r2["receipt_ai"])
-    assert ai["dup_of"] == p1, ai
-    assert "ЭТОТ ЧЕК УЖЕ БЫЛ" in __import__("donatix.receipt_ai").receipt_ai.summary(ai, r2["pay_amount"], "TJS")
+    with pytest.raises(payments.ReceiptUsed) as err:
+        payments.attach_receipt(conn, config, uid, p2, PNG1, seen=seen)
+    assert f"#{p1}" in str(err.value)
+    assert conn.execute("SELECT receipt_file FROM payments WHERE id=?", (p2,)).fetchone()[0] is None
 
 
 def test_dc_same_amount_without_txn_is_flagged(app, config, conn):

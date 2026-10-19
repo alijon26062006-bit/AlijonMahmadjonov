@@ -642,8 +642,22 @@ class ReceiptRejected(PaymentError):
 REJECTED_TEXT = "Чек не прошёл проверку. Если это ошибка — напишите в поддержку."
 
 
+class ReceiptUsed(ReceiptRejected):
+    """Этот чек мы уже приняли (зачислили) по другой заявке — второй раз не принимаем."""
+
+    def __init__(self, old_id: int):
+        super().__init__([f"этот чек уже приняли — заявка #{old_id}"])
+        self.old_id = old_id
+        self.args = (used_text(old_id),)
+
+
+def used_text(old_id: int) -> str:
+    return (f"Этот чек уже принят по заявке #{old_id}. Один чек принимаем только один раз. "
+            "Если это ошибка — напишите в поддержку.")
+
+
 def _report_rejected(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
-                     reasons: list[str]) -> None:
+                     reasons: list[str], buttons: list | None = None) -> None:
     """Админу — в отдельном потоке: Telegram не должен держать базу."""
     import threading
     from .worker import notify_admin
@@ -651,7 +665,7 @@ def _report_rejected(conn: sqlite3.Connection, config: Config, user_id: int, pay
     who = row["login"] if row else f"#{user_id}"
     text = (f"🚫 Чек к заявке #{payment_id} от {who} НЕ принят:\n• " + "\n• ".join(reasons)
             + "\nЗаявка без чека не зачислится. Если чек настоящий — клиент напишет в поддержку.")
-    threading.Thread(target=notify_admin, args=(config, text), daemon=True).start()
+    threading.Thread(target=notify_admin, args=(config, text), kwargs={"buttons": buttons}, daemon=True).start()
 
 
 def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
@@ -680,12 +694,11 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         max_age = receipt_ai.MAX_AGE_HOURS
     reasons = (receipt_ai.verdict(seen, data, ext, details, p["created_at"], max_age_hours=max_age)
                if p else [])
-    # Отсекаем только «не чек» (другое фото). Возраст, получатель, признаки правки, повтор — не повод
-    # отклонить: админ видит это в заявке крупно и решает сам.
-    not_receipt = "это не чек о переводе"
+    # Ничего не отклоняем: «не чек», возраст, получатель, признаки правки — админ видит это в заявке крупно
+    # и решает сам. Не пускаем только чек, который уже приняли (см. _attach_locked).
     if seen and reasons:
-        seen = {**seen, "checks": [r for r in reasons if r != not_receipt]}
-    reasons = [not_receipt] if not_receipt in reasons else []
+        seen = {**seen, "checks": reasons}
+    reasons = []
     own_tx = not conn.in_transaction
     if own_tx:   # проверка повтора и запись — под одной блокировкой, иначе два одинаковых чека пройдут разом
         conn.execute("BEGIN IMMEDIATE")
@@ -695,7 +708,9 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         if own_tx:
             conn.execute("ROLLBACK")
         if isinstance(exc, ReceiptRejected):
-            _report_rejected(conn, config, user_id, payment_id, exc.reasons)
+            old = getattr(exc, "old_id", 0)
+            _report_rejected(conn, config, user_id, payment_id, exc.reasons,
+                             [[(f"🔎 Показать заявку #{old}", f"q:show:{old}")]] if old else None)
         raise
     if own_tx:
         conn.execute("COMMIT")
@@ -719,10 +734,16 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
                        f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
+    # Этот чек уже ПРИНЯЛИ (зачислили) — второй раз не пускаем вовсе
+    used = conn.execute("SELECT id, status FROM payments WHERE receipt_hash = ? AND id != ? AND status = 'paid'",
+                        (digest, payment_id)).fetchone()
+    used = used or (receipt_ai.duplicate(conn, payment_id, seen, statuses="('paid')") if seen else None)
+    if used and used["status"] == "paid":
+        raise ReceiptUsed(used["id"])
     twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
     if not twin and seen and p["auto_kind"] == "dcbank":   # та же сумма от этого клиента уже пришла автоматом
         twin = receipt_ai.auto_twin(conn, payment_id, user_id, seen)
-    if twin:   # повтор не отклоняем — админ видит в заявке «ЭТОТ ЧЕК УЖЕ БЫЛ»
+    if twin:   # ждёт проверки или отклонён — пускаем, админ видит «ЭТОТ ЧЕК УЖЕ БЫЛ» и кнопку на старую заявку
         seen = {**(seen or {}), "dup_of": twin["id"]}
     if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
         raise ReceiptRejected(reasons)

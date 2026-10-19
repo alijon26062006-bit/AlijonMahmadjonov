@@ -242,43 +242,58 @@ def test_fresh_receipt_rule_and_admin_setting():
     assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T12:00", max_age_hours=48) == []
 
 
-def test_guest_receipt_only_must_be_a_receipt(app, config, conn, monkeypatch):
-    """Покупатель без регистрации: отклоняется только «не чек». Повтор не отклоняется — админ видит пометку."""
+def test_accepted_receipt_never_passes_again(app, config, conn, monkeypatch):
+    """Чек, который уже приняли (зачислили), второй раз не пускаем — клиент видит номер старой заявки,
+    админ — кнопку на неё. Ждущий проверки или отклонённый повтор пускаем с пометкой и той же кнопкой."""
     from donatix import payments, quickbuy, tgbot
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
-    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda cfg, text, buttons=None, **k: sent.append((text, buttons)))
     c, token = _client(app, config, conn, 90)
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(SEEN))
-    _send(c, token, RECEIPT_PNG)                                   # обычный клиент: чек принят
+    _send(c, token, RECEIPT_PNG)
     first = conn.execute("SELECT id FROM payments ORDER BY id DESC LIMIT 1").fetchone()["id"]
-    payments.confirm(conn, config, first, 1)
 
     gid = quickbuy.new_guest(conn)
     guest = accounts.get_user(conn, gid)
     def new_pay():
         return payments.create(conn, config, guest, "alif", "5", for_purchase=True)
-    pid = new_pay()                                                # тот же чек у гостя — не отклоняется
-    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG)
-    row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
-    assert row["receipt_file"] and json.loads(row["receipt_ai"])["dup_of"] == first
-    assert f"ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{first}" in tgbot.receipt_text(conn, config, pid)
+    pid = new_pay()                                       # первый ещё ждёт проверки — пускаем с кнопкой
+    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"1")
+    assert json.loads(conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (pid,)).fetchone()[0])["dup_of"] == first
+    assert tgbot.dup_buttons(conn, pid) == [[(f"🔎 Этот чек уже был — открыть заявку #{first}", f"q:show:{first}")]]
     payments.cancel(conn, gid, pid, config)
 
-    old = {**SEEN, "txn_id": "ZZ-1", "datetime": "2020-01-01 10:00", "amount": 7}   # старый чек — гостю можно
-    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(old))
-    pid = new_pay()
-    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"2")
-    payments.cancel(conn, gid, pid, config)
+    payments.confirm(conn, config, first, 1)              # приняли — теперь этот чек не пройдёт нигде
+    for body in (RECEIPT_PNG, RECEIPT_PNG + b"other-screenshot"):   # тот же файл и другой скриншот того же перевода
+        pid = new_pay()
+        try:
+            payments.attach_receipt(conn, config, gid, pid, body)
+            raise AssertionError("принятый чек прошёл второй раз")
+        except payments.ReceiptUsed as exc:
+            assert f"заявке #{first}" in str(exc)
+        assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0] is None
+        payments.cancel(conn, gid, pid, config)
+    import time
+    time.sleep(0.2)   # сообщение админу уходит в отдельном потоке
+    used = [b for t, b in sent if "НЕ принят" in t]
+    assert used and used[0] == [[(f"🔎 Показать заявку #{first}", f"q:show:{first}")]]
+    assert f"#{first}" in _send(c, token, RECEIPT_PNG).text   # и на сайте клиент видит номер старой заявки
 
-    photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}                 # не чек — нельзя
+
+def test_any_photo_is_accepted_admin_sees_warnings(app, config, conn, monkeypatch):
+    """Защита снята: и старый чек, и фото «не чек» принимаются — админ видит предупреждения и решает сам."""
+    from donatix import payments, quickbuy
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    gid = quickbuy.new_guest(conn)
+    guest = accounts.get_user(conn, gid)
+    photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
-    pid = new_pay()
-    try:
-        payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"3")
-        raise AssertionError("фото без чека принято")
-    except payments.PaymentError:
-        pass
-    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0] is None
+    pid = payments.create(conn, config, guest, "alif", "5", for_purchase=True)
+    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"3")
+    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0]
+    assert "не чек" in receipt_ai.summary(_flags(conn), "5", "TJS")
 
 
 def test_old_receipt_is_accepted_and_admin_sees_why(app, config, conn, monkeypatch):
@@ -290,11 +305,11 @@ def test_old_receipt_is_accepted_and_admin_sees_why(app, config, conn, monkeypat
     assert "🚨 Чек старый" in receipt_ai.summary(_flags(conn), "545", "TJS")
 
 
-def test_photo_that_is_not_a_receipt_is_rejected(app, config, conn, monkeypatch):
+def test_photo_that_is_not_a_receipt_goes_to_admin(app, config, conn, monkeypatch):
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
     monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
     photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
     a, ta = _client(app, config, conn, 1)
-    assert "Чек не прошёл проверку" in _send(a, ta, RECEIPT_PNG).text
-    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 0
+    assert "создана" in _send(a, ta, RECEIPT_PNG).text
+    assert "🚨 Это не чек о переводе" in receipt_ai.summary(_flags(conn), "50", "TJS")

@@ -4,9 +4,9 @@
 номер операции, получателя. Сайт запоминает это у заявки и ищет по базе:
   • тот же номер операции — чек уже был;
   • та же сумма + валюта + время до минуты + банк — тот же перевод, даже если скриншот другой.
-Повтор отклоняется сразу, новый чек уходит админу вместе с тем, что прочитал ИИ.
-Не принимаем вовсе (verdict): получатель не наши реквизиты, ИИ видит подделку, «не чек», перевод не прошёл,
-дата в будущем или старше 3 дней, а также файл из фоторедактора или нейросети (метки в EXIF/XMP/C2PA).
+Не пускаем только чек, который уже ПРИНЯЛИ (зачислили) по другой заявке. Остальное (verdict: чужие реквизиты,
+подделка, «не чек», старый чек, фоторедактор или нейросеть, повтор ждущего/отклонённого) не отклоняем —
+админ видит предупреждения в заявке и кнопку на старую заявку и решает сам.
 
 Нет ключа, PDF или ИИ не ответил — заявка всё равно принимается, админ проверяет как раньше.
 """
@@ -161,14 +161,15 @@ def auto_twin(conn: sqlite3.Connection, payment_id: int, user_id: int, d: dict[s
                         (amount, user_id, payment_id, since)).fetchone()
 
 
-def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> sqlite3.Row | None:
+def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any],
+              statuses: str = USED) -> sqlite3.Row | None:
     """Заявка с тем же чеком. Сравниваем по номеру операции, потом по сумме + дате-времени (+ банку).
 
     Чтобы не отклонить настоящий чек: если у обоих чеков есть номера операций и они РАЗНЫЕ — это два разных
     перевода, даже если сумма и минута совпали."""
     key, fp, loose = txn_key(d), fingerprint(d), loose_fingerprint(d)
     if key:
-        row = conn.execute(f"SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? AND status IN {USED}",
+        row = conn.execute(f"SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? AND status IN {statuses}",
                            (key, payment_id)).fetchone()
         if row:
             return row
@@ -188,7 +189,7 @@ def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> s
         if not value:
             continue
         for row in conn.execute(f"SELECT id, status, receipt_txn FROM payments WHERE {column} = ? AND id != ? "
-                                f"AND status IN {USED}", (value, payment_id)).fetchall():
+                                f"AND status IN {statuses}", (value, payment_id)).fetchall():
             if key and row["receipt_txn"] and row["receipt_txn"] != key:
                 continue   # номера операций разные — разные переводы
             return row

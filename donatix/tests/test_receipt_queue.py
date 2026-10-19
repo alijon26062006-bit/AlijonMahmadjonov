@@ -115,3 +115,22 @@ def test_cashier_finds_any_request_by_button_but_decides_only_own_bank(config, c
     _press(bot, conn, ALI, "cs:home:0")
     home = [p for m, p in calls if m in ("sendMessage", "editMessageText")][-1]
     assert any(b["callback_data"] == "q:find:0" for row in home["reply_markup"]["inline_keyboard"] for b in row)
+
+
+def test_repeat_receipt_has_button_to_open_old_request(config, conn):
+    """«Этот чек уже был» — кнопка под чеком открывает старую заявку."""
+    import json
+    uid, _ = make_client(conn, balance="0")
+    old = _payment(conn, uid, "alif")
+    payments.reject(conn, config, old, 1, "Перевод не найден")
+    new = _payment(conn, uid, "alif")
+    conn.execute("UPDATE payments SET receipt_ai = ? WHERE id = ?", (json.dumps({"dup_of": old}), new))
+    calls = []
+    bot = _bot(config, calls)
+    bot.api = _api(calls)
+    _say(bot, conn, int(ADMIN_CHAT), "🧾 Проверка чеков")
+    rows = _cards(calls)[-1]["reply_markup"]["inline_keyboard"]
+    assert rows[-1][0]["callback_data"] == f"q:show:{old}" and f"#{old}" in rows[-1][0]["text"]
+    _press(bot, conn, int(ADMIN_CHAT), f"q:show:{old}", message_id=1)       # из любого сообщения, не только очереди
+    text = calls[-1][1]["text"]
+    assert f"#{old}" in text and "❌ Отклонена" in text and "Перевод не найден" in text
