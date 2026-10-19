@@ -69,6 +69,21 @@ def enabled(conn: sqlite3.Connection) -> bool:
     return per_usd(conn) > 0 and pool_pct(conn) > 0
 
 
+def earn_until(conn: sqlite3.Connection) -> datetime | None:
+    """До какого момента копятся D-коины (UTC). None — без срока."""
+    raw = db.get_setting(conn, "dcoin.earn_until")
+    try:
+        return _parse(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def earning(conn: sqlite3.Connection, now: datetime | None = None) -> bool:
+    """Сейчас ещё начисляются монеты за покупки? После срока сбора — нет (монеты у людей остаются)."""
+    end = earn_until(conn)
+    return enabled(conn) and (end is None or (now or _now()) < end)
+
+
 def started_at(conn: sqlite3.Connection) -> datetime:
     raw = db.get_setting(conn, "dcoin.started_at")
     if not raw:
@@ -199,7 +214,7 @@ def reward_units(conn: sqlite3.Connection, usd: float) -> int:
 def on_created(conn: sqlite3.Connection, order_id: int) -> int:
     """Покупка оформлена — монеты сразу в истории и на счету, но «ждут выполнения»: обменять их
     нельзя, пока заказ не выполнен. Не выполнится — спишутся с пометкой «возврат»."""
-    if not enabled(conn):
+    if not earning(conn):   # сбор закончился — за новые покупки монет нет
         return 0
     row = conn.execute("SELECT public_id, user_id, total_micro FROM orders WHERE id = ?", (order_id,)).fetchone()
     if row is None or row["total_micro"] <= 0:
@@ -240,6 +255,8 @@ def _award(conn: sqlite3.Connection, order_id: int) -> int:
         return 0
     given = conn.execute("SELECT id, amount, pending FROM dcoin_ledger WHERE order_id = ?", (order_id,)).fetchone()
     if given is not None and given["pending"] != 1:
+        return 0
+    if given is None and not earning(conn):   # куплено после конца сбора — монет нет (купленные до — засчитываем)
         return 0
     started_at(conn)
     usd = row["total_micro"] / 10_000
@@ -560,7 +577,8 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
             "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_today(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
-            "enabled": enabled(conn)}
+            "enabled": enabled(conn), "earning": earning(conn),
+            "earn_until": int(e.timestamp()) if (e := earn_until(conn)) else 0}
 
 
 def history(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict[str, Any]]:

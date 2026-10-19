@@ -368,3 +368,26 @@ def test_stuck_after_promo_drained_pool_moves_again(conn):
         assert (b - a) / a <= 0.0401
     s = dcoin.state(conn)
     assert s["pool"] > 1 and dcoin.quote(conn, s["supply"]) <= s["pool"]  # копилка снова копится, без минуса
+
+
+def test_earning_closes_at_deadline(conn, config):
+    """«Сбор до 15:00»: до срока покупки приносят D-коины, после — нет; накопленное остаётся.
+    Заказ, оформленный до срока и выполненный после, монеты получает."""
+    from datetime import datetime, timedelta, timezone
+
+    from donatix import sitecfg
+    uid = _user(conn)
+    _buy(conn, uid, 10_000)
+    before = dcoin.balance(conn, uid)
+    assert before > 0 and dcoin.earning(conn)
+    sitecfg.save(conn, config, {"dcoin_earn_until": "2026-10-19 15:00"})          # по Душанбе = 10:00 UTC
+    assert dcoin.earn_until(conn) == datetime(2026, 10, 19, 10, 0, tzinfo=timezone.utc)
+    assert sitecfg._local_input(conn, dcoin.earn_until(conn)) == "2026-10-19T15:00"
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    db.set_setting(conn, "dcoin.earn_until", past)                                 # срок прошёл
+    assert not dcoin.earning(conn) and dcoin.summary(conn, uid)["earn_until"] > 0
+    _buy(conn, uid, 10_000)
+    assert dcoin.balance(conn, uid) == before                                      # новых монет нет, старые на месте
+    sitecfg.save(conn, config, {"dcoin_earn_until": ""})                           # без срока — снова копятся
+    _buy(conn, uid, 10_000)
+    assert dcoin.balance(conn, uid) > before

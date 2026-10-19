@@ -169,7 +169,16 @@ def _dcoin_view(conn: sqlite3.Connection) -> dict[str, Any]:
     st = dcoin.state(conn)
     return {"dcoin_per_usd": dcoin.per_usd(conn), "dcoin_pool_pct": dcoin.pool_pct(conn),
             "dcoin_open_days": dcoin.open_days(conn), "dcoin_refund_pct": dcoin.refund_pct(conn),
-            "dcoin_pool": st["pool"], "dcoin_supply": dcoin.fmt_d(st["supply"])}
+            "dcoin_pool": st["pool"], "dcoin_supply": dcoin.fmt_d(st["supply"]),
+            "dcoin_earn_until": _local_input(conn, dcoin.earn_until(conn))}
+
+
+def _local_input(conn: sqlite3.Connection, when) -> str:
+    """UTC → «2026-10-19T15:00» по времени сайта (для поля datetime-local)."""
+    if when is None:
+        return ""
+    from . import timez
+    return when.astimezone(timez.zone(timez.site_zone_name(conn))).strftime("%Y-%m-%dT%H:%M")
 
 
 def _watch_rules(conn: sqlite3.Connection) -> dict:
@@ -266,6 +275,20 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             if not lo <= n <= hi:
                 raise SettingsError(f"{what} — от {lo} до {hi}.")
             values["dcoin." + key.removeprefix("dcoin_")] = str(n)
+    if "dcoin_earn_until" in data:   # срок сбора D-коинов — по времени сайта; пусто — без срока
+        raw = str(data["dcoin_earn_until"] or "").strip().replace(" ", "T")
+        if not raw:
+            values["dcoin.earn_until"] = ""
+        else:
+            from datetime import datetime, timezone
+
+            from . import timez
+            try:
+                local = datetime.strptime(raw[:16], "%Y-%m-%dT%H:%M")
+            except ValueError:
+                raise SettingsError("Срок сбора D-коинов — дата и время, например 2026-10-19 15:00.") from None
+            utc = local.replace(tzinfo=timez.zone(timez.site_zone_name(conn))).astimezone(timezone.utc)
+            values["dcoin.earn_until"] = utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     if "daily_report" in data:
         values["report.daily_on"] = "1" if data["daily_report"] in (True, "1", "on") else "0"
     if "watch_on" in data:

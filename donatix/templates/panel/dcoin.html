@@ -21,6 +21,17 @@
       <span class="muted small">цена 1 D · за сегодня (с 00:00)</span>
     </div>
   </section>
+  {% if d.earn_until %}
+  <div class="card" id="dc-earn" data-until="{{ d.earn_until }}" style="margin:10px 0;padding:12px 14px;text-align:center">
+    {% if d.earning %}⏳ <b>Сбор D-коинов закончится через <span data-left>…</span></b><br>
+      <span class="muted small">Успейте накопить: покупки до конца срока приносят D-коины</span>
+    {% else %}🔒 <b>Сбор D-коинов завершён</b><br><span class="muted small">Ваши монеты сохранены</span>{% endif %}
+  </div>
+  <script>(function(){var el=document.getElementById("dc-earn");if(!el)return;var s=el.querySelector("[data-left]");if(!s)return;
+    var end=+el.dataset.until*1000,p=function(n){return(n<10?"0":"")+n};
+    function t(){var x=Math.max(0,Math.floor((end-Date.now())/1000));if(!x){location.reload();return}
+      s.textContent=(x>=3600?Math.floor(x/3600)+" ч ":"")+p(Math.floor(x%3600/60))+" мин "+p(x%60)+" сек";setTimeout(t,1000)}t()})();</script>
+  {% endif %}
 
   <section class="dc-chart-card">
     <div class="dc-bar">
