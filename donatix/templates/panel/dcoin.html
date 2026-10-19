@@ -114,8 +114,8 @@
   var view = { count: 60, offset: 0 }, rng = null, hover = -1, drag = null, pts = {}, pinch = null, fling = 0;
 
   function conv(v) { return CUR === "TJS" && RATE ? v * RATE : v; }
-  // Цена — 3 значащие цифры: коротко, и каждая покупка (шаг от 1%) меняет последнюю цифру
-  function places(v) { return v <= 0 ? 4 : Math.max(2, Math.min(12, 2 - Math.floor(Math.log10(v)))); }
+  // Цена — 4 значащие цифры: каждая покупка (шаг от 0.2%) меняет последнюю цифру
+  function places(v) { return v <= 0 ? 4 : Math.max(2, Math.min(14, 3 - Math.floor(Math.log10(v)))); }
   function fmt(v) { v = conv(v); var s = v.toFixed(places(v)); return CUR === "TJS" && RATE ? s + " с." : "$" + s; }
   var axisPlaces = 4;
   function axis(v) { return conv(v).toFixed(axisPlaces); }
@@ -173,7 +173,7 @@
 
     ctx.font = "700 12px " + css("--font-num");
     var gstep = conv((hi - lo) / 4), last = c[n - 1][4];
-    axisPlaces = Math.max(places(conv(last || hi)), gstep > 0 ? Math.min(12, 1 - Math.floor(Math.log10(gstep))) : 4);
+    axisPlaces = Math.max(places(conv(last || hi)), gstep > 0 ? Math.min(14, 1 - Math.floor(Math.log10(gstep))) : 4);
     R = Math.max(62, Math.ceil(Math.max(ctx.measureText(axis(hi)).width, ctx.measureText(axis(last)).width)) + 26);
     var pw = W - R, ph = H - B - T, bw = pw / cnt;
     var X = function (idx) { return (idx - s) * bw + bw / 2; };
