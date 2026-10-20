@@ -370,18 +370,18 @@ async def matching(conn, bot) -> None:
         conn, bot, source=SOURCE, message_id=2002,
         text=sample(zach="Zachislenie 100.01 TJS", kod="Kod 77002",
                     otpr="Otpravitel 9991110002222"))
-    # 14. Сумма разошлась на копейку. Раньше это был отказ, теперь —
-    # закрытие ближайшей заявки, если она рядом ровно одна: бот сам
-    # просит платить с копейками, и человек, отправивший круглую сумму,
-    # не должен из-за этого ждать владельца. Двух рядом это не касается.
-    check("14. копейка разницы закрывает единственную соседнюю заявку",
-          result.confirmed, result.status)
-    check("    зачислено столько, сколько пришло",
-          (await db.get_user(conn, CLIENT)).balance == balance + 10001,
+    # 14. Сумма разошлась на копейку, плательщик незнаком. Раньше бот
+    # закрывал ближайшую заявку сам — и так чужие 10 сомони однажды легли
+    # на чужую заявку на 10.01. Теперь «рядом» решает владелец.
+    check("14. копейка разницы от незнакомого — решает владелец",
+          result.status == db.BANK_AMBIGUOUS, result.status)
+    check("    никому не зачислено",
+          (await db.get_user(conn, CLIENT)).balance == balance,
           str((await db.get_user(conn, CLIENT)).balance))
-    check("    и заявка стала на ту же сумму",
-          (await db.get_deposit(conn, first.id)).amount == 10001,
-          str((await db.get_deposit(conn, first.id)).amount))
+    check("    заявка не тронута",
+          (await db.get_deposit(conn, first.id)).status == db.DEP_PENDING
+          and (await db.get_deposit(conn, first.id)).amount == 10000)
+    await db.resolve_deposit(conn, first.id, approved=False, admin_id=1)
 
     # А вот когда рядом двое — по-прежнему решает владелец.
     near1 = await db.create_deposit(conn, user_id=CLIENT, amount=7001,
@@ -671,6 +671,9 @@ async def unique_kopeck(conn, bot) -> None:
     watcher.clear()
     watcher.edits.clear()
 
+    # Клиент нажал «Я оплатил» — без этого совпадение суммы деньги не
+    # зачисляет, а только придерживает (см. held_until_paid).
+    await db.mark_deposit_paid(conn, target[0].id)
     kopecks = amounts[1] % 100
     result = await processor.handle(
         conn, watcher, source=SOURCE, message_id=6001,
@@ -678,7 +681,7 @@ async def unique_kopeck(conn, bot) -> None:
                     summa=f"Summa 10.{kopecks:02d} TJS",
                     kod="Kod 66001", otpr="Otpravitel 9993330001111"))
 
-    check("платёж зачислен без чека", result.confirmed, result.status)
+    check("платёж зачислен без чека, по «Я оплатил»", result.confirmed, result.status)
     check("деньги ушли нужному клиенту", result.deposit_id == target[0].id,
           str(result.deposit_id))
     check("сумма зачислена полностью",
@@ -730,12 +733,16 @@ async def unique_kopeck(conn, bot) -> None:
         conn, watcher, source=SOURCE, message_id=6002,
         text=sample(zach="Zachislenie 20.00 TJS", summa="Summa 20.00 TJS",
                     kod="Kod 66002", otpr="Otpravitel 9993330002222"))
-    check("круглая сумма закрыла ближайшую заявку", result.confirmed,
-          result.status)
-    check("зачислено ровно столько, сколько пришло",
-          (await db.get_user(conn, CLIENT + 6)).balance == before + 2000,
+    check("круглая сумма от незнакомого — решает владелец",
+          result.status == db.BANK_AMBIGUOUS, result.status)
+    check("сама не зачислена",
+          (await db.get_user(conn, CLIENT + 6)).balance == before,
           str((await db.get_user(conn, CLIENT + 6)).balance))
-    check("а не столько, сколько просили", asked != 2000, str(asked))
+    check("владельцу объяснили почему", "не ровно" in watcher.last(),
+          watcher.last()[:160])
+    check("просили с копейками", asked != 2000, str(asked))
+    await db.resolve_deposit(conn, state.data["deposit_id"], approved=False,
+                             admin_id=1)
 
     # ---- рядом две заявки — гадать нельзя
     first = await db.create_deposit(conn, user_id=CLIENT + 7, amount=5001,
@@ -765,9 +772,10 @@ async def known_sender(conn, bot) -> None:
     REGULAR = 930
     await db.upsert_user(conn, REGULAR, "regular", "Постоянный")
 
-    # ---- первый платёж: сумма уникальна, чека не просим
-    await db.create_deposit(
+    # ---- первый платёж: сумма уникальна, клиент нажал «Я оплатил»
+    first_dep = await db.create_deposit(
         conn, user_id=REGULAR, amount=1507, method="card", receipt_file_id="")
+    await db.mark_deposit_paid(conn, first_dep.id)
     before = (await db.get_user(conn, REGULAR)).balance
     bot.clear()
 
@@ -824,6 +832,104 @@ async def known_sender(conn, bot) -> None:
           and (await db.get_deposit(conn, only_other.id)).status == db.DEP_PENDING)
     await db.resolve_deposit(conn, only_other.id, approved=False, admin_id=1)
     await db.resolve_deposit(conn, second_other.id, approved=False, admin_id=1)
+
+    # ---- знакомый плательщик прислал круглую сумму — его заявку закрываем
+    own_near = await db.create_deposit(
+        conn, user_id=REGULAR, amount=2203, method="card", receipt_file_id="")
+    before = (await db.get_user(conn, REGULAR)).balance
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=5005,
+        text=sample(zach="Zachislenie 22.00 TJS", summa="Summa 22.00 TJS",
+                    kod="Kod 55005", otpr="Otpravitel 9990001112233"))
+    check("круглая сумма от знакомого закрывает его заявку",
+          result.confirmed and result.deposit_id == own_near.id, result.status)
+    check("зачислено столько, сколько пришло",
+          (await db.get_user(conn, REGULAR)).balance == before + 2200)
+
+    # ---- сумма точно совпала с заявкой ДРУГОГО, а платит знакомый — нет
+    foreign = await db.create_deposit(
+        conn, user_id=OTHER, amount=1809, method="card", receipt_file_id="")
+    await db.mark_deposit_paid(conn, foreign.id)
+    others = (await db.get_user(conn, OTHER)).balance
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=5006,
+        text=sample(zach="Zachislenie 18.09 TJS", summa="Summa 18.09 TJS",
+                    kod="Kod 55006", otpr="Otpravitel 9990001112233"))
+    check("платит чужой знакомый — заявку другого не закрываем",
+          result.status == db.BANK_AMBIGUOUS
+          and (await db.get_user(conn, OTHER)).balance == others, result.status)
+    await db.resolve_deposit(conn, foreign.id, approved=False, admin_id=1)
+
+
+async def held_until_paid(conn, bot) -> None:
+    """Деньги пришли раньше «Я оплатил» — ждут, а не зачисляются.
+
+    Ровно так однажды чужой перевод закрыл заявку человека, который ещё
+    ничего не платил: заявку открыл, а перевёл кто-то другой.
+    """
+    from app.handlers import deposit as dep_h
+
+    WHO = 940
+    await db.upsert_user(conn, WHO, "who", "Кто")
+    dep = await db.create_deposit(
+        conn, user_id=WHO, amount=1311, method="card", receipt_file_id="")
+    before = (await db.get_user(conn, WHO)).balance
+    bot.clear()
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=5101,
+        text=sample(zach="Zachislenie 13.11 TJS", summa="Summa 13.11 TJS",
+                    kod="Kod 55101", otpr="Otpravitel 9997770001111"))
+    check("без «Я оплатил» деньги придержаны", result.status == db.BANK_HOLD,
+          result.status)
+    check("баланс не тронут", (await db.get_user(conn, WHO)).balance == before)
+    check("заявка ждёт", (await db.get_deposit(conn, dep.id)).status == db.DEP_PENDING)
+    check("владельцу сказали, как решить",
+          "ждёт подтверждения клиента" in bot.last() and f"/dep_no {dep.id}" in bot.last(),
+          bot.last()[:200])
+
+    # Клиент нажимает «Я оплатил» — придержанные деньги зачисляются.
+    await db.mark_deposit_paid(conn, dep.id)
+    credited = await dep_h._credit_if_paid(conn, bot, await db.get_deposit(conn, dep.id))
+    check("после «Я оплатил» зачислено", credited
+          and (await db.get_user(conn, WHO)).balance == before + 1311)
+    check("плательщик закреплён за клиентом",
+          len(await db.senders_of(conn, WHO)) == 1)
+
+    # Чужой перевод придержан за заявкой — админ отклоняет её, платёж
+    # снова ничей (его можно отдать настоящему плательщику).
+    from app.handlers.admin import _resolve_deposit
+
+    wrong = await db.create_deposit(
+        conn, user_id=WHO, amount=1414, method="card", receipt_file_id="")
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=5103,
+        text=sample(zach="Zachislenie 14.14 TJS", summa="Summa 14.14 TJS",
+                    kod="Kod 55103", otpr="Otpravitel 9997770003333"))
+    check("чужой перевод придержан", result.status == db.BANK_HOLD, result.status)
+    balance = (await db.get_user(conn, WHO)).balance
+    await _resolve_deposit(conn, bot, wrong.id, 1, approved=False)
+    pay = await db.get_bank_payment(conn, (await db.list_bank_payments(conn, limit=1))[0].id)
+    check("заявку отклонили — платёж снова ничей",
+          pay.status == db.BANK_UNKNOWN and pay.deposit_id is None
+          and (await db.get_user(conn, WHO)).balance == balance, f"{pay.status} {pay.deposit_id}")
+
+    # Заявка, открытая полдня назад, держит свою сумму: новой такую не дадут.
+    old = await db.create_deposit(
+        conn, user_id=WHO + 1, amount=7701, method="card", receipt_file_id="")
+    await conn.execute("UPDATE deposits SET created_at = datetime('now', '-10 hours') "
+                       "WHERE id = ?", (old.id,))
+    await conn.commit()
+    fresh = await db.free_amount(conn, 7700, hours=6)
+    check("сумма 10-часовой заявки не выдаётся новой", fresh != 7701, str(fresh))
+    # Платёж на сумму старой заявки находит именно её.
+    await db.mark_deposit_paid(conn, old.id)
+    await db.upsert_user(conn, WHO + 1, "late", "Поздний")
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=5102,
+        text=sample(zach="Zachislenie 77.01 TJS", summa="Summa 77.01 TJS",
+                    kod="Kod 55102", otpr="Otpravitel 9997770002222"))
+    check("поздний платёж нашёл свою старую заявку",
+          result.confirmed and result.deposit_id == old.id, result.status)
 
 
 
@@ -938,6 +1044,7 @@ async def main() -> None:
         await sources()
         await unique_kopeck(conn, bot)
         await known_sender(conn, bot)
+        await held_until_paid(conn, bot)
         await from_russia(conn, bot)
     finally:
         await conn.close()

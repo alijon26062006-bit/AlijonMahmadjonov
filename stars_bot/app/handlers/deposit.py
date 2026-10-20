@@ -376,6 +376,25 @@ async def cb_paid(
         await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
         return
 
+    # Клиент сам сказал, что заплатил. Деньги, пришедшие раньше этой
+    # кнопки, ждали именно её — зачисляем сразу.
+    deposit = await db.get_deposit(conn, data.get("deposit_id") or 0)
+    if deposit is not None and deposit.user_id == call.from_user.id:
+        await db.mark_deposit_paid(conn, deposit.id)
+        bot = getattr(call, "bot", None)
+        if deposit.status == db.DEP_PENDING and bot is not None \
+                and await _credit_if_paid(conn, bot, deposit):
+            await state.clear()
+            user = await db.get_user(conn, call.from_user.id)
+            await call.message.edit_text(
+                texts.DEPOSIT_APPROVED.format(
+                    amount=fmt(deposit.amount),
+                    balance=fmt(user.balance if user else 0)),
+                reply_markup=keyboards.back(),
+            )
+            await call.answer()
+            return
+
     await call.message.edit_text(
         texts.DEPOSIT_WAITING.format(amount=fmt(amount)),
         reply_markup=keyboards.deposit_receipt(),

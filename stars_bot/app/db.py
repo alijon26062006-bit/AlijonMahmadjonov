@@ -631,10 +631,20 @@ class Deposit:
     updated_at: str
     pay_chat: int | None = None
     pay_msg: int | None = None
+    client_paid_at: str | None = None
 
     @property
     def status_title(self) -> str:
         return DEP_TITLES.get(self.status, self.status)
+
+    @property
+    def client_confirmed(self) -> bool:
+        """Клиент сам сказал, что заплатил: кнопкой, чеком или — при оплате
+        из России — суммой из чека, введённой уже после перевода."""
+        from app import texts
+
+        return bool(self.client_paid_at or self.receipt_file_id
+                    or self.method == texts.RU_METHOD)
 
 
 @dataclass
@@ -772,6 +782,9 @@ MIGRATIONS: dict[str, dict[str, str]] = {
         "reference": "TEXT",
         "pay_chat": "INTEGER",
         "pay_msg": "INTEGER",
+        # Когда клиент сам сказал «я оплатил» (кнопкой или чеком). Без
+        # этого совпавшая сумма деньги не зачисляет — только придерживает.
+        "client_paid_at": "TEXT",
     },
     "users": {"source": "TEXT"},
     # Приписка банка. У переводов из России там написано «Сбербанк» —
@@ -3085,7 +3098,7 @@ BANK_FAILED = "failed"         # уведомление не разобрало�
 
 BANK_TITLES = {
     BANK_MATCHED: "✅ Зачислено",
-    BANK_HOLD: "📸 Ждём чек",
+    BANK_HOLD: "⏸ Ждёт «Я оплатил»",
     BANK_AMBIGUOUS: "⚠️ Несколько заявок",
     BANK_UNKNOWN: "❔ Заявка не найдена",
     BANK_FAILED: "🚫 Не разобрал",
@@ -3350,6 +3363,23 @@ KOPECK_MIN, KOPECK_MAX = 1, 10
 KOPECK_WIDE = 99
 
 
+#: Сколько часов сумма с копейками остаётся занятой за открытой заявкой.
+#:
+#: Было 6 часов — и это давало чужие зачисления: человек открывал заявку
+#: на 10.01, платил через полдня, а за это время ту же 10.01 успевали
+#: выдать другому. Перевод уходил на чужую, свежую заявку. Неделя
+#: покрывает любой реальный перевод, а копеек на всех хватает с запасом.
+UNIQUE_HOURS = 7 * 24
+
+
+async def mark_deposit_paid(conn: aiosqlite.Connection, deposit_id: int) -> None:
+    await conn.execute(
+        "UPDATE deposits SET client_paid_at = COALESCE(client_paid_at, ?) WHERE id = ?",
+        (_now(), deposit_id),
+    )
+    await conn.commit()
+
+
 async def busy_amounts(conn: aiosqlite.Connection, hours: int = 6) -> set[int]:
     """Суммы, которые прямо сейчас кого-то ждут.
 
@@ -3377,15 +3407,14 @@ async def free_amount(
     Сравниваем с ВСЕМИ живыми заявками, а не только с такой же круглой
     суммой: 10.07 столкнулось бы и с базой 10.00, и с базой 10.06.
     """
-    busy = await busy_amounts(conn, hours)
-    for tail in range(KOPECK_MIN, KOPECK_MAX + 1):
-        if base + tail not in busy:
-            return base + tail
-    for tail in range(KOPECK_MAX + 1, KOPECK_WIDE + 1):
-        if base + tail not in busy:
-            return base + tail
-    # Сто заявок на одну сумму одновременно — такого не бывает, но
-    # оставить человека без суммы нельзя: берём как есть.
+    busy = await busy_amounts(conn, max(hours, UNIQUE_HOURS))
+    # Сначала копейки поближе к просимой сумме, потом подальше, потом —
+    # следующий сомони. Повторять занятую сумму нельзя ни при каком
+    # раскладе: два человека с одной суммой — это чужие зачисления.
+    for extra in range(0, 100 * 50, 100):
+        for tail in range(KOPECK_MIN, KOPECK_WIDE + 1):
+            if base + extra + tail not in busy:
+                return base + extra + tail
     return base + KOPECK_MIN
 
 

@@ -90,28 +90,82 @@ async def handle(
     log.info("[USERBOT] Matching order...")
 
     hours = runtime.get_int("deposit_match_hours", 6)
-    waiting = await db.pending_deposits_for(conn, notice.amount, hours=hours)
+    # Точную сумму ищем за то же окно, в котором копейки уникальны: раз
+    # такой суммы нет ни у кого другого, старая заявка опасности не несёт.
+    waiting = await db.pending_deposits_for(conn, notice.amount,
+                                            hours=max(hours, db.UNIQUE_HOURS))
 
     # Сумма с уникальными копейками — сама себе опознавательный знак.
-    # Совпала ровно одна заявка — вопросов нет.
     if len(waiting) == 1:
-        return await _confirm(conn, bot, payment, waiting[0], notice)
+        return await _single(conn, bot, payment, waiting[0], notice)
 
     if len(waiting) > 1:
         # Столкнуться могли только заявки, заведённые до этой затеи.
         # Разберём по плательщику, если он знаком.
         return await _by_sender(conn, bot, payment, waiting, notice)
 
-    # Точной суммы нет. Скорее всего клиент отправил круглую вместо
-    # названной: бот просил 10.04, человек по привычке послал 10.00.
-    # Ищем рядом — но закрываем, только если рядом ровно одна.
+    # Точной суммы нет. Может быть, клиент отправил круглую вместо
+    # названной (просили 10.04, прислали 10.00) — а может, это вовсе
+    # чужой перевод, к нашим заявкам отношения не имеющий. Именно так
+    # однажды чужие 10 сомони легли на чужую заявку на 10.01. Поэтому
+    # сам бот зачисляет «рядом» только знакомому плательщику; остальное
+    # решает владелец.
     near = await db.pending_near(conn, notice.amount, hours=hours)
-    if len(near) == 1:
-        return await _confirm(conn, bot, payment, near[0], notice, near=True)
-    if len(near) > 1:
-        return await _by_sender(conn, bot, payment, near, notice)
+    if near:
+        known = await db.sender_owner(conn, notice.sender)
+        his = [d for d in near if known is not None and d.user_id == known.user_id]
+        if len(his) == 1:
+            return await _confirm(conn, bot, payment, his[0], notice, near=True)
+        return await _ambiguous(
+            conn, bot, payment, near, notice,
+            why="пришло не ровно столько, сколько просили",
+        )
 
     return await _unknown(conn, bot, payment, notice)
+
+
+async def _single(conn, bot, payment, deposit, notice) -> Result:
+    """Сумма совпала ровно с одной заявкой. Зачисляем не всегда.
+
+    Совпадения суммы мало, если клиент ещё не сказал, что платил: заявку
+    мог открыть один, а перевести — другой. Поэтому:
+      - плательщик знаком и он и есть этот клиент — зачисляем;
+      - плательщик знаком, но как ДРУГОЙ клиент — решает владелец;
+      - клиент нажал «Я оплатил» или прислал чек — зачисляем;
+      - иначе деньги придерживаем за заявкой: зачислятся, когда клиент
+        подтвердит оплату. Чужой перевод так и останется ждать владельца.
+    """
+    known = await db.sender_owner(conn, notice.sender)
+    if known is not None and known.user_id != deposit.user_id:
+        return await _ambiguous(
+            conn, bot, payment, [deposit], notice,
+            why=f"этот плательщик раньше платил за клиента {known.user_id}",
+        )
+    if known is not None or deposit.client_confirmed:
+        return await _confirm(conn, bot, payment, deposit, notice)
+    return await _hold(conn, bot, payment, deposit, notice)
+
+
+async def _hold(conn, bot, payment, deposit, notice) -> Result:
+    """Деньги пришли раньше, чем клиент сказал «я оплатил». Ждём его."""
+    await db.close_bank_payment(
+        conn, payment.id, status=db.BANK_HOLD, deposit_id=deposit.id,
+        note="ждём подтверждения клиента",
+    )
+    log.info("[USERBOT] Payment held for deposit %s", deposit.id)
+    await _tell_owner(
+        bot,
+        "⏸ <b>Оплата пришла — ждёт подтверждения клиента</b>\n"
+        f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
+        f"├ Заявка: <code>№{deposit.id}</code>, клиент <code>{deposit.user_id}</code>\n"
+        + (f"├ Отправитель: <code>{notice.sender}</code>\n" if notice.sender else "")
+        + f"└ {notice.bank_time or 'время не указано'}\n\n"
+        "<blockquote>Зачислится само, когда клиент нажмёт «Я оплатил» или "
+        "пришлёт чек. Если этот клиент не платил (перевод чужой) — "
+        f"<code>/dep_no {deposit.id}</code> и начислите тому, кто платил. "
+        f"Зачислить сразу: <code>/dep_ok {deposit.id}</code>.</blockquote>",
+    )
+    return Result(status=db.BANK_HOLD, amount=notice.amount, deposit_id=deposit.id)
 
 
 async def claim_for_deposit(conn, bot, deposit) -> Result | None:
@@ -269,9 +323,9 @@ async def _close_screen(bot, conn, deposit, notice) -> None:
         log.info("[USERBOT] экран реквизитов не заменился: %s", exc)
 
 
-async def _ambiguous(conn, bot, payment, waiting, notice) -> Result:
-    """Заявок несколько. Угадывать нельзя — деньги чужие."""
-    note = f"подходящих заявок: {len(waiting)}"
+async def _ambiguous(conn, bot, payment, waiting, notice, why: str = "") -> Result:
+    """Угадывать нельзя — деньги чужие. Решает владелец."""
+    note = why or f"подходящих заявок: {len(waiting)}"
     await db.close_bank_payment(
         conn, payment.id, status=db.BANK_AMBIGUOUS, note=note,
     )
@@ -284,17 +338,20 @@ async def _ambiguous(conn, bot, payment, waiting, notice) -> Result:
     )
     await _tell_owner(
         bot,
-        "⚠️ <b>Пришла оплата, но заявок несколько</b>\n"
-        f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
+        ("⚠️ <b>Пришла оплата — проверьте, чья она</b>\n"
+         f"├ Почему: {why}\n" if why else
+         "⚠️ <b>Пришла оплата, но заявок несколько</b>\n")
+        + f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
         + (f"├ Отправитель: <code>{notice.sender}</code>\n"
            if notice.sender else "")
         + (f"├ Приписка банка: <b>{notice.comment}</b>\n"
            if notice.comment else "")
-        + f"└ Ждут той же суммы: <b>{len(waiting)}</b>\n\n"
+        + f"└ Подходящих заявок: <b>{len(waiting)}</b>\n\n"
         f"{rows}\n\n"
         "<blockquote>Деньги <b>не зачислены</b>. Выбирать наугад нельзя — "
         "зачислили бы чужой платёж. Сверьте отправителя и подтвердите "
-        "нужную заявку сами.</blockquote>",
+        "нужную заявку сами. Если платил кто-то без заявки — начислите "
+        "ему руками: /panel → 👥 Клиенты.</blockquote>",
     )
     return Result(status=db.BANK_AMBIGUOUS, amount=notice.amount, note=note)
 

@@ -73,6 +73,20 @@ async def _resolve_deposit(
         return texts.ADMIN_ALREADY_HANDLED
     await close_notices(conn, bot, deposit_id, approved, admin_id, pressed)
 
+    # Деньги банка, придержанные за этой заявкой, решаются вместе с ней:
+    # зачислили — платёж закрыт; отклонили — платёж снова ничей, и его
+    # можно отдать тому, кто платил на самом деле.
+    held = await db.held_bank_payment(conn, deposit_id)
+    if held is not None:
+        if approved:
+            await db.close_bank_payment(conn, held.id, status=db.BANK_MATCHED,
+                                        deposit_id=deposit_id,
+                                        note="подтвердил админ")
+            await db.bind_sender(conn, held.sender, deposit.user_id)
+        else:
+            await db.close_bank_payment(conn, held.id, status=db.BANK_UNKNOWN,
+                                        note=f"заявку №{deposit_id} отклонили")
+
     if not approved:
         await delivery.notify(bot, deposit.user_id, texts.DEPOSIT_REJECTED.format(
             deposit_id=deposit.id, amount=fmt(deposit.amount), support=texts.support()
