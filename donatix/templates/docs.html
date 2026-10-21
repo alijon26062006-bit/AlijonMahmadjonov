@@ -8,6 +8,7 @@
     <div class="label-caps">API v1</div>
     {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
                      ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
+                     ('numbers', 'Виртуальные номера'), ('gifts', 'Подарки Telegram'),
                      ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (как FazerCards)'),
                      ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
     <a href="#{{ id }}">{{ t }}</a>
@@ -203,6 +204,44 @@ done</pre>
         Ошибки: <code>invalid_clan_id</code> <code>invalid_region</code> <code>clan_busy</code> (для клана уже работает группа)
         <code>insufficient_balance</code> <code>launch_failed</code>. Те же адреса есть в <code>/api/v2/glory/…</code>.</p>
     </section>
+    <section id="numbers" class="doc-sec">
+      <h2>Виртуальные номера (коды из SMS)</h2>
+      <p>Номер на один СМС-код: вы покупаете номер для сервиса, получаете код и отдаёте его клиенту.
+        Цены как на сайте. Деньги списываются с баланса аккаунта ключа. Если номер не получился или код не пришёл
+        за отведённое время, деньги возвращаются на баланс сами.</p>
+<pre data-lang="bash" data-title="1. сервисы">curl -s "{{ base_url }}/api/v1/numbers/services" -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json">{"ok": true, "items": [{"service": "telegram", "title": "Telegram"}, {"service": "whatsapp", "title": "WhatsApp"}]}</pre>
+<pre data-lang="bash" data-title="2. страны и цены">curl -s "{{ base_url }}/api/v1/numbers/countries?service=telegram" -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json">{"ok": true, "items": [{"country": "indonesia", "title": "Индонезия", "flag": "🇮🇩", "price_usd": "0.3100", "available": 120}]}</pre>
+<pre data-lang="bash" data-title="3. купить номер">curl -s -X POST "{{ base_url }}/api/v1/numbers/orders" -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"service": "telegram", "country": "indonesia"}'</pre>
+<pre data-lang="json">{"ok": true, "order": {"id": 555, "service": "telegram", "country": "indonesia", "status": "PENDING", "phone": "+6281234567", "code": null, "sms": null, "price_usd": "0.3100", "expires": "2030-01-01T00:15:00Z", "refunded": false}}</pre>
+<pre data-lang="bash" data-title="4. проверить код (опрашивайте каждые 5–10 секунд)">curl -s "{{ base_url }}/api/v1/numbers/orders/555" -H "X-API-Key: $KEY"</pre>
+<p>Когда в <code>code</code> появится код, номер готов. Статусы: <code>PENDING</code> — ждём код, <code>RECEIVED</code> — код пришёл,
+        <code>FINISHED</code> — завершён, <code>CANCELED</code> — отменён, <code>TIMEOUT</code> — код не пришёл, деньги вернулись,
+        <code>BANNED</code> — номер отклонён сервисом, деньги вернулись.</p>
+<pre data-lang="bash" data-title="отменить (если код не нужен)">curl -s -X POST "{{ base_url }}/api/v1/numbers/orders/555/cancel" -H "X-API-Key: $KEY"</pre>
+<p class="hint">Список своих заказов: <code>GET /api/v1/numbers/orders?limit=20</code>. Ошибки: <code>insufficient_balance</code> (402) — пополните баланс;
+        <code>order_failed</code> (400) — номер не купился, деньги не списаны; <code>service_unavailable</code> (503) — сервис временно выключен.</p>
+    </section>
+
+    <section id="gifts" class="doc-sec">
+      <h2>Подарки Telegram</h2>
+      <p>Подарок за Telegram Stars, который уходит на аккаунт получателя. Цена как на сайте, списание с баланса.
+        Если знаете @username получателя и он уже нажимал Start в нашем боте, подарок уходит сразу. Если нет,
+        создаётся ссылка: отправьте её получателю, он нажмёт Start и получит подарок.</p>
+<pre data-lang="bash" data-title="список подарков">curl -s "{{ base_url }}/api/v1/gifts" -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json">{"ok": true, "items": [{"gift_id": "g15", "stars": 15, "emoji": "🧸", "image": null, "price_usd": "0.2400", "left": null, "total": null}]}</pre>
+<pre data-lang="bash" data-title="отправить подарок">curl -s -X POST "{{ base_url }}/api/v1/gifts/orders" -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"gift_id": "g15", "recipient": "@username", "text": "С днём рождения!"}'</pre>
+<pre data-lang="json">{"ok": true, "order": {"id": 91, "ref": "GF-91", "gift_id": "g15", "stars": 15, "price_usd": "0.2400", "status": "paid", "recipient": "@username", "link": null, "error": null}}</pre>
+<pre data-lang="bash" data-title="статус">curl -s "{{ base_url }}/api/v1/gifts/orders/91" -H "X-API-Key: $KEY"</pre>
+<p>Если получатель ещё не нажимал Start, в ответе будет <code>"status": "awaiting_recipient"</code> и поле <code>link</code>:
+        отправьте её получателю. Статусы: <code>paid</code> — в очереди, <code>sent</code> — отправлен,
+        <code>awaiting_recipient</code> — ждём получателя, <code>failed</code> и <code>refunded</code> — деньги вернулись.
+        Поле <code>text</code> — до 128 символов, подпись к подарку.</p>
+    </section>
+
 
     <section id="errors" class="doc-sec">
       <h2>Ошибки</h2>

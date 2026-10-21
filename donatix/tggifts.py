@@ -340,9 +340,14 @@ class GiftError(Exception):
     pass
 
 
+_SAME = object()
+
+
 def buy(conn: sqlite3.Connection, config: Config, user: Any, gift_id: str, *, recipient_id: int | None = None,
-        recipient: str = "", text: str = "") -> dict[str, Any]:
-    """Купить подарок с баланса. recipient_id известен — сразу в очередь отправки, иначе — ссылка для друга."""
+        recipient: str = "", text: str = "", price_user: Any = _SAME) -> dict[str, Any]:
+    """Купить подарок с баланса. recipient_id известен — сразу в очередь отправки, иначе — ссылка для друга.
+
+    price_user — чья наценка считается в цене (по умолчанию покупателя); API передаёт None — цена как на сайте."""
     ensure(conn)
     if not enabled(config):
         raise GiftError("Подарки сейчас недоступны.")
@@ -350,7 +355,7 @@ def buy(conn: sqlite3.Connection, config: Config, user: Any, gift_id: str, *, re
     if g is None:
         raise GiftError("Этого подарка больше нет — выберите другой.")
     text = (text or "").strip()[:TEXT_MAX]
-    price = price_micro(conn, config, user, g["star_count"])
+    price = price_micro(conn, config, user if price_user is _SAME else price_user, g["star_count"])
     cost = int(settings(conn)["star_cost_usd"] * g["star_count"] * 10_000)
     token = secrets.token_hex(16)
     status = "paid" if recipient_id else "awaiting_recipient"

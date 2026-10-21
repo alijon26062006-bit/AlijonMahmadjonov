@@ -310,6 +310,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     catalog_job.load_image_index(config)
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
     app.include_router(api.router)
+    from . import api_extra   # виртуальные номера и подарки Telegram для партнёров
+    app.include_router(api_extra.router)
     from . import glory_api
     for _r in glory_api.routers:
         app.include_router(_r)
