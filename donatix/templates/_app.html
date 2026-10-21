@@ -270,6 +270,13 @@
         });
       }).catch(function () {}).then(function () { busy = false; });
     }
+    // Не чаще раза в 4 с: при потоке заказов страница не перерисовывается каждую секунду
+    var lastRefresh = 0, refreshTimer = null;
+    function scheduleRefresh() {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(function () { refreshTimer = null; lastRefresh = Date.now(); refreshMain(); },
+                                Math.max(0, 4000 - (Date.now() - lastRefresh)));
+    }
     document.addEventListener("focusout", function () { if (pending) setTimeout(refreshMain, 300); });
     function apply(d) {
       if (!d || d.gone) return;
@@ -281,7 +288,7 @@
         });
       }
       bell(d.unread);
-      if (last && d.sig !== last.sig && LIVE.test(location.pathname)) refreshMain();
+      if (last && d.sig !== last.sig && LIVE.test(location.pathname)) scheduleRefresh();
       last = d;
     }
     function startPoll() {

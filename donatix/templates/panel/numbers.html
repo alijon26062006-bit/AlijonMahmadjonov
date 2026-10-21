@@ -36,15 +36,17 @@
 </div>
 <script>
   (function () {
-    var q = document.getElementById("vn-q");
     function filter() {
+      var q = document.getElementById("vn-q");   // берём заново: после живого обновления поле уже другое
       var t = q ? q.value.trim().toLowerCase() : "";
       document.querySelectorAll("#vn-list .vn-row").forEach(function (r) {
         r.style.display = !t || r.dataset.name.indexOf(t) >= 0 ? "" : "none"; });
     }
-    q && q.addEventListener("input", filter);
+    var box = document.getElementById("vn-q");
+    box && box.addEventListener("input", filter);
     // Наличие номеров меняется быстро: раз в 20 с берём свежий список — закончившиеся страны исчезают сами
-    setInterval(function () {
+    // Таймер один на страницу: живое обновление заново запускает этот скрипт, и без проверки таймеры копились бы
+    if (!window.dxVnTimer) window.dxVnTimer = setInterval(function () {
       if (document.hidden) return;
       fetch(location.href, {credentials: "same-origin"}).then(function (r) { return r.text(); }).then(function (html) {
         var fresh = new DOMParser().parseFromString(html, "text/html").getElementById("vn-list"),

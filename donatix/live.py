@@ -13,12 +13,13 @@ import json
 import time
 from typing import Any, AsyncIterator
 
-from . import db
+from . import cache, db
 from .config import Config
 
 TICK = 1.0          # как часто смотреть в базу, секунд
 MAX_AGE = 1800      # одно соединение живёт не дольше 30 минут
 PING = 15           # пустая строка раз в 15 с — чтобы nginx и мобильная сеть не рвали соединение
+CACHE = 1.0         # одно и то же состояние на все открытые вкладки одного пользователя — считаем раз в секунду
 
 
 def state(config: Config, user_id: int, admin: bool, cur: str) -> dict[str, Any]:
@@ -52,6 +53,12 @@ def state(config: Config, user_id: int, admin: bool, cur: str) -> dict[str, Any]
             "unread": unread, "sig": ".".join(str(x or 0) for x in sig)}
 
 
+def cached(config: Config, user_id: int, admin: bool, cur: str) -> dict[str, Any] | None:
+    """Состояние не чаще раза в CACHE секунд на пользователя: пять вкладок — один запрос к базе, а не пять."""
+    return cache.get_or_set(f"live:{user_id}:{int(admin)}:{cur}", CACHE,
+                            lambda: state(config, user_id, admin, cur))
+
+
 async def stream(request, config: Config, user_id: int, admin: bool, cur: str) -> AsyncIterator[str]:
     started, quiet, last = time.monotonic(), 0.0, None
     yield "retry: 2000\n\n"
@@ -59,7 +66,7 @@ async def stream(request, config: Config, user_id: int, admin: bool, cur: str) -
         if await request.is_disconnected():
             return
         try:
-            now = await asyncio.to_thread(state, config, user_id, admin, cur)
+            now = await asyncio.to_thread(cached, config, user_id, admin, cur)
         except Exception:  # noqa: BLE001 — база занята на миг: попробуем через секунду
             now = last
         if now is not None and now != last:

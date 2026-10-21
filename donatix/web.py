@@ -2181,7 +2181,7 @@ async def panel_live(request: Request, once: int = 0):
     admin = user["role"] == "admin"
     if once:   # запасной путь, если браузер не держит соединение: раз в несколько секунд
         import asyncio
-        data = await asyncio.to_thread(live.state, config, user["id"], admin, cur)
+        data = await asyncio.to_thread(live.cached, config, user["id"], admin, cur)
         return JSONResponse(data, headers={"Cache-Control": "no-store"})
     return StreamingResponse(live.stream(request, config, user["id"], admin, cur), media_type="text/event-stream",
                              headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
