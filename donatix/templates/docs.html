@@ -121,6 +121,12 @@
 
       <h3><span class="step-n">2</span>Получить пакеты и их ID</h3>
 <pre data-lang="bash">curl -s "{{ base_url }}/api/v1/products?kind=topup&q=free%20fire" -H "X-API-Key: $KEY"</pre>
+      <p class="hint">За один запрос отдаётся не больше <code>limit</code> товаров: по умолчанию <b>100</b>, максимум <b>500</b>.
+        Если пакетов больше, листайте через <code>offset</code>: <code>?limit=500&amp;offset=0</code>, потом <code>offset=500</code> и так, пока
+        <code>items</code> не станет пустым. Так вы получите <b>все</b> товары, а не только первую сотню.</p>
+<pre data-lang="bash" data-title="все пакеты всех игр, постранично">for off in 0 500 1000 1500 2000; do
+  curl -s "{{ base_url }}/api/v1/products?kind=topup&limit=500&offset=$off" -H "X-API-Key: $KEY"
+done</pre>
 <pre data-lang="json" data-title="ответ">{"ok": true, "items": [{
   "product_id": "topup-3f9a1c2b7d",
   "kind": "topup", "category_id": "free_fire", "category_name": "Free Fire",
