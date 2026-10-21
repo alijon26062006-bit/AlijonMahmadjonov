@@ -9,7 +9,7 @@
     {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
                      ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
                      ('numbers', 'Виртуальные номера'), ('gifts', 'Подарки Telegram'),
-                     ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (как FazerCards)'),
+                     ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (совместимый формат)'),
                      ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
     <a href="#{{ id }}">{{ t }}</a>
     {% endfor %}
@@ -147,7 +147,7 @@ done</pre>
   -d '{"product_id": "topup-3f9a1c2b7d", "fields": {"player_id": "1234567890"}}'</pre>
 
       <div class="card hint">
-        <b>Бот в формате FazerCards (API v2).</b> Там пакет передаётся как <code>offer_id</code> — в него ставится тот же
+        <b>Бот в формате API v2.</b> Там пакет передаётся как <code>offer_id</code> — в него ставится тот же
         <code>product_id</code> (<code>topup-…</code>), а в <code>category_id</code> — <code>category_id</code> игры:
         <code>POST /api/v2/topups/order</code> с телом
         <code>{"category_id": "free_fire", "offer_id": "topup-3f9a1c2b7d", "fields": {"player_id": "1234567890"}}</code>.
@@ -288,8 +288,8 @@ done</pre>
     </section>
 
     <section id="v2" class="doc-sec">
-      <h2>API v2 — совместимо с FazerCards</h2>
-      <p>Если ваш бот написан под FazerCards, поменяйте в нём только адрес и ключ — всё остальное работает как есть:</p>
+      <h2>API v2 — совместимый формат</h2>
+      <p>Если ваш бот уже работает с API в формате v2, поменяйте в нём только адрес и ключ — всё остальное работает как есть:</p>
       <div class="grid two">
         <div class="card"><div class="label-caps">Адрес</div><code class="mono">{{ base_url }}/api/v2</code></div>
         <div class="card"><div class="label-caps">Ключ</div><code class="mono">X-API-Key: dx_live_…</code></div>
@@ -318,7 +318,7 @@ done</pre>
         <div class="ep"><span class="method {{ 'get' if m == 'GET' else 'post' }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}
       </div>
-      <p class="hint">Номера заказов у нас вида <code>dx-123</code> (у FazerCards — <code>ord-123</code>). Ответы и ошибки — в том же формате
+      <p class="hint">Номера заказов у нас вида <code>dx-123</code>. Ответы и ошибки — в том же формате
         <code>{"ok": false, "error": "…", "code": "…"}</code>.</p>
     </section>
 

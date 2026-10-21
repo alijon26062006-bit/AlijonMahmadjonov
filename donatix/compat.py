@@ -22,7 +22,7 @@ from .config import Config
 from .deps import get_config, get_conn
 from .money import fmt, fmt_unit, to_decimal
 
-router = APIRouter(prefix="/api/v2", tags=["FazerCards-совместимый API"])
+router = APIRouter(prefix="/api/v2", tags=["API v2 (совместимый формат)"])
 
 
 def _order_out(row: sqlite3.Row) -> dict[str, Any]:
