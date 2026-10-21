@@ -397,7 +397,9 @@ async def on_game_promo(
     message: Message, state: FSMContext, conn: aiosqlite.Connection,
 ) -> None:
     ok, reply = await promos.enter(conn, state, message.text or "", message.from_user.id)
-    notice = await message.answer(reply)
+    from app import effects
+
+    notice = await message.answer(reply, **(effects.kw("promo") if ok else {}))
     if ok:
         await show_confirm(notice, state, conn, message.from_user.id)
 

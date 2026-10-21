@@ -8,6 +8,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from app import effects
 from app import db, keyboards, texts
 from app import runtime
 from app.emoji import em
@@ -139,7 +140,7 @@ async def on_promo(message: Message, state: FSMContext, conn: aiosqlite.Connecti
         await db.save_promo_for(conn, message.from_user.id, promo["code"])
         await state.clear()
         await message.answer(texts.PROMO_SAVED.format(percent=promo["percent"]),
-                             reply_markup=keyboards.back())
+                             reply_markup=keyboards.back(), **effects.kw("promo"))
         return
     if isinstance(result, str):
         await message.answer(texts.PROMO_ERRORS.get(result, texts.PROMO_ERRORS["not_found"]))
@@ -149,5 +150,5 @@ async def on_promo(message: Message, state: FSMContext, conn: aiosqlite.Connecti
     user = await db.get_user(conn, message.from_user.id)
     await message.answer(
         texts.PROMO_OK.format(amount=fmt(result), balance=fmt(user.balance if user else 0)),
-        reply_markup=keyboards.back(),
+        reply_markup=keyboards.back(), **effects.kw("promo"),
     )

@@ -95,12 +95,14 @@ async def _resolve_deposit(
 
     await db.credit(conn, deposit.user_id, deposit.amount, as_deposit=True)
     user = await db.get_user(conn, deposit.user_id)
+    from app import effects
+
     await delivery.notify(
         bot, deposit.user_id,
         texts.DEPOSIT_APPROVED.format(
             amount=fmt(deposit.amount), balance=fmt(user.balance if user else 0)
         ),
-        reply_markup=keyboards.back(),
+        reply_markup=keyboards.back(), **effects.kw("paid"),
     )
     await _pay_referral(conn, bot, user, deposit.amount)
     return texts.ADMIN_DEPOSIT_OK.format(deposit_id=deposit.id, amount=fmt(deposit.amount))
@@ -154,9 +156,11 @@ async def _pay_referral(
         return
     await db.add_ref_earning(conn, user.referrer_id, bonus)
     referrer = await db.get_user(conn, user.referrer_id)
+    from app import effects
+
     await delivery.notify(bot, user.referrer_id, texts.REFERRAL_BONUS.format(
         amount=fmt(bonus), balance=fmt(referrer.balance if referrer else 0)
-    ))
+    ), **effects.kw("referral"))
 
 
 @router.callback_query(F.data.startswith("a:dep_ok:"))

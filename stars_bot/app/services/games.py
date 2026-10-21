@@ -381,7 +381,10 @@ async def check(
         if await db.transition_order(
             conn, order.id, expected=order.status, new=db.ORDER_DELIVERED, error=None
         ):
-            await delivery.tell_buyer(bot, conn, order, delivery._done_text(order))
+            from app import effects
+
+            await delivery.tell_buyer(bot, conn, order, delivery._done_text(order),
+                                      **effects.kw("done"))
             await delivery._ask_review(bot, conn, order)
             log.info("Игры: заказ %s выполнен", order.id)
         return "done"

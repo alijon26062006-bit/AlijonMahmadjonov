@@ -28,7 +28,8 @@ async def main_markup(conn: aiosqlite.Connection):
     return keyboards.main_menu(games=has_games)
 
 
-async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connection) -> None:
+async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connection,
+                      effect: dict | None = None) -> None:
     """Показать меню. У Message берём отправителя, у CallbackQuery — нажавшего.
 
     Правка текста годится не для всякого сообщения: у фотографии текста
@@ -44,7 +45,7 @@ async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connectio
     # нет. Так же это работает и в проверках, где Telegram подставной.
     message = getattr(target, "message", None)
     if message is None:
-        await target.answer(text, reply_markup=markup)
+        await target.answer(text, reply_markup=markup, **(effect or {}))
         return
 
     if getattr(message, "text", None) is None:
@@ -58,9 +59,14 @@ async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connectio
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext, conn: aiosqlite.Connection) -> None:
+async def cmd_start(message: Message, state: FSMContext, conn: aiosqlite.Connection,
+                    is_new_user: bool = False) -> None:
+    from app import effects
+
     await state.clear()
-    await render_menu(message, conn)
+    # Огонь на /start, конфетти — новому клиенту на первом входе.
+    await render_menu(message, conn,
+                      effect=effects.kw("welcome" if is_new_user else "start"))
 
 
 @router.message(Command("cancel"))

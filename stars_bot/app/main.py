@@ -114,6 +114,10 @@ async def main() -> None:
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     # Если премиум-эмодзи перестанут приниматься, бот не должен замолчать.
     bot.session.middleware(CustomEmojiGuard())
+    # Эффект сообщения (огонь, конфетти) не принят — шлём без него.
+    from app.middlewares.effect_guard import EffectGuard
+
+    bot.session.middleware(EffectGuard())
     conn = await db.connect()
     await db.init(conn)
     # Журнал WAL сворачивается в базу сам, но только когда её никто не

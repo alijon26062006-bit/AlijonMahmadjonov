@@ -185,8 +185,11 @@ async def _run_delivery(
             fragment_order_id=result.order_id, error=None,
         )
         await runtime.note_delivery_ok(conn, order.product_type, order.quantity)
+        from app import effects
+
         await tell_buyer(
-            bot, conn, order, _done_text(order), reply_markup=keyboards.back()
+            bot, conn, order, _done_text(order), reply_markup=keyboards.back(),
+            **effects.kw("done"),
         )
         await notify_admins(
             bot,
@@ -282,7 +285,9 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
         conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_DELIVERED
     ):
         return False
-    await tell_buyer(bot, conn, order, _done_text(order))
+    from app import effects
+
+    await tell_buyer(bot, conn, order, _done_text(order), **effects.kw("done"))
     await _ask_review(bot, conn, order)
     return True
 

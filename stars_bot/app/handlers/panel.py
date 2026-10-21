@@ -1761,6 +1761,13 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
         "pn:emtest",
         style=DANGER if emoji.premium_on() else PRIMARY,
     ))
+    from app import effects
+
+    kb.row(btn(
+        "🔥 Выключить анимацию сообщений" if effects.on()
+        else "🔥 Включить анимацию сообщений",
+        "pn:fx_toggle",
+    ))
     kb.row(btn("♻️ Вернуть все по умолчанию", "pn:emreset", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
 
@@ -1773,11 +1780,23 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
         "Изменения видны клиентам сразу, перезапуск не нужен.</blockquote>\n\n"
         f"Сейчас: {preview}\n\n"
         f"💎 Премиум-эмодзи: <b>{'включены' if emoji.premium_on() else 'выключены'}</b> "
-        f"<i>({custom_count} шт. задано)</i>\n\n"
+        f"<i>({custom_count} шт. задано)</i>\n"
+        f"🔥 Анимация сообщений: <b>{'включена' if effects.on() else 'выключена'}</b>\n"
+        "<i>(огонь на /start, конфетти при оплате, выдаче заказа, промокоде "
+        "и бонусе за нового клиента)</i>\n\n"
         "<i>Выберите группу</i> " + emoji.em("point"),
         kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:fx_toggle")
+async def cb_fx_toggle(call: CallbackQuery, state: FSMContext,
+                       conn: aiosqlite.Connection) -> None:
+    from app import effects
+
+    await runtime.set_value(conn, "effects_on", "0" if effects.on() else "1")
+    await cb_look(call, state)
 
 
 async def render_emoji_group(call: CallbackQuery, group: str) -> bool:

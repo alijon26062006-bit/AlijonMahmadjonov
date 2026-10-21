@@ -38,6 +38,8 @@ class UserGuardMiddleware(BaseMiddleware):
         )
         if payload and not match:
             await db.record_link_hit(conn, payload, user.id, is_new)
+        # Первый /start — повод для приветственной анимации.
+        data["is_new_user"] = bool(is_new)
 
         # Админа не банит собственный бан-лист — иначе можно потерять доступ.
         if not access.is_admin(user.id) and await _banned(conn, user.id):
