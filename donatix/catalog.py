@@ -173,6 +173,11 @@ def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sq
     return cache.get_or_set(f"cats:{kind}\x1f{q}", 60, lambda: conn.execute(sql, args).fetchall())
 
 
+def _own_media(url: str | None) -> str | None:
+    from .catalog_job import own_media
+    return own_media(url)
+
+
 def public_view(product: dict[str, Any], markup: Decimal, *, config: Any = None, user: Any = None) -> dict[str, Any]:
     """Товар, как его видит клиент: наша цена, без закупочной и без данных поставщика.
 
@@ -200,7 +205,7 @@ def public_view(product: dict[str, Any], markup: Decimal, *, config: Any = None,
         "max_quantity": product["max_qty"],
         "stock": product["stock"],
         "fields": product["fields"],
-        "image_url": product.get("image_url"),
+        "image_url": _own_media(product.get("image_url")),
         "region": product.get("region"),
         "region_title": region_title(product.get("region")),
         **(_steam_extra(product, price) if product["kind"] == "steam_topup" else {}),

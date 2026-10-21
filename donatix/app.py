@@ -308,6 +308,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)
     from . import catalog_job
     catalog_job.load_image_index(config)
+    catalog_job.bind_base(config.base_url)
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
     app.include_router(api.router)
     from . import api_extra   # виртуальные номера и подарки Telegram для партнёров

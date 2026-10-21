@@ -96,6 +96,34 @@ def _shrink_all(folder: Path, keys: list[str]) -> None:
         log.info("картинки: сжато %s", done)
 
 
+_base = ""   # адрес сайта (https://donatix.tj) — задаёт приложение при запуске
+
+
+def bind_base(base: str) -> None:
+    global _base
+    _base = (base or "").rstrip("/")
+
+
+def own_media(url: str | None) -> str | None:
+    """Ссылка на картинку НА НАШЕМ сайте — её и отдаём в API. Скачанной копии нет — None:
+    ссылку поставщика наружу не отдаём никогда."""
+    local = local_url(url)
+    if not local or not local.startswith("/media/"):
+        return None
+    return _base + local
+
+
+def covers(products: list[dict[str, Any]]) -> dict[str, str]:
+    """Обложка игры (category_id) — первая скачанная картинка из её товаров. Ссылки поставщика не отдаём."""
+    out: dict[str, str] = {}
+    for p in products:
+        if p["category_id"] not in out:
+            m = own_media(p.get("image_url"))
+            if m:
+                out[p["category_id"]] = m
+    return out
+
+
 def _key(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:16]
 

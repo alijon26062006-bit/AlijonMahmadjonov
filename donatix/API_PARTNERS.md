@@ -26,7 +26,9 @@
 - `GET /transactions?page=1&limit=20` — движение денег.
 
 ## 2. Каталог и заказы игр, Stars, Premium, Steam, подарочных карт
-- `GET /categories` — все игры и сервисы: `category_id`, `kind`, `products` (сколько пакетов).
+- `GET /categories` — все игры и сервисы: `category_id`, `kind`, `products` (сколько пакетов), `image_url` (обложка).
+- **Картинки:** `image_url` у игр и товаров — полная ссылка на картинку на `donatix.tj` (например, `https://donatix.tj/media/ab12cd.png`).
+  Скачивайте её или ставьте в свой сайт напрямую. Если картинки ещё нет, поле равно `null`: покажите свою заглушку.
 - `GET /products?kind=&category_id=&q=&limit=100&offset=0` — товары с вашей ценой.
   **За один запрос не больше 500 товаров** (по умолчанию 100). Листайте через `offset`, пока `items` не пустой.
 - `GET /products/{product_id}` — один товар.

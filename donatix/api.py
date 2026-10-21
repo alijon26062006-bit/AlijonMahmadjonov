@@ -17,6 +17,7 @@ from . import account_check, accounts, catalog, db, orders
 from .config import Config
 from .deps import get_config, get_conn
 from .money import fmt
+from . import catalog_job
 
 router = APIRouter(prefix="/api/v1", tags=["API"])
 MAX_JSON = 64 * 1024   # тело JSON-запроса API — не больше 64 КБ (чек об оплате — отдельно, со своим лимитом)
@@ -163,8 +164,10 @@ def transaction(transaction_id: str, request: Request, user=Depends(api_user), c
 @router.get("/categories")
 def categories(request: Request, user=Depends(api_user), conn=Depends(get_conn)) -> dict[str, Any]:
     _limit(request, "catalog", str(user["id"]))
+    covers = catalog_job.covers(catalog.list_products(conn, limit=10000))
     items = [
-        {"kind": r["kind"], "category_id": r["category_id"], "name": r["category_name"], "products": r["n"]}
+        {"kind": r["kind"], "category_id": r["category_id"], "name": r["category_name"], "products": r["n"],
+         "image_url": covers.get(r["category_id"])}
         for r in catalog.categories(conn)
     ]
     return {"ok": True, "items": items}

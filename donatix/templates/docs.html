@@ -122,6 +122,8 @@
 
       <h3><span class="step-n">2</span>Получить пакеты и их ID</h3>
 <pre data-lang="bash">curl -s "{{ base_url }}/api/v1/products?kind=topup&q=free%20fire" -H "X-API-Key: $KEY"</pre>
+      <p class="hint"><b>Картинки:</b> у каждого товара и каждой игры есть поле <code>image_url</code> — полная ссылка на картинку
+        на donatix.tj. Если картинки ещё нет, поле равно <code>null</code>.</p>
       <p class="hint">За один запрос отдаётся не больше <code>limit</code> товаров: по умолчанию <b>100</b>, максимум <b>500</b>.
         Если пакетов больше, листайте через <code>offset</code>: <code>?limit=500&amp;offset=0</code>, потом <code>offset=500</code> и так, пока
         <code>items</code> не станет пустым. Так вы получите <b>все</b> товары, а не только первую сотню.</p>

@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 
+from . import catalog_job
 from . import account_check, accounts, catalog, orders
 from .api import ApiError, _limit, api_user
 from .config import Config
@@ -129,7 +130,9 @@ def _categories(conn, supplier, only_checkable: bool = False) -> list[dict[str, 
 def _categories_now(conn, supplier, only_checkable: bool = False) -> list[dict[str, Any]]:
     checkable = account_check.supported(supplier)
     out, seen = [], set()
-    for p in catalog.list_products(conn, kind="topup", limit=10000):
+    products = catalog.list_products(conn, kind="topup", limit=10000)
+    covers = catalog_job.covers(products)
+    for p in products:
         if p["category_id"] in seen:
             continue
         can = p["category_id"] in checkable or account_check.can_check(supplier, p)
@@ -137,7 +140,7 @@ def _categories_now(conn, supplier, only_checkable: bool = False) -> list[dict[s
             continue
         seen.add(p["category_id"])
         out.append({"category_id": p["category_id"], "name": p["category_name"], "fields": _fields_out(p),
-                    "imageurl": p.get("image_url"), "validate": can})
+                    "imageurl": covers.get(p["category_id"]), "validate": can})
     return out
 
 
@@ -160,7 +163,7 @@ def topup_offers(category_id: str, request: Request, user=Depends(api_user), con
     offers = [{"offer_id": p["id"], "name": p["name"], "price_usd": fmt_unit(_price(user, config, p)),
                "region": p.get("region")} for p in products]
     return {"ok": True, "category_id": category_id, "name": products[0]["category_name"],
-            "imageurl": products[0].get("image_url"), "fields": _fields_out(products[0]), "offers": offers}
+            "imageurl": catalog_job.covers(products).get(category_id), "fields": _fields_out(products[0]), "offers": offers}
 
 
 @router.get("/topups/validate-id")
@@ -311,11 +314,13 @@ def subscription_plans() -> dict[str, Any]:
 
 def _cats(conn, kind: str) -> list[dict[str, Any]]:
     out, seen = [], set()
-    for p in catalog.list_products(conn, kind=kind, limit=10000):
+    products = catalog.list_products(conn, kind=kind, limit=10000)
+    covers = catalog_job.covers(products)
+    for p in products:
         if p["category_id"] in seen:
             continue
         seen.add(p["category_id"])
-        out.append(p)
+        out.append({**p, "image_url": covers.get(p["category_id"])})
     return out
 
 
@@ -391,7 +396,7 @@ def gamekey_keys(game_id: str, request: Request, user=Depends(api_user), conn=De
              "stock": p.get("stock"), "region": p.get("region"), "min_order_quantity": p["min_qty"],
              "max_order_quantity": p["max_qty"]} for p in products]
     return {"ok": True, "GameName": products[0]["category_name"], "game_id": game_id, "platform": ref.get("platform"),
-            "region_restriction": bool(ref.get("region_restriction")), "imageurl": products[0].get("image_url"),
+            "region_restriction": bool(ref.get("region_restriction")), "imageurl": catalog_job.covers(products).get(products[0]["category_id"]),
             "keys": keys}
 
 
