@@ -216,6 +216,18 @@ details.more[open] > summary { margin-bottom: 14px; }
 .sale-line { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .sale-line .thumb { width: 44px; height: 44px; font-size: 20px; }
 
+/* хиты и таблицы товаров */
+.hitrow { display: grid; grid-template-columns: 26px 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 0; border-top: 1px solid var(--line); background: none; padding: 10px 0 0; text-align: left; width: 100%; }
+.hitrow:first-of-type { border-top: 0; padding-top: 0; }
+.rank { font-family: var(--f-display); font-weight: 700; font-size: 17px; color: var(--muted); text-align: center; }
+.hitrow:nth-of-type(-n+3) .rank { color: var(--accent); }
+.linkrow { border: 0; background: none; padding: 0; font-weight: 600; text-align: left; color: var(--ink); }
+.linkrow:hover { color: var(--accent); }
+.onum { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+@media (max-width: 800px) { .prow.compact .open { grid-column: 1; } .prow.compact .stepper { grid-column: 2; grid-row: 1; } }
+.prow.compact { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 800px) { .hitrow { grid-template-columns: 22px 44px minmax(0, 1fr) auto; } .hitrow .thumb { width: 44px; height: 44px; font-size: 20px; } }
+
 /* storefront */
 .store-hero { display: flex; gap: 16px; align-items: center; }
 .store-logo { width: 72px; height: 72px; border-radius: 18px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-family: var(--f-display); font-size: 28px; overflow: hidden; flex: none; }
@@ -394,12 +406,13 @@ function demo() {
     return items;
   };
   const orders = []; let no = 1000;
-  for (let back = 34; back >= 1; back--) {
+  for (let back = 34; back >= 0; back--) {
     const day = parseKey(addDays(today(), -back));
     const weekend = day.getDay() === 0 || day.getDay() === 6;
     const n = 3 + Math.floor(R() * (weekend ? 9 : 6)) + (back < 10 ? 2 : 0);
     for (let i = 0; i < n; i++) {
       const ts = new Date(day); ts.setHours(9 + Math.floor(R() * 12), Math.floor(R() * 60));
+      if (ts.getTime() > Date.now() - 60 * 60000) continue; // сегодня — только уже прошедшие часы
       const app = R() < .6, cancel = R() < .06;
       orders.push({ id: uid(), no: ++no, ts: ts.getTime(), source: app ? 'app' : 'shop', status: cancel ? 'cancelled' : 'done', items: pickItems(), customer: app ? { name: names[Math.floor(R() * names.length)], phone: '+992 9' + Math.floor(R() * 1e8).toString().padStart(8, '0'), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] } : null, delivery: app ? (R() < .8 ? 'courier' : 'pickup') : 'shop', comment: '', cancelReason: cancel ? 'Нет товара' : '', pay: R() < .5 ? 'Наличные' : 'Карта' });
     }
@@ -444,7 +457,7 @@ const flow = { step: auth.agreed ? (auth.onboarded ? 'phone' : 'intro') : 'terms
 const save = () => { if (S && !store.save(S)) toast('Не удалось сохранить: хранилище браузера переполнено или недоступно. Уменьшите число фото.'); };
 
 let view = 'home';
-const ui = { q: '', cat: 'Все', stock: 'all', ordTab: 'new', period: '30', from: addDays(today(), -13), to: today(), pickDay: null, expMonth: today().slice(0, 7) };
+const ui = { q: '', oq: '', psort: 'sales', cat: 'Все', stock: 'all', ordTab: 'new', period: '30', from: addDays(today(), -13), to: today(), pickDay: null, expMonth: today().slice(0, 7) };
 
 // ================= общие куски интерфейса =================
 const $ = sel => document.querySelector(sel);
@@ -651,6 +664,24 @@ function calc(a, b) {
   return { list, T, top: Object.values(prod).sort((x, y) => y.rev - x.rev) };
 }
 
+// продажи каждого товара за период (только выполненные заказы)
+function prodSales(a, b) {
+  const m = {};
+  for (const o of S.orders) {
+    if (o.status !== 'done') continue; const k = dkey(o.ts); if (k < a || k > b) continue;
+    const feeK = o.source === 'app' ? FEE : 0;
+    for (const i of o.items) { const r = m[i.pid] || (m[i.pid] = { qty: 0, rev: 0, profit: 0, orders: 0 }); r.qty += i.qty; r.rev += i.qty * i.price; r.profit += i.qty * (i.price * (1 - feeK) - (i.cost || 0)); r.orders++; }
+  }
+  return m;
+}
+const ZERO = { qty: 0, rev: 0, profit: 0, orders: 0 };
+function trend(cur, prev) {
+  if (!prev && !cur) return '<span class="muted">—</span>';
+  if (!prev) return '<span class="pill">новый</span>';
+  const d = Math.round((cur - prev) / prev * 100);
+  return d >= 0 ? `<b style="color:var(--accent)">▲ ${d}%</b>` : `<b style="color:var(--bad)">▼ ${-d}%</b>`;
+}
+
 // ================= Главная =================
 function vHome() {
   const t = today(), { T } = calc(t, t), y = calc(addDays(t, -1), addDays(t, -1)).T;
@@ -669,6 +700,7 @@ function vHome() {
       <div class="kpi"><span>Выполнено заказов</span><b class="num">${T.orders}</b></div>
       <div class="kpi"><span>Заказы в работе</span><b class="num">${active}</b></div>
     </div>
+    ${hitsBlock()}
     <div class="split">
       <section class="panel col">
         <div class="row between"><h2>Готовность к запуску</h2><b class="num" style="color:var(--accent)">${ready.pct}%</b></div>
@@ -677,9 +709,18 @@ function vHome() {
       </section>
       <section class="col">
         <div class="row between"><h2>Нужно пополнить</h2>${low.length ? `<span class="pill warn">${low.length}</span>` : ''}</div>
-        ${low.length ? `<div class="plist">${low.slice(0, 6).map(p => `<div class="prow" style="grid-template-columns:minmax(0,1fr) auto"><button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta">${stockPill(p)}</div></div></button><div class="stepper"><button class="iconbtn" data-stock="${p.id}" data-d="10" aria-label="Добавить 10">+10</button></div></div>`).join('')}</div>` : '<div class="panel muted">Все товары в наличии.</div>'}
+        ${low.length ? `<div class="plist">${low.slice(0, 6).map(p => `<div class="prow compact"><button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta">${stockPill(p)}</div></div></button><div class="stepper"><button class="iconbtn" data-stock="${p.id}" data-d="10" aria-label="Добавить 10">+10</button></div></div>`).join('')}</div>` : '<div class="panel muted">Все товары в наличии.</div>'}
       </section>
     </div>`;
+}
+function hitsBlock() {
+  const t = today(), m = prodSales(addDays(t, -6), t), pm = prodSales(addDays(t, -13), addDays(t, -7));
+  const list = S.products.map(p => ({ p, ...(m[p.id] || ZERO) })).filter(x => x.qty).sort((x, y) => y.qty - x.qty).slice(0, 5);
+  if (!list.length) return '';
+  const mx = list[0].qty;
+  return `<section class="panel col"><div class="row between"><h2>Хиты недели</h2><button class="btn sm" data-nav="stats">Все товары</button></div>
+    ${list.map((x, i) => `<button class="hitrow" data-edit="${x.p.id}"><span class="rank num">${i + 1}</span>${thumb(x.p)}<span style="min-width:0"><span class="pname" style="display:block">${esc(x.p.name)}</span><span class="bar" style="display:block;margin-top:6px"><i style="width:${x.qty / mx * 100}%"></i></span></span><span style="text-align:right"><b class="num">${x.qty} ${esc(x.p.unit)}</b><br><span class="small num">${trend(x.qty, (pm[x.p.id] || ZERO).qty)}</span></span></button>`).join('')}
+    <span class="small muted">Продано за последние 7 дней, в сравнении с неделей до этого.</span></section>`;
 }
 const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
 function readiness() {
@@ -701,14 +742,18 @@ function readiness() {
 function vOrders() {
   const groups = { new: ['new'], work: ['accepted', 'ready'], done: ['done'], cancelled: ['cancelled'] };
   const cnt = k => S.orders.filter(o => groups[k].includes(o.status)).length;
-  let list = S.orders.filter(o => groups[ui.ordTab].includes(o.status)).sort((a, b) => b.ts - a.ts);
+  const oq = ui.oq.trim().replace(/^№\s*/, '').toLowerCase();
+  let list = (oq ? S.orders.filter(o => String(o.no).includes(oq) || (o.customer && (o.customer.name.toLowerCase().includes(oq) || o.customer.phone.replace(/\D/g, '').includes(oq.replace(/\D/g, '') || '§'))))
+                 : S.orders.filter(o => groups[ui.ordTab].includes(o.status))).sort((a, b) => b.ts - a.ts);
   const more = list.length > 40; list = list.slice(0, 40);
   const tab = (k, l) => `<button class="chip" data-otab="${k}" aria-pressed="${ui.ordTab === k}">${l} <b class="num">${cnt(k)}</b></button>`;
   return `
     <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Заказы</h1></div>
       <div class="row"><button class="btn" data-act="testorder">Тестовый заказ</button><button class="btn primary" data-act="sale">${plusI} Продажа в магазине</button></div></div>
     <label class="switch" for="pauseSw"><span><b style="font-weight:600">Принимаю заказы</b><br><span class="small muted">Выключите, если закрылись раньше или не успеваете. Покупатели увидят «Временно не работает».</span></span><input type="checkbox" id="pauseSw" ${S.shop.paused ? '' : 'checked'}></label>
-    <div class="chips" role="group" aria-label="Статус">${tab('new', 'Новые')}${tab('work', 'В работе')}${tab('done', 'Выполненные')}${tab('cancelled', 'Отменённые')}</div>
+    <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="oq" type="search" inputmode="search" placeholder="Найти заказ по номеру, имени или телефону" value="${esc(ui.oq)}" aria-label="Поиск заказа"></div>
+    ${oq ? `<span class="small muted">Найдено: ${list.length}</span>` : ''}
+    <div class="chips" role="group" aria-label="Статус" ${oq ? 'hidden' : ''}>${tab('new', 'Новые')}${tab('work', 'В работе')}${tab('done', 'Выполненные')}${tab('cancelled', 'Отменённые')}</div>
     ${list.length ? `<div class="orders">${list.map(orderCard).join('')}</div>${more ? '<p class="muted small" style="margin:0">Показаны последние 40 заказов. Все продажи по дням есть в «Статистике».</p>' : ''}` : `<div class="empty panel"><b>${ui.ordTab === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</b><span>${ui.ordTab === 'new' ? 'Когда покупатель оформит заказ, он появится здесь, а на телефон придёт уведомление со звуком. Нажмите «Тестовый заказ», чтобы посмотреть, как это выглядит.' : ''}</span></div>`}`;
 }
 function orderCard(o) {
@@ -720,7 +765,7 @@ function orderCard(o) {
   if (o.status === 'ready') acts = `<button class="btn primary sm" data-oact="done" data-id="${o.id}">${o.delivery === 'pickup' ? 'Выдан покупателю' : 'Передан курьеру'}</button>`;
   const statusLine = o.status === 'new' ? `<span class="pill bad">Ждёт ответа · ${minsAgo(o.ts)} мин</span>` : o.status === 'accepted' ? `<span class="pill warn">${STATUS.accepted}${o.readyIn ? ' · к ' + hhmm((o.acceptedAt || o.ts) + o.readyIn * 60000) : ''}</span>` : o.status === 'ready' ? `<span class="pill info">${STATUS.ready}</span>` : o.status === 'cancelled' ? `<span class="pill bad">Отменён${o.cancelReason ? ': ' + esc(o.cancelReason) : ''}</span>` : `<span class="pill">${STATUS.done}</span>`;
   return `<article class="order s-${o.status}">
-    <div class="row between"><b>№ ${o.no}</b><span class="small muted">${whenText(o.ts)}</span></div>
+    <div class="row between"><b class="onum num">№ ${o.no}</b><span class="small muted">${whenText(o.ts)}</span></div>
     <div class="row">${statusLine}${src}</div>
     <ul>${o.items.map(i => `<li><span>${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''} × ${i.qty}</span><span class="num">${money(i.qty * i.price)}</span></li>`).join('')}</ul>
     <div class="total"><span>Итого</span><span class="num">${money(total)}</span></div>
@@ -801,21 +846,23 @@ function saveSale() {
 }
 
 // ================= Товары =================
-function filtered() {
+function filtered(sales) {
   const q = ui.q.trim().toLowerCase();
+  const by = { sales: (a, b) => (sales[b.id] || ZERO).qty - (sales[a.id] || ZERO).qty, new: (a, b) => b.created - a.created, cheap: (a, b) => a.price - b.price, stock: (a, b) => a.stock - b.stock }[ui.psort];
   return S.products.filter(p =>
     (ui.cat === 'Все' || p.cat === ui.cat) && (!q || p.name.toLowerCase().includes(q)) &&
     (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice))
-  ).sort((a, b) => b.created - a.created);
+  ).sort(by);
 }
 function vCatalog() {
-  const list = filtered();
+  const sales = prodSales(addDays(today(), -29), today());
+  const list = filtered(sales);
   const cats = ['Все', ...S.cats.filter(c => S.products.some(p => p.cat === c))];
   const cnt = f => S.products.filter(f).length;
   const rows = list.map(p => {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
-      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span>${stockPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
+      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
       <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${p.stock}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
@@ -834,6 +881,12 @@ function vCatalog() {
         <option value="nophoto" ${ui.stock === 'nophoto' ? 'selected' : ''}>Без фото (${cnt(p => !p.imgs.length)})</option>
         <option value="sale" ${ui.stock === 'sale' ? 'selected' : ''}>Со скидкой (${cnt(p => p.oldPrice)})</option>
         <option value="hidden" ${ui.stock === 'hidden' ? 'selected' : ''}>Скрытые (${cnt(p => !p.active)})</option>
+      </select>
+      <select class="input" id="psort" style="width:auto" aria-label="Сортировка">
+        <option value="sales" ${ui.psort === 'sales' ? 'selected' : ''}>Сначала самые продаваемые</option>
+        <option value="new" ${ui.psort === 'new' ? 'selected' : ''}>Сначала новые</option>
+        <option value="cheap" ${ui.psort === 'cheap' ? 'selected' : ''}>Сначала дешёвые</option>
+        <option value="stock" ${ui.psort === 'stock' ? 'selected' : ''}>Меньше всего на складе</option>
       </select>
     </div>
     ${cats.length > 2 ? `<div class="chips" role="group" aria-label="Категории">${cats.map(c => `<button class="chip" data-cat="${esc(c)}" aria-pressed="${ui.cat === c}">${esc(c)}</button>`).join('')}</div>` : ''}
@@ -1036,10 +1089,8 @@ function vStats() {
       <div class="axis">${list.map((d, i) => `<span>${i % step === 0 ? ddmm(d.k).slice(0, 2) : ''}</span>`).join('')}</div>
       <span class="small muted">Валовая прибыль: выручка минус закупочная цена и комиссия сервиса. Высота столбика — выручка за день, самый высокий: ${money(max)}.</span>
     </section>` : ''}
+    ${productTable(a, b)}
     <div class="split">
-      <section class="panel tight"><div style="padding:16px 16px 6px"><h2>Лучшие товары</h2></div>
-        ${top.length ? `<div class="tablewrap"><table><thead><tr><th>Товар</th><th class="r">Продано</th><th class="r">Выручка</th><th class="r">Прибыль</th></tr></thead><tbody>${top.slice(0, 8).map(p => `<tr><td style="white-space:normal;min-width:140px">${esc(p.name)}</td><td class="r">${p.qty}</td><td class="r">${moneyShort(p.rev)}</td><td class="r">${moneyShort(p.profit)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Нет продаж за этот период</div>'}
-      </section>
       <section class="panel col"><h2>Выручка по категориям</h2>
         ${cats.length ? cats.map(([c, v]) => `<div class="col" style="gap:4px"><div class="row between small"><span>${esc(c)}</span><b class="num">${money(v)}</b></div><div class="bar"><i style="width:${v / catMax * 100}%"></i></div></div>`).join('') : '<span class="muted">Нет продаж за этот период</span>'}
       </section>
@@ -1047,6 +1098,19 @@ function vStats() {
     <section class="panel tight"><div style="padding:16px 16px 6px"><h2>По дням</h2></div>
       ${dayRows.length ? `<div class="tablewrap"><table><thead><tr><th>Дата</th><th class="r">Заказов</th><th class="r">Продано</th><th class="r">Выручка</th><th class="r">Закупка</th><th class="r">Комиссия</th><th class="r">Расходы</th><th class="r">Прибыль</th></tr></thead><tbody>${dayRows.map(d => `<tr><td>${ddmm(d.k)}, ${parseKey(d.k).toLocaleDateString('ru-RU', { weekday: 'short' })}</td><td class="r">${d.orders}</td><td class="r">${d.qty}</td><td class="r">${money(d.rev)}</td><td class="r">${money(d.cogs)}</td><td class="r">${money(d.fee)}</td><td class="r">${d.exp ? money(d.exp) : '—'}</td><td class="r"><span class="${d.profit < 0 ? 'neg' : ''}">${money(d.profit)}</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">За этот период продаж и расходов нет</div>'}
     </section>`;
+}
+function productTable(a, b) {
+  const n = Math.round((parseKey(b) - parseKey(a)) / 864e5) + 1;
+  const cur = prodSales(a, b), prev = prodSales(addDays(a, -n), addDays(a, -1));
+  const rows = S.products.map(p => ({ p, ...(cur[p.id] || ZERO), prevQty: (prev[p.id] || ZERO).qty })).sort((x, y) => y.rev - x.rev || y.qty - x.qty);
+  const total = rows.reduce((t, r) => t + r.rev, 0) || 1;
+  const leaders = rows.filter(r => r.qty).slice(0, 3).map(r => r.p.id);
+  const dead = rows.filter(r => !r.qty && r.p.active).length;
+  return `<section class="panel tight"><div style="padding:16px 16px 6px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h2>Продажи по товарам</h2><span class="small muted">изменение к предыдущим ${n} ${plural(n, 'дню', 'дням', 'дням')}</span></div>
+    ${dead ? `<div class="alert" style="margin:6px 16px 10px"><span><b>${dead} ${plural(dead, 'товар не продавался', 'товара не продавались', 'товаров не продавались')}</b> за этот период. Проверьте фото, цену или сделайте скидку.</span></div>` : ''}
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Товар</th><th class="r">Продано</th><th class="r">Заказов</th><th class="r">Выручка</th><th class="r">Доля</th><th class="r">Прибыль</th><th class="r">Динамика</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr><td class="num muted">${i + 1}</td><td style="white-space:normal;min-width:170px"><button class="linkrow" data-edit="${r.p.id}">${esc(r.p.name)}</button>${leaders.includes(r.p.id) ? ' <span class="pill">Лидер</span>' : ''}${!r.qty && r.p.active ? ' <span class="pill warn">Не продаётся</span>' : ''}</td><td class="r">${r.qty} ${esc(r.p.unit)}</td><td class="r">${r.orders}</td><td class="r">${money(r.rev)}</td><td class="r">${Math.round(r.rev / total * 100)}%</td><td class="r">${money(r.profit)}</td><td class="r">${trend(r.qty, r.prevQty)}</td></tr>`).join('')}
+    </tbody></table></div></section>`;
 }
 function exportStats() {
   const [a, b] = range(), { list } = calc(a, b);
@@ -1297,6 +1361,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'q') { ui.q = e.target.value; render(); }
+  if (id === 'oq') { ui.oq = e.target.value; render(); const el = $('#oq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   if (id === 'p_price' || id === 'p_cost' || id === 'p_old') updateMargin();
   if (id === 'impText') previewImport();
   if (id === 'ag1' || id === 'ag2') $('#agreeBtn').disabled = !($('#ag1').checked && $('#ag2').checked);
@@ -1306,6 +1371,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', async e => {
   const t = e.target, id = t.id;
   if (id === 'stockFilter') { ui.stock = t.value; render(); }
+  if (id === 'psort') { ui.psort = t.value; render(); }
   if (id === 'p_cat') { const n = $('#p_newcat'); n.hidden = t.value !== '__new'; if (!n.hidden) n.focus(); }
   if (id === 'pFile' && t.files.length) {
     syncDraft();
