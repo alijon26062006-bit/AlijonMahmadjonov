@@ -58,6 +58,8 @@ export function orderCard(o) {
     <ul>${o.items.map(itemLine).join('')}</ul>
     <div class="total"><span>Итого</span><span class="num">${total !== orderedTotal(o) ? `<s class="muted">${money(orderedTotal(o))}</s> ` : ''}${money(total)}</span></div>
     ${o.comment ? `<div class="ocomment small">${ICON.note}<span>${esc(o.comment)}</span></div>` : ''}
+    ${o.receivedAt ? `<span class="pill">Покупатель получил заказ — деньги ваши</span>` : ''}
+    ${o.problem ? `<div class="alert bad small"><span><b>Покупатель сообщил о проблеме:</b> ${esc(o.problem.reason)}${o.problem.text ? ' — ' + esc(o.problem.text) : ''}</span></div>` : ''}
     ${o.customer ? `<div class="who">${esc(o.customer.name)} · ${esc(o.customer.phone)}${o.delivery === 'courier' ? '<br>' + esc(o.customer.address) : ''}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
   </article>`;

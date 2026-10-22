@@ -1,8 +1,8 @@
 import { DAYS } from './config.js';
-import { blankShop, demo } from './demo.js';
+import { blankShop, demo, migrate } from './demo.js';
 import { changeStockForOrder } from './domain/orders.js';
 import { esc, fmtPhone, num, today, uid } from './lib/format.js';
-import { auth, saveAuth, store } from './services/storage.js';
+import { auth, KEY, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
 import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, openSheet, showErrors, TABS, toast } from './ui/dom.js';
 import { copyText, doImport, previewImport, readImage, sheetImport, vCatalog } from './views/catalog.js';
@@ -18,6 +18,7 @@ import { cart, drawSale, orderAction, saveSale, sheetSale, testOrder, vOrders } 
 import { vMore, vShop } from './views/shop.js';
 import { exportStats, vStats } from './views/stats.js';
 import { vPreview } from './views/storefront.js';
+import { refreshSheet } from './views/assemble.js';
 import { saveReply, sendComplaint, sheetComplain, sheetReply, testReview, vReviews } from './views/reviews.js';
 import { unansweredBad } from './domain/reviews.js';
 import { can, me, role } from './domain/staff.js';
@@ -204,5 +205,13 @@ document.addEventListener('submit', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 // обновляем «ждёт N мин» у новых заказов
 setInterval(() => { if (S && (view === 'orders' || view === 'home') && $('#sheet').hidden && newCount()) render(); }, 60000);
+
+// приложение покупателя на этом устройстве изменило заказы или отзывы — подхватываем сразу
+window.addEventListener('storage', e => {
+  if (e.key !== KEY) return;
+  const next = migrate(store.load()); if (!next || next === 'fresh') return;
+  setS(next);
+  if ($('#sheet').hidden) render(); else refreshSheet?.();
+});
 
 render();

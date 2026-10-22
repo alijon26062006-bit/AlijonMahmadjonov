@@ -8,18 +8,21 @@ import { closeSheet, fmtQty, isStopped, onSheetClose, openSheet, thumb, toast } 
 // Сборка заказа: отметить собранное, указать точный вес, предложить замену, если товара нет.
 // Покупатель уже заплатил: вес можно превысить не больше чем на 10 %, разницу вниз вернём ему.
 const OVER = 0.10;
-let cur = null;           // открытый заказ
+let curId = null;         // открытый заказ
+const order = () => S.orders.find(o => o.id === curId);
 let subFor = null;        // для какой строки выбираем замену
-onSheetClose(() => { cur = null; subFor = null; });
+onSheetClose(() => { curId = null; subFor = null; });
 
 const unitOf = i => i.unit || S.products.find(p => p.id === i.pid)?.unit || 'шт';
 const isWeight = i => WEIGHT_UNITS.includes(unitOf(i));
 const handled = i => i.missing || i.picked;
 
-export function sheetAssemble(id) { cur = S.orders.find(o => o.id === id); subFor = null; draw(); }
+export function sheetAssemble(id) { curId = id; subFor = null; draw(); }
+/** Данные поменялись снаружи (ответ покупателя) — перерисовать открытую сборку. */
+export function refreshSheet() { if (curId && subFor == null) draw(); }
 
 function draw(keep = true) {
-  const o = cur; if (!o) return;
+  const o = order(); if (!o) return;
   if (subFor != null) return drawSubs(keep);
   const done = o.items.filter(handled).length, wait = o.items.some(i => i.sub?.status === 'wait');
   const rows = o.items.map((i, n) => {
@@ -46,7 +49,7 @@ function draw(keep = true) {
 }
 
 function drawSubs() {
-  const i = cur.items[subFor], base = S.products.find(p => p.id === i.pid);
+  const i = order().items[subFor], base = S.products.find(p => p.id === i.pid);
   const avail = S.products.filter(p => p.active && p.stock > 0 && !isStopped(p) && p.id !== i.pid);
   const same = avail.filter(p => base && p.cat === base.cat), other = avail.filter(p => !base || p.cat !== base.cat);
   const row = p => `<button class="sale-line subpick" data-subpid="${p.id}">${thumb(p)}<div style="min-width:0;text-align:left"><div class="pname">${esc(p.name)}</div><div class="small muted num">${money(p.price)} за ${esc(p.unit)} · ост. ${fmtQty(p.stock)}</div></div><span class="small ${p.price > i.price ? 'neg' : 'muted'}">${p.price > i.price ? 'дороже' : p.price < i.price ? 'дешевле' : 'та же цена'}</span></button>`;
@@ -61,7 +64,7 @@ function drawSubs() {
 }
 
 function act(t) {
-  const o = cur, n = +t.dataset.n, i = o.items[n], k = t.dataset.pk;
+  const o = order(), n = +t.dataset.n, i = o.items[n], k = t.dataset.pk;
   if (k === 'pick') i.picked = !i.picked;
   if (k === 'miss') { subFor = n; return draw(); }
   if (k === 'back') { subFor = null; return draw(false); }
@@ -71,13 +74,13 @@ function act(t) {
   save(); draw(); render();
 }
 function chooseSub(pid) {
-  const i = cur.items[subFor], p = S.products.find(x => x.id === pid);
+  const i = order().items[subFor], p = S.products.find(x => x.id === pid);
   const qty = WEIGHT_UNITS.includes(p.unit) ? i.qty : Math.max(1, Math.round(i.qty));
   Object.assign(i, { missing: true, picked: false, sub: { pid: p.id, name: p.name, unit: p.unit, qty, price: p.price, cost: p.cost, status: 'wait', ts: Date.now() } });
   subFor = null; save(); draw(false); render(); toast('Замену отправили покупателю');
 }
 function finish() {
-  const o = cur;
+  const o = order();
   for (const i of o.items) {
     const p = S.products.find(x => x.id === i.pid);
     // остаток при заказе уже списан на заказанное количество — поправляем на разницу
@@ -90,27 +93,27 @@ function finish() {
 }
 
 document.addEventListener('click', e => {
-  if (!cur) return;
+  if (!curId) return;
   const t = e.target.closest('[data-pk],[data-subpid]'); if (!t || t.disabled) return;
   if (t.dataset.subpid) return chooseSub(t.dataset.subpid);
   act(t);
 });
 document.addEventListener('change', e => {
-  const n = e.target.dataset?.weigh; if (!cur || n == null) return;
-  const i = cur.items[+n], v = num(e.target.value), max = r2(i.qty * (1 + OVER));
+  const n = e.target.dataset?.weigh; if (!curId || n == null) return;
+  const i = order().items[+n], v = num(e.target.value), max = r2(i.qty * (1 + OVER));
   if (v == null || v <= 0) { toast('Введите вес, например 1,05'); return draw(); }
   if (v > max) toast(`Покупатель оплатил ${fmtQty(i.qty)} ${unitOf(i)}. Положите не больше ${fmtQty(max)} ${unitOf(i)}`);
   i.actual = Math.min(r2(v), max); i.picked = true; save(); draw(); render();
 });
 
-// тестовый режим: покупатель отвечает на замену сам через несколько секунд
+// тестовый режим: на заказы-примеры покупатель отвечает сам; на заказы из приложения покупателя отвечает он
 setInterval(() => {
   if (!S) return;
   let changed = false;
-  for (const o of S.orders) for (const i of o.items) if (i.sub?.status === 'wait' && Date.now() - i.sub.ts > 5000) {
+  for (const o of S.orders) if (!o.client) for (const i of o.items) if (i.sub?.status === 'wait' && Date.now() - i.sub.ts > 5000) {
     i.sub.status = Math.random() < 0.8 ? 'ok' : 'no'; i.picked = false; changed = true;
     toast(i.sub.status === 'ok' ? `Покупатель согласен на замену: ${i.sub.name}` : `Покупатель отказался от замены — позиция убрана`);
   }
   if (!changed) return;
-  save(); render(); if (cur && subFor == null) draw();
+  save(); render(); if (curId && subFor == null) draw();
 }, 2000);

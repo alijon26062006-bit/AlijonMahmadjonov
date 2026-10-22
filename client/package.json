@@ -1,0 +1,9 @@
+{
+  "name": "zud-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8766",
+    "check": "for f in $(find js -name '*.js') sw.js; do node --check \"$f\" || exit 1; done && echo ok"
+  }
+}
