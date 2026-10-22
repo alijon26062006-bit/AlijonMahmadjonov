@@ -1,4 +1,3 @@
-import { FEE } from '../config.js';
 import { calc, prodSales, range, trend, ZERO } from '../domain/analytics.js';
 import { addDays, ddmm, dkey, esc, money, parseKey, plural, r2 } from '../lib/format.js';
 import { S, ui } from '../state.js';
@@ -34,7 +33,7 @@ export function vStats() {
       <div class="tablewrap"><table><tbody>
         <tr><td>Выручка от продаж</td><td class="r">${money(T.rev)}</td></tr>
         <tr><td>− Закупочная стоимость проданного товара</td><td class="r">${money(T.cogs)}</td></tr>
-        <tr><td>− Комиссия сервиса ${FEE * 100}% (только заказы из приложения)</td><td class="r">${money(T.fee)}</td></tr>
+        <tr><td>− Комиссия сервиса (заказы из приложения)</td><td class="r">${money(T.fee)}</td></tr>
         <tr><td>− Расходы (аренда, зарплата и др.)</td><td class="r">${money(T.exp)}</td></tr>
         <tr><td><b>= Чистая прибыль</b></td><td class="r"><b class="${T.profit < 0 ? 'neg' : ''}">${money(T.profit)}</b></td></tr>
       </tbody></table></div>

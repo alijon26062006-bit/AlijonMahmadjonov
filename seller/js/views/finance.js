@@ -1,4 +1,3 @@
-import { CUR, FEE } from '../config.js';
 import { orderFee, orderTotal } from '../domain/orders.js';
 import { addDays, esc, money, parseKey, r2, today, whenText } from '../lib/format.js';
 import { S } from '../state.js';
@@ -55,12 +54,12 @@ export function vFinance() {
     ${alifBlock()}
     <section class="panel col">
       <h2>Как приходят деньги</h2>
-      <div class="tablewrap"><table><tbody>
-        <tr><td>Покупатель оплатил заказ, например торт. Деньги заморожены в Alif</td><td class="r">100 ${CUR}</td></tr>
-        <tr><td>− Комиссия сервиса ${FEE * 100}%</td><td class="r">20 ${CUR}</td></tr>
-        <tr><td><b>= Alif переводит на ваш счёт, когда покупатель получил заказ</b></td><td class="r"><b>80 ${CUR}</b></td></tr>
-      </tbody></table></div>
-      <span class="small muted">Если заказ отменён, Alif возвращает покупателю всю сумму, комиссия не удерживается. Если получение заказа не подтверждено в срок, Alif тоже возвращает деньги покупателю. В тестовой версии кнопка «Передан курьеру» считается получением заказа.</span>
+      <ol class="steps">
+        <li>Покупатель оплачивает заказ. Деньги резервируются в Alif и видны в строке «Заморожено».</li>
+        <li>Вы собираете заказ, курьер доставляет его покупателю.</li>
+        <li>Покупатель получил заказ — Alif переводит сумму за вычетом комиссии сервиса на ваш счёт.</li>
+      </ol>
+      <span class="small muted">Если заказ отменён, покупателю возвращается вся сумма, комиссия не удерживается.</span>
     </section>
     <section class="panel tight"><div style="padding:16px 16px 6px"><h2>Переводы от Alif</h2></div>
       ${ledger.length ? `<div class="tablewrap"><table class="ledger"><thead><tr><th>Дата</th><th>Заказ</th><th class="r">Оплачено</th><th class="r">Комиссия</th><th class="r">Вам</th></tr></thead><tbody>${ledger.map(l => `<tr><td>${whenText(l.ts)}</td><td>№ ${l.no}</td><td class="r">${money(l.total)}</td><td class="r">${money(l.fee)}</td><td class="r"><b class="plus">+${money(l.net)}</b></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Пока нет переводов</b><span>Здесь появится каждый оплаченный и полученный покупателем заказ.</span></div>'}
