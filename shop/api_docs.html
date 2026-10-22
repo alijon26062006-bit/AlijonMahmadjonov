@@ -173,7 +173,7 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
       <h2>Быстрый старт</h2>
       <div class="steps">
         <div class="step"><div class="num">1</div><b>Получите ключ</b><span>В нашем Telegram-боте нажмите «🔌 API барои барномасозон», затем «🔑 Калид сохтан».</span></div>
-        <div class="step"><div class="num">2</div><b>Пополните баланс</b><span>Как обычно в боте. API тратит деньги с этого же баланса.</span></div>
+        <div class="step"><div class="num">2</div><b>Пополните баланс</b><span>Как обычно в боте. API тратит деньги с этого же баланса — по специальным ценам для API.</span></div>
         <div class="step"><div class="num">3</div><b>Отправьте заказ</b><span>Один POST-запрос — и товар уходит игроку автоматически.</span></div>
       </div>
       <div class="code"><span class="label">Проверить ключ и баланс</span><button class="copy">Копировать</button><pre>curl {{BASE}}/balance \
@@ -208,7 +208,8 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
       <div class="card">
         <ul>
           <li>Баланс — <b>тот же, что в боте</b>. Пополнение — через бота (Душанбе Сити, Alif Mobi).</li>
-          <li>Цены — <b>те же, что вы видите в боте</b>. Партнёры магазина автоматически получают партнёрские цены.</li>
+          <li>Цены для API — <b>специальные</b>: они рассчитываются от закупочной цены поставщика и могут отличаться от цен в боте.</li>
+          <li>Цены <b>обновляются автоматически</b> вслед за поставщиком. Всегда берите актуальную цену из <a href="#products">/products</a> перед покупкой — в ответе на заказ указана точная списанная сумма.</li>
           <li>Деньги списываются в момент создания заказа. Если заказ не выполнен — <b>вся сумма автоматически возвращается</b> на баланс.</li>
           <li>Все суммы — строки с двумя знаками после точки, валюта <code>TJS</code> (сомони).</li>
         </ul>
@@ -229,7 +230,7 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
       <h2>Товары</h2>
       <div class="card">
         <div class="endpoint"><span class="method get">GET</span><code class="path">/products</code><span class="tag">?category=</span></div>
-        <p>Все доступные товары с <b>вашими</b> ценами. Поле <code>fields</code> говорит, что нужно передать при покупке.</p>
+        <p>Все товары, доступные через API, с <b>актуальными ценами для API</b>. Поле <code>fields</code> говорит, что нужно передать при покупке.</p>
         <div class="table-wrap"><table>
           <tr><th>Параметр</th><th>Описание</th></tr>
           <tr><td><code>category</code></td><td>Необязательно. Только одна категория: <code>tg_stars</code>, <code>tg_premium</code>, <code>ff_cis</code>, <code>ff_id</code>, <code>pubg</code>, <code>other_games</code></td></tr>

@@ -14,7 +14,7 @@ from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from . import catalog, devapi, guard, requisites
+from . import catalog, costs, devapi, guard, requisites
 from .config import ROOT, Config, load_config
 from .db import Database
 from .fulfillment import resume_in_background
@@ -181,6 +181,7 @@ async def run() -> None:
     dp = build_dispatcher(db, cfg, supplier)
 
     api_runner = None
+    costs_task = None
     try:
         try:
             me = await bot.get_me()
@@ -209,10 +210,15 @@ async def run() -> None:
         # расонида мешаванд — дар паси парда, то бот фавран ҷавоб диҳад.
         resume_in_background(bot, db, cfg, supplier)
         # API барои барномасозон — дар ҳамин раванд, бо ҳамин база ва ҳисобҳо.
+        # Нархи харид худкор нав мешавад — нархи API аз он ҳисоб мешавад.
+        costs_task = asyncio.create_task(costs.refresh_forever(db, cfg, supplier))
         api_runner = await devapi.start(db, cfg, supplier, bot)
         await dp.start_polling(bot)
     finally:
         # Ҳатто ҳангоми хатогӣ ҳама чиз тоза баста мешавад.
+        if costs_task is not None:
+            costs_task.cancel()
+            await asyncio.gather(costs_task, return_exceptions=True)
         if api_runner is not None:
             await api_runner.cleanup()
         await fulfillment_shutdown()

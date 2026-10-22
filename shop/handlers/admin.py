@@ -296,10 +296,9 @@ DEFAULT_RATE = 11.0
 
 def usd_rate(db: Database) -> float:
     """Курси доллар барои ҳисоби нархи харид дар панел."""
-    try:
-        return float(db.setting(RATE_KEY) or DEFAULT_RATE)
-    except ValueError:
-        return DEFAULT_RATE
+    from ..costs import usd_rate as _rate
+
+    return _rate(db)
 
 
 # ── нархҳо ────────────────────────────────────────────────────────────

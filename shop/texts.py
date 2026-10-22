@@ -782,6 +782,12 @@ def admin_settings(
             f"   калидҳо: <b>{api.get('keys', 0)}</b> · фармоишҳо имрӯз: "
             f"<b>{api.get('orders_today', 0)}</b> · ҳамагӣ: <b>{api.get('orders', 0)}</b>"
         )
+        if "markup" in api:
+            stamp = (api.get("costs_at") or "")[:16].replace("T", " ") or "ҳанӯз не"
+            text += (
+                f"\n   💹 нарх: нархи харид <b>+{api['markup']:g}%</b> "
+                f"(нархи харид нав шуд: {esc(stamp)})"
+            )
         if api.get("url"):
             text += f"\n   📖 {esc(api['url'])}"
     return text
@@ -1033,8 +1039,8 @@ def api_screen(key, balance: int, url: str, is_open: bool, currency: str = CURRE
     head = (
         "🔌 <b>API барои барномасозон</b>\n\n"
         "<blockquote>Боти ё сайти шумо метавонад аз мо <b>худкор</b> харид кунад: "
-        "алмоси Free Fire, UC-и PUBG, Telegram Stars ва Premium — бо ҳамон нархҳо "
-        "ва аз ҳамин ҳисоб.</blockquote>\n\n"
+        "алмоси Free Fire, UC-и PUBG, Telegram Stars ва Premium — аз ҳамин ҳисоб."
+        "</blockquote>\n\n"
         f"💳 Ҳисоб: <b>{money(balance, currency)}</b>\n"
     )
     if not is_open:
@@ -1048,6 +1054,7 @@ def api_screen(key, balance: int, url: str, is_open: bool, currency: str = CURRE
             f"📅 Сохта шуд: {esc(key['created_at'][:16].replace('T', ' '))}\n"
             f"🕐 Охирин истифода: {esc(used)}"
         )
+    body += "\n\n💲 Нархҳо дар API махсус ҳастанд — рӯйхаташ дар <code>/products</code>."
     if url:
         body += f"\n\n📖 Ҳуҷҷатҳо (бо забони русӣ):\n{esc(url)}"
     return head + body
@@ -1077,3 +1084,10 @@ API_CONFIRM_REVOKE = (
 )
 API_REVOKED = "🗑 Калид бекор шуд."
 API_CLOSED = "API ҳоло хомӯш аст."
+
+ADMIN_ASK_API_MARKUP = (
+    "💹 <b>Наценкаи API</b>\n\n"
+    "Нархи API = нархи хариди таъминкунанда × курси доллар + ин фоиз.\n"
+    "Фоизро нависед. Намуна: <code>5</code> ё <code>10</code>\n\n"
+    "<i>Нархҳои бот тағйир намеёбанд — ин танҳо барои харидорони API.</i>"
+)

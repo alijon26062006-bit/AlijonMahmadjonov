@@ -350,7 +350,10 @@ def admin_settings() -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_MARKUP, "a:markup", style.PRIMARY),
             ],
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
-            [_btn("🔌 API: фаъол / хомӯш", "a:apitoggle", style.PRIMARY)],
+            [
+                _btn("🔌 API: фаъол / хомӯш", "a:apitoggle", style.PRIMARY),
+                _btn("💹 Наценкаи API", "a:apimarkup", style.PRIMARY),
+            ],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
     )

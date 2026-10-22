@@ -31,9 +31,12 @@ SKIP = ("-", "—", "нет", "не")
 
 # ── экрани танзимот ───────────────────────────────────────────────────
 def _api_info(db: Database, cfg: Config) -> dict:
-    from .. import devapi
+    from .. import costs, devapi
 
-    return {**db.api_stats(), "open": devapi.api_open(db, cfg), "url": devapi.docs_url(cfg)}
+    return {
+        **db.api_stats(), "open": devapi.api_open(db, cfg), "url": devapi.docs_url(cfg),
+        "markup": costs.api_markup(db), "costs_at": db.setting(costs.UPDATED_KEY),
+    }
 
 
 @router.callback_query(F.data == "a:settings")
@@ -533,42 +536,70 @@ async def got_rate(message: Message, state: FSMContext, db: Database) -> None:
 @router.callback_query(F.data == "a:costs")
 async def cb_refresh_costs(cb: CallbackQuery, db: Database, cfg: Config, supplier) -> None:
     """Нархи хариди ҳамаи молҳоро аз таъминкунандаҳо мегирад."""
-    telegram = getattr(supplier, "telegram", None)
-    if not cfg.has_supplier and telegram is None:
+    from .. import costs
+
+    if not cfg.has_supplier and getattr(supplier, "telegram", None) is None:
         await cb.answer("Таъминкунанда хомӯш аст", show_alert=True)
         return
     await safe_edit(cb, "⏳ Нархи харидро мегирам...", None)
     await cb.answer()
 
+    report = await costs.refresh_costs(db, cfg, supplier)
     lines = ["✅ Нархи харид нав шуд.\n"]
     if cfg.has_supplier:
-        live = await supplier.products()
-        if live:
-            updated = db.update_costs({sku: item.get("price") for sku, item in live.items()})
-            lines.append(f"🎮 FireLoot: <b>{len(live)}</b> мол, нав шуд: <b>{updated}</b>")
-        else:
+        if report["fireloot"] is None:
             lines.append("⚠️ Каталоги FireLoot гирифта нашуд.")
-
-    if telegram is not None:
-        # Stars ва Premium аз Donatix харида мешаванд — нархашон аз он ҷо.
-        updated = missing = 0
-        for category, kind in ((catalog.CAT_STARS, "stars"), (catalog.CAT_PREMIUM, "premium")):
-            for row in db.products(category, only_active=False):
-                if row["kind"] != kind:
-                    continue
-                cost = await telegram.cost_usd(kind, row["amount"])
-                if cost is None:
-                    missing += 1
-                    continue
-                db.set_cost(row["code"], round(cost * 1000))
-                updated += 1
-        lines.append(f"⭐️ Donatix (Stars, Premium): нав шуд: <b>{updated}</b>")
-        if missing:
-            lines.append(f"⚠️ Дар Donatix мол нест: <b>{missing}</b>")
-
-    lines.append("\n<i>Акнун дар экрани ҳар мол нархи харид ва фоида дида мешавад.</i>")
+        else:
+            lines.append(
+                f"🎮 FireLoot: <b>{report['fireloot_total']}</b> мол, "
+                f"нав шуд: <b>{report['fireloot']}</b>"
+            )
+    if report["donatix"] is not None:
+        lines.append(f"⭐️ Donatix (Stars, Premium): нав шуд: <b>{report['donatix']}</b>")
+        if report["donatix_missing"]:
+            lines.append(f"⚠️ Дар Donatix мол нест: <b>{report['donatix_missing']}</b>")
+    lines.append(
+        "\n<i>Нархи харид худкор ҳар 3 соат нав мешавад. Нархи API аз он ва "
+        "наценкаи шумо ҳисоб мешавад.</i>"
+    )
     await cb.message.answer(
         "\n".join(lines), reply_markup=keyboards.admin_price_categories()
+    )
+
+
+# ── наценкаи API ──────────────────────────────────────────────────────
+@router.callback_query(F.data == "a:apimarkup")
+async def cb_api_markup(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+    from .. import costs
+
+    await state.set_state(Admin.waiting_api_markup)
+    await safe_edit(
+        cb,
+        f"{texts.ADMIN_ASK_API_MARKUP}\n\nҲозир: <b>+{costs.api_markup(db):g}%</b>",
+        keyboards.admin_back(),
+    )
+    await cb.answer()
+
+
+@router.message(Admin.waiting_api_markup, F.text)
+async def got_api_markup(message: Message, state: FSMContext, db: Database, cfg: Config) -> None:
+    from .. import costs
+
+    raw = message.text.strip().replace("%", "").replace(",", ".").replace("+", "")
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1
+    if not 0 <= value <= 500:
+        await message.answer("❌ Фоиз нодуруст аст. Намуна: <code>5</code> ё <code>10</code>")
+        return
+    await state.clear()
+    db.set_setting(costs.API_MARKUP_KEY, f"{value:g}")
+    await message.answer(
+        f"✅ Наценкаи API: <b>+{value:g}%</b>\n\n"
+        "<i>Нархҳои API фавран аз нав ҳисоб мешаванд: нархи харид × курс × "
+        f"{1 + value / 100:g}.</i>",
+        reply_markup=keyboards.admin_settings(),
     )
 
 

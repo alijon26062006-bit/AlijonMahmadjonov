@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-from shop import devapi, fulfillment, keyboards
+from shop import costs, devapi, fulfillment, keyboards
 from shop.db import ORDER_DONE, ORDER_REJECTED
 from shop.supplier import OrderResult
 
@@ -28,8 +28,17 @@ def cfg_api(cfg):
     return replace(cfg, supplier="fireloot", supplier_url="https://api.test", supplier_key="k")
 
 
+def _prices(db, rate="10", markup="0"):
+    """Курс 10 ва наценка 0: нархи API = нархи харид × 10 (pubg_60 → 10.00)."""
+    db.set_setting(costs.RATE_KEY, rate)
+    db.set_setting(costs.API_MARKUP_KEY, markup)
+    for code, milli in (("pubg_60", 1000), ("stars_100", 1500), ("prem_3", 12000)):
+        db.set_cost(code, milli)
+
+
 @pytest.fixture
 async def api(db, cfg_api):
+    _prices(db)
     supplier, bot = FakeSupplier(), FakeBot()
     client = TestClient(TestServer(devapi.build_app(db, cfg_api, supplier, bot)))
     await client.start_server()
@@ -130,15 +139,90 @@ async def test_products_show_buyer_price_and_fields(api, db):
     assert [f["key"] for f in by_id["pubg_60"]["fields"]] == ["player_id"]
 
 
-async def test_partner_sees_partner_price(api, db):
+async def test_api_price_ignores_bot_and_partner_prices(api, db):
     client, _, _ = api
     key = _user(db)
     db.add_partner(USER_ID)
     db.set_partner_price("pubg_60", 900)
+    db.set_price("pubg_60", 5000)
     data = await (await client.get("/api/v1/products?category=pubg",
                                    headers={"X-API-Key": key})).json()
-    assert {i["id"]: i["price"] for i in data["items"]}["pubg_60"] == "9.00"
+    assert {i["id"]: i["price"] for i in data["items"]}["pubg_60"] == "10.00"
     assert {i["category"] for i in data["items"]} == {"pubg"}
+
+
+async def test_markup_change_applies_immediately(api, db):
+    client, _, _ = api
+    key = _user(db)
+    db.set_setting(costs.API_MARKUP_KEY, "5")
+    data = await (await client.get("/api/v1/products?category=pubg",
+                                   headers={"X-API-Key": key})).json()
+    assert {i["id"]: i["price"] for i in data["items"]}["pubg_60"] == "10.50"
+
+    resp = await client.post("/api/v1/orders", headers={"X-API-Key": key},
+                             json={"product": "pubg_60", "player_id": "5123456789"})
+    assert (await resp.json())["order"]["price"] == "10.50"
+    assert db.user(USER_ID).balance == 20000 - 1050
+
+
+async def test_products_without_supplier_price_are_not_sold(api, db):
+    """Нархи харид нест — намефурӯшем, вагарна шояд бо зарар."""
+    client, _, _ = api
+    key = _user(db)
+    with db._lock:
+        db._conn.execute("UPDATE products SET cost = NULL WHERE code = 'pubg_60'")
+        db._conn.commit()
+    data = await (await client.get("/api/v1/products", headers={"X-API-Key": key})).json()
+    assert "pubg_60" not in {i["id"] for i in data["items"]}
+    resp = await client.post("/api/v1/orders", headers={"X-API-Key": key},
+                             json={"product": "pubg_60", "player_id": "5123456789"})
+    assert resp.status == 404 and db.user(USER_ID).balance == 20000
+
+
+@pytest.mark.parametrize("cost,rate,markup,expected", [
+    (1000, 10, 0, 1000),        # 1.000 $ × 10 = 10.00
+    (1000, 10, 5, 1050),        # +5%
+    (886, 11, 10, 1073),        # 0.886 $ × 11 × 1.10 = 10.7206 → ба боло 10.73
+    (1, 11.2, 0, 2),            # хеле арзон — ҳадди ақал як дирам, ба боло
+    (None, 10, 5, None),        # нархи харид нест
+    (0, 10, 5, None),
+])
+def test_api_price_formula(cost, rate, markup, expected):
+    assert costs.api_price(cost, rate, markup) == expected
+
+
+async def test_admin_sets_api_markup(db):
+    from aiogram.fsm.context import FSMContext
+    from aiogram.fsm.storage.base import StorageKey
+    from aiogram.fsm.storage.memory import MemoryStorage
+    from shop.handlers import settings as st
+    from test_shop_flow import FakeMessage
+
+    state = FSMContext(storage=MemoryStorage(),
+                       key=StorageKey(bot_id=1, chat_id=ADMIN_ID, user_id=ADMIN_ID))
+    bad = FakeMessage("сто", user_id=ADMIN_ID)
+    await st.got_api_markup(bad, state, db, None)
+    assert "нодуруст" in bad.last and costs.api_markup(db) == costs.DEFAULT_API_MARKUP
+
+    good = FakeMessage("7,5%", user_id=ADMIN_ID)
+    await st.got_api_markup(good, state, db, None)
+    assert costs.api_markup(db) == 7.5 and "+7.5%" in good.last
+
+
+async def test_refresh_costs_from_both_suppliers(db, cfg_api):
+    from shop.supplier import RouterSupplier
+    from test_donatix import FakeDonatix
+
+    class Catalog(FakeSupplier):
+        async def products(self):
+            return {"pubg_uc_60": {"sku": "pubg_uc_60", "price": "0.95"}}
+
+    report = await costs.refresh_costs(db, cfg_api, RouterSupplier(Catalog(), FakeDonatix([])))
+
+    assert report["fireloot"] >= 1 and db.product("pubg_60")["cost"] == 950
+    assert report["donatix"] >= 1
+    assert db.product("stars_100")["cost"] == round(0.016605 * 100 * 1000)
+    assert db.setting(costs.UPDATED_KEY)
 
 
 async def test_check_returns_nickname(api, db):

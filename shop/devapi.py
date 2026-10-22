@@ -29,9 +29,9 @@ from typing import Any
 
 from aiohttp import web
 
-from . import catalog, guard
+from . import catalog, costs, guard
 from .config import Config
-from .db import DuplicateRequest, NotEnoughMoney, Database, price_of
+from .db import DuplicateRequest, NotEnoughMoney, Database
 from .fulfillment import deliver_in_background, pick_supplier
 
 log = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ def _needs_server(row) -> bool:
     return group in catalog.SERVER_GROUPS
 
 
-def product_json(row, partner: bool, groups: dict[str, str]) -> dict:
+def product_json(row, price: int, groups: dict[str, str]) -> dict:
     info = catalog.CATEGORY_INFO.get(row["category"])
     if info is not None and info.target == "username":
         fields = [{"key": "username", "label": "Telegram @username", "required": True}]
@@ -155,7 +155,7 @@ def product_json(row, partner: bool, groups: dict[str, str]) -> dict:
         "category": row["category"],
         "category_title": info.title if info else row["category"],
         "group": groups.get(row["group_code"] or "", ""),
-        "price": money(price_of(row, partner)),
+        "price": money(price),
         "currency": CURRENCY,
         "fields": fields,
     }
@@ -234,7 +234,8 @@ def _product(db: Database, body: dict):
     if not code:
         raise ApiError(400, "missing_field", "Не указан product", field="product")
     row = db.product(code)
-    if row is None or not row["active"]:
+    # Без цены поставщика товар через API не продаётся — иначе можно уйти в минус.
+    if row is None or not row["active"] or costs.api_price_of(db, row) is None:
         raise ApiError(404, "product_not_found", "Товар не найден или сейчас недоступен")
     return row
 
@@ -289,9 +290,9 @@ def build_app(db: Database, cfg: Config, supplier, bot) -> web.Application:
         return _json({"ok": True, "balance": money(user.balance), "currency": CURRENCY})
 
     async def products(request: web.Request) -> web.Response:
-        _, user = auth(request)
-        partner = db.is_partner(user.id)
+        auth(request)
         only = request.query.get("category", "").strip()
+        rate, markup = costs.usd_rate(db), costs.api_markup(db)
         groups: dict[str, str] = {}
         items = []
         for category in catalog.CATEGORIES:
@@ -299,7 +300,10 @@ def build_app(db: Database, cfg: Config, supplier, bot) -> web.Application:
                 continue
             for group in db.groups(category, only_active=False):
                 groups[group["code"]] = group["title"]
-            items += [product_json(r, partner, groups) for r in db.products(category)]
+            for row in db.products(category):
+                price = costs.api_price(row["cost"], rate, markup)
+                if price is not None:
+                    items.append(product_json(row, price, groups))
         return _json({"ok": True, "items": items, "count": len(items)})
 
     async def check(request: web.Request) -> web.Response:
@@ -329,7 +333,7 @@ def build_app(db: Database, cfg: Config, supplier, bot) -> web.Application:
         body, raw = await _body(request)
         row = _product(db, body)
         target, server = _target_for(row, body)
-        price = price_of(row, db.is_partner(user.id))
+        price = costs.api_price_of(db, row)
 
         idem_key = request.headers.get("Idempotency-Key", "").strip()[:100]
         idem = (idem_key, hashlib.sha256(raw).hexdigest()) if idem_key else None
