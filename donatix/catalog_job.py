@@ -124,6 +124,24 @@ def covers(products: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+def forget(urls: list[str]) -> int:
+    """Удалить скачанные картинки (и маленькие копии) — по этим ссылкам их больше нельзя открыть."""
+    if not _images_dir:
+        return 0
+    gone = 0
+    for url in urls:
+        key = _key(url)
+        name = _images.pop(key, None)
+        _thumbs.discard(key)
+        for f in ([_images_dir / name] if name else []) + [_images_dir / "s" / f"{key}.webp"]:
+            try:
+                f.unlink()
+                gone += 1
+            except FileNotFoundError:
+                pass
+    return gone
+
+
 def _key(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:16]
 

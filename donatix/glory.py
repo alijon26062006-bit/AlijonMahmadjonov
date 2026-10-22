@@ -40,8 +40,16 @@ class GloryError(Exception):
     pass
 
 
+SELLING = False   # новые запуски выключены (жалоба правообладателя). Работающие заказы можно смотреть и остановить
+
+
 def enabled(config: Config) -> bool:
     return bool(config.ffglory_key and config.ffglory_master)
+
+
+def selling(config: Config) -> bool:
+    """Можно ли запускать новые группы: подключено и продажа не выключена."""
+    return SELLING and enabled(config)
 
 
 def _call(config: Config, method: str, path: str, body: dict | None = None, auth: bool = True) -> Any:
@@ -183,6 +191,8 @@ def _clean_clan(clan_id: str) -> str:
 
 
 def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, region: str, clan_id: str) -> int:
+    if not selling(config):
+        raise GloryError("Боты для гильдии сейчас недоступны.")
     clan_id = _clean_clan(clan_id)
     try:
         reg = next((r for r in regions(config, conn) if r["id"] == region), None)

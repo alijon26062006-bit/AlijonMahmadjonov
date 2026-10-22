@@ -34,7 +34,7 @@ def _game(name: str, cat_id: str) -> str:
     words = _words(text)
     if "pubg" in text and "new state" not in text and "newstate" not in text and "lite" not in words:
         return "pubg"
-    if ("free fire" in text or "freefire" in text) and "max" not in words:
+    if ("free fire" in text or "freefire" in text or "ff" in words) and "max" not in words:
         return "ff"
     if "standoff" in text:
         return "standoff"
@@ -69,9 +69,9 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         elif game == "coc":
             key, title, reg = "coc", "Clash of Clans", None
         elif region in ("CIS", "RU") or words & _CIS:
-            key, title, reg = "ff_cis", "Free Fire СНГ", r["region"] if region in ("CIS", "RU") else None
+            key, title, reg = "ff_cis", "FF CIS", r["region"] if region in ("CIS", "RU") else None
         elif region == "ID" or words & _ID:
-            key, title, reg = "ff_id", "Free Fire Индонезия", r["region"] if region == "ID" else None
+            key, title, reg = "ff_id", "FF Indonesia", r["region"] if region == "ID" else None
         else:
             continue
         entry = {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",
@@ -148,8 +148,9 @@ def services(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 
 def with_extras(items: list[dict[str, Any]], config: Any) -> list[dict[str, Any]]:
     """Сервисы не из каталога (не кэшируются вместе с каталогом): Glory клана Free Fire — если подключён FFGlory."""
-    if not (getattr(config, "ffglory_key", "") and getattr(config, "ffglory_master", "")):
-        return items
+    from . import glory
+    if not glory.selling(config):
+        return [i for i in items if i.get("key") != "glory"]
     entry = {"title": "Боты для гильдии", "href": "/panel/glory", "kind": "glory",
              "image_url": "/static/glory.svg", "key": "glory"}
     out = [i for i in items if i.get("key") != "glory"]

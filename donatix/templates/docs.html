@@ -7,7 +7,7 @@
   <aside class="docs-nav" aria-label="Разделы документации">
     <div class="label-caps">API v1</div>
     {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
-                     ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
+                     ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'),
                      ('numbers', 'Виртуальные номера'), ('gifts', 'Подарки Telegram'),
                      ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (совместимый формат)'),
                      ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
@@ -88,10 +88,6 @@
           ('POST', '/payments/{id}/receipt', 'Прислать чек перевода (фото/PDF)'),
           ('GET', '/payments', 'Ваши заявки на пополнение'),
           ('GET', '/payments/{id}', 'Статус заявки'),
-          ('GET', '/glory/regions', 'Боты для гильдии: регионы и цена'),
-          ('POST', '/glory/orders', 'Запустить ботов для клана'),
-          ('GET', '/glory/orders/{id}', 'Очки клана вживую, статус'),
-          ('POST', '/glory/orders/{id}/stop', 'Остановить'),
         ] %}
         <div class="ep"><span class="method {{ m | lower }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}
@@ -105,7 +101,7 @@
         По виду ID сразу понятно, что это за товар:</p>
       <div class="table-wrap card"><table>
         <tr><th>Товар</th><th>product_id</th><th>Пример</th></tr>
-        <tr><td>Пополнения игр (Free Fire, PUBG Mobile и др.)</td><td><code>topup-</code> + 10 знаков</td><td><code>topup-3f9a1c2b7d</code></td></tr>
+        <tr><td>Пополнения игр (FF, PUBG Mobile и др.)</td><td><code>topup-</code> + 10 знаков</td><td><code>topup-3f9a1c2b7d</code></td></tr>
         <tr><td>Подарочные карты</td><td><code>gc-</code> + 10 знаков</td><td><code>gc-8b21e0d4a6</code></td></tr>
         <tr><td>Ключи игр</td><td><code>gk-</code> + 10 знаков</td><td><code>gk-5c0f7a9e13</code></td></tr>
         <tr><td>Telegram Stars</td><td>постоянный</td><td><code>tg-stars</code></td></tr>
@@ -132,13 +128,13 @@
 done</pre>
 <pre data-lang="json" data-title="ответ">{"ok": true, "items": [{
   "product_id": "topup-3f9a1c2b7d",
-  "kind": "topup", "category_id": "free_fire", "category_name": "Free Fire",
+  "kind": "topup", "category_id": "free_fire", "category_name": "FF",
   "region": "CIS", "region_title": "СНГ",
   "name": "100 Diamonds", "title": "100 алмазов", "emoji": "💎",
   "price_usd": "0.9900",
   "fields": [{"key": "player_id", "label": "ID игрока", "type": "text"}]
 }]}</pre>
-      <p><b>Смотрите на <code>region</code>:</b> у одной игры бывают пакеты для разных регионов (например, Free Fire СНГ и
+      <p><b>Смотрите на <code>region</code>:</b> у одной игры бывают пакеты для разных регионов (например, FF CIS и
         Индонезия) — у них разные ID, и пакет другого региона на аккаунт не зачислится.</p>
 
       <h3><span class="step-n">3</span>Заказать пакет по его ID</h3>
@@ -192,20 +188,6 @@ done</pre>
       <p class="hint">«Душанбе Сити»: приложение → «Переводы» → «По номеру карты» → вставьте номер карты из ответа.</p>
     </section>
 
-    <section id="glory" class="doc-sec">
-      <h2>Боты для гильдии (Glory клана Free Fire)</h2>
-      <p>Группа ботов заходит в игру за клан и набирает очки славы (glory). Цена одна для всех регионов.
-        Не запустилось — деньги возвращаются сами. <b>После запуска деньги не возвращаются</b>, можно только остановить.</p>
-<pre data-lang="bash" data-title="регионы и цена">curl {{ base_url }}/api/v1/glory/regions -H "X-API-Key: $KEY"</pre>
-<pre data-lang="json">{"ok": true, "items": [{"id": "bd", "name": "Bangladesh", "code": "BD", "premium": false, "price_usd": "1.8349", "price_tjs": "20.00"}]}</pre>
-<pre data-lang="bash" data-title="запуск">curl -X POST {{ base_url }}/api/v1/glory/orders -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
-  -d '{"region": "bd", "clan_id": "3012345678"}'</pre>
-<pre data-lang="json" data-title="GET /glory/orders/gl-15 — каждые 15–30 секунд">{"ok": true, "order": {"id": "gl-15", "clan_id": "3012345678", "status": "running", "glory": 48210, "farmed": 1350,
-  "clan": {"name": "TJ KINGS", "level": 6, "members": 47, "capacity": 55}, "uptime": "1h12m", "bots": 4, "price_usd": "1.8349"}}</pre>
-      <p class="hint">status: <code>running</code> работает · <code>stopped</code> закончила · <code>failed</code> не запустилась (деньги вернулись).
-        Ошибки: <code>invalid_clan_id</code> <code>invalid_region</code> <code>clan_busy</code> (для клана уже работает группа)
-        <code>insufficient_balance</code> <code>launch_failed</code>. Те же адреса есть в <code>/api/v2/glory/…</code>.</p>
-    </section>
     <section id="numbers" class="doc-sec">
       <h2>Виртуальные номера (коды из SMS)</h2>
       <p>Номер на один СМС-код: вы покупаете номер для сервиса, получаете код и отдаёте его клиенту.
@@ -315,7 +297,6 @@ done</pre>
           ('POST', '/steam-gifts/order', 'Отправить гифт'),
           ('GET/POST', '/payments/methods · /payments/create · /payments/{id}', 'Пополнение баланса'),
           ('GET', '/orders · /orders/{id}', 'Заказы'),
-          ('GET/POST', '/glory/…', 'Боты для гильдии (как в v1)'),
         ] %}
         <div class="ep"><span class="method {{ 'get' if m == 'GET' else 'post' }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}

@@ -30,6 +30,6 @@ def test_admin_page(client, conn):
     _ff(conn)
     web_login(client, "admin@example.com", "adminpass123")
     page = client.get("/admin/pricelist?show=ff_cis&fmt=story").text
-    assert "Скачать PNG" in page and "Free Fire" in page and "1080×1920" in page
+    assert "Скачать PNG" in page and "FF" in page and "1080×1920" in page
     assert '"fmt": "story"' in page and '"single": true' in page and "ff_cis" in page
     assert "PUBG" in client.get("/admin/pricelist").text

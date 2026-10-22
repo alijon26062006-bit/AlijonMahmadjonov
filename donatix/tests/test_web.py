@@ -127,7 +127,7 @@ def test_catalog_games_and_regions(app, config, conn):
     client.cookies.set("dx_cur", "USD")   # суммы в долларах (по умолчанию сомони)
     web_login(client, "g@example.com", "password123")
     page = client.get("/panel/catalog?kind=topup").text
-    assert "game-card" in page and "Free Fire" in page and "Регионов: 2" in page
+    assert "game-card" in page and "FF" in page and "Регионов: 2" in page
     assert "pack-card" not in page  # сначала выбирают игру
     assert "от $0.97" in page and "$0.89<" not in page  # 0.89 + 8%, закупку не видно
     page = client.get("/panel/catalog?kind=topup&category=free_fire").text

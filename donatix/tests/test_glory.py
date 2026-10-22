@@ -6,6 +6,12 @@ from conftest import balance, csrf_of, make_client, web_login
 
 from donatix import accounts, cache, glory
 
+
+@pytest.fixture(autouse=True)
+def _selling(monkeypatch):
+    """Продажа Glory сейчас выключена (glory.SELLING = False) — тесты проверяют работу при включённой."""
+    monkeypatch.setattr(glory, "SELLING", True)
+
 PRICING = {"basic_credit_usd": 1.5, "premium_credit_usd": 3.0, "regions": [
     {"id": "me", "region_name": "Middle East", "region_code": "ME", "tier": "premium", "enabled": True},
     {"id": "bd", "region_name": "Bangladesh", "region_code": "BD", "tier": "basic", "enabled": True},
@@ -230,3 +236,17 @@ def test_finance_counts_numbers_and_glory(app, config, conn, ffg):
     assert s["vnumbers"] == {"n": 1, "revenue": 3000, "cost": 2400, "profit": 600}      # возвращённый — не считаем
     assert s["revenue"] == 21800 and s["gross_profit"] == 4400
     assert "Боты для гильдии: 1 шт." in finance.report_text(s) and "Виртуальные номера: 1 шт." in finance.report_text(s)
+
+
+def test_selling_off_blocks_new_launches(client, conn, config, monkeypatch):
+    """Продажа выключена: страницы нет, API отвечает 503, buy не списывает деньги."""
+    monkeypatch.setattr(glory, "SELLING", False)
+    config.ffglory_key, config.ffglory_master = "k", "m"
+    uid, key = make_client(conn)
+    before = balance(conn, uid)
+    r = client.get("/api/v1/glory/regions", headers={"X-API-Key": key})
+    assert r.status_code == 503
+    r = client.post("/api/v1/glory/orders", headers={"X-API-Key": key}, json={"region": "bd", "clan_id": "3012345678"})
+    assert r.status_code == 503 and balance(conn, uid) == before
+    with pytest.raises(glory.GloryError):
+        glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")

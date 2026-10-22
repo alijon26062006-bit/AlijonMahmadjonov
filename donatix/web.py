@@ -94,7 +94,7 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
 FAQ = [
     ("Нужна ли регистрация?", "Нет. Выберите игру, введите ID игрока и оплатите — заказ оформится сам. "
                               "Аккаунт можно сохранить потом, чтобы видеть заказы с любого телефона."),
-    ("Как узнать свой ID в игре?", "В Free Fire и PUBG Mobile ID показан в профиле игрока, под ником. "
+    ("Как узнать свой ID в игре?", "В FF и PUBG Mobile ID показан в профиле игрока, под ником. "
                                    "Перед оплатой мы проверяем ID и показываем ник — ошибиться сложно."),
     ("Как быстро придёт донат?", "Обычно за минуту после оплаты. Если перевод проверяют вручную — до часа."),
     ("Что если заказ не выполнится?", "Деньги сразу вернутся на баланс — купите заново или напишите в поддержку."),
@@ -104,13 +104,13 @@ FAQ = [
 
 BOT_FAQ = [
     ("Что такое конструктор ботов?", "Это ваш собственный Telegram-бот-магазин. Клиенты покупают у вас алмазы "
-                                     "Free Fire, UC для PUBG Mobile, Telegram Stars и Premium, а заказы "
+                                     "FF, UC для PUBG Mobile, Telegram Stars и Premium, а заказы "
                                      "выполняются автоматически с вашего баланса Donatix."),
     ("Сколько стоит конструктор?", "Подключение бесплатное. Вы платите только за проданные товары по нашей "
                                    "цене, а наценку в боте ставите сами — разница ваш заработок."),
     ("Как создать своего бота?", "Сделайте 5 заказов на сайте — после этого откроется «Мой Telegram-бот». "
                                  "Создайте бота в @BotFather и вставьте токен в кабинете или отправьте его нашему "
-                                 "боту поддержки. Бот запустится сразу с готовыми играми: Free Fire СНГ и "
+                                 "боту поддержки. Бот запустится сразу с готовыми играми: FF CIS и "
                                  "Индонезия, PUBG Mobile."),
     ("Как клиенты платят в моём боте?", "На ваши реквизиты: карта, Душанбе Сити, USDT. Вы подтверждаете оплату "
                                         "в боте, и баланс клиента пополняется. Контакт поддержки тоже ваш."),
@@ -2081,7 +2081,7 @@ def panel_number_cancel(vid: int, request: Request, user=Depends(panel_user), co
 @router.get("/panel/glory")
 def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import glory
-    if not glory.enabled(config):
+    if not glory.selling(config):
         return _redirect("/panel")
     error, regions = "", []
     try:
@@ -2106,7 +2106,7 @@ def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_con
 def panel_glory_buy(request: Request, region: str = Form(""), clan_id: str = Form(""), agree: str = Form(""),
                     user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import glory
-    if not glory.enabled(config):
+    if not glory.selling(config):
         return _redirect("/panel")
     if not agree:
         flash(request, "Отметьте, что вы прочитали условия.", "error")

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, kind_icon, media, tg_logo, wa_logo %}
-{% block title %}{{ site_name }} — независимый сервис пополнения: алмазы для Free Fire, UC для PUBG Mobile, Telegram Stars{% endblock %}
+{% block title %}{{ site_name }} — независимый сервис пополнения: алмазы для FF, UC для PUBG Mobile, Telegram Stars{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org",
@@ -20,7 +20,7 @@
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
     <section class="hero hero-play">
       <div>
-        <h1>Алмазы для Free Fire, UC для PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>
+        <h1>Алмазы для FF, UC для PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>
         <p class="lead">Без регистрации: выберите игру, введите ID и оплатите. Заказ придёт сам — обычно за минуту.</p>
         <p class="hero-indep">Независимый сервис пополнения — не официальный сайт Garena, Tencent, Moonton, Valve или Telegram.
           Нужен только ID игрока, пароль не нужен никогда.</p>
@@ -38,7 +38,7 @@
         </ul>
       </div>
       <div class="how-buy" aria-label="Как купить">
-        {% for n, t, d in [('1', 'Игра', 'Free Fire, PUBG, Telegram Stars и другие'),
+        {% for n, t, d in [('1', 'Игра', 'FF, PUBG, Telegram Stars и другие'),
                            ('2', 'ID игрока', 'Мы проверим его — ошибки не будет'),
                            ('3', 'Оплата', 'Алиф, Душанбе Сити или USDT — заказ придёт сам')] %}
         <div class="hb-step"><span class="hb-n">{{ n }}</span><div><b>{{ t }}</b><span>{{ d }}</span></div></div>
@@ -130,7 +130,7 @@
         {% set defaults = {
           "telegram_stars": ["от 50 до 10 000 звёзд"],
           "telegram_premium": ["3, 6 и 12 месяцев"],
-          "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends"],
+          "topup": ["PUBG Mobile", "FF", "Mobile Legends"],
           "gift_card": ["Steam", "App Store", "PlayStation", "Google Play"],
           "game_key": ["Steam", "Xbox", "PlayStation"],
           "steam_topup": ["USD", "RUB", "KZT", "UAH"],

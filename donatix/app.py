@@ -202,6 +202,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     conn = db.connect(config.db_path)
     try:
         accounts.ensure_admin(conn, config)
+        from . import catalog
+        ff_images = catalog.rename_brands(conn)
         from . import sitecfg
         sitecfg.load(conn, config)  # наценки и прочее, что админ поменял в админке
     finally:
@@ -309,6 +311,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     from . import catalog_job
     catalog_job.load_image_index(config)
     catalog_job.bind_base(config.base_url)
+    catalog_job.forget(ff_images)   # картинки FF — убрать с сервера
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
     app.include_router(api.router)
     from . import api_extra   # виртуальные номера и подарки Telegram для партнёров

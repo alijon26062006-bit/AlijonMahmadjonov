@@ -148,6 +148,26 @@ _REGION_WORDS = {
 _REGION_KEYS = ("region", "region_code", "regionCode", "country", "country_code", "countryCode", "server_region")
 
 
+_FF = re.compile(r"free\s*-?\s*fire", re.I)
+
+
+def is_ff(text: str) -> bool:
+    """Это FF (по старому названию или по новому «FF …»)."""
+    t = text or ""
+    return bool(_FF.search(t) or re.search(r"(?<![A-Za-z])FF(?![A-Za-z])", t))
+
+
+def brand_safe(text: str | None) -> str | None:
+    """Название без бренда правообладателя: «Free Fire (CIS)», «Free Fire — СНГ» → «FF CIS»."""
+    if not text or not _FF.search(text):
+        return text
+    t = _FF.sub("FF", text)
+    t = re.sub(r"FF\s*[-—–:]?\s*[\(\[]\s*([^\)\]]+?)\s*[\)\]]", r"FF \1", t)   # FF (CIS) → FF CIS
+    t = re.sub(r"FF\s*[-—–:|]\s*", "FF ", t)                                        # FF — Global → FF Global
+    t = re.sub(r"FF\s+СНГ", "FF CIS", t, flags=re.I)
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
 def region_title(code: str | None) -> str:
     return REGION_TITLES.get((code or "").upper(), code or "")
 

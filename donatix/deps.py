@@ -301,7 +301,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["support_contact"] = config.support_contact
     ctx["tg_channel"] = config.tg_channel
     ctx["vnumbers_on"] = bool(config.fivesim_token)   # виртуальные номера (5sim) подключены
-    ctx["glory_on"] = bool(config.ffglory_key and config.ffglory_master)   # Glory клана (FFGlory)
+    from . import glory
+    ctx["glory_on"] = glory.selling(config)   # Glory клана: показываем, только пока продажа включена
     ctx["csrf"] = csrf_token(request)
     # Живое обновление страницы (X-Live) сообщения не «съедает» — их покажет следующий обычный переход
     ctx["flashes"] = [] if request.headers.get("x-live") else request.session.pop("flash", [])

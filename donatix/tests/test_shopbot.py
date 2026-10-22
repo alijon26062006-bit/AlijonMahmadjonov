@@ -190,7 +190,7 @@ def test_deep_link_opens_game(app, config, conn, supplier):
     _start(bot, conn)
     rid = conn.execute("SELECT MIN(rowid) FROM products WHERE category_id = 'free_fire'").fetchone()[0]
     bot.handle(conn, msg(f"/start g{rid}"))
-    assert "Free Fire" in bot.api.last_text()
+    assert "FF" in bot.api.last_text()
 
 
 def test_cannot_see_other_users_order(app, config, conn, supplier, shop):
@@ -244,8 +244,8 @@ def test_free_fire_separate_button_per_region_opens_packs_directly(app, config, 
     bot = _bot(config, supplier)
     _start(bot, conn)
     bot.handle(conn, press("g:games:0"))
-    ff = [b for b in bot.api.last_buttons() if b["text"].startswith("Free Fire")]
-    assert len(ff) >= 2 and all(b["text"] != "Free Fire" for b in ff)      # «Free Fire 🇷🇺 СНГ», «Free Fire 🇮🇩 …»
+    ff = [b for b in bot.api.last_buttons() if b["text"].startswith("FF")]
+    assert len(ff) >= 2 and all(b["text"] != "FF" for b in ff)              # «FF 🇷🇺 СНГ», «FF 🇮🇩 …»
     bot.handle(conn, press(ff[0]["callback_data"]))
     assert ff[0]["text"].split(" ", 2)[2] in bot.api.last_text()           # сразу пакеты этого региона
     packs_ = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("p:")]

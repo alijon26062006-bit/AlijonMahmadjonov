@@ -36,7 +36,8 @@ def norm(name: str) -> str:
     """«Free Fire (Indonesia)», «FREE FIRE - Global», «Free Fire» → «freefire»."""
     text = re.sub(r"[\(\[].*?[\)\]]", " ", (name or "").lower())
     text = _REGION_WORDS.sub(" ", text)
-    return re.sub(r"[^a-zа-я0-9]", "", text)
+    text = re.sub(r"[^a-zа-я0-9]", "", text)
+    return "freefire" if text == "ff" else text   # у нас игра называется «FF CIS» — у сервиса проверки «Free Fire»
 
 
 class FlashError(Exception):

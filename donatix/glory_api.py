@@ -31,6 +31,11 @@ def _on(config: Config) -> None:
         raise ApiError("Боты для гильдии сейчас недоступны.", "not_available", 503)
 
 
+def _sale(config: Config) -> None:
+    if not glory.selling(config):
+        raise ApiError("Боты для гильдии сейчас недоступны.", "not_available", 503)
+
+
 def _out(g) -> dict[str, Any]:
     v = glory.view(g)
     return {"id": f"gl-{v['id']}", "clan_id": v["clan_id"], "region": v["region"], "status": v["status"],
@@ -52,7 +57,7 @@ class GloryIn(BaseModel):
 
 
 def _regions(request: Request, user=Depends(api_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
-    _on(config)
+    _sale(config)
     _limit(request, "catalog", str(user["id"]))
     from .payments import settings
     rate = settings(conn, config)["tjs_rate"]
@@ -67,7 +72,7 @@ def _regions(request: Request, user=Depends(api_user), conn=Depends(get_conn), c
 
 def _create(body: GloryIn, request: Request, user=Depends(api_user), conn=Depends(get_conn),
             config: Config = Depends(get_config)):
-    _on(config)
+    _sale(config)
     _limit(request, "orders", str(user["id"]))
     try:
         gid = glory.buy(conn, config, user, body.region.strip(), body.clan_id)

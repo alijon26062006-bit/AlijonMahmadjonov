@@ -64,7 +64,7 @@ def test_popular_pins_free_fire_regions_first(conn):
                      "updated_at) VALUES (?, 'topup', ?, ?, '100 алмазов', '1', ?, ?)",
                      (pid, cat, name, region, now))
     items = popular.compute(conn)
-    assert [i["title"] for i in items[:3]] == ["Free Fire СНГ", "Free Fire Индонезия", "PUBG Mobile"]
+    assert [i["title"] for i in items[:3]] == ["FF CIS", "FF Indonesia", "PUBG Mobile"]
     assert items[0]["href"] == "/panel/catalog?kind=topup&category=ff_cis"
     assert items[1]["href"] == "/panel/catalog?kind=topup&category=free_fire_global&region=ID"
 
