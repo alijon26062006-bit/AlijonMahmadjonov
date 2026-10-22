@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Кабинет продавца — как это работает</title>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: 148mm 210mm; margin: 0; }
+  :root {
+    --bg: #f3f6f5; --ink: #13201d; --muted: #5d6e69; --line: #dde5e2;
+    --accent: #0e6b5c; --accent-soft: #dcefe9; --warn: #a8570a; --warn-soft: #fbecd9; --bad: #b3261e; --bad-soft: #fbe3e1;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "Onest", "DejaVu Sans", sans-serif; color: var(--ink); background: #fff; }
+  .page { width: 148mm; height: 210mm; padding: 11mm 10mm 9mm; display: flex; flex-direction: column; gap: 5mm; page-break-after: always; overflow: hidden; position: relative; background: #fff; }
+  .page:last-child { page-break-after: auto; }
+  .eyebrow { font-size: 9pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 20pt; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: 17pt; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  .lead { font-size: 11pt; line-height: 1.45; color: var(--muted); }
+  .foot { position: absolute; left: 10mm; right: 10mm; bottom: 6mm; display: flex; justify-content: space-between; font-size: 8pt; color: var(--muted); }
+  .row { display: flex; gap: 6mm; align-items: center; flex: 1; min-height: 0; }
+  .notes { flex: 1; display: flex; flex-direction: column; gap: 3.2mm; font-size: 10.5pt; line-height: 1.4; }
+  .note { display: flex; gap: 2.5mm; align-items: flex-start; }
+  .note b { color: var(--ink); }
+  .dot { flex: none; width: 6mm; height: 6mm; border-radius: 50%; background: var(--accent); color: #fff; font-size: 8.5pt; font-weight: 700; display: grid; place-items: center; margin-top: .3mm; }
+
+  /* телефон */
+  .phone { flex: none; width: 62mm; height: 128mm; border-radius: 9mm; background: #0f1513; padding: 2.4mm; box-shadow: 0 3mm 8mm rgba(19,32,29,.18); }
+  .scr { width: 100%; height: 100%; border-radius: 7mm; background: var(--bg); overflow: hidden; display: flex; flex-direction: column; font-size: 7pt; position: relative; }
+  .bar { height: 7mm; display: flex; align-items: center; justify-content: space-between; padding: 0 5mm; font-size: 6pt; font-weight: 700; color: var(--ink); flex: none; }
+  .notch { width: 18mm; height: 4.2mm; background: #0f1513; border-radius: 3mm; }
+  .body { flex: 1; padding: 1mm 3.5mm 3mm; display: flex; flex-direction: column; gap: 2.2mm; min-height: 0; }
+  .s-ey { font-size: 5.5pt; font-weight: 700; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+  .s-h { font-size: 11pt; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+  .s-p { font-size: 6.5pt; color: var(--muted); line-height: 1.35; }
+  .prog { display: flex; gap: 1mm; }
+  .prog i { flex: 1; height: 1mm; border-radius: 1mm; background: var(--line); }
+  .prog i.on { background: var(--accent); }
+  .lbl { font-size: 5.8pt; font-weight: 600; color: var(--muted); margin-bottom: .6mm; }
+  .inp { background: #fff; border: .25mm solid var(--line); border-radius: 1.8mm; padding: 1.8mm 2.2mm; font-size: 7pt; display: flex; align-items: center; gap: 1.5mm; }
+  .inp.focus { border-color: var(--accent); box-shadow: 0 0 0 .7mm var(--accent-soft); }
+  .pre { font-weight: 700; padding-right: 1.5mm; border-right: .25mm solid var(--line); }
+  .btn { background: var(--accent); color: #fff; font-weight: 700; text-align: center; border-radius: 2mm; padding: 2.2mm; font-size: 7.2pt; }
+  .btn.ghost { background: #fff; color: var(--ink); border: .25mm solid var(--line); }
+  .btn.red { background: #fff; color: var(--bad); border: .25mm solid var(--line); }
+  .mt { margin-top: auto; }
+  .card { background: #fff; border: .25mm solid var(--line); border-radius: 2.2mm; padding: 2.2mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm; }
+  .tile { background: #fff; border: .25mm solid var(--line); border-radius: 2.2mm; padding: 2.2mm 1.5mm; display: flex; flex-direction: column; align-items: center; gap: 1mm; font-size: 6.3pt; font-weight: 600; text-align: center; }
+  .tile.on { border: .5mm solid var(--accent); background: var(--accent-soft); }
+  .tile svg, .ico svg { width: 6mm; height: 6mm; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tile small { font-weight: 400; color: var(--muted); font-size: 5.3pt; }
+  .chips { display: flex; gap: 1.2mm; flex-wrap: wrap; }
+  .chip { background: #fff; border: .25mm solid var(--line); border-radius: 9mm; padding: 1mm 2.2mm; font-size: 6.3pt; font-weight: 600; }
+  .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .check { display: flex; gap: 1.5mm; align-items: flex-start; font-size: 6.3pt; }
+  .box { flex: none; width: 3.4mm; height: 3.4mm; border-radius: .8mm; background: var(--accent); color: #fff; font-size: 5.5pt; display: grid; place-items: center; font-weight: 800; }
+  .logo-up { width: 15mm; height: 15mm; border-radius: 3.5mm; border: .4mm dashed var(--accent); display: grid; place-items: center; color: var(--accent); font-size: 5.5pt; font-weight: 700; text-align: center; background: #fff; }
+  .logo { width: 15mm; height: 15mm; border-radius: 3.5mm; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13pt; }
+  .map { height: 46mm; border-radius: 2.2mm; position: relative; overflow: hidden; background: #e8efe9; border: .25mm solid var(--line); }
+  .map .road { position: absolute; background: #fff; }
+  .map .park { position: absolute; background: #cfe5d6; border-radius: 2mm; }
+  .map .river { position: absolute; background: #c9def0; transform: rotate(-18deg); }
+  .pin { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -100%); width: 7mm; height: 9mm; }
+  .pin svg { width: 100%; height: 100%; }
+  .gps { position: absolute; right: 2mm; bottom: 2mm; background: #fff; border-radius: 2mm; padding: 1.3mm 2mm; font-size: 5.6pt; font-weight: 700; color: var(--accent); box-shadow: 0 .6mm 2mm rgba(0,0,0,.15); display: flex; gap: 1mm; align-items: center; }
+  .sw { width: 6.5mm; height: 3.6mm; border-radius: 3mm; background: var(--accent); position: relative; flex: none; }
+  .sw::after { content: ""; position: absolute; right: .4mm; top: .4mm; width: 2.8mm; height: 2.8mm; border-radius: 50%; background: #fff; }
+  .line { display: flex; justify-content: space-between; align-items: center; gap: 2mm; padding: 1.6mm 0; border-bottom: .25mm solid var(--line); font-size: 6.4pt; }
+  .line:last-child { border-bottom: 0; }
+  .edit { color: var(--accent); font-weight: 700; font-size: 5.8pt; }
+  .photo { height: 24mm; border-radius: 2.2mm; background: linear-gradient(135deg, #f6d2c9, #e7816b); position: relative; }
+  .photo::after { content: ""; position: absolute; left: 50%; top: 50%; width: 11mm; height: 11mm; margin: -5.5mm 0 0 -5.5mm; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff8a6b, #c8341d); box-shadow: 6mm 2mm 0 -1mm #d8442b, -6mm 3mm 0 -1.5mm #e2553a; }
+  .alert { background: var(--bad-soft); border-radius: 2.2mm; padding: 2mm; display: flex; gap: 1.6mm; align-items: center; font-size: 6.4pt; font-weight: 700; }
+  .badge { background: var(--bad); color: #fff; border-radius: 9mm; padding: .6mm 1.8mm; font-size: 5.6pt; font-weight: 700; }
+  .money-big { font-size: 15pt; font-weight: 800; letter-spacing: -.02em; }
+  .tabs { display: grid; grid-template-columns: repeat(5, 1fr); background: #fff; border-top: .25mm solid var(--line); padding: 1.6mm 1mm 2.4mm; font-size: 4.8pt; color: var(--muted); text-align: center; flex: none; }
+  .tabs b { display: block; width: 3.4mm; height: 3.4mm; border-radius: 1mm; background: var(--line); margin: 0 auto .6mm; }
+  .tabs .on { color: var(--accent); font-weight: 700; }
+  .tabs .on b { background: var(--accent); }
+
+  /* схемы на обложке и итогах */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .fstep { display: flex; gap: 4mm; align-items: center; background: var(--bg); border-radius: 4mm; padding: 3.2mm 4mm; }
+  .fstep .ico { flex: none; width: 11mm; height: 11mm; border-radius: 3mm; background: #fff; display: grid; place-items: center; }
+  .fstep b { font-size: 11.5pt; display: block; }
+  .fstep span { font-size: 9pt; color: var(--muted); }
+  .farrow { height: 5mm; display: flex; justify-content: center; }
+  .farrow svg { width: 4mm; height: 5mm; stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .fstep.fin { background: var(--accent); color: #fff; }
+  .fstep.fin span { color: #d6efe8; }
+  .money-flow { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .q { display: flex; gap: 3mm; padding: 3mm 0; border-bottom: .3mm solid var(--line); font-size: 11pt; line-height: 1.35; }
+  .q:last-child { border-bottom: 0; }
+  .q .dot { width: 7mm; height: 7mm; font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<!-- 1. Обложка -->
+<section class="page" style="background:var(--accent);color:#fff">
+  <div class="eyebrow" style="color:#bfe6dc">Для продавцов</div>
+  <h1 style="font-size:28pt;margin-top:6mm">Кабинет<br>продавца</h1>
+  <p class="lead" style="color:#d6efe8;font-size:12.5pt">Как магазин подключается к сервису доставки, добавляет товары, принимает заказы и получает деньги.</p>
+  <div class="flow" style="margin-top:6mm">
+    <div class="fstep"><span class="ico"><svg viewBox="0 0 24 24" style="width:6mm;height:6mm;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M4 10v10h16V10M3 10l2-6h14l2 6M3 10h18"/></svg></span><div><b style="color:var(--ink)">Регистрация магазина</b><span>6 простых шагов</span></div></div>
+    <div class="farrow"><svg viewBox="0 0 8 10" style="stroke:#fff"><path d="M4 0v9M1 6l3 3 3-3"/></svg></div>
+    <div class="fstep"><span class="ico"><svg viewBox="0 0 24 24" style="width:6mm;height:6mm;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10"/></svg></span><div><b style="color:var(--ink)">Товары</b><span>фото, цена, кг или штуки</span></div></div>
+    <div class="farrow"><svg viewBox="0 0 8 10" style="stroke:#fff"><path d="M4 0v9M1 6l3 3 3-3"/></svg></div>
+    <div class="fstep"><span class="ico"><svg viewBox="0 0 24 24" style="width:6mm;height:6mm;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M6 3h12l1 4H5zM5 7h14v13H5zM9 11h6M9 15h4"/></svg></span><div><b style="color:var(--ink)">Заказы</b><span>принять, собрать, отдать курьеру</span></div></div>
+    <div class="farrow"><svg viewBox="0 0 8 10" style="stroke:#fff"><path d="M4 0v9M1 6l3 3 3-3"/></svg></div>
+    <div class="fstep"><span class="ico"><svg viewBox="0 0 24 24" style="width:6mm;height:6mm;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M3 6h18v12H3zM3 10h18M7 15h3"/></svg></span><div><b style="color:var(--ink)">Деньги</b><span>приходят на счёт после доставки</span></div></div>
+  </div>
+  <div class="foot" style="color:#bfe6dc"><span>Листайте вниз ↓</span><span>1 / 11</span></div>
+</section>
+
+<!-- 2. Вход -->
+<section class="page">
+  <div class="eyebrow">Шаг 1 из 6 · Вход</div>
+  <h2>Вход по номеру телефона</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="s-ey" style="margin-top:3mm">Вход</div>
+        <div class="s-h">Ваш номер телефона</div>
+        <div class="s-p">Пришлём SMS с кодом</div>
+        <div><div class="lbl">Номер</div><div class="inp focus"><span class="pre">+992</span>90 123 45 67</div></div>
+        <div class="btn">Получить код</div>
+        <div class="card" style="margin-top:3mm;text-align:center"><div class="lbl">Код из SMS</div><div style="font-size:13pt;font-weight:800;letter-spacing:2.5mm">4 8 2 1</div></div>
+        <div class="check" style="margin-top:auto"><span class="box">✓</span><span>Принимаю условия работы для продавцов</span></div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>Продавец вводит <b>таджикский номер</b> +992.</span></div>
+      <div class="note"><span class="dot">2</span><span>Приходит <b>SMS-код</b> из 4 цифр.</span></div>
+      <div class="note"><span class="dot">3</span><span>Ставит галочку: <b>принимаю условия</b>.</span></div>
+      <div class="note"><span class="dot">✓</span><span>Пароль не нужен — по номеру он будет входить всегда.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>2 / 11</span></div>
+</section>
+
+<!-- 3. Что продаёте -->
+<section class="page">
+  <div class="eyebrow">Шаг 2 из 6 · Тип магазина</div>
+  <h2>Что вы продаёте?</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div class="s-h" style="margin-top:2mm">Что вы продаёте?</div>
+        <div class="grid2">
+          <div class="tile on"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h9.6l2-8H6"/><circle cx="9" cy="19" r="1.3"/><circle cx="17" cy="19" r="1.3"/></svg>Продукты<small>кг, г, шт, л</small></div>
+          <div class="tile"><svg viewBox="0 0 24 24"><path d="M4 11h16a8 8 0 0 1-16 0zM12 3v4M8 5v2M16 5v2"/></svg>Ресторан<small>порции</small></div>
+          <div class="tile"><svg viewBox="0 0 24 24"><path d="M4 21h16M5 21v-7h14v7M5 14c0-3 3-4 7-4s7 1 7 4M12 10V6"/></svg>Торты<small>шт, кг</small></div>
+          <div class="tile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 12v9M12 17c-3 0-5-2-5-4M12 17c3 0 5-2 5-4"/></svg>Цветы<small>шт, букет</small></div>
+          <div class="tile"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>Аптека<small>упаковки</small></div>
+          <div class="tile"><svg viewBox="0 0 24 24"><path d="M8 4l4 2 4-2 4 4-3 3v9H7v-9L4 8z"/></svg>Одежда<small>размеры</small></div>
+        </div>
+        <div class="btn mt">Далее</div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>Продавец <b>нажимает на карточку</b> — ничего печатать не нужно.</span></div>
+      <div class="note"><span class="dot">2</span><span>Под каждой карточкой видно, <b>в чём будет продавать</b>.</span></div>
+      <div class="note"><span class="dot">✓</span><span>Продуктовый получит <b>кг, г, штуки, литры</b> и готовые категории: овощи, фрукты, молочное.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>3 / 11</span></div>
+</section>
+
+<!-- 4. Магазин и логотип -->
+<section class="page">
+  <div class="eyebrow">Шаг 3 из 6 · Магазин</div>
+  <h2>Название и логотип</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        <div class="s-h" style="margin-top:2mm">Ваш магазин</div>
+        <div style="display:flex;gap:2.5mm;align-items:center"><div class="logo">Б</div><div class="logo-up">+ Логотип</div><div class="s-p" style="flex:1">Квадратная картинка, можно сфотографировать вывеску</div></div>
+        <div><div class="lbl">Название *</div><div class="inp focus">Бозори Сабз</div></div>
+        <div><div class="lbl">Телефон магазина *</div><div class="inp"><span class="pre">+992</span>93 555 12 34</div></div>
+        <div><div class="lbl">Коротко о магазине</div><div class="inp" style="height:11mm;align-items:flex-start">Свежие овощи и фрукты каждый день</div></div>
+        <div style="display:flex;gap:1.6mm" class="mt"><div class="btn ghost" style="flex:1">Назад</div><div class="btn" style="flex:2">Далее</div></div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span><b>Название</b> — как его увидят покупатели.</span></div>
+      <div class="note"><span class="dot">2</span><span><b>Логотип</b> — загрузить картинку или сфотографировать вывеску. Сразу видно, как он выглядит.</span></div>
+      <div class="note"><span class="dot">3</span><span><b>Телефон</b> магазина для курьера.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>4 / 11</span></div>
+</section>
+
+<!-- 5. Где находится -->
+<section class="page">
+  <div class="eyebrow">Шаг 4 из 6 · Адрес</div>
+  <h2>Где находится магазин</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        <div><div class="lbl">Город</div><div class="inp" style="justify-content:space-between">Душанбе <span>▾</span></div></div>
+        <div class="map">
+          <div class="park" style="left:4mm;top:5mm;width:14mm;height:9mm"></div>
+          <div class="river" style="left:-6mm;top:31mm;width:70mm;height:3mm"></div>
+          <div class="road" style="left:0;right:0;top:17mm;height:2.2mm"></div>
+          <div class="road" style="left:0;right:0;top:27mm;height:1.4mm"></div>
+          <div class="road" style="top:0;bottom:0;left:24mm;width:2.2mm"></div>
+          <div class="road" style="top:0;bottom:0;left:40mm;width:1.4mm"></div>
+          <div class="pin"><svg viewBox="0 0 24 30"><path d="M12 29s10-10 10-17A10 10 0 0 0 2 12c0 7 10 17 10 17z" fill="#b3261e"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg></div>
+          <div class="gps"><svg viewBox="0 0 24 24" style="width:3mm;height:3mm;fill:none;stroke:currentColor;stroke-width:2.4"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Определить моё место</div>
+        </div>
+        <div><div class="lbl">Адрес (подставился сам)</div><div class="inp">пр. Рудаки, 45</div></div>
+        <div><div class="lbl">Ориентир для курьера</div><div class="inp">Напротив ЦУМа, вход со двора</div></div>
+        <div class="btn mt">Далее</div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>Выбрать <b>город</b>: Душанбе, Худжанд, Бохтар, Куляб…</span></div>
+      <div class="note"><span class="dot">2</span><span>Нажать <b>«Определить моё место»</b> — метка встанет сама. Или передвинуть её пальцем.</span></div>
+      <div class="note"><span class="dot">3</span><span><b>Адрес заполнится сам</b>, остаётся добавить ориентир.</span></div>
+      <div class="note"><span class="dot">✓</span><span>Курьер увидит магазин на карте и не заблудится.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>5 / 11</span></div>
+</section>
+
+<!-- 6. Как работаете -->
+<section class="page">
+  <div class="eyebrow">Шаг 5 из 6 · Работа</div>
+  <h2>Когда и как работаете</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="s-h" style="margin-top:2mm">График работы</div>
+        <div class="chips"><span class="chip on">Каждый день</span><span class="chip">Будни</span><span class="chip">Свой</span></div>
+        <div class="grid2"><div><div class="lbl">Открываемся</div><div class="inp">08:00</div></div><div><div class="lbl">Закрываемся</div><div class="inp">21:00</div></div></div>
+        <div class="card"><div class="line"><span>Доставка курьером</span><span class="sw"></span></div><div class="line"><span>Самовывоз</span><span class="sw"></span></div></div>
+        <div><div class="lbl">Сколько собирается заказ</div><div class="chips"><span class="chip">15 мин</span><span class="chip on">30 мин</span><span class="chip">45 мин</span><span class="chip">1 час</span></div></div>
+        <div class="btn mt">Далее</div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>График <b>одной кнопкой</b>: каждый день, будни или свой.</span></div>
+      <div class="note"><span class="dot">2</span><span>Включить <b>доставку</b> и/или <b>самовывоз</b>.</span></div>
+      <div class="note"><span class="dot">3</span><span>Выбрать, <b>за сколько минут</b> обычно собирается заказ.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>6 / 11</span></div>
+</section>
+
+<!-- 7. Проверка -->
+<section class="page">
+  <div class="eyebrow">Шаг 6 из 6 · Проверка</div>
+  <h2>Проверить и создать магазин</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <div style="display:flex;gap:2.5mm;align-items:center;margin-top:2mm"><div class="logo" style="width:11mm;height:11mm;font-size:10pt">Б</div><div><div class="s-h" style="font-size:9.5pt">Бозори Сабз</div><div class="s-p">Продукты · Душанбе</div></div></div>
+        <div class="card">
+          <div class="line"><span>Тип: Продукты</span><span class="edit">Изменить</span></div>
+          <div class="line"><span>+992 93 555 12 34</span><span class="edit">Изменить</span></div>
+          <div class="line"><span>пр. Рудаки, 45</span><span class="edit">Изменить</span></div>
+          <div class="line"><span>Каждый день 08:00–21:00</span><span class="edit">Изменить</span></div>
+          <div class="line"><span>Доставка и самовывоз</span><span class="edit">Изменить</span></div>
+        </div>
+        <div class="btn mt">Создать магазин</div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>Всё введённое <b>на одном экране</b>.</span></div>
+      <div class="note"><span class="dot">2</span><span>Ошибся — нажал <b>«Изменить»</b> рядом с пунктом.</span></div>
+      <div class="note"><span class="dot">✓</span><span>После «Создать магазин» сразу открывается <b>добавление первого товара</b>.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>7 / 11</span></div>
+</section>
+
+<!-- 8. Товар -->
+<section class="page">
+  <div class="eyebrow">Товары</div>
+  <h2>Добавить товар за минуту</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="s-h" style="margin-top:1mm">Новый товар</div>
+        <div class="photo"></div>
+        <div><div class="lbl">Название</div><div class="inp">Помидоры местные</div></div>
+        <div><div class="lbl">Продаю в</div><div class="chips"><span class="chip on">кг</span><span class="chip">г</span><span class="chip">шт</span><span class="chip">л</span></div></div>
+        <div class="grid2"><div><div class="lbl">Цена за 1 кг</div><div class="inp focus"><b>12</b>&nbsp;смн</div></div><div><div class="lbl">Остаток</div><div class="inp">40 кг</div></div></div>
+        <div><div class="lbl">Покупатель может взять от</div><div class="chips"><span class="chip">100 г</span><span class="chip on">0,5 кг</span><span class="chip">1 кг</span></div></div>
+        <div class="btn mt">Добавить товар</div>
+      </div></div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span><b>Фото</b> с телефона — товары с фото покупают чаще.</span></div>
+      <div class="note"><span class="dot">2</span><span>Выбрать, в чём продаёт: <b>кг, граммы, штуки, литры</b>.</span></div>
+      <div class="note"><span class="dot">3</span><span>Цена <b>за 1 кг</b> и с какого веса можно купить.</span></div>
+      <div class="note"><span class="dot">✓</span><span>Много товаров? Можно <b>загрузить списком из Excel</b>.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>8 / 11</span></div>
+</section>
+
+<!-- 9. Заказ -->
+<section class="page">
+  <div class="eyebrow">Заказы</div>
+  <h2>Пришёл заказ — три кнопки</h2>
+  <div class="row">
+    <div class="phone"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="alert"><span class="badge">новый</span>Заказ № 1001 ждёт ответа</div>
+        <div class="card" style="display:flex;flex-direction:column;gap:1.2mm">
+          <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:10pt">№ 1001</b><span class="s-p">сегодня 12:40</span></div>
+          <div class="line"><span>Помидоры × 2 кг</span><b>24 смн</b></div>
+          <div class="line"><span>Огурцы × 1 кг</span><b>10 смн</b></div>
+          <div class="line"><span>Чакка × 1</span><b>11 смн</b></div>
+          <div class="line" style="font-size:7.5pt"><b>Итого</b><b>45 смн</b></div>
+          <div class="s-p">Фарзона · ул. Айни 12, кв. 5</div>
+        </div>
+        <div style="display:flex;gap:1.6mm"><div class="btn" style="flex:2">Принять</div><div class="btn red" style="flex:1">Отклонить</div></div>
+        <div class="card" style="margin-top:1mm"><div class="lbl">Дальше по очереди:</div><div class="chips"><span class="chip on">Принять</span><span class="chip">Готов</span><span class="chip">Передан курьеру</span></div></div>
+      </div>
+      <div class="tabs"><span><b></b>Главная</span><span class="on"><b></b>Заказы</span><span><b></b>Товары</span><span><b></b>Статистика</span><span><b></b>Ещё</span></div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><span class="dot">1</span><span>Звук и уведомление: <b>«Новый заказ № 1001»</b>. У каждого заказа свой номер.</span></div>
+      <div class="note"><span class="dot">2</span><span><b>Принять</b> → собрать → <b>Готов</b> → <b>Передан курьеру</b>.</span></div>
+      <div class="note"><span class="dot">3</span><span>Нет товара — <b>Отклонить</b> и выбрать причину. Деньги покупателю вернутся.</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>9 / 11</span></div>
+</section>
+
+<!-- 10. Деньги -->
+<section class="page">
+  <div class="eyebrow">Деньги</div>
+  <h2>Когда приходят деньги</h2>
+  <div class="row" style="align-items:stretch">
+    <div class="phone" style="align-self:center"><div class="scr"><div class="bar"><span>9:41</span><span class="notch"></span><span>100%</span></div>
+      <div class="body">
+        <div class="s-h" style="margin-top:1mm">Деньги</div>
+        <div class="card" style="background:var(--accent);color:#fff;border:0"><div style="font-size:6pt;opacity:.85">Пришло на счёт за 30 дней</div><div class="money-big">12 480 смн</div></div>
+        <div class="card"><div class="s-p">Заморожено в заказах</div><div style="font-size:11pt;font-weight:800">680 смн</div></div>
+        <div class="card">
+          <div class="lbl">Последние переводы</div>
+          <div class="line"><span>№ 1001</span><b style="color:var(--accent)">+ 39 смн</b></div>
+          <div class="line"><span>№ 1000</span><b style="color:var(--accent)">+ 210 смн</b></div>
+          <div class="line"><span>№ 998</span><b style="color:var(--accent)">+ 96 смн</b></div>
+        </div>
+      </div>
+      <div class="tabs"><span><b></b>Главная</span><span><b></b>Заказы</span><span><b></b>Товары</span><span><b></b>Статистика</span><span class="on"><b></b>Ещё</span></div>
+    </div></div>
+    <div class="flow" style="flex:1;justify-content:center">
+      <div class="fstep"><div><b>Покупатель оплатил</b><span>деньги заморожены в Alif</span></div></div>
+      <div class="farrow"><svg viewBox="0 0 8 10"><path d="M4 0v9M1 6l3 3 3-3"/></svg></div>
+      <div class="fstep"><div><b>Курьер привёз заказ</b><span>покупатель получил</span></div></div>
+      <div class="farrow"><svg viewBox="0 0 8 10"><path d="M4 0v9M1 6l3 3 3-3"/></svg></div>
+      <div class="fstep fin"><div><b>Деньги на вашем счёте</b><span>за вычетом комиссии сервиса</span></div></div>
+      <p class="lead" style="font-size:9.5pt;margin-top:4mm">Отменили заказ — покупатель получает всю сумму обратно.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>10 / 11</span></div>
+</section>
+
+<!-- 11. Вопросы -->
+<section class="page">
+  <div class="eyebrow">Ваше мнение</div>
+  <h2>Что скажете?</h2>
+  <p class="lead">Напишите коротко, можно голосовым:</p>
+  <div>
+    <div class="q"><span class="dot">1</span><span>Всё понятно на каждом шаге? Где непонятно?</span></div>
+    <div class="q"><span class="dot">2</span><span>Каких типов магазинов или единиц не хватает?</span></div>
+    <div class="q"><span class="dot">3</span><span>Что ещё спросить при регистрации: ИНН, документы, фото витрины?</span></div>
+    <div class="q"><span class="dot">4</span><span>Удобно ли принимать заказы с телефона?</span></div>
+    <div class="q"><span class="dot">5</span><span>Какие цифры вы хотите видеть первыми?</span></div>
+    <div class="q"><span class="dot">6</span><span>Что лишнее или слишком сложно?</span></div>
+  </div>
+  <div class="foot"><span>Кабинет продавца</span><span>11 / 11</span></div>
+</section>
+
+</body>
+</html>
