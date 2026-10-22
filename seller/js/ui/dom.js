@@ -7,6 +7,7 @@ export const app = $('#app');
 export let toastTimer;
 export function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
 export const ICON = {
+  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
   note: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
@@ -29,11 +30,15 @@ export const thumb = p => `<div class="thumb">${pic(p)}</div>`;
 export const plusI = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
 export const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['finance', 'Деньги'], ['expenses', 'Расходы'], ['preview', 'Витрина'], ['shop', 'Магазин']];
 export const TABS = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['more', 'Ещё']];
+// товар на стопе до конца дня: «Закончилось на сегодня»
+export const isStopped = p => !!p.stopUntil && p.stopUntil > Date.now();
+export const fmtQty = n => (+n).toLocaleString('ru-RU', { maximumFractionDigits: 3 });
 export function stockPill(p) {
   if (!p.active) return '<span class="pill off">Скрыт</span>';
+  if (isStopped(p)) return '<span class="pill bad">Закончилось на сегодня</span>';
   if (p.stock <= 0) return '<span class="pill bad">Нет в наличии</span>';
-  if (p.stock <= LOW) return `<span class="pill warn">Осталось ${p.stock}</span>`;
-  return `<span class="pill">В наличии ${p.stock}</span>`;
+  if (p.stock <= LOW) return `<span class="pill warn">Осталось ${fmtQty(p.stock)} ${esc(p.unit)}</span>`;
+  return `<span class="pill">В наличии ${fmtQty(p.stock)} ${esc(p.unit)}</span>`;
 }
 export function showErrors(form, errs) {
   form.querySelectorAll('.err').forEach(e => e.remove());

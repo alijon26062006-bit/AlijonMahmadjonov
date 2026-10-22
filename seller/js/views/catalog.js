@@ -1,9 +1,9 @@
 import { render } from '../app.js';
-import { CUR, LABELS, LOW, UNITS } from '../config.js';
+import { CUR, kindOf, LABELS, LOW, WEIGHT_STEPS, WEIGHT_UNITS } from '../config.js';
 import { prodSales, ZERO } from '../domain/analytics.js';
 import { addDays, esc, money, num, today, uid } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
-import { $, closeSheet, onSheetClose, ICON, openSheet, plusI, showErrors, stockPill, thumb, toast } from '../ui/dom.js';
+import { $, closeSheet, fmtQty, isStopped, onSheetClose, ICON, openSheet, plusI, showErrors, stockPill, thumb, toast } from '../ui/dom.js';
 
 // Товары
 export function filtered(sales) {
@@ -11,7 +11,7 @@ export function filtered(sales) {
   const by = { sales: (a, b) => (sales[b.id] || ZERO).qty - (sales[a.id] || ZERO).qty, new: (a, b) => b.created - a.created, cheap: (a, b) => a.price - b.price, stock: (a, b) => a.stock - b.stock }[ui.psort];
   return S.products.filter(p =>
     (ui.cat === 'Все' || p.cat === ui.cat) && (!q || p.name.toLowerCase().includes(q)) &&
-    (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice))
+    (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice) || (ui.stock === 'stopped' && isStopped(p)))
   ).sort(by);
 }
 export function vCatalog() {
@@ -23,7 +23,7 @@ export function vCatalog() {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
       <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
-      <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${p.stock}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button></div>
+      <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="btn sm ${isStopped(p) ? 'danger' : 'ghost'}" data-stop="${p.id}" title="${isStopped(p) ? 'Вернуть в продажу' : 'Скрыть до завтра: закончилось на сегодня'}">${isStopped(p) ? 'Вернуть' : 'Стоп'}</button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
   }).join('');
@@ -40,6 +40,7 @@ export function vCatalog() {
         <option value="low" ${ui.stock === 'low' ? 'selected' : ''}>Заканчиваются (${cnt(p => p.active && p.stock <= LOW)})</option>
         <option value="nophoto" ${ui.stock === 'nophoto' ? 'selected' : ''}>Без фото (${cnt(p => !p.imgs.length)})</option>
         <option value="sale" ${ui.stock === 'sale' ? 'selected' : ''}>Со скидкой (${cnt(p => p.oldPrice)})</option>
+        <option value="stopped" ${ui.stock === 'stopped' ? 'selected' : ''}>На стопе сегодня (${cnt(isStopped)})</option>
         <option value="hidden" ${ui.stock === 'hidden' ? 'selected' : ''}>Скрытые (${cnt(p => !p.active)})</option>
       </select>
       <select class="input" id="psort" style="width:auto" aria-label="Сортировка">
@@ -58,7 +59,7 @@ export let editing = null;
 onSheetClose(() => { editing = null; });
 export function openProduct(id, copyFrom) {
   const src = copyFrom || (id ? S.products.find(x => x.id === id) : null);
-  const base = { id: uid(), name: '', cat: S.cats[0] || '', price: null, oldPrice: null, cost: null, stock: 10, unit: 'шт', desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() };
+  const base = { id: uid(), name: '', cat: S.cats[0] || '', price: null, oldPrice: null, cost: null, stock: 10, unit: kindOf(S.shop).units[0], minStep: 0.5, desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() };
   const draft = src ? JSON.parse(JSON.stringify(src)) : base;
   if (copyFrom) { draft.id = uid(); draft.name = src.name + ' (копия)'; draft.created = Date.now(); draft.variants.forEach(v => { v.id = uid(); }); }
   editing = { isNew: !id || !!copyFrom, draft };
@@ -66,6 +67,8 @@ export function openProduct(id, copyFrom) {
 }
 export function drawProduct() {
   const d = editing.draft;
+  const units = [...new Set([...kindOf(S.shop).units, d.unit])];
+  const weight = WEIGHT_UNITS.includes(d.unit);
   const ph = d.imgs.map((src, i) => `<div class="ph"><img src="${src}" alt="Фото ${i + 1}">${i === 0 ? '<span class="main">главное</span>' : `<button type="button" class="mk" data-mainph="${i}" title="Сделать главным" aria-label="Сделать главным">${ICON.star}</button>`}<button type="button" data-rmph="${i}" aria-label="Удалить фото">${ICON.close}</button></div>`).join('');
   openSheet(editing.isNew ? 'Новый товар' : 'Изменить товар', `
     <div class="field"><span class="lbl">Фото, до 4 штук</span><div class="photos">${ph}${d.imgs.length < 4 ? `<label class="ph" for="pFile">+ Добавить фото</label>` : ''}</div><input type="file" id="pFile" accept="image/*" multiple hidden>
@@ -75,10 +78,12 @@ export function drawProduct() {
       <div class="grid2">
         <div class="field"><label for="p_cat">Категория</label><select class="input" id="p_cat" name="cat">${S.cats.map(c => `<option ${c === d.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__new">+ Новая категория…</option></select>
           <input class="input" id="p_newcat" name="newcat" placeholder="Название категории" hidden maxlength="30"></div>
-        <div class="field"><label for="p_stock">Остаток</label><div style="display:flex;gap:6px"><input class="input num" id="p_stock" name="stock" inputmode="numeric" value="${d.stock}" style="min-width:0"><select class="input" name="unit" aria-label="Единица" style="width:auto;padding-inline:8px">${UNITS.map(u => `<option ${u === d.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+        <div class="field"><label for="p_stock">Остаток</label><div class="suffix"><input class="input num" id="p_stock" name="stock" inputmode="${weight ? 'decimal' : 'numeric'}" value="${d.stock}"><span>${esc(d.unit)}</span></div></div>
       </div>
+      <div class="field"><span class="lbl">Продаю в</span><div class="chips wrap" role="radiogroup" aria-label="Единица">${units.map(u => `<label class="chip unit-chip"><input type="radio" name="unit" value="${u}" ${u === d.unit ? 'checked' : ''}>${u}</label>`).join('')}</div></div>
+      ${weight ? `<div class="field"><span class="lbl">Покупатель может взять от</span><div class="chips wrap" role="radiogroup" aria-label="Минимальное количество">${WEIGHT_STEPS.map(s => `<label class="chip unit-chip"><input type="radio" name="minStep" value="${s}" ${s === (d.minStep ?? 0.5) ? 'checked' : ''}>${stepLabel(s, d.unit)}</label>`).join('')}</div></div>` : ''}
       <div class="grid3">
-        <div class="field"><label for="p_price">Цена продажи *</label><div class="suffix"><input class="input num" id="p_price" name="price" inputmode="decimal" value="${d.price ?? ''}" placeholder="0"><span>${CUR}</span></div></div>
+        <div class="field"><label for="p_price">${weight ? `Цена за 1 ${esc(d.unit)} *` : 'Цена продажи *'}</label><div class="suffix"><input class="input num" id="p_price" name="price" inputmode="decimal" value="${d.price ?? ''}" placeholder="0"><span>${CUR}</span></div></div>
         <div class="field"><label for="p_cost">Закупочная цена</label><div class="suffix"><input class="input num" id="p_cost" name="cost" inputmode="decimal" value="${d.cost ?? ''}" placeholder="0"><span>${CUR}</span></div></div>
         <div class="field"><label for="p_old">Цена до скидки</label><div class="suffix"><input class="input num" id="p_old" name="oldPrice" inputmode="decimal" value="${d.oldPrice ?? ''}" placeholder="—"><span>${CUR}</span></div></div>
       </div>
@@ -108,7 +113,7 @@ export function syncDraft() {
   // сохраняем введённое перед перерисовкой (добавили фото или вариант)
   const f = $('#pForm'); if (!f || !editing) return;
   const fd = new FormData(f), d = editing.draft;
-  d.name = fd.get('name'); d.cat = fd.get('cat') === '__new' ? d.cat : fd.get('cat'); d.stock = num(fd.get('stock')) ?? d.stock; d.unit = fd.get('unit');
+  d.name = fd.get('name'); d.cat = fd.get('cat') === '__new' ? d.cat : fd.get('cat'); d.stock = num(fd.get('stock')) ?? d.stock; d.unit = fd.get('unit') || d.unit; d.minStep = num(fd.get('minStep')) ?? d.minStep;
   d.price = num(fd.get('price')); d.cost = num(fd.get('cost')); d.oldPrice = num(fd.get('oldPrice')); d.desc = fd.get('desc');
   d.labels = fd.getAll('label'); d.prep = num(fd.get('prep')); d.active = !!fd.get('active'); d.variants = readVariants();
 }
@@ -128,7 +133,8 @@ export function saveProduct() {
   if (price == null || price <= 0) errs.price = 'Цена больше нуля';
   if (costRaw && (cost == null || cost < 0)) errs.cost = 'Число от нуля';
   if (oldRaw && (old == null || price == null || old <= price)) errs.oldPrice = 'Должна быть больше цены';
-  if (stock == null || stock < 0 || !Number.isInteger(stock)) errs.stock = 'Целое число от 0';
+  const weightUnit = WEIGHT_UNITS.includes(fd.get('unit'));
+  if (stock == null || stock < 0 || (!weightUnit && !Number.isInteger(stock))) errs.stock = weightUnit ? 'Число от 0, например 12,5' : 'Целое число от 0';
   if (prepRaw && (prep == null || prep <= 0 || prep > 600)) errs.prep = 'От 1 до 600 минут';
   let cat = fd.get('cat');
   if (cat === '__new') { cat = (fd.get('newcat') || '').trim(); if (!cat) errs.newcat = 'Введите категорию'; }
@@ -143,7 +149,7 @@ export function saveProduct() {
   if (!ok || vErr) return;
   if (!S.cats.includes(cat)) S.cats.push(cat);
   const d = editing.draft;
-  Object.assign(d, { name: fd.get('name').trim(), cat, price, cost, oldPrice: old, stock, unit: fd.get('unit'), desc: fd.get('desc').trim(), labels: fd.getAll('label'), prep, active: !!fd.get('active'), variants });
+  Object.assign(d, { name: fd.get('name').trim(), cat, price, cost, oldPrice: old, stock: weightUnit ? Math.round(stock * 1000) / 1000 : stock, unit: fd.get('unit'), minStep: weightUnit ? (num(fd.get('minStep')) ?? 0.5) : 1, desc: fd.get('desc').trim(), labels: fd.getAll('label'), prep, active: !!fd.get('active'), variants });
   // если есть варианты, цена товара = самая низкая цена варианта
   if (variants.length) { const min = variants.reduce((a, b) => a.price <= b.price ? a : b); d.price = min.price; if (min.cost != null) d.cost = min.cost; }
   const i = S.products.findIndex(p => p.id === d.id);
@@ -198,7 +204,7 @@ export function doImport() {
   const { ok } = parseImport($('#impText').value);
   for (const r of ok) {
     if (!S.cats.includes(r.cat)) S.cats.push(r.cat);
-    S.products.push({ id: uid(), name: r.name, cat: r.cat, price: r.price, oldPrice: null, cost: r.cost, stock: r.stock, unit: 'шт', desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() });
+    S.products.push({ id: uid(), name: r.name, cat: r.cat, price: r.price, oldPrice: null, cost: r.cost, stock: r.stock, unit: kindOf(S.shop).units[0], desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() });
   }
   save(); closeSheet(); ui.stock = 'all'; ui.cat = 'Все'; render(); toast(`Добавлено товаров: ${ok.length}. Теперь добавьте к ним фото`);
 }
@@ -206,3 +212,6 @@ export async function copyText(text, msg) {
   try { await navigator.clipboard.writeText(text); toast(msg); }
   catch { openSheet('Скопируйте текст', `<textarea class="input" id="copyBox" style="min-height:260px">${esc(text)}</textarea><span class="small muted">Выделите всё и скопируйте, затем вставьте в Excel.</span>`, ''); setTimeout(() => $('#copyBox')?.select(), 50); }
 }
+
+// 0.5 кг → «500 г», 1 кг → «1 кг», 0.25 л → «250 мл»
+export const stepLabel = (s, unit) => s < 1 ? `${s * 1000} ${unit === 'л' ? 'мл' : 'г'}` : `${s} ${unit}`;

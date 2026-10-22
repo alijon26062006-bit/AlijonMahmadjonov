@@ -1,10 +1,10 @@
 import { esc, money } from '../lib/format.js';
 import { S } from '../state.js';
-import { pic } from '../ui/dom.js';
+import { isStopped, pic } from '../ui/dom.js';
 
 // Витрина
 export function vPreview() {
-  const vis = S.products.filter(p => p.active && p.stock > 0);
+  const vis = S.products.filter(p => p.active && p.stock > 0 && !isStopped(p));
   const cats = S.cats.filter(c => vis.some(p => p.cat === c));
   const sh = S.shop;
   const dow = (new Date().getDay() + 6) % 7, sc = sh.schedule[dow];

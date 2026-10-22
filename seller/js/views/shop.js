@@ -18,6 +18,7 @@ export function vShop() {
         <label class="btn" for="logoFile">Загрузить логотип</label><input type="file" id="logoFile" accept="image/*" hidden>
         <span class="small muted">Квадратная картинка, JPG или PNG</span></div></div>
       ${shopFields(sh)}
+      <div class="row"><button class="btn" type="button" data-act="place">${ICON.pin} Изменить адрес на карте</button>${sh.lat ? '<span class="small muted">Метка на карте стоит</span>' : '<span class="small" style="color:var(--warn)">Метка на карте не поставлена</span>'}</div>
       <div><button class="btn primary" type="submit">Сохранить профиль</button></div>
     </form>
     <form class="panel col" id="opsForm" novalidate style="gap:14px">

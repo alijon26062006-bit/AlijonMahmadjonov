@@ -4,12 +4,14 @@ import { changeStockForOrder } from './domain/orders.js';
 import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
-import { $, app, closeSheet, confirmTwice, ICON, NAV, showErrors, TABS, toast } from './ui/dom.js';
+import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, showErrors, TABS, toast } from './ui/dom.js';
 import { copyText, doImport, drawProduct, editing, openProduct, previewImport, readImage, saveProduct, sheetImport, syncDraft, updateMargin, variantRow, vCatalog } from './views/catalog.js';
 import { saveExpense, sheetExpense, vExpenses } from './views/expenses.js';
 import { vFinance } from './views/finance.js';
 import { vHome } from './views/home.js';
-import { renderAuth, renderWelcome, sendCode, validateShop } from './views/onboarding.js';
+import { renderAuth, sendCode, validateShop } from './views/onboarding.js';
+import { renderRegister, sheetPlace } from './views/register.js';
+import './services/alerts.js';
 import { cart, drawSale, orderAction, saveSale, sheetSale, testOrder, vOrders } from './views/orders.js';
 import { vMore, vShop } from './views/shop.js';
 import { exportStats, vStats } from './views/stats.js';
@@ -19,7 +21,7 @@ let view = 'home';
 // рендер
 export function render() {
   if (!auth.phone) return renderAuth();
-  if (!S) return renderWelcome();
+  if (!S) return renderRegister();
   const nc = newCount();
   const btn = ([k, label]) => `<button class="nav-btn" data-nav="${k}" ${view === k || (k === 'more' && ['finance', 'expenses', 'preview', 'shop', 'more'].includes(view)) ? 'aria-current="page"' : ''}>${ICON[k]}<span>${label}</span>${k === 'orders' && nc ? `<span class="badge">${nc}</span>` : ''}</button>`;
   app.innerHTML = `
@@ -52,6 +54,12 @@ document.addEventListener('click', async e => {
   if (ds.oact) return orderAction(ds.oact, ds.id);
   if (ds.accmin) { const o = S.orders.find(x => x.id === ds.id); o.status = 'accepted'; o.readyIn = +ds.accmin; o.acceptedAt = Date.now(); save(); closeSheet(); ui.ordTab = 'work'; render(); return toast(`Заказ № ${o.no} принят, будет готов через ${ds.accmin} мин`); }
   if (ds.stock) { const p = S.products.find(x => x.id === ds.stock); p.stock = Math.max(0, p.stock + +ds.d); save(); return render(); }
+  if (ds.stop) {
+    const p = S.products.find(x => x.id === ds.stop);
+    if (isStopped(p)) { p.stopUntil = null; toast('Товар снова в продаже'); }
+    else { const end = new Date(); end.setHours(24, 0, 0, 0); p.stopUntil = end.getTime(); toast('Скрыт до завтра. Утром вернётся сам'); }
+    save(); return render();
+  }
   if (ds.cart) { cart.items[ds.cart] = Math.max(0, (cart.items[ds.cart] || 0) + +ds.d); return drawSale(); }
   if (ds.delexp) { if (confirmTwice(t, 'Точно?')) { S.expenses = S.expenses.filter(x => x.id !== ds.delexp); save(); render(); } return; }
   if (ds.delcat) { const n = S.products.filter(p => p.cat === ds.delcat).length; if (n) return toast(`Нельзя удалить: в категории ${n} тов.`); S.cats = S.cats.filter(x => x !== ds.delcat); save(); return render(); }
@@ -72,6 +80,7 @@ document.addEventListener('click', async e => {
     case 'alifedit': S.shop.alif.status = 'none'; save(); return render();
     case 'alifok': S.shop.alif.status = 'connected'; save(); render(); return toast('Магазин подключён к Alif');
     case 'demo': setS(demo()); save(); return go('home');
+    case 'place': return sheetPlace();
     case 'reset': if (confirmTwice(t, 'Нажмите ещё раз — пример удалится')) { store.fresh(); setS(null); render(); } return;
     case 'wipe': if (confirmTwice(t, 'Точно удалить всё? Нажмите ещё раз')) { store.fresh(); setS(null); render(); } return;
     case 'add': return openProduct(null);
@@ -107,6 +116,7 @@ document.addEventListener('change', async e => {
   const t = e.target, id = t.id;
   if (id === 'stockFilter') { ui.stock = t.value; render(); }
   if (id === 'psort') { ui.psort = t.value; render(); }
+  if ((t.name === 'unit' || t.name === 'minStep') && t.closest('#pForm')) { syncDraft(); drawProduct(); return; }
   if (id === 'p_cat') { const n = $('#p_newcat'); n.hidden = t.value !== '__new'; if (!n.hidden) n.focus(); }
   if (id === 'pFile' && t.files.length) {
     syncDraft();
@@ -116,6 +126,8 @@ document.addEventListener('change', async e => {
     drawProduct();
   }
   if (id === 'logoFile' && t.files[0]) { try { S.shop.logo = await readImage(t.files[0], 400); save(); render(); toast('Логотип обновлён'); } catch (err) { toast(err.message); } }
+  if (id === 'soundSw') { S.shop.sound = t.checked; save(); toast(t.checked ? 'Звук включён' : 'Звук выключен'); }
+  if (id === 'autoSw') { S.shop.autoAccept = t.checked; save(); render(); toast(t.checked ? 'Новые заказы будут приниматься сами' : 'Автопринятие выключено'); }
   if (id === 'pauseSw') { S.shop.paused = !t.checked; save(); render(); toast(S.shop.paused ? 'Приём заказов на паузе' : 'Снова принимаем заказы'); }
   if (id === 'fromD') { ui.from = t.value; render(); }
   if (id === 'toD') { ui.to = t.value; render(); }
@@ -127,7 +139,6 @@ document.addEventListener('change', async e => {
 document.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target, id = f.id;
-  if (id === 'shopForm') { const d = validateShop(f); if (!d) return; setS({ v: 2, demo: false, shop: blankShop(d), cats: ['Основное'], products: [], orders: [], expenses: [], payouts: [], nextNo: 1001 }); save(); go('catalog'); toast('Магазин создан. Добавьте первый товар'); }
   if (id === 'shopEdit') { const d = validateShop(f); if (!d) return; Object.assign(S.shop, d); save(); render(); toast('Профиль сохранён'); }
   if (id === 'opsForm') {
     const fd = new FormData(f), prep = num(fd.get('prep')), min = fd.get('minOrder').trim() === '' ? 0 : num(fd.get('minOrder'));

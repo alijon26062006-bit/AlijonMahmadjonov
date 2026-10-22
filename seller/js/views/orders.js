@@ -3,7 +3,7 @@ import { CANCEL_REASONS, STATUS } from '../config.js';
 import { changeStockForOrder, orderTotal } from '../domain/orders.js';
 import { esc, hhmm, minsAgo, money, parseKey, today, uid, whenText } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
-import { closeSheet, ICON, onSheetClose, openSheet, plusI, thumb, toast } from '../ui/dom.js';
+import { closeSheet, ICON, isStopped, onSheetClose, openSheet, plusI, thumb, toast } from '../ui/dom.js';
 
 // Заказы
 export function vOrders() {
@@ -18,6 +18,10 @@ export function vOrders() {
     <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Заказы</h1></div>
       <div class="row"><button class="btn" data-act="testorder">Тестовый заказ</button><button class="btn primary" data-act="sale">${plusI} Продажа в магазине</button></div></div>
     <label class="switch" for="pauseSw"><span><b style="font-weight:600">Принимаю заказы</b><br><span class="small muted">Выключите, если закрылись раньше или не успеваете. Покупатели увидят «Временно не работает».</span></span><input type="checkbox" id="pauseSw" ${S.shop.paused ? '' : 'checked'}></label>
+    <div class="grid2">
+      <label class="switch" for="soundSw"><span><b style="font-weight:600">Звук о новых заказах</b><br><span class="small muted">Звонит, пока вы не ответите</span></span><input type="checkbox" id="soundSw" ${S.shop.sound !== false ? 'checked' : ''}></label>
+      <label class="switch" for="autoSw"><span><b style="font-weight:600">Принимать автоматически</b><br><span class="small muted">Со временем сборки ${S.shop.prep} мин</span></span><input type="checkbox" id="autoSw" ${S.shop.autoAccept ? 'checked' : ''}></label>
+    </div>
     <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="oq" type="search" inputmode="search" placeholder="Найти заказ по номеру, имени или телефону" value="${esc(ui.oq)}" aria-label="Поиск заказа"></div>
     ${oq ? `<span class="small muted">Найдено: ${list.length}</span>` : ''}
     <div class="chips" role="group" aria-label="Статус" ${oq ? 'hidden' : ''}>${tab('new', 'Новые')}${tab('work', 'В работе')}${tab('done', 'Выполненные')}${tab('cancelled', 'Отменённые')}</div>
@@ -61,7 +65,7 @@ export function sheetCancel(o) {
     `<span></span><div class="row"><button class="btn" data-act="close">Назад</button><button class="btn danger" data-act="docancel" data-id="${o.id}">Отменить заказ</button></div>`);
 }
 export function testOrder() {
-  const avail = S.products.filter(p => p.active && p.stock > 0);
+  const avail = S.products.filter(p => p.active && p.stock > 0 && !isStopped(p));
   if (!avail.length) return toast('Нет товаров в наличии для тестового заказа');
   const p = avail[Math.floor(Math.random() * avail.length)], v = p.variants[0];
   const o = { id: uid(), no: S.nextNo++, ts: Date.now(), source: 'app', status: 'new', items: [{ pid: p.id, name: p.name, variant: v ? v.name : '', qty: 1, price: v ? v.price : p.price, cost: v ? v.cost : p.cost }], customer: { name: 'Тестовый покупатель', phone: '+992 00 000 00 00', address: 'Душанбе, ул. Примерная 1' }, delivery: 'courier', comment: 'Это тестовый заказ', cancelReason: '', pay: 'Наличные', test: true };

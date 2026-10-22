@@ -70,21 +70,6 @@ setInterval(() => {
   b.disabled = !!left; b.textContent = left ? `Отправить код ещё раз через ${left} с` : 'Отправить код ещё раз';
 }, 1000);
 
-export function renderWelcome() {
-  app.innerHTML = `
-  <div class="welcome"><div class="welcome-card">
-    <div class="eyebrow">Кабинет продавца</div>
-    <h1>Добавьте свой магазин и товары до запуска</h1>
-    <p>Покупатели увидят ваш каталог в приложении доставки в день старта рекламы. Заполните его заранее, тогда первые заказы придут сразу.</p>
-    <ol class="steps"><li>Укажите название, адрес и телефон магазина</li><li>Добавьте товары с фото и ценой, можно сразу списком из Excel</li><li>Проверьте витрину глазами покупателя</li></ol>
-    <form class="panel col" id="shopForm" novalidate>
-      ${shopFields({ name: '', type: '', phone: '+992 ' + fmtPhone(auth.phone || ''), address: '', about: '' })}
-      <button class="btn primary" type="submit">Создать магазин</button>
-    </form>
-    <button class="btn ghost" data-act="demo">Сначала посмотреть пример магазина цветов</button>
-  </div></div>`;
-}
-
 export function shopFields(s) {
   return `
     <div class="field"><label for="s_name">Название магазина *</label><input class="input" id="s_name" name="name" value="${esc(s.name)}" placeholder="Например, Гулистон" maxlength="60"></div>
