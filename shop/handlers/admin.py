@@ -9,7 +9,8 @@ from aiogram.filters import BaseFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
-from .. import catalog, keyboards, texts
+from .. import catalog, keyboards
+from ..i18n import texts
 from ..config import Config
 from ..db import (
     Database,
@@ -227,9 +228,9 @@ async def cb_order_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot
         if status == ORDER_DONE
         else texts.order_rejected_note(order_id, row["price"], cfg.currency)
     )
-    from ..fulfillment import via_api
+    from ..fulfillment import quiet_buyer
 
-    if not via_api(row):
+    if not quiet_buyer(row):
         await notify_user(bot, row["user_id"], note)
     await cb.answer("✅" if status == ORDER_DONE else "❌")
 
@@ -339,17 +340,26 @@ async def cb_price_item(cb: CallbackQuery, db: Database, cfg: Config) -> None:
         if partner_price
         else "🤝 Нархи шарикӣ: <i>гузошта нашудааст</i> (шарик нархи оддиро медиҳад)"
     )
-    rate = usd_rate(db)
+    if cfg.is_tenant:
+        # Боти шарик: нархи харид — нархи яклухти платформа, на нархи таъминкунанда.
+        head = texts.wholesale_line(row["wholesale"], row["price"], cfg.currency)
+        if row["auto_off"]:
+            status = "⛔ платформа ҳоло намефурӯшад (худкор пинҳон)"
+        details = "🔒 нархи дастӣ" if row["price_locked"] else "🔄 нарх худкор (яклухт + наценка)"
+    else:
+        head = texts.cost_line(row["cost"], row["price"], usd_rate(db), cfg.currency)
+        details = f"🏪 SKU: <code>{texts.esc(row['sku'] or '—')}</code>"
     await safe_edit(
         cb,
         f"📦 <b>{texts.esc(row['title'])}</b>\n\n"
-        f"{texts.cost_line(row['cost'], row['price'], rate, cfg.currency)}\n\n"
+        f"{head}\n\n"
         f"💰 Нархи оддӣ: <b>{texts.money(row['price'], cfg.currency)}</b>\n"
         f"{partner_line}\n"
         f"📶 Ҳолат: {status}\n"
         f"🔖 Код: <code>{texts.esc(code)}</code>\n"
-        f"🏪 SKU: <code>{texts.esc(row['sku'] or '—')}</code>",
-        keyboards.admin_price_item(code, bool(row["active"]), bool(partner_price)),
+        f"{details}",
+        keyboards.admin_price_item(code, bool(row["active"]), bool(partner_price),
+                                   locked=bool(row["price_locked"])),
     )
     await cb.answer()
 
@@ -361,8 +371,46 @@ async def cb_toggle(cb: CallbackQuery, db: Database, cfg: Config) -> None:
     if row is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
+    if cfg.is_tenant and not row["active"] and row["wholesale"] is None:
+        await cb.answer("⛔ Платформа ин молро ҳоло намефурӯшад — фаъол кардан мумкин нест.",
+                        show_alert=True)
+        return
     db.set_active(code, not row["active"])
     await cb_price_item(cb, db, cfg)
+
+
+@router.callback_query(F.data.startswith("a:rename:"))
+async def cb_rename(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+    code = cb.data.rsplit(":", 1)[1]
+    if db.product(code) is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    await state.set_state(Admin.waiting_product_title)
+    await state.update_data(price_code=code)
+    await cb.message.answer(texts.ADMIN_ASK_PRODUCT_TITLE, reply_markup=keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_product_title, F.text)
+async def got_product_title(message: Message, state: FSMContext, db: Database,
+                            cfg: Config) -> None:
+    title = " ".join(message.text.split())
+    if not 1 <= len(title) <= 60:
+        await message.answer("❌ Ном бояд аз 1 то 60 аломат бошад.")
+        return
+    data = await state.get_data()
+    code = data.get("price_code", "")
+    await state.clear()
+    if not db.rename_product(code, title):
+        await message.answer(texts.UNKNOWN)
+        return
+    row = db.product(code)
+    await message.answer(
+        f"✅ Номи нав: <b>{texts.esc(title)}</b>",
+        reply_markup=keyboards.admin_price_item(code, bool(row["active"]),
+                                                bool(row["partner_price"]),
+                                                locked=bool(row["price_locked"])),
+    )
 
 
 @router.callback_query(F.data.startswith("a:setprice:"))

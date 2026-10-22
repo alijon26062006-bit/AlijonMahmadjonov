@@ -950,6 +950,18 @@ def cost_line(cost_milli: int | None, price: int, rate: float, currency: str = C
     return line
 
 
+def wholesale_line(wholesale: int | None, price: int, currency: str = CURRENCY) -> str:
+    """Боти шарик: нархи яклухт ва фоидаи шарик аз ҳар фурӯш."""
+    if wholesale is None:
+        return "🏷 Нархи яклухт: <i>нест</i> — платформа ин молро ҳоло намефурӯшад"
+    line = f"🏷 Нархи яклухт: <b>{money(wholesale, currency)}</b>"
+    profit = price - wholesale
+    if profit < 0:
+        return line + f"\n🔴 <b>ЗАРАР: {money(profit, currency)}</b> — нархро баланд кунед!"
+    percent = profit / wholesale * 100 if wholesale else 0
+    return line + f"\n💚 Фоидаи шумо: <b>{money(profit, currency)}</b> ({percent:+.0f}%)"
+
+
 ADMIN_ASK_MARKUP = (
     "📈 Фоизи илова ба нархи харидро нависед.\n\n"
     "Намуна: <code>20</code> — яъне нарх = харид + 20%\n"
@@ -1091,3 +1103,194 @@ ADMIN_ASK_API_MARKUP = (
     "Фоизро нависед. Намуна: <code>5</code> ё <code>10</code>\n\n"
     "<i>Нархҳои бот тағйир намеёбанд — ин танҳо барои харидорони API.</i>"
 )
+
+
+# ══ Конструктор ═══════════════════════════════════════════════════════
+BTN_CONSTRUCTOR = "🤖 Боти худро созед"
+BTN_NEW_BOT = "➕ Боти нав пайваст кардан"
+BTN_TOPUP_WHOLESALE = "💳 Пур кардани ҳисоби яклухт"
+ADM_BTN_CONSTRUCTOR = "🏗 Конструктор"
+
+TENANT_STATUS = {
+    "active": "🟢 кор мекунад",
+    "paused": "⏸ хомӯш (худатон)",
+    "blocked": "🚫 баста (соҳиби платформа)",
+    "disabled": "🔴 токен кор намекунад",
+}
+LANG_TITLE = {"tj": "🇹🇯 Тоҷикӣ", "ru": "🇷🇺 Русӣ"}
+
+
+def constructor_home(rows: list, balance: int, can_add: bool, limit: int,
+                     currency: str = CURRENCY) -> str:
+    lines = [
+        "🤖 <b>Ботҳои ман</b>\n",
+        "<blockquote>Боти худро пайваст кунед — дӯкони тайёр бо номи худ, нархҳои худ "
+        "ва реквизитҳои худ. Фармоишҳо худкор иҷро мешаванд.</blockquote>\n",
+        f"💳 Ҳисоби яклухт: <b>{money(balance, currency)}</b>",
+        "<i>Аз ин ҳисоб нархи яклухти ҳар фармоиши боти шумо гирифта мешавад.</i>\n",
+    ]
+    if rows:
+        for row in rows:
+            name = f"@{row['username']}" if row["username"] else f"#{row['id']}"
+            lines.append(f"• {esc(name)} — {TENANT_STATUS.get(row['status'], row['status'])}")
+    else:
+        lines.append("Ҳоло бот надоред.")
+    lines.append(f"\n📦 Ботҳо: <b>{len(rows)}</b> аз <b>{limit}</b>")
+    if not can_add and len(rows) < limit:
+        lines.append("<i>Ҳадди ботҳои платформа пур аст.</i>")
+    return "\n".join(lines)
+
+
+ASK_BOT_TOKEN = (
+    "🔑 <b>Токени боти худро фиристед</b>\n\n"
+    "1. Ба @BotFather нависед ва <code>/newbot</code>-ро пахш кунед.\n"
+    "2. Ном ва username-и ботро гузоред.\n"
+    "3. BotFather токен медиҳад, масалан:\n"
+    "<code>123456789:AAH...</code>\n"
+    "4. Онро ҳамин ҷо фиристед.\n\n"
+    "<i>Токенро ба каси дигар надиҳед.</i>"
+)
+BAD_TOKEN = "❌ Ин ба токени бот монанд нест. Намуна: <code>123456789:AAH...</code>"
+TOKEN_REJECTED = "❌ Telegram ин токенро қабул накард. Аз @BotFather токени навро гиред."
+BOT_ALREADY_ADDED = "❌ Ин бот аллакай ба платформа пайваст аст."
+BOT_IS_MAIN = "❌ Ин худи боти асосӣ аст — боти дигари худро созед."
+BOT_LIMIT = "❌ Ба шумо зиёда аз ин миқдор бот иҷозат нест."
+CONSTRUCTOR_CLOSED = "🚫 Конструктор ҳоло хомӯш аст."
+CONSTRUCTOR_NO_ACCESS = (
+    "🔒 Конструктор танҳо бо иҷозати соҳиби платформа.\n"
+    "Ба дастгирӣ нависед, то ба шумо дастрасӣ диҳанд."
+)
+
+
+def bot_created(username: str) -> str:
+    return (
+        "✅ <b>Боти шумо тайёр аст!</b>\n\n"
+        f"🤖 @{esc(username)}\n\n"
+        "<b>Қадамҳои навбатӣ:</b>\n"
+        f"1. Ботро кушоед: t.me/{esc(username)} ва /start-ро пахш кунед.\n"
+        "2. Дар он <code>/admin</code> нависед — шумо админ ҳастед.\n"
+        "3. ⚙️ Танзимот → реквизитҳои худро гузоред (корт, Alif).\n"
+        "4. Наценка ва нархҳоро бинед — нархҳо аллакай худкор гузошта шудаанд.\n"
+        "5. Ҳисоби яклухтро пур кунед — бе он фармоишҳо иҷро намешаванд."
+    )
+
+
+def tenant_screen(row, sales: dict, balance: int, currency: str = CURRENCY) -> str:
+    name = f"@{row['username']}" if row["username"] else f"#{row['id']}"
+    return (
+        f"🤖 <b>{esc(name)}</b>\n\n"
+        f"📶 Ҳолат: {TENANT_STATUS.get(row['status'], row['status'])}\n"
+        f"🌐 Забон: {LANG_TITLE.get(row['lang'], row['lang'])}\n"
+        f"🧾 Фармоишҳои иҷрошуда: <b>{sales['orders']}</b>\n"
+        f"💰 Харидҳои яклухт: <b>{money(sales['revenue'], currency)}</b>\n"
+        f"💳 Ҳисоби яклухт: <b>{money(balance, currency)}</b>\n\n"
+        f"🔗 t.me/{esc(row['username'] or '')}"
+    )
+
+
+def tenant_token_revoked(username: str) -> str:
+    return (
+        f"🔴 <b>Боти @{esc(username)} хомӯш шуд</b>\n\n"
+        "Telegram токени онро қабул намекунад (токен бекор шуд ё бот нест карда шуд).\n"
+        "Дар «🤖 Ботҳои ман» токени навро гузоред — бот бо ҳамаи харидорон ва "
+        "фармоишҳо боз кор мекунад."
+    )
+
+
+def partner_low_balance(balance: int, currency: str = CURRENCY) -> str:
+    return (
+        "⚠️ <b>Ҳисоби яклухт кам монд</b>\n\n"
+        f"💳 Боқимонда: <b>{money(balance, currency)}</b>\n"
+        "Ҳисобро пур кунед — вагарна фармоишҳои харидорони боти шумо иҷро намешаванд."
+    )
+
+
+def partner_empty_balance(balance: int, currency: str = CURRENCY) -> str:
+    return (
+        "🚨 <b>Фармоиш иҷро нашуд — ҳисоби яклухт кофӣ нест</b>\n\n"
+        f"💳 Боқимонда: <b>{money(balance, currency)}</b>\n"
+        "Пули харидор худкор баргардонида шуд. Ҳисобро пур кунед: "
+        "«💳 Пур кардани ҳисоб» дар боти асосӣ."
+    )
+
+
+# ── соҳиби платформа ──
+def admin_constructor(is_open: bool, tenants: int, active: int, partners: int,
+                      markup: float, max_bots: int) -> str:
+    return (
+        "🏗 <b>Конструктор</b>\n\n"
+        f"📶 Ҳолат: <b>{'✅ фаъол' if is_open else '🚫 хомӯш'}</b>\n"
+        f"🤖 Ботҳо: <b>{tenants}</b> (кор мекунанд: {active}) · ҳадди аксар: {max_bots}\n"
+        f"👥 Шарикон бо дастрасӣ: <b>{partners}</b>\n"
+        f"💹 Наценкаи яклухт: <b>+{markup:g}%</b> аз нархи харид\n\n"
+        "<i>Шарик аз ҳисоби худ нархи яклухт мепардозад, ба харидорони худ бо "
+        "нархи худ мефурӯшад.</i>"
+    )
+
+
+ADMIN_ASK_ACCESS = (
+    "👥 ID-и Telegram ё @username-и шарикро нависед.\n"
+    "Агар ба ӯ зиёда аз як бот иҷозат бошад — баъд аз фосила рақам:\n"
+    "<code>123456789 3</code>"
+)
+ADMIN_ASK_C_MARKUP = (
+    "💹 <b>Наценкаи яклухт барои конструктор</b>\n\n"
+    "Нархи яклухт = нархи харид × курс + ин фоиз.\n"
+    "Намуна: <code>10</code>"
+)
+ADMIN_ASK_MAX_BOTS = "🔢 Ҳадди аксари ботҳои шарикон дар платформа. Намуна: <code>50</code>"
+
+
+def admin_c_partners(rows: list, currency: str = CURRENCY) -> str:
+    if not rows:
+        return "👥 <b>Шарикони конструктор</b>\n\nҲоло касе дастрасӣ надорад."
+    lines = ["👥 <b>Шарикони конструктор</b>\n"]
+    for row in rows:
+        who = f"@{row['username']}" if row["username"] else (row["first_name"] or "")
+        lines.append(
+            f"• <code>{row['user_id']}</code> {esc(who)} — ботҳо {row['bots']}/{row['max_bots']}, "
+            f"ҳисоб {money(row['balance'] or 0, currency)}"
+        )
+    return "\n".join(lines)
+
+
+def admin_tenants(rows: list) -> str:
+    if not rows:
+        return "🤖 <b>Ботҳои шарикон</b>\n\nҲоло бот нест."
+    lines = ["🤖 <b>Ботҳои шарикон</b>\n"]
+    for row in rows:
+        lines.append(
+            f"• @{esc(row['username'] or '?')} — шарик <code>{row['owner_id']}</code> — "
+            f"{TENANT_STATUS.get(row['status'], row['status'])}"
+        )
+    return "\n".join(lines)
+
+
+# ── боти шарик: панели админ ──
+ADMIN_ASK_PARTNER_MARKUP = (
+    "💹 <b>Наценкаи шумо</b>\n\n"
+    "Нархи фурӯш = нархи яклухт + ин фоиз (ба боло то 0.50 сомонӣ).\n"
+    "Ба молҳое, ки нархашонро дастӣ гузоштед, таъсир намекунад.\n\n"
+    "Намуна: <code>15</code>"
+)
+ADMIN_ASK_OPERATOR = "👥 ID-и Telegram-и операторро нависед (ӯ бояд аввал ботро /start кунад)."
+ADMIN_ASK_SUPPORT = "🎧 Username-и дастгирӣ (бе @) ё <code>-</code> барои хомӯш кардан."
+ADMIN_ASK_PRODUCT_TITLE = "✏️ Номи нави молро нависед (то 60 аломат)."
+ADMIN_ASK_LOW_BALANCE = (
+    "🔔 Вақте ҳисоби яклухт аз ин маблағ кам шавад, огоҳ мекунем.\n"
+    "Намуна: <code>50</code>"
+)
+
+
+def tenant_settings(markup: float, operators: tuple, support: str, lang: str,
+                    low: int, balance: int, currency: str = CURRENCY) -> str:
+    ops = ", ".join(f"<code>{o}</code>" for o in operators) or "—"
+    return (
+        "\n\n🤖 <b>Боти шумо</b>\n"
+        f"💹 Наценка: <b>+{markup:g}%</b> аз нархи яклухт\n"
+        f"💳 Ҳисоби яклухт: <b>{money(balance, currency)}</b> "
+        f"(огоҳӣ аз {money(low, currency)})\n"
+        f"👥 Операторон: {ops}\n"
+        f"🎧 Дастгирӣ: {('@' + esc(support)) if support else '—'}\n"
+        f"🌐 Забон: {LANG_TITLE.get(lang, lang)}"
+    )

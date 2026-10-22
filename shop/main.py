@@ -25,7 +25,9 @@ from .middlewares import (
     ConflictWatch,
     ErrorGuardMiddleware,
     GuardMiddleware,
+    TenantMiddleware,
 )
+from .tenants import Platform, TenantManager
 from .donatix import DonatixSupplier
 from .supplier import RouterSupplier, build_supplier
 
@@ -58,12 +60,17 @@ def build_shop_supplier(cfg: Config, db: Database) -> RouterSupplier:
     return RouterSupplier(main, telegram)
 
 
-def build_dispatcher(db: Database, cfg: Config, supplier) -> Dispatcher:
+def build_dispatcher(db: Database, cfg: Config, supplier, tenants=None) -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
     dp["db"] = db
     dp["cfg"] = cfg
     dp["supplier"] = supplier
+    dp["tenants"] = tenants
     dp.update.outer_middleware(ErrorGuardMiddleware())
+    # Конструктор: аввал муайян мекунем, ки навсозӣ ба кадом бот тааллуқ дорад.
+    dp.update.outer_middleware(
+        TenantMiddleware(tenants.resolve if tenants is not None else (lambda _bot_id: None))
+    )
     dp.update.outer_middleware(GuardMiddleware(db, cfg))
     dp.include_router(build_router())
     return dp
@@ -178,10 +185,14 @@ async def run() -> None:
     # Агар Telegram рангҳоро нашиносад — бот кор карданашро давом медиҳад.
     bot.session.middleware(ButtonStyleFallback())
     bot.session.middleware(ConflictWatch(_conflict_notifier(cfg, here)))
-    dp = build_dispatcher(db, cfg, supplier)
+    platform = Platform(db, cfg, supplier, bot)
+    tenants = TenantManager(platform)
+    dp = build_dispatcher(db, cfg, supplier, tenants)
+    platform.dp = dp
 
     api_runner = None
     costs_task = None
+    tenants_task = None
     try:
         try:
             me = await bot.get_me()
@@ -213,15 +224,20 @@ async def run() -> None:
         # Нархи харид худкор нав мешавад — нархи API аз он ҳисоб мешавад.
         costs_task = asyncio.create_task(costs.refresh_forever(db, cfg, supplier))
         api_runner = await devapi.start(db, cfg, supplier, bot)
+        # Конструктор: ботҳои шарикон дар ҳамин раванд кор мекунанд.
+        await tenants.start_all()
+        tenants_task = asyncio.create_task(tenants.maintenance_forever())
         await dp.start_polling(bot)
     finally:
         # Ҳатто ҳангоми хатогӣ ҳама чиз тоза баста мешавад.
-        if costs_task is not None:
-            costs_task.cancel()
-            await asyncio.gather(costs_task, return_exceptions=True)
+        for task in (costs_task, tenants_task):
+            if task is not None:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if api_runner is not None:
             await api_runner.cleanup()
         await fulfillment_shutdown()
+        await tenants.stop_all()
         await supplier.close()
         await bot.session.close()
         db.close()

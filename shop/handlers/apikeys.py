@@ -5,7 +5,8 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from .. import devapi, keyboards, texts
+from .. import devapi, keyboards
+from ..i18n import texts
 from ..config import Config
 from ..db import Database
 from .common import current_user, safe_edit

@@ -76,6 +76,9 @@ class Config:
     api_host: str = "0.0.0.0"
     api_port: int = 8080
     api_public_url: str = ""        # холӣ — аз IP-и сервер худкор
+    # Конструктор: 0 — боти асосӣ, вагарна рақами боти шарик (tenants.id).
+    tenant_id: int = 0
+    lang: str = "tj"
 
     @property
     def has_supplier(self) -> bool:
@@ -91,6 +94,11 @@ class Config:
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
+
+    @property
+    def is_tenant(self) -> bool:
+        """Ин боти шарик аст (аз конструктор), на боти асосии соҳиб."""
+        return self.tenant_id > 0
 
 
 def load_config(env_file: str | os.PathLike[str] | None = None) -> Config:

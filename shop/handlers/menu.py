@@ -7,7 +7,8 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
-from .. import catalog, keyboards, texts
+from .. import catalog, keyboards
+from ..i18n import texts
 from ..config import Config
 from ..db import Database
 from .common import current_user, safe_edit, show_main_menu

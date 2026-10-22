@@ -11,7 +11,8 @@ from aiogram.exceptions import TelegramRetryAfter
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.fsm.context import FSMContext
 
-from .. import catalog, keyboards, payments, requisites, texts
+from .. import catalog, keyboards, payments, requisites
+from ..i18n import texts
 from ..config import Config
 from ..db import Database
 from ..states import Admin
@@ -40,17 +41,34 @@ def _api_info(db: Database, cfg: Config) -> dict:
 
 
 @router.callback_query(F.data == "a:settings")
-async def cb_settings(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+async def cb_settings(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config,
+                      supplier=None) -> None:
     await state.clear()
-    await safe_edit(
-        cb,
-        texts.admin_settings(
-            len(db.channels()), db.setting(REVIEW_CHANNEL_KEY), db.setting(WHATSAPP_KEY),
-            api=_api_info(db, cfg),
-        ),
-        keyboards.admin_settings(),
+    text = texts.admin_settings(
+        len(db.channels()), db.setting(REVIEW_CHANNEL_KEY), db.setting(WHATSAPP_KEY),
+        api=None if cfg.is_tenant else _api_info(db, cfg),
     )
+    if cfg.is_tenant:
+        text += await _tenant_info(db, cfg, supplier)
+    await safe_edit(cb, text, keyboards.admin_settings())
     await cb.answer()
+
+
+async def _tenant_info(db: Database, cfg: Config, supplier) -> str:
+    from .. import tenants, wholesale
+
+    balance = 0
+    if supplier is not None and hasattr(supplier, "partner_id"):
+        user = supplier.platform.db.user(supplier.partner_id)
+        balance = user.balance if user else 0
+    try:
+        low = int(db.setting(wholesale.LOW_BALANCE_KEY) or wholesale.DEFAULT_LOW_BALANCE)
+    except ValueError:
+        low = wholesale.DEFAULT_LOW_BALANCE
+    return texts.tenant_settings(
+        wholesale.partner_markup(db), tenants.operators_of(db), cfg.support,
+        cfg.lang, low, balance, cfg.currency,
+    )
 
 
 @router.callback_query(F.data == "a:apitoggle")

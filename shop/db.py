@@ -161,6 +161,29 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id, revoked);
 
+-- Конструктор: ботҳои шарикон (танҳо дар базаи боти асосӣ истифода мешавад).
+CREATE TABLE IF NOT EXISTS tenants (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id   INTEGER NOT NULL,
+    bot_id     INTEGER NOT NULL UNIQUE,
+    username   TEXT,
+    title      TEXT,
+    token      TEXT    NOT NULL,
+    lang       TEXT    NOT NULL DEFAULT 'tj',
+    status     TEXT    NOT NULL DEFAULT 'active',
+    note       TEXT,
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tenants_owner ON tenants(owner_id);
+
+CREATE TABLE IF NOT EXISTS constructor_access (
+    user_id    INTEGER PRIMARY KEY,
+    max_bots   INTEGER NOT NULL DEFAULT 1,
+    granted_by INTEGER,
+    created_at TEXT    NOT NULL
+);
+
 -- Idempotency-Key: такрори ҳамон дархост фармоиши дуюм намесозад.
 CREATE TABLE IF NOT EXISTS api_requests (
     key_id     INTEGER NOT NULL,
@@ -279,6 +302,11 @@ class Database:
         ("orders", "supplier_ref", "TEXT"),
         ("orders", "source", "TEXT NOT NULL DEFAULT 'bot'"),
         ("orders", "api_key_id", "INTEGER"),
+        # Конструктор: нархи яклухт, нархи дастӣ, номи дастӣ, хомӯшии худкор.
+        ("products", "wholesale", "INTEGER"),
+        ("products", "price_locked", "INTEGER NOT NULL DEFAULT 0"),
+        ("products", "title_locked", "INTEGER NOT NULL DEFAULT 0"),
+        ("products", "auto_off", "INTEGER NOT NULL DEFAULT 0"),
     )
 
     def _add_missing_columns(self) -> None:
@@ -332,8 +360,10 @@ class Database:
                      p.partner_price or None, p.cost or None, p.group, p.sku,
                      p.kind, i, 1 if p.active else 0),
                 )
+                # Номе, ки админ худаш гузоштааст (title_locked), иваз намешавад.
                 self._conn.execute(
-                    "UPDATE products SET category = ?, title = ?, amount = ?, "
+                    "UPDATE products SET category = ?, "
+                    "title = CASE WHEN title_locked = 1 THEN title ELSE ? END, amount = ?, "
                     "group_code = ?, sku = ?, kind = ?, sort = ? WHERE code = ?",
                     (p.category, p.title, p.amount, p.group, p.sku, p.kind, i, p.code),
                 )
@@ -532,9 +562,116 @@ class Database:
         return cur.rowcount > 0
 
     def set_price(self, code: str, price: int) -> bool:
-        cur = self._run("UPDATE products SET price = ? WHERE code = ?", (price, code))
+        """Нархи дастии админ. Дар боти шарик нархи худкор онро дигар иваз намекунад."""
+        cur = self._run(
+            "UPDATE products SET price = ?, price_locked = 1 WHERE code = ?", (price, code)
+        )
         return cur.rowcount > 0
 
+    def unlock_price(self, code: str) -> bool:
+        return self._run(
+            "UPDATE products SET price_locked = 0 WHERE code = ?", (code,)
+        ).rowcount > 0
+
+    def rename_product(self, code: str, title: str) -> bool:
+        return self._run(
+            "UPDATE products SET title = ?, title_locked = 1 WHERE code = ?", (title, code)
+        ).rowcount > 0
+
+    def all_products(self) -> list[sqlite3.Row]:
+        return self._all("SELECT * FROM products ORDER BY sort, price")
+
+    def set_wholesale(self, code: str, wholesale: int | None, *, auto_price: int | None,
+                      available: bool) -> None:
+        """Нархи яклухт аз платформа. Бе нархи яклухт мол худкор пинҳон мешавад."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT active, auto_off, price_locked FROM products WHERE code = ?", (code,)
+            ).fetchone()
+            if row is None:
+                return
+            active, auto_off = row["active"], row["auto_off"]
+            if not available and active:
+                active, auto_off = 0, 1
+            elif available and auto_off:
+                active, auto_off = 1, 0
+            price_sql, params = "", [wholesale, active, auto_off]
+            if auto_price is not None and not row["price_locked"]:
+                price_sql = ", price = ?"
+                params.append(auto_price)
+            self._conn.execute(
+                f"UPDATE products SET wholesale = ?, active = ?, auto_off = ?{price_sql} "
+                "WHERE code = ?",
+                (*params, code),
+            )
+            self._conn.commit()
+
+    # ── конструктор (базаи асосӣ) ─────────────────────────────────────
+    def grant_constructor(self, user_id: int, max_bots: int, admin_id: int | None) -> None:
+        self._run(
+            "INSERT INTO constructor_access(user_id, max_bots, granted_by, created_at) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET max_bots = excluded.max_bots",
+            (user_id, max_bots, admin_id, now()),
+        )
+
+    def revoke_constructor(self, user_id: int) -> bool:
+        return self._run(
+            "DELETE FROM constructor_access WHERE user_id = ?", (user_id,)
+        ).rowcount > 0
+
+    def constructor_access(self, user_id: int) -> sqlite3.Row | None:
+        return self._one("SELECT * FROM constructor_access WHERE user_id = ?", (user_id,))
+
+    def constructor_partners(self) -> list[sqlite3.Row]:
+        return self._all(
+            "SELECT a.*, u.username, u.first_name, u.balance, "
+            "(SELECT COUNT(*) FROM tenants t WHERE t.owner_id = a.user_id) AS bots "
+            "FROM constructor_access a LEFT JOIN users u ON u.id = a.user_id "
+            "ORDER BY a.created_at DESC"
+        )
+
+    def add_tenant(self, owner_id: int, bot_id: int, username: str, title: str,
+                   token: str, lang: str = "tj") -> int:
+        stamp = now()
+        cur = self._run(
+            "INSERT INTO tenants(owner_id, bot_id, username, title, token, lang, status, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)",
+            (owner_id, bot_id, username, title, token, lang, stamp, stamp),
+        )
+        return int(cur.lastrowid)
+
+    def tenant(self, tenant_id: int) -> sqlite3.Row | None:
+        return self._one("SELECT * FROM tenants WHERE id = ?", (tenant_id,))
+
+    def tenant_by_bot(self, bot_id: int) -> sqlite3.Row | None:
+        return self._one("SELECT * FROM tenants WHERE bot_id = ?", (bot_id,))
+
+    def tenants(self, owner_id: int | None = None) -> list[sqlite3.Row]:
+        if owner_id is None:
+            return self._all("SELECT * FROM tenants ORDER BY id")
+        return self._all("SELECT * FROM tenants WHERE owner_id = ? ORDER BY id", (owner_id,))
+
+    def set_tenant(self, tenant_id: int, **fields) -> None:
+        allowed = {"status", "note", "token", "lang", "username", "title"}
+        keys = [k for k in fields if k in allowed]
+        if not keys:
+            return
+        sets = ", ".join(f"{k} = ?" for k in keys)
+        self._run(
+            f"UPDATE tenants SET {sets}, updated_at = ? WHERE id = ?",
+            (*[fields[k] for k in keys], now(), tenant_id),
+        )
+
+    def tenant_sales(self, tenant_id: int, since: str = "") -> dict[str, int]:
+        """Фармоишҳои яклухти як боти шарик (дар базаи асосӣ)."""
+        sql = ("SELECT COUNT(*), COALESCE(SUM(price), 0) FROM orders "
+               "WHERE source = 'tenant' AND api_key_id = ? AND status = 'done'")
+        params: list = [-tenant_id]
+        if since:
+            sql += " AND created_at >= ?"
+            params.append(since)
+        row = self._one(sql, params)
+        return {"orders": int(row[0] or 0), "revenue": int(row[1] or 0)}
     def set_active(self, code: str, active: bool) -> bool:
         cur = self._run(
             "UPDATE products SET active = ? WHERE code = ?", (1 if active else 0, code)

@@ -8,7 +8,8 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import catalog, keyboards, payments, requisites, texts
+from .. import catalog, keyboards, payments, requisites
+from ..i18n import texts
 from ..config import Config
 from ..db import Database, TOPUP_WAITING
 from ..states import Topup

@@ -9,7 +9,8 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
-from .. import catalog, keyboards, texts
+from .. import catalog, keyboards
+from ..i18n import texts
 from ..config import Config
 from ..db import Database, User
 
@@ -66,6 +67,16 @@ async def safe_edit(
             log.exception("Паём фиристода нашуд")
 
 
+def _show_constructor(db: Database, cfg: Config, user_id: int) -> bool:
+    """Тугмаи «🤖 Ботҳои ман» — танҳо дар боти асосӣ ва барои касе, ки дастрасӣ ё бот дорад."""
+    from .. import tenants
+
+    if cfg.is_tenant or not tenants.constructor_open(db):
+        return False
+    return (cfg.is_admin(user_id) or db.constructor_access(user_id) is not None
+            or bool(db.tenants(user_id)))
+
+
 async def show_main_menu(
     event: Message | CallbackQuery, db: Database, cfg: Config, *, edit: bool = True
 ) -> None:
@@ -78,6 +89,10 @@ async def show_main_menu(
         reviews_url=cfg.reviews_url,
         other_games=db.active_count(catalog.CAT_OTHER) > 0,
         api=cfg.api_enabled and db.setting("api_enabled", "1") == "1",
+        constructor=_show_constructor(db, cfg, user_id),
+        hidden=frozenset(c for c in catalog.CATEGORIES if db.active_count(c) == 0),
+        titles={c: db.setting(f"title:{c}") for c in (*catalog.CATEGORIES, "telegram")
+                if db.setting(f"title:{c}")},
     )
     if isinstance(event, CallbackQuery) and edit:
         await safe_edit(event, text, markup)

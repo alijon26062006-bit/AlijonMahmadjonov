@@ -8,7 +8,8 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import keyboards, texts
+from .. import keyboards
+from ..i18n import texts
 from ..config import Config
 from ..db import Database
 from ..states import Review

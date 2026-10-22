@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
 
-from . import catalog, keyboards, texts
+from . import catalog, keyboards
+from .i18n import texts
 from .config import Config
 from .db import ORDER_DONE, ORDER_NEW, ORDER_OPEN, ORDER_REJECTED, ORDER_SENT, Database
 from .supplier import OrderResult, Supplier
@@ -35,7 +36,16 @@ FINAL = ("completed", "failed", "refunded")
 _TASKS: set[asyncio.Task] = set()
 
 # Фармоишҳое, ки ҳоло иҷро мешаванд — то як фармоиш ду бор фиристода нашавад.
-_BUSY: set[int] = set()
+# Калид (база, рақам): рақамҳои фармоиш дар боти асосӣ ва ботҳои шарикон такрор мешаванд.
+_BUSY: set[tuple[str, int]] = set()
+
+
+def busy_key(db: Database, order_id: int) -> tuple[str, int]:
+    return (str(db.path), int(order_id))
+
+
+def is_busy(db: Database, order_id: int) -> bool:
+    return busy_key(db, order_id) in _BUSY
 
 # Фармоиши кӯҳнатар аз ин пас аз азнавоғозкунӣ худкор фиристода намешавад:
 # шояд админ онро аллакай дастӣ иҷро кардааст.
@@ -60,18 +70,27 @@ async def _tell_admins(bot: Bot, cfg: Config, text: str, markup=None) -> None:
             log.warning("Ба админ %s нарасид: %s", admin_id, exc)
 
 
+def _source(row) -> str:
+    return row["source"] if row is not None and "source" in row.keys() else "bot"
+
+
 def via_api(row) -> bool:
     """Фармоиш аз API омадааст — харидор натиҷаро аз API мегирад, на дар Telegram."""
-    return row is not None and "source" in row.keys() and row["source"] == "api"
+    return _source(row) == "api"
+
+
+def quiet_buyer(row) -> bool:
+    """Ба харидор дар Telegram хабар намедиҳем: API ё фармоиши яклухти боти шарик."""
+    return _source(row) in ("api", "tenant")
 
 
 def _api_mark(row) -> str:
-    return "🔌 API · " if via_api(row) else ""
+    return {"api": "🔌 API · ", "tenant": "🤖 Боти шарик · "}.get(_source(row), "")
 
 
 async def _send_receipt(bot: Bot, cfg: Config, db: Database, order_id: int) -> None:
     row = db.order(order_id)
-    if row is None or via_api(row):
+    if row is None or quiet_buyer(row):
         return
     info = catalog.CATEGORY_INFO.get(row["category"])
     receipt = texts.receipt(
@@ -113,12 +132,14 @@ async def _refund(
     row = db.set_order_status(order_id, ORDER_REJECTED, note=reason)
     if row is None or row["status"] != ORDER_REJECTED:
         return
-    if not via_api(row):
+    if not quiet_buyer(row):
         await _tell(
             bot,
             row["user_id"],
             texts.auto_refunded(order_id, row["price"], reason, cfg.currency),
         )
+    if _source(row) == "tenant":
+        return      # бо садҳо фармоиши шарикон соҳиб ғарқ намешавад
     await _tell_admins(
         bot,
         cfg,
@@ -146,6 +167,8 @@ async def _complete(bot: Bot, cfg: Config, db: Database, order_id: int) -> None:
         return
     db.set_order_status(order_id, ORDER_DONE)
     await _send_receipt(bot, cfg, db, order_id)
+    if _source(before) == "tenant":
+        return
     await _tell_admins(
         bot, cfg,
         f"✅ {_api_mark(before)}<b>Фармоиши #{order_id} худкор иҷро шуд.</b>\n"
@@ -161,7 +184,7 @@ async def _to_admin(
     row = db.order(order_id)
     if row is None or row["status"] not in ORDER_OPEN:
         return
-    if tell_user and not via_api(row):
+    if tell_user and not quiet_buyer(row):
         await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
     await _tell_admins(bot, cfg, _api_mark(row) + why, keyboards.admin_order(order_id))
 
@@ -170,9 +193,10 @@ async def deliver_order(
     bot: Bot, db: Database, cfg: Config, supplier: Supplier, order_id: int
 ) -> None:
     """Фармоишро иҷро мекунад. Ҳеҷ гоҳ хато намепартояд."""
-    if order_id in _BUSY:
+    key = busy_key(db, order_id)
+    if key in _BUSY:
         return
-    _BUSY.add(order_id)
+    _BUSY.add(key)
     try:
         await _deliver(bot, db, cfg, supplier, order_id)
     except asyncio.CancelledError:
@@ -185,7 +209,7 @@ async def deliver_order(
             f"⚠️ Фармоиши #{order_id} худкор иҷро нашуд — дастӣ санҷед.",
         )
     finally:
-        _BUSY.discard(order_id)
+        _BUSY.discard(key)
 
 
 @dataclass(frozen=True)
@@ -301,7 +325,19 @@ def pick_supplier(cfg: Config, supplier: Supplier, kind: str, sku: str) -> Suppl
 
 
 def _title(sup: Supplier) -> str:
-    return "Donatix" if getattr(sup, "name", "") == "donatix" else "FireLoot"
+    return {"donatix": "Donatix", "wholesale": "платформа"}.get(
+        getattr(sup, "name", ""), "FireLoot"
+    )
+
+
+async def finalize(
+    bot: Bot, db: Database, cfg: Config, order_id: int, status: str, reason: str | None = None
+) -> None:
+    """Фармоишро аз берун мебандад (ҳолати фармоиши яклухт дар платформа)."""
+    if status == "completed":
+        await _complete(bot, cfg, db, order_id)
+    elif status == "failed":
+        await _refund(bot, cfg, db, order_id, reason or status)
 
 
 def _split_target(row) -> tuple[str, str]:
@@ -325,7 +361,7 @@ async def _deliver(
 
     # ── моли дастӣ ё таъминкунанда хомӯш ──────────────────────────────
     if sup is None:
-        if not via_api(row):
+        if not quiet_buyer(row):
             await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
         await _tell_admins(
             bot,
@@ -341,6 +377,8 @@ async def _deliver(
     job = _Job(order_id=order_id, ref=_ref_for(db, row), sku=sku, target=target)
 
     async def place() -> OrderResult:
+        if hasattr(sup, "place_for"):           # боти шарик → платформа
+            return await sup.place_for(row, target, server, job.ref)
         return await sup.place_order(
             kind=kind, sku=sku, target=target, amount=amount,
             order_id=job.ref, server=server,
@@ -443,9 +481,10 @@ async def _resume_one(
     bot: Bot, db: Database, cfg: Config, supplier: Supplier, sup: Supplier, row
 ) -> str:
     order_id = row["id"]
-    if order_id in _BUSY:
+    key = busy_key(db, order_id)
+    if key in _BUSY:
         return "busy"
-    _BUSY.add(order_id)
+    _BUSY.add(key)
     target, _ = _split_target(row)
     # Фармоишҳои пеш аз навсозӣ бо рақами оддӣ («283») фиристода шуда буданд.
     job = _Job(
@@ -458,7 +497,7 @@ async def _resume_one(
             return "resumed"
         if getattr(sup, "idempotent", False):
             # Ҳамон калиди такрор — фармоиши мавҷударо бармегардонад ё месозад.
-            _BUSY.discard(order_id)
+            _BUSY.discard(key)
             await deliver_order(bot, db, cfg, supplier, order_id)
             return "resent"
         state, _ = await _lookup(sup, job)
@@ -468,7 +507,7 @@ async def _resume_one(
             return "resumed"
         if state == "absent" and row["status"] == ORDER_NEW:
             # Ба таъминкунанда нарасида буд — ҳоло мефиристем.
-            _BUSY.discard(order_id)
+            _BUSY.discard(key)
             await deliver_order(bot, db, cfg, supplier, order_id)
             return "resent"
         await _to_admin(
@@ -484,7 +523,7 @@ async def _resume_one(
         log.exception("Идомаи фармоиши #%s нашуд", order_id)
         return "error"
     finally:
-        _BUSY.discard(order_id)
+        _BUSY.discard(key)
 
 
 async def resume_open_orders(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram import Router
 
-from . import admin, apikeys, menu, purchase, reviews, settings, topup
+from . import admin, apikeys, constructor, menu, purchase, reviews, settings, topup
 
 
 _root: Router | None = None
@@ -20,6 +20,10 @@ def build_router() -> Router:
     if _root is not None:
         return _root
     root = Router(name="shop")
+    # Конструктор пеш аз админ: дар боти шарик бахшҳои соҳибро мебандад.
+    root.include_router(constructor.tenant_router)
+    root.include_router(constructor.owner_router)
+    root.include_router(constructor.partner_router)
     root.include_router(admin.router)
     root.include_router(settings.router)
     root.include_router(menu.router)

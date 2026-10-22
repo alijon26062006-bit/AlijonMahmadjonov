@@ -12,7 +12,8 @@ from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.exceptions import TelegramBadRequest, TelegramConflictError
 from aiogram.types import TelegramObject, Update
 
-from . import keyboards, style, texts
+from . import keyboards, style
+from .i18n import texts
 from .subscription import missing_channels
 from .config import Config
 from .db import Database
@@ -48,27 +49,30 @@ class GuardMiddleware(BaseMiddleware):
         if src is None or src.is_bot:
             return await handler(event, data)
 
-        user = self.db.touch_user(src.id, src.username, src.first_name)
+        # Дар конструктор ҳар бот базаи худро дорад — аз TenantMiddleware.
+        db = data.get("db") or self.db
+        cfg = data.get("cfg") or self.cfg
+        user = db.touch_user(src.id, src.username, src.first_name)
         data["user"] = user
 
-        if user.is_blocked and not self.cfg.is_admin(src.id):
+        if user.is_blocked and not cfg.is_admin(src.id):
             await _tell(data.get("bot"), src.id, texts.BLOCKED)
             return None
 
-        if not await self._subscribed(inner, data, src.id):
+        if not await self._subscribed(inner, data, src.id, db, cfg):
             return None
 
         return await handler(event, data)
 
-    async def _subscribed(self, inner, data: dict[str, Any], user_id: int) -> bool:
+    async def _subscribed(self, inner, data: dict[str, Any], user_id: int, db, cfg) -> bool:
         """Обунаи ҳатмӣ. Админ ва худи тугмаи санҷиш озоданд."""
         bot = data.get("bot")
-        if bot is None or self.cfg.is_admin(user_id):
+        if bot is None or cfg.is_admin(user_id):
             return True
         if getattr(inner, "data", None) == keyboards.CB_CHECK_SUB:
             return True  # ҳамин тугма обунаро месанҷад
 
-        missing = await missing_channels(bot, self.db, user_id)
+        missing = await missing_channels(bot, db, user_id)
         if not missing:
             return True
         try:
@@ -176,3 +180,29 @@ class ConflictWatch(BaseRequestMiddleware):
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
             raise
+
+
+class TenantMiddleware(BaseMiddleware):
+    """Конструктор: барои ҳар навсозӣ базаи, танзимот ва забони ҳамон ботро медиҳад.
+
+    Боти асосӣ бо маълумоти Dispatcher кор мекунад; ботҳои шарикон — бо худашон.
+    """
+
+    def __init__(self, resolve) -> None:
+        self.resolve = resolve          # bot_id → TenantContext | None
+
+    async def __call__(self, handler, event, data):
+        from .i18n import set_lang, set_tenant
+
+        bot = data.get("bot")
+        ctx = self.resolve(bot.id) if bot is not None else None
+        if ctx is not None:
+            data["db"], data["cfg"], data["supplier"] = ctx.db, ctx.cfg, ctx.supplier
+            data["tenant"] = ctx
+            set_lang(ctx.cfg.lang)
+            set_tenant(ctx.id)
+        else:
+            cfg = data.get("cfg")
+            set_lang(getattr(cfg, "lang", "tj"))
+            set_tenant(0)
+        return await handler(event, data)

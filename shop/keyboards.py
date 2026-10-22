@@ -6,7 +6,8 @@ from typing import Sequence
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from . import catalog, db, style, texts
+from . import catalog, db, style
+from .i18n import in_tenant, texts
 
 # ── калидҳои callback ─────────────────────────────────────────────────
 CB_HOME = "m:home"
@@ -51,18 +52,33 @@ def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton
 
 def main_menu(
     *, is_admin: bool = False, reviews_url: str = "", other_games: bool = False,
-    api: bool = False,
+    api: bool = False, constructor: bool = False,
+    hidden: frozenset = frozenset(), titles: dict | None = None,
 ) -> InlineKeyboardMarkup:
-    """Менюи асосӣ — ҳамон тарҳбандии намуна."""
-    rows: list[list[InlineKeyboardButton]] = [
-        [_btn(texts.BTN_TELEGRAM, CB_TG_MENU, style.PRIMARY)],
-        [_btn(texts.BTN_FF_CIS, CB_CAT + catalog.CAT_FF_CIS, style.PRIMARY)],
-        [_btn(texts.BTN_FF_ID, CB_CAT + catalog.CAT_FF_ID, style.PRIMARY)],
-        [_btn(texts.BTN_PUBG, CB_CAT + catalog.CAT_PUBG, style.PRIMARY)],
-    ]
+    """Менюи асосӣ — ҳамон тарҳбандии намуна.
+
+    ``hidden`` — бахшҳое, ки дар онҳо моли фаъол нест (пинҳон мешаванд).
+    ``titles`` — номҳои бахшҳо, ки шарик худаш гузоштааст.
+    """
+    titles = titles or {}
+
+    def title(cat: str, default: str) -> str:
+        return titles.get(cat) or default
+
+    rows: list[list[InlineKeyboardButton]] = []
+    if not {catalog.CAT_STARS, catalog.CAT_PREMIUM} <= hidden:
+        rows.append([_btn(title("telegram", texts.BTN_TELEGRAM), CB_TG_MENU, style.PRIMARY)])
+    for cat, default in (
+        (catalog.CAT_FF_CIS, texts.BTN_FF_CIS),
+        (catalog.CAT_FF_ID, texts.BTN_FF_ID),
+        (catalog.CAT_PUBG, texts.BTN_PUBG),
+    ):
+        if cat not in hidden:
+            rows.append([_btn(title(cat, default), CB_CAT + cat, style.PRIMARY)])
     # Тугмаи «Дигар бозиҳо» танҳо вақте пайдо мешавад, ки дар он мол ҳаст.
-    if other_games:
-        rows.append([_btn(texts.BTN_OTHER, CB_CAT + catalog.CAT_OTHER, style.PRIMARY)])
+    if other_games and catalog.CAT_OTHER not in hidden:
+        rows.append([_btn(title(catalog.CAT_OTHER, texts.BTN_OTHER),
+                          CB_CAT + catalog.CAT_OTHER, style.PRIMARY)])
     rows += [
         [_btn(texts.BTN_TOPUP, CB_TOPUP, style.SUCCESS)],
         [
@@ -78,6 +94,8 @@ def main_menu(
         rows.append([_url(texts.BTN_REVIEWS, reviews_url, style.PRIMARY)])
     if api:
         rows.append([_btn(texts.BTN_API, CB_API, style.PRIMARY)])
+    if constructor:
+        rows.append([_btn(texts.BTN_CONSTRUCTOR, "c:home", style.SUCCESS)])
     if is_admin:
         rows.append([_btn(texts.BTN_ADMIN, "a:home", style.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -248,7 +266,29 @@ def support(username: str, whatsapp: str = "") -> InlineKeyboardMarkup:
 
 
 # ── Панели админ ──────────────────────────────────────────────────────
-def admin_home() -> InlineKeyboardMarkup:
+def admin_home(*, tenant: bool | None = None) -> InlineKeyboardMarkup:
+    tenant = in_tenant() if tenant is None else tenant
+    if tenant:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [
+                _btn(texts.ADM_BTN_STATS, "a:stats", style.PRIMARY),
+                _btn(texts.ADM_BTN_FIND, "a:find", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_ORDERS, "a:orders", style.PRIMARY),
+                _btn(texts.ADM_BTN_TOPUPS, "a:topups", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_PRICES, "a:prices", style.PRIMARY),
+                _btn(texts.ADM_BTN_BROADCAST, "a:bc", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_PARTNERS, "a:partners", style.PRIMARY),
+                _btn(texts.ADM_BTN_USERS, "a:users", style.PRIMARY),
+            ],
+            [_btn(texts.ADM_BTN_SETTINGS, "a:settings", style.PRIMARY)],
+            [_btn(texts.BTN_HOME, CB_HOME)],
+        ])
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -271,6 +311,7 @@ def admin_home() -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_SETTINGS, "a:settings", style.PRIMARY),
                 _btn(texts.ADM_BTN_SUPPLIER, "a:supplier", style.PRIMARY),
             ],
+            [_btn(texts.ADM_BTN_CONSTRUCTOR, "o:home", style.SUCCESS)],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )
@@ -338,7 +379,28 @@ def admin_topup(topup_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def admin_settings() -> InlineKeyboardMarkup:
+def admin_settings(*, tenant: bool | None = None) -> InlineKeyboardMarkup:
+    tenant = in_tenant() if tenant is None else tenant
+    if tenant:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [_btn(texts.ADM_BTN_REQUISITES, "a:req", style.SUCCESS)],
+            [
+                _btn("💹 Наценкаи ман", "a:pmarkup", style.PRIMARY),
+                _btn("🔔 Огоҳии ҳисоб", "a:lowbal", style.PRIMARY),
+            ],
+            [_btn(texts.ADM_BTN_CHANNELS, "a:channels", style.PRIMARY)],
+            [_btn(texts.ADM_BTN_REVIEW_CH, "a:revch", style.PRIMARY)],
+            [
+                _btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY),
+                _btn("🎧 Дастгирӣ", "a:support", style.PRIMARY),
+            ],
+            [
+                _btn("👥 Операторон", "a:ops", style.PRIMARY),
+                _btn("🌐 Забон / Язык", "a:lang", style.PRIMARY),
+            ],
+            [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
+            [_btn(texts.BTN_BACK, "a:home")],
+        ])
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [_btn(texts.ADM_BTN_REQUISITES, "a:req", style.SUCCESS)],
@@ -437,7 +499,8 @@ def admin_bc_confirm() -> InlineKeyboardMarkup:
     )
 
 
-def admin_price_categories() -> InlineKeyboardMarkup:
+def admin_price_categories(*, tenant: bool | None = None) -> InlineKeyboardMarkup:
+    tenant = in_tenant() if tenant is None else tenant
     rows = [
         [_btn(f"{c.icon} {c.title}",
               # Бахши сербахш — аввал зербахшҳо, вагарна рост ба нархҳо.
@@ -445,8 +508,9 @@ def admin_price_categories() -> InlineKeyboardMarkup:
               style.PRIMARY)]
         for c in catalog.CATEGORY_INFO.values()
     ]
-    rows.append([_btn(texts.ADM_BTN_ADDGAME, "a:addgame", style.SUCCESS)])
-    rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.PRIMARY)])
+    if not tenant:
+        rows.append([_btn(texts.ADM_BTN_ADDGAME, "a:addgame", style.SUCCESS)])
+        rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.PRIMARY)])
     rows.append([_btn(texts.BTN_BACK, "a:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -515,13 +579,18 @@ def admin_price_list(
 
 
 def admin_price_item(
-    code: str, active: bool, has_partner_price: bool = False
+    code: str, active: bool, has_partner_price: bool = False, *,
+    tenant: bool | None = None, locked: bool = False,
 ) -> InlineKeyboardMarkup:
+    tenant = in_tenant() if tenant is None else tenant
     toggle = "🚫 Хомӯш кардан" if active else "✅ Фаъол кардан"
     rows = [
         [_btn("💲 Нархи оддӣ", f"a:setprice:{code}", style.PRIMARY)],
         [_btn(texts.ADM_BTN_PARTNER_PRICE, f"a:setpp:{code}", style.PRIMARY)],
+        [_btn("✏️ Ном", f"a:rename:{code}", style.PRIMARY)],
     ]
+    if tenant and locked:
+        rows.append([_btn("🔄 Нархи худкор (яклухт + наценка)", f"a:unlock:{code}", style.SUCCESS)])
     if has_partner_price:
         rows.append(
             [_btn(texts.ADM_BTN_PARTNER_OFF, f"a:delpp:{code}", style.DANGER)]
@@ -529,3 +598,91 @@ def admin_price_item(
     rows.append([_btn(toggle, f"a:toggle:{code}", style.DANGER if active else style.SUCCESS)])
     rows.append([_btn(texts.BTN_BACK, "a:prices")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# ── конструктор: шарик дар боти асосӣ ─────────────────────────────────
+def constructor_home(rows, can_add: bool) -> InlineKeyboardMarkup:
+    buttons = [
+        [_btn(f"⚙️ @{row['username'] or row['id']}", f"c:bot:{row['id']}", style.PRIMARY)]
+        for row in rows
+    ]
+    if can_add:
+        buttons.append([_btn(texts.BTN_NEW_BOT, "c:new", style.SUCCESS)])
+    buttons.append([_btn(texts.BTN_TOPUP_WHOLESALE, CB_TOPUP, style.SUCCESS)])
+    buttons.append([_btn(texts.BTN_HOME, CB_HOME)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def tenant_manage(row) -> InlineKeyboardMarkup:
+    tid = row["id"]
+    rows: list[list[InlineKeyboardButton]] = []
+    if row["username"]:
+        rows.append([_url("🔗 Кушодани бот", f"https://t.me/{row['username']}", style.PRIMARY)])
+    if row["status"] == "active":
+        rows.append([_btn("⏸ Хомӯш кардан", f"c:pause:{tid}", style.DANGER)])
+    elif row["status"] == "paused":
+        rows.append([_btn("▶️ Фаъол кардан", f"c:resume:{tid}", style.SUCCESS)])
+    if row["status"] in ("disabled", "paused", "active"):
+        rows.append([_btn("🔑 Токени нав", f"c:token:{tid}", style.PRIMARY)])
+    rows.append([_btn("🌐 Забон: тоҷикӣ / русӣ", f"c:lang:{tid}", style.PRIMARY)])
+    rows.append([_btn(texts.BTN_BACK, "c:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def constructor_cancel() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[_btn(texts.BTN_CANCEL, "c:home", style.DANGER)]])
+
+
+# ── конструктор: соҳиби платформа ─────────────────────────────────────
+def admin_constructor(is_open: bool) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_btn("🚫 Конструкторро хомӯш" if is_open else "✅ Конструкторро фаъол",
+              "o:toggle", style.DANGER if is_open else style.SUCCESS)],
+        [
+            _btn("💹 Наценкаи яклухт", "o:markup", style.PRIMARY),
+            _btn("🔢 Ҳадди ботҳо", "o:max", style.PRIMARY),
+        ],
+        [_btn("👥 Шарикон (дастрасӣ)", "o:partners", style.PRIMARY)],
+        [_btn("🤖 Ҳамаи ботҳо", "o:bots", style.PRIMARY)],
+        [_btn(texts.BTN_BACK, "a:home")],
+    ])
+
+
+def admin_c_partners(rows) -> InlineKeyboardMarkup:
+    buttons = [[_btn("➕ Додани дастрасӣ", "o:grant", style.SUCCESS)]]
+    for row in rows:
+        name = f"@{row['username']}" if row["username"] else str(row["user_id"])
+        buttons.append([_btn(f"🗑 {name}", f"o:revoke:{row['user_id']}", style.DANGER)])
+    buttons.append([_btn(texts.BTN_BACK, "o:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def admin_tenants(rows) -> InlineKeyboardMarkup:
+    buttons = []
+    for row in rows:
+        blocked = row["status"] == "blocked"
+        buttons.append([_btn(
+            f"{'✅ Кушодан' if blocked else '🚫 Бастан'} @{row['username'] or row['id']}",
+            f"o:{'unblock' if blocked else 'block'}:{row['id']}",
+            style.SUCCESS if blocked else style.DANGER,
+        )])
+    buttons.append([_btn(texts.BTN_BACK, "o:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def operators_menu(ops) -> InlineKeyboardMarkup:
+    buttons = [[_btn("➕ Оператори нав", "a:opadd", style.SUCCESS)]]
+    for op in ops:
+        buttons.append([_btn(f"🗑 {op}", f"a:opdel:{op}", style.DANGER)])
+    buttons.append([_btn(texts.BTN_BACK, "a:settings")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def language_menu(prefix: str, back: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            _btn("🇹🇯 Тоҷикӣ", f"{prefix}tj", style.PRIMARY),
+            _btn("🇷🇺 Русский", f"{prefix}ru", style.PRIMARY),
+        ],
+        [_btn(texts.BTN_BACK, back)],
+    ])

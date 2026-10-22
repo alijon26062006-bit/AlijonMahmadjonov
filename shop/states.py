@@ -37,6 +37,21 @@ class Admin(StatesGroup):
     waiting_rate = State()
     waiting_markup = State()
     waiting_api_markup = State()
+    # конструктор (соҳиб)
+    waiting_access = State()
+    waiting_c_markup = State()
+    waiting_max_bots = State()
+    # боти шарик
+    waiting_partner_markup = State()
+    waiting_operator = State()
+    waiting_support = State()
+    waiting_product_title = State()
+    waiting_low_balance = State()
     waiting_bc_media = State()
     waiting_bc_text = State()
     waiting_bc_button = State()
+
+
+class Constructor(StatesGroup):
+    waiting_token = State()       # боти нав
+    waiting_new_token = State()   # токени нав барои боти мавҷуда
