@@ -1,6 +1,6 @@
 """Жалоба правообладателя: игру показываем как «FF <регион>», без их картинок."""
 from donatix import catalog, db
-from donatix.suppliers.base import brand_safe, is_ff
+from donatix.suppliers.base import FF_COVER, brand_safe, is_ff
 
 
 def test_names():
@@ -15,7 +15,7 @@ def test_names():
 def test_catalog_has_no_ff_brand_or_images(conn, supplier):
     catalog.sync_catalog(conn, supplier)
     rows = conn.execute("SELECT category_name, name, image_url FROM products WHERE category_id = 'free_fire'").fetchall()
-    assert rows and all(r["category_name"].startswith("FF") and r["image_url"] is None for r in rows)
+    assert rows and all(r["category_name"].startswith("FF") and r["image_url"] == FF_COVER for r in rows)
     assert not conn.execute("SELECT 1 FROM products WHERE category_name LIKE '%Free Fire%' "
                             "OR name LIKE '%Free Fire%'").fetchone()
 
@@ -28,4 +28,19 @@ def test_old_rows_renamed_on_start(conn):
                      "'{}', 1, ?, 'https://cdn.example/ff.png', 'CIS')", (db.now(),))
     urls = catalog.rename_brands(conn)
     r = conn.execute("SELECT category_name, image_url FROM products WHERE id = 'x1'").fetchone()
-    assert r["category_name"] == "FF CIS" and r["image_url"] is None and urls == ["https://cdn.example/ff.png"]
+    assert r["category_name"] == "FF CIS" and r["image_url"] == FF_COVER and urls == ["https://cdn.example/ff.png"]
+    assert catalog.rename_brands(conn) == []   # второй запуск — уже ничего не меняет
+
+
+def test_ff_cover_everywhere(client, conn, shop, supplier, monkeypatch):
+    from donatix import cache, catalog_job, popular
+    monkeypatch.setattr(catalog_job, "_base", "https://donatix.tj")
+    catalog.sync_catalog(conn, supplier)
+    with db.tx(conn):
+        conn.execute("UPDATE products SET region = 'CIS' WHERE category_id = 'free_fire'")
+    cache.clear()
+    ff = [i for i in popular.compute(conn) if i["title"].startswith("FF")]
+    assert ff and all(i["image_url"] == FF_COVER for i in ff)
+    items = client.get("/api/v1/products?category_id=free_fire", headers=shop["h"]).json()["items"]
+    assert items and all(i["image_url"] == "https://donatix.tj" + FF_COVER for i in items)
+    assert client.get(FF_COVER).status_code == 200

@@ -13,7 +13,7 @@ from . import cache, db
 from .leader import FileLock
 from .money import apply_markup, fmt_unit, to_decimal
 from .suppliers import KIND_TITLES, Supplier, SupplierError, region_title
-from .suppliers.base import brand_safe, is_ff
+from .suppliers.base import FF_COVER, brand_safe, is_ff
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
         ff = is_ff(p.category_name)   # жалоба правообладателя: своё имя «FF …» и без их картинок
         batch.append((p.id, p.kind, p.category_id, brand_safe(p.category_name), brand_safe(p.name), str(p.base_price),
                       p.unit, p.min_qty, max(p.max_qty, p.min_qty), p.stock, json.dumps(p.fields, ensure_ascii=False),
-                      json.dumps(p.supplier_ref, ensure_ascii=False), started, None if ff else p.image_url, p.region))
+                      json.dumps(p.supplier_ref, ensure_ascii=False), started, FF_COVER if ff else p.image_url, p.region))
         if len(batch) >= 300:
             write()
     write()
@@ -253,14 +253,15 @@ def delivery_note(category_name: str | None) -> str:
 
 
 def rename_brands(conn: sqlite3.Connection) -> list[str]:
-    """Уже загруженные товары FF: новое имя и без картинки (до следующей загрузки каталога ждать не надо).
-    Вернёт ссылки снятых картинок — их файлы удаляет catalog_job.forget."""
+    """Уже загруженные товары FF: новое имя и своя обложка (до следующей загрузки каталога ждать не надо).
+    Вернёт ссылки снятых картинок поставщика — их файлы удаляет catalog_job.forget."""
     rows = conn.execute("SELECT id, category_name, name, image_url FROM products WHERE category_name LIKE '%free%fire%' "
-                        "OR name LIKE '%free%fire%' OR (category_name LIKE 'FF%' AND image_url IS NOT NULL)").fetchall()
+                        "OR name LIKE '%free%fire%' OR (category_name LIKE 'FF%' AND image_url IS NOT ?)",
+                        (FF_COVER,)).fetchall()
     with db.tx(conn):
         for r in rows:
-            conn.execute("UPDATE products SET category_name = ?, name = ?, image_url = NULL WHERE id = ?",
-                         (brand_safe(r["category_name"]), brand_safe(r["name"]), r["id"]))
+            conn.execute("UPDATE products SET category_name = ?, name = ?, image_url = ? WHERE id = ?",
+                         (brand_safe(r["category_name"]), brand_safe(r["name"]), FF_COVER, r["id"]))
     if rows:
         cache.clear()
-    return [r["image_url"] for r in rows if r["image_url"]]
+    return [r["image_url"] for r in rows if (r["image_url"] or "").startswith("http")]

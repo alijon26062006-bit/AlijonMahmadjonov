@@ -9,7 +9,7 @@ def _product(conn, pid, image):
     with db.tx(conn):
         conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit, min_qty, "
                      "max_qty, stock, fields_json, supplier_ref_json, active, updated_at, image_url, region) "
-                     "VALUES (?, 'topup', 'free_fire', 'Free Fire', ?, '1.0', 'item', 1, 10, 0, '[]', '{}', 1, ?, ?, '')",
+                     "VALUES (?, 'topup', 'pubg_mobile', 'PUBG Mobile', ?, '1.0', 'item', 1, 10, 0, '[]', '{}', 1, ?, ?, '')",
                      (pid, f"{pid} 100", db.now(), image))
 
 
@@ -30,7 +30,7 @@ def test_api_gets_our_media_url_and_never_supplier(client, conn, shop, monkeypat
 
     cats = client.get("/api/v1/categories", headers=shop["h"]).json()["items"]
     assert all("supplier-example" not in str(c) for c in cats)
-    ff = next(c for c in cats if c["category_id"] == "free_fire")
+    ff = next(c for c in cats if c["category_id"] == "pubg_mobile")
     assert ff["image_url"].startswith(f"{BASE}/media/")
 
     for path in ("/api/v1/products?kind=topup", "/api/v1/categories"):
@@ -45,5 +45,5 @@ def test_compat_v2_gets_our_media_url(client, conn, shop, monkeypatch):
     _product(conn, "topup-a1", SUPPLIER)
     from donatix import cache
     cache.clear()
-    text = client.get("/api/v2/topups/offers?category_id=free_fire", headers=shop["h"]).text
+    text = client.get("/api/v2/topups/offers?category_id=pubg_mobile", headers=shop["h"]).text
     assert "supplier-example" not in text

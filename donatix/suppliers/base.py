@@ -157,6 +157,9 @@ def is_ff(text: str) -> bool:
     return bool(_FF.search(t) or re.search(r"(?<![A-Za-z])FF(?![A-Za-z])", t))
 
 
+FF_COVER = "/static/img/ff-cover.webp"   # своя обложка для всех FF (без картинок правообладателя)
+
+
 def brand_safe(text: str | None) -> str | None:
     """Название без бренда правообладателя: «Free Fire (CIS)», «Free Fire — СНГ» → «FF CIS»."""
     if not text or not _FF.search(text):
