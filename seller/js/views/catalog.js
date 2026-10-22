@@ -1,6 +1,7 @@
 import { render } from '../app.js';
 import { EXPIRY_SOON, kindOf, LOW } from '../config.js';
 import { prodSales, ZERO } from '../domain/analytics.js';
+import { productLikes } from '../domain/reviews.js';
 import { addDays, esc, money, num, today, uid } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
 import { $, closeSheet, daysLeft, expiryBlock, expiryPill, fmtQty, ICON, isStopped, openSheet, plusI, stockPill, thumb, toast } from '../ui/dom.js';
@@ -15,15 +16,16 @@ export function filtered(sales) {
   ).sort(by);
 }
 export const expiringOrBlocked = p => !!expiryBlock(p) || (daysLeft(p) ?? 99) <= EXPIRY_SOON;
+const likePill = l => !l || l.up + l.down < 3 ? '' : `<span class="pill ${l.up / (l.up + l.down) < 0.7 ? 'bad' : ''}">Нравится ${Math.round(l.up / (l.up + l.down) * 100)}%</span>`;
 export function vCatalog() {
   const sales = prodSales(addDays(today(), -29), today());
-  const list = filtered(sales);
+  const list = filtered(sales), likes = productLikes();
   const cats = ['Все', ...S.cats.filter(c => S.products.some(p => p.cat === c))];
   const cnt = f => S.products.filter(f).length;
   const rows = list.map(p => {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
-      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
+      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${likePill(likes[p.id])}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
       <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="tgl" role="switch" aria-checked="${!isStopped(p)}" data-stop="${p.id}" aria-label="${esc(p.name)}: в наличии сегодня" title="${isStopped(p) ? 'Закончилось на сегодня. Включите, чтобы вернуть в продажу' : 'В продаже. Выключите, если закончилось на сегодня'}"></button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;

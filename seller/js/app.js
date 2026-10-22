@@ -12,35 +12,50 @@ import { vFinance } from './views/finance.js';
 import { vHome } from './views/home.js';
 import { PRIVACY, renderAuth, SLIDES, sendCode, TERMS, validateShop } from './views/onboarding.js';
 import { renderRegister, sheetPlace } from './views/register.js';
-import './services/alerts.js';
+import { ring, testSound } from './services/alerts.js';
+import { install } from './services/install.js';
 import { cart, drawSale, orderAction, saveSale, sheetSale, testOrder, vOrders } from './views/orders.js';
 import { vMore, vShop } from './views/shop.js';
 import { exportStats, vStats } from './views/stats.js';
 import { vPreview } from './views/storefront.js';
+import { saveReply, sendComplaint, sheetComplain, sheetReply, testReview, vReviews } from './views/reviews.js';
+import { unansweredBad } from './domain/reviews.js';
+import { can, me, role } from './domain/staff.js';
+import { deleteStaff, saveStaff, sheetStaff, vStaff } from './views/staff.js';
+import { ROLES } from './config.js';
 
 let view = 'home';
 // рендер
 export function render() {
   if (!auth.phone) return renderAuth();
   if (!S) return renderRegister();
-  const nc = newCount();
-  const btn = ([k, label]) => `<button class="nav-btn" data-nav="${k}" ${view === k || (k === 'more' && ['finance', 'expenses', 'preview', 'shop', 'more'].includes(view)) ? 'aria-current="page"' : ''}>${ICON[k]}<span>${label}</span>${k === 'orders' && nc ? `<span class="badge">${nc}</span>` : ''}</button>`;
+  if (!S.shop.owner) { S.shop.owner = auth.phone; save(); }
+  const who = role();
+  if (!who) return renderNoAccess();
+  if (!can(view)) view = ROLES[who]?.views[0] || 'home';
+  const nc = newCount(), rb = can('reviews') ? unansweredBad() : 0;
+  const btn = ([k, label]) => `<button class="nav-btn" data-nav="${k}" ${view === k || (k === 'more' && ['finance', 'expenses', 'preview', 'shop', 'more', 'reviews', 'staff'].includes(view)) ? 'aria-current="page"' : ''}>${ICON[k]}<span>${label}</span>${k === 'orders' && nc ? `<span class="badge">${nc}</span>` : ''}${(k === 'reviews' || k === 'more') && rb ? `<span class="badge">${rb}</span>` : ''}</button>`;
   app.innerHTML = `
   <div class="shell">
     <nav class="rail" aria-label="Разделы">
       <div class="brand"><span class="brand-mark">${ICON.shop}</span>Кабинет продавца</div>
-      ${NAV.map(btn).join('')}
-      <div class="rail-foot"><span><span class="status-dot ${S.shop.paused ? 'off' : ''}"></span>${S.shop.paused ? 'Приём заказов на паузе' : 'Принимаем заказы'}</span><span>${esc(S.shop.name)} · ${esc(S.shop.type)}</span></div>
+      ${NAV.filter(([k]) => can(k)).map(btn).join('')}
+      <div class="rail-foot"><span><span class="status-dot ${S.shop.paused ? 'off' : ''}"></span>${S.shop.paused ? 'Приём заказов на паузе' : 'Принимаем заказы'}</span><span>${esc(S.shop.name)} · ${who === 'owner' ? esc(S.shop.type) : esc(me().name) + ', ' + ROLES[who].name.toLowerCase()}</span></div>
     </nav>
     <main class="main"><div class="content" id="page"></div></main>
-    <nav class="tabs" aria-label="Разделы">${TABS.map(btn).join('')}</nav>
+    <nav class="tabs" aria-label="Разделы">${TABS.filter(([k]) => can(k)).map(btn).join('')}</nav>
   </div>`;
   const banner = S.demo ? `<div class="alert"><span>Это <b>пример магазина</b> с выдуманными заказами, чтобы посмотреть, как всё работает.</span><button class="btn sm" data-act="reset">Удалить пример и завести свой магазин</button></div>` : '';
-  const V = { finance: vFinance, home: vHome, orders: vOrders, catalog: vCatalog, stats: vStats, expenses: vExpenses, preview: vPreview, shop: vShop, more: vMore };
+  const V = { finance: vFinance, home: vHome, orders: vOrders, catalog: vCatalog, stats: vStats, expenses: vExpenses, preview: vPreview, shop: vShop, more: vMore, reviews: vReviews, staff: vStaff };
   $('#page').innerHTML = banner + V[view]();
   if (view === 'catalog' && ui.q) { const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 }
-export function go(v) { view = v; render(); window.scrollTo(0, 0); }
+export function go(v) { if (S && !S.shop.owner) S.shop.owner = auth.phone; if (!can(v)) return; view = v; render(); window.scrollTo(0, 0); }
+function renderNoAccess() {
+  app.innerHTML = `<div class="screen"><div class="screen-top"></div><div class="screen-body"><h1>Нет доступа</h1>
+    <p>Номер +992 ${fmtPhone(auth.phone)} не добавлен в этот магазин. Попросите владельца добавить вас в разделе «Сотрудники» или войдите с другим номером.</p></div>
+    <div class="screen-foot"><button class="btn primary big" data-act="logoutnow">Войти с другим номером</button></div></div>`;
+}
 
 document.addEventListener('click', async e => {
   if (e.target.id === 'sheetBg') return closeSheet();
@@ -61,6 +76,14 @@ document.addEventListener('click', async e => {
     else { const end = new Date(); end.setHours(24, 0, 0, 0); p.stopUntil = end.getTime(); toast('Скрыт до завтра. Утром вернётся сам'); }
     save(); return render();
   }
+  if (ds.melody) { S.shop.melody = ds.melody; save(); render(); ring(ds.melody); return; }
+  if (ds.staffedit) return sheetStaff(ds.staffedit);
+  if (ds.staffdel) { if (confirmTwice(t, 'Нажмите ещё раз')) deleteStaff(ds.staffdel); return; }
+  if (ds.revtab) { ui.revTab = ds.revtab; return render(); }
+  if (ds.reply) return sheetReply(ds.reply);
+  if (ds.savereply) return saveReply(ds.savereply);
+  if (ds.complain) return sheetComplain(ds.complain);
+  if (ds.sendcomplaint) return sendComplaint(ds.sendcomplaint);
   if (ds.cart) { cart.items[ds.cart] = Math.max(0, (cart.items[ds.cart] || 0) + +ds.d); return drawSale(); }
   if (ds.delexp) { if (confirmTwice(t, 'Точно?')) { S.expenses = S.expenses.filter(x => x.id !== ds.delexp); save(); render(); } return; }
   if (ds.delcat) { const n = S.products.filter(p => p.cat === ds.delcat).length; if (n) return toast(`Нельзя удалить: в категории ${n} тов.`); S.cats = S.cats.filter(x => x !== ds.delcat); save(); return render(); }
@@ -80,10 +103,10 @@ document.addEventListener('click', async e => {
     return render();
   }
   switch (ds.act) {
-    case 'logout': if (confirmTwice(t, 'Нажмите ещё раз, чтобы выйти')) { auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; render(); } return;
+    case 'logout': if (confirmTwice(t, 'Нажмите ещё раз, чтобы выйти')) { auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; view = 'home'; render(); } return;
     case 'alifedit': S.shop.alif.status = 'none'; save(); return render();
     case 'alifok': S.shop.alif.status = 'connected'; save(); render(); return toast('Магазин подключён к Alif');
-    case 'demo': setS(demo()); save(); return go('home');
+    case 'demo': setS(demo()); S.shop.owner = auth.phone; save(); return go('home');
     case 'place': return sheetPlace();
     case 'reset': if (confirmTwice(t, 'Нажмите ещё раз — пример удалится')) { store.fresh(); setS(null); render(); } return;
     case 'wipe': if (confirmTwice(t, 'Точно удалить всё? Нажмите ещё раз')) { store.fresh(); setS(null); render(); } return;
@@ -96,6 +119,12 @@ document.addEventListener('click', async e => {
     case 'sale': return sheetSale();
     case 'savesale': return saveSale();
     case 'testorder': return testOrder();
+    case 'testsound': return testSound();
+    case 'testreview': return testReview();
+    case 'install': return install();
+    case 'addstaff': return sheetStaff();
+    case 'savestaff': return saveStaff();
+    case 'logoutnow': auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; return render();
     case 'docancel': { const o = S.orders.find(x => x.id === ds.id); o.status = 'cancelled'; o.cancelReason = document.querySelector('input[name="reason"]:checked')?.value || ''; changeStockForOrder(o, 1); save(); closeSheet(); render(); return toast(`Заказ № ${o.no} отменён`); }
     case 'pause': S.shop.paused = false; save(); render(); return toast('Снова принимаем заказы');
     case 'import': return sheetImport();
@@ -131,6 +160,7 @@ document.addEventListener('change', async e => {
   }
   if (id === 'logoFile' && t.files[0]) { try { S.shop.logo = await readImage(t.files[0], 400); save(); render(); toast('Логотип обновлён'); } catch (err) { toast(err.message); } }
   if (id === 'soundSw') { S.shop.sound = t.checked; save(); toast(t.checked ? 'Звук включён' : 'Звук выключен'); }
+  if (id === 'awakeSw') { S.shop.awake = t.checked; save(); toast(t.checked ? 'Экран не будет гаснуть' : 'Экран гаснет как обычно'); }
   if (id === 'autoSw') { S.shop.autoAccept = t.checked; save(); render(); toast(t.checked ? 'Новые заказы будут приниматься сами' : 'Автопринятие выключено'); }
   if (id === 'pauseSw') { S.shop.paused = !t.checked; save(); render(); toast(S.shop.paused ? 'Приём заказов на паузе' : 'Снова принимаем заказы'); }
   if (id === 'fromD') { ui.from = t.value; render(); }
@@ -158,6 +188,7 @@ document.addEventListener('submit', e => {
   }
   if (id === 'catForm') { const v = $('#newCat').value.trim(); if (!v) return; if (S.cats.includes(v)) return toast('Такая категория уже есть'); S.cats.push(v); save(); render(); }
   if (id === 'pForm') submitProduct();
+  if (id === 'staffForm') saveStaff();
   if (id === 'expForm') saveExpense();
   if (id === 'phoneForm') {
     if (!$('#agIn').checked) return;

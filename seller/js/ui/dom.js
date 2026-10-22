@@ -24,12 +24,15 @@ export const ICON = {
   more: '<svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg>',
   finance: '<svg viewBox="0 0 24 24"><path d="M4 7h15a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"/></svg>',
   logout: '<svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
+  reviews: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9l-5.3 2.7 1-5.8-4.2-4.1 5.9-.9z"/></svg>',
+  staff: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6 6 0 0 0-4-5.7"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/></svg>',
   import: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>',
 };
 export const pic = p => p.imgs && p.imgs[0] ? `<img src="${p.imgs[0]}" alt="">` : `<span class="noimg" title="Нет фото">${ICON.image}</span>`;
 export const thumb = p => `<div class="thumb">${pic(p)}</div>`;
 export const plusI = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
-export const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['finance', 'Деньги'], ['expenses', 'Расходы'], ['preview', 'Витрина'], ['shop', 'Магазин']];
+export const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['reviews', 'Отзывы'], ['finance', 'Деньги'], ['expenses', 'Расходы'], ['preview', 'Витрина'], ['shop', 'Магазин'], ['staff', 'Сотрудники']];
 export const TABS = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['more', 'Ещё']];
 // товар на стопе до конца дня: «Закончилось на сегодня»
 export const isStopped = p => !!p.stopUntil && p.stopUntil > Date.now();
@@ -63,7 +66,7 @@ export function showErrors(form, errs) {
   let first = null;
   for (const [k, m] of Object.entries(errs)) {
     const el = form.querySelector(`[name="${k}"]`); if (!el) continue;
-    el.classList.add('invalid'); (el.closest('.suffix') || el).insertAdjacentHTML('afterend', `<span class="err">${m}</span>`); first = first || el;
+    el.classList.add('invalid'); (el.closest('.suffix, .phone') || el).insertAdjacentHTML('afterend', `<span class="err">${m}</span>`); first = first || el;
   }
   if (first) first.focus();
   return !first;

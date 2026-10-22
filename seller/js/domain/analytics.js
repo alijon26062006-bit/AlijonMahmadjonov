@@ -1,7 +1,7 @@
 import { FEE } from '../config.js';
 import { addDays, dkey, parseKey, today } from '../lib/format.js';
 import { S, ui } from '../state.js';
-import { orderFee } from './orders.js';
+import { lines, orderFee } from './orders.js';
 
 // статистика: расчёт
 export function range() {
@@ -24,7 +24,7 @@ export function calc(a, b) {
     if (o.status !== 'done') continue;
     d.orders++; d.fee += orderFee(o);
     const feeK = o.source === 'app' ? FEE : 0;
-    for (const i of o.items) {
+    for (const i of lines(o)) {
       d.rev += i.qty * i.price; d.cogs += i.qty * (i.cost || 0); d.qty += i.qty;
       const key = i.name + (i.variant ? ' · ' + i.variant : '');
       const p = prod[key] || (prod[key] = { name: key, qty: 0, rev: 0, profit: 0 });
@@ -44,7 +44,7 @@ export function prodSales(a, b) {
   for (const o of S.orders) {
     if (o.status !== 'done') continue; const k = dkey(o.ts); if (k < a || k > b) continue;
     const feeK = o.source === 'app' ? FEE : 0;
-    for (const i of o.items) { const r = m[i.pid] || (m[i.pid] = { qty: 0, rev: 0, profit: 0, orders: 0 }); r.qty += i.qty; r.rev += i.qty * i.price; r.profit += i.qty * (i.price * (1 - feeK) - (i.cost || 0)); r.orders++; }
+    for (const i of lines(o)) { const r = m[i.pid] || (m[i.pid] = { qty: 0, rev: 0, profit: 0, orders: 0 }); r.qty += i.qty; r.rev += i.qty * i.price; r.profit += i.qty * (i.price * (1 - feeK) - (i.cost || 0)); r.orders++; }
   }
   return m;
 }

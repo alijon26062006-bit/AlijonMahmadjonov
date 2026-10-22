@@ -177,7 +177,7 @@ function create() {
     kind: k.id, city: R.city, lat: R.lat, lng: R.lng, landmark: R.landmark.trim(), logo: R.logo,
     schedule: schedule(), delivery: R.delivery, pickup: R.pickup, prep: R.prep,
   };
-  setS({ v: 2, demo: false, shop, cats: [...k.cats], products: [], orders: [], expenses: [], nextNo: 1001 });
+  setS({ v: 2, demo: false, shop, cats: [...k.cats], products: [], orders: [], expenses: [], reviews: [], staff: [], nextNo: 1001 });
   save(); forget(); R = fresh();
   go('catalog');
   toast('Магазин создан. Добавьте первый товар');

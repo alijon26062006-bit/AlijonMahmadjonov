@@ -4,6 +4,8 @@ import { auth } from '../services/storage.js';
 import { S } from '../state.js';
 import { ICON } from '../ui/dom.js';
 import { ALIF_STATUS } from './finance.js';
+import { can, role } from '../domain/staff.js';
+import { installed } from '../services/install.js';
 import { shopFields } from './onboarding.js';
 
 // Магазин
@@ -43,13 +45,14 @@ export function vShop() {
     <section class="panel col">
       <h2>Данные</h2>
       <span class="small muted">Сейчас всё хранится в этом браузере. После подключения сервера товары и заказы будут в общей базе, и войти можно будет с любого телефона.</span>
-      <div class="row"><button class="btn" data-act="logout">Выйти из кабинета</button><button class="btn danger" data-act="wipe">Удалить магазин и все данные</button></div>
+      <div class="row"><button class="btn" data-act="logout">Выйти из кабинета</button>${role() === 'owner' ? '<button class="btn danger" data-act="wipe">Удалить магазин и все данные</button>' : ''}</div>
     </section>`;
 }
 export function vMore() {
-  const item = (k, t, s) => `<button data-nav="${k}">${ICON[k]}<span>${t}<small>${s}</small></span></button>`;
+  const item = (k, t, s) => !can(k) ? '' : `<button data-nav="${k}">${ICON[k]}<span>${t}<small>${s}</small></span></button>`;
   return `<div class="head"><h1>Ещё</h1></div>
-    <div class="panel tight morelist">${item('finance', 'Деньги', 'Оплата через Alif и подключение')}${item('expenses', 'Расходы', 'Аренда, зарплата и другие траты')}${item('preview', 'Витрина', 'Как покупатели видят магазин')}${item('shop', 'Магазин', 'Профиль, график, выплаты, категории')}
-    <button data-act="import">${ICON.import}<span>Загрузить товары из Excel<small>Сразу весь список</small></span></button>
+    <div class="panel tight morelist">${item('reviews', 'Отзывы', 'Рейтинг магазина и ответы покупателям')}${item('finance', 'Деньги', 'Оплата через Alif и подключение')}${item('expenses', 'Расходы', 'Аренда, зарплата и другие траты')}${item('preview', 'Витрина', 'Как покупатели видят магазин')}${item('shop', 'Магазин', 'Профиль, график, выплаты, категории')}${item('staff', 'Сотрудники', 'Кассиры, сборщики, управляющий')}
+    ${can('catalog') ? `<button data-act="import">${ICON.import}<span>Загрузить товары из Excel<small>Сразу весь список</small></span></button>` : ''}
+    ${installed() ? '' : `<button data-act="install">${ICON.download}<span>Установить на телефон<small>Иконка на экране, как приложение</small></span></button>`}
     <button data-act="logout">${ICON.logout}<span>Выйти<small>+992 ${fmtPhone(auth.phone || '')}</small></span></button></div>`;
 }

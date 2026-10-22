@@ -83,6 +83,13 @@ function stepPrice(d, kind) {
         <div class="variants" id="variants">${d.variants.map(v => variantRow(v)).join('')}</div>
         <div><button type="button" class="btn sm" data-act="addvar">${plusI} Добавить вариант</button></div>
       </div></details>
+    ${kind.id === 'food' ? `<details class="more" ${d.options?.length ? 'open' : ''} data-f="options"><summary>Добавки и опции ${d.options?.length ? `(${d.options.length})` : ''}</summary>
+      <div class="col">
+        <span class="small muted">Покупатель отметит их при заказе: «Без лука» бесплатно, «Двойной сыр» +5 смн, «Большая порция» +15 смн.</span>
+        <div class="variants" id="options">${(d.options || []).map(optionRow).join('')}</div>
+        <div class="chips wrap">${['Без лука', 'Острое', 'Двойной сыр', 'Большая порция', 'Хлеб'].map(t => `<button type="button" class="chip" data-addopt="${t}">+ ${t}</button>`).join('')}</div>
+        <div><button type="button" class="btn sm" data-addopt="">${plusI} Своя добавка</button></div>
+      </div></details>` : ''}
     <div class="field"><span class="lbl">Метки на карточке</span><div class="chips wrap">${LABELS.map(l => `<label class="chip" style="cursor:pointer"><input type="checkbox" name="label" value="${esc(l)}" ${d.labels.includes(l) ? 'checked' : ''} style="accent-color:var(--accent);margin:0 6px 0 0;vertical-align:-2px">${esc(l)}</label>`).join('')}</div></div>`;
 }
 
@@ -128,6 +135,8 @@ function markErrors(errs) {
 }
 
 export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="${kindOf(S.shop).id === 'perfume' ? 'Например, 50 мл' : 'Название, напр. 30 шт'}" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
+export const optionRow = o => `<div class="variant opt-row" data-oid="${o.id}"><input class="input on" placeholder="Например, Без лука" value="${esc(o.name)}" aria-label="Название добавки"><div class="suffix"><input class="input num op" inputmode="decimal" placeholder="0" value="${o.price || ''}" aria-label="Доплата"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmopt="${o.id}" aria-label="Удалить добавку">${ICON.close}</button></div>`;
+const readOptions = () => [...document.querySelectorAll('#options .opt-row')].map(el => ({ id: el.dataset.oid, name: el.querySelector('.on').value.trim(), price: num(el.querySelector('.op').value) ?? 0 }));
 export function readVariants() {
   return [...document.querySelectorAll('#variants .variant')].map(el => ({ id: el.dataset.vid, name: el.querySelector('.vn').value.trim(), price: num(el.querySelector('.vp').value), cost: el.querySelector('.vc').value.trim() === '' ? null : num(el.querySelector('.vc').value) }));
 }
@@ -146,6 +155,7 @@ export function syncDraft() {
   if (has('price')) { d.price = number('price'); d.cost = number('cost'); d.oldPrice = number('oldPrice'); d.stock = number('stock'); }
   if (has('label')) d.labels = [...f.querySelectorAll('[name="label"]:checked')].map(x => x.value);
   if ($('#variants')) d.variants = readVariants();
+  if ($('#options')) d.options = readOptions();
   if (has('expiry')) d.expiry = val('expiry');
   if (has('prep')) d.prep = number('prep');
   if (has('active')) d.active = el.active.checked;
@@ -170,6 +180,7 @@ function check(step) {
     const w = WEIGHT_UNITS.includes(d.unit);
     if (d.stock == null || d.stock < 0 || (!w && !Number.isInteger(d.stock))) e.stock = w ? 'Число от 0, например 12,5' : 'Целое число от 0';
     if (d.variants.some(v => !v.name || v.price == null || v.price <= 0)) e.variants = 'У каждого варианта нужны название и цена';
+    if ((d.options || []).some(o => !o.name || o.price < 0)) e.options = 'У каждой добавки нужно название, доплата от 0';
   }
   if (step === 3) {
     const cat = d.cat === '__new' ? editing.newcat : d.cat;
@@ -236,7 +247,12 @@ export function updateMargin() {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-pstep],[data-pnav],[data-pfill]'); if (!t || !editing || t.disabled) return;
+  const t = e.target.closest('[data-pstep],[data-pnav],[data-pfill],[data-addopt],[data-rmopt]'); if (!t || !editing || t.disabled) return;
+  if (t.dataset.addopt != null) {
+    const box = $('#options'); box.insertAdjacentHTML('beforeend', optionRow({ id: uid(), name: t.dataset.addopt, price: 0 }));
+    const row = box.lastElementChild; row.querySelector(t.dataset.addopt ? '.op' : '.on').focus(); return;
+  }
+  if (t.dataset.rmopt) return t.closest('.opt-row').remove();
   if (t.dataset.pstep) return goStep(+t.dataset.pstep);
   if (t.dataset.pnav) return goStep(editing.step + +t.dataset.pnav);
   const inp = $('#' + t.dataset.pfill); if (inp) { inp.value = t.dataset.v; inp.focus(); }

@@ -71,3 +71,23 @@ export const PERFUME_BRANDS = ['Ajmal', 'Al Haramain', 'Armaf', 'Armani', 'Azzar
   'Mancera', 'Marc Jacobs', 'Montale', 'Montblanc', 'Narciso Rodriguez', 'Nina Ricci', 'Paco Rabanne', 'Parfums de Marly', 'Prada', 'Rasasi', 'Swiss Arabian',
   'Tiziana Terenzi', 'Tom Ford', 'Valentino', 'Versace', 'Yves Saint Laurent', 'Zara', 'Zielinski & Rozen',
   'Garnier', 'L’Oréal', 'Maybelline', 'NIVEA', 'Vichy', 'La Roche-Posay', 'CeraVe', 'The Ordinary', 'Bioderma', 'Dove', 'Gillette', 'Rexona', 'Old Spice'];
+
+// отзывы: быстрые причины, которые отмечает покупатель
+export const REVIEW_GOOD = ['Всё как на фото', 'Свежее, качественное', 'Хорошо упаковано', 'Быстро собрали', 'Вежливо'];
+export const REVIEW_BAD = ['Не тот товар', 'Несвежее', 'Не хватало товара', 'Плохо упаковано', 'Долго собирали'];
+export const REPLY_TEMPLATES = [
+  'Спасибо за отзыв! Рады, что вам понравилось. Ждём вас снова.',
+  'Спасибо, что выбрали нас! Передадим добрые слова команде.',
+  'Извините, что так получилось. Мы уже разбираемся. Напишите нам — предложим компенсацию.',
+  'Спасибо, что сообщили. Передали замечание сотрудникам, такого больше не повторится.',
+];
+export const COMPLAINT_REASONS = ['Оскорбления или нецензурные слова', 'Отзыв не о нашем магазине', 'Отзыв о курьере, а не о магазине', 'Похоже на отзыв конкурента', 'Другое'];
+export const RATING_DAYS = 90;    // рейтинг считаем по оценкам за последние 3 месяца
+export const RATING_MIN = 10;     // меньше оценок — показываем «Новый магазин»
+
+// сотрудники: какие разделы открыты каждой роли (владелец видит всё)
+export const ROLES = {
+  manager: { name: 'Управляющий', hint: 'Всё, кроме денег и сотрудников', views: ['home', 'orders', 'catalog', 'stats', 'reviews', 'expenses', 'preview', 'shop', 'more'] },
+  cashier: { name: 'Кассир', hint: 'Заказы, товары, продажи в магазине', views: ['home', 'orders', 'catalog', 'reviews', 'preview', 'more'] },
+  picker: { name: 'Сборщик', hint: 'Только заказы: принять, собрать, отдать курьеру', views: ['orders', 'more'] },
+};

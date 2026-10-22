@@ -1,4 +1,4 @@
-import { DAYS, SHOP_KINDS } from './config.js';
+import { DAYS, REPLY_TEMPLATES, REVIEW_BAD, REVIEW_GOOD, SHOP_KINDS } from './config.js';
 import { addDays, pad, parseKey, today, uid } from './lib/format.js';
 
 // пример магазина
@@ -26,7 +26,7 @@ export function demo() {
       const p = products[Math.floor(R() * products.length)];
       const v = p.variants.length ? p.variants[Math.floor(R() * p.variants.length)] : null;
       const qty = p.unit === 'кг' || p.unit === 'л' ? (1 + Math.floor(R() * 5)) * 0.5 : p.price < 6 ? 2 + Math.floor(R() * 6) : 1 + Math.floor(R() * 2);
-      items.push({ pid: p.id, name: p.name, variant: v ? v.name : '', qty, price: v ? v.price : p.price, cost: v ? v.cost : p.cost });
+      items.push({ pid: p.id, name: p.name, unit: p.unit, variant: v ? v.name : '', qty, price: v ? v.price : p.price, cost: v ? v.cost : p.cost });
     }
     return items;
   };
@@ -45,6 +45,20 @@ export function demo() {
   const now = Date.now();
   const live = (st, ago, comment) => ({ id: uid(), no: ++no, ts: now - ago * 60000, source: 'app', status: st, items: pickItems(), customer: { name: names[Math.floor(R() * names.length)], phone: '+992 93 555 12 ' + pad(Math.floor(R() * 99)), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] }, delivery: 'courier', comment, cancelReason: '', pay: 'Наличные', readyIn: st === 'accepted' ? 25 : null });
   orders.push(live('ready', 41, ''), live('accepted', 18, 'Позвоните за 10 минут'), live('new', 3, 'Помидоры выберите покрепче, пожалуйста'), live('new', 1, ''));
+  // отзывы примерно к каждому третьему заказу из приложения
+  const texts = { 5: ['Всё свежее, спасибо!', 'Помидоры как с грядки, буду заказывать ещё', '', 'Быстро и аккуратно'], 4: ['Хорошо, но пакет порвался', '', 'Всё пришло, спасибо'], 3: ['Яблоки были мелковаты'], 2: ['Не положили курагу, пришлось звонить'], 1: ['Молоко оказалось кислым'] };
+  const reviews = [];
+  for (const o of orders) {
+    if (o.source !== 'app' || o.status !== 'done' || R() > 0.33) continue;
+    const x = R(), rate = x < 0.62 ? 5 : x < 0.86 ? 4 : x < 0.93 ? 3 : x < 0.97 ? 2 : 1, bad = rate <= 3;
+    const pool = bad ? REVIEW_BAD : REVIEW_GOOD, list = texts[rate];
+    const r = { id: uid(), orderId: o.id, orderNo: o.no, ts: o.ts + 3 * 36e5, name: o.customer.name, rating: rate, tags: pool.filter(() => R() < 0.3).slice(0, 2),
+      text: list[Math.floor(R() * list.length)], items: o.items.map(i => ({ pid: i.pid, name: i.name, like: bad ? R() < 0.4 : R() < 0.95 })) };
+    if (r.ts > Date.now()) continue;
+    if (!bad && R() < 0.5) Object.assign(r, { reply: REPLY_TEMPLATES[0], replyTs: r.ts + 36e5 });
+    if (bad && Date.now() - r.ts > 5 * 864e5) Object.assign(r, { reply: REPLY_TEMPLATES[2], replyTs: r.ts + 36e5 });
+    reviews.push(r);
+  }
   const expenses = [];
   const E = (back, cat, amount, note) => expenses.push({ id: uid(), date: addDays(today(), -back), cat, amount, note });
   E(30, 'Аренда', 2500, 'Аренда магазина'); E(28, 'Закупка товара', 3200, 'Овощи с базы'); E(21, 'Закупка товара', 2800, 'Фрукты, молочное');
@@ -56,7 +70,7 @@ export function demo() {
     v: 2, demo: true,
     shop: { name: 'Бозори Сабз', type: 'Продукты', kind: 'grocery', city: 'Душанбе', landmark: 'Напротив ЦУМа', phone: '+992 93 555 12 34', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие овощи и фрукты каждый день.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), alif: { terminal: '200001', status: 'connected', holder: 'ИП Каримов Шерали', tin: '510012345' } },
     cats: [...SHOP_KINDS[0].cats],
-    products, orders, expenses, nextNo: no + 1,
+    products, orders, expenses, reviews, staff: [], nextNo: no + 1,
   };
 }
 export function blankShop(d) {

@@ -3,6 +3,8 @@ import { calc, prodSales, readiness, trend, ZERO } from '../domain/analytics.js'
 import { addDays, esc, money, plural, today } from '../lib/format.js';
 import { newCount, S } from '../state.js';
 import { ICON, plusI, stockPill, thumb } from '../ui/dom.js';
+import { rating, stars, unansweredBad } from '../domain/reviews.js';
+import { can } from '../domain/staff.js';
 
 // Главная
 export function vHome() {
@@ -10,17 +12,19 @@ export function vHome() {
   const nc = newCount(), active = S.orders.filter(o => o.status === 'accepted' || o.status === 'ready').length;
   const low = S.products.filter(p => p.active && p.stock <= LOW);
   const delta = y.rev ? Math.round((T.rev - y.rev) / y.rev * 100) : null;
-  const ready = readiness();
+  const ready = readiness(), rb = unansweredBad(), R = rating();
   return `
     <div class="head"><div><div class="eyebrow">${new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${esc(S.shop.name)}</h1></div>
       <div class="row"><button class="btn" data-act="sale">${plusI} Продажа в магазине</button><button class="btn primary" data-act="add">${plusI} Товар</button></div></div>
     ${S.shop.paused ? `<div class="alert bad"><span><b>Приём заказов на паузе.</b> Покупатели видят магазин закрытым.</span><button class="btn sm" data-act="pause">Снова принимать заказы</button></div>` : ''}
     ${nc ? `<div class="alert bad"><span><b>${nc} ${plural(nc, 'новый заказ', 'новых заказа', 'новых заказов')}</b> ждёт ответа. Покупатель ждёт: примите или отклоните заказ как можно быстрее.</span><button class="btn sm primary" data-nav="orders">Открыть заказы</button></div>` : ''}
+    ${rb ? `<div class="alert"><span><b>${rb} ${plural(rb, 'плохой отзыв', 'плохих отзыва', 'плохих отзывов')} без ответа.</b> Ответьте покупателю — другие видят, как магазин решает проблемы.</span><button class="btn sm" data-nav="reviews">Ответить</button></div>` : ''}
     <div class="kpis">
       <div class="kpi hero"><span>Выручка сегодня</span><b class="num">${money(T.rev)}</b><span>${delta == null ? 'вчера продаж не было' : (delta >= 0 ? '+' : '') + delta + '% к вчера'}</span></div>
-      <div class="kpi ${T.profit < 0 ? 'neg' : ''}"><span>Чистая прибыль сегодня</span><b class="num">${money(T.profit)}</b></div>
+      ${can('stats') ? `<div class="kpi ${T.profit < 0 ? 'neg' : ''}"><span>Чистая прибыль сегодня</span><b class="num">${money(T.profit)}</b></div>` : ''}
       <div class="kpi"><span>Выполнено заказов</span><b class="num">${T.orders}</b></div>
       <div class="kpi"><span>Заказы в работе</span><b class="num">${active}</b></div>
+      <button class="kpi link" data-nav="reviews"><span>Рейтинг магазина</span><b class="num">${R.isNew ? 'Новый' : R.value.toLocaleString('ru-RU', { minimumFractionDigits: 1 })}</b><span>${R.isNew ? `оценок ${R.count} из 10` : `<span class="stars">${stars(R.value)}</span> · ${R.count} ${plural(R.count, 'оценка', 'оценки', 'оценок')}`}</span></button>
     </div>
     ${hitsBlock()}
     <div class="split">

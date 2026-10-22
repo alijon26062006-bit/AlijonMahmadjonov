@@ -7,7 +7,8 @@ export let S = migrate(store.load());
 if (S === 'fresh') S = null;
 
 /** Заменяет всё состояние магазина (пример, новый магазин, выход). */
-export function setS(next) { S = next; }
+export function setS(next) { S = next; if (S) { S.reviews ||= []; S.staff ||= []; } }
+if (S && S.shop) { S.reviews ||= []; S.staff ||= []; }
 if (S && S.shop && !S.shop.alif) S.shop.alif = { terminal: '', status: 'none', holder: S.shop.payout?.holder || '', tin: S.shop.tin || '' };
 
 // вход: четыре слайда → номер телефона с согласием → SMS-код (сейчас тестовый режим, SMS не отправляется)

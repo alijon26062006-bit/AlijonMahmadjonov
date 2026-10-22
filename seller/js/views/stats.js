@@ -1,4 +1,5 @@
 import { calc, prodSales, range, trend, ZERO } from '../domain/analytics.js';
+import { lines } from '../domain/orders.js';
 import { addDays, ddmm, dkey, esc, money, parseKey, plural, r2 } from '../lib/format.js';
 import { S, ui } from '../state.js';
 import { copyText } from './catalog.js';
@@ -12,7 +13,7 @@ export function vStats() {
   const step = list.length > 16 ? Math.ceil(list.length / 8) : 1;
   const pick = list.find(d => d.k === ui.pickDay);
   const byCat = {};
-  for (const o of S.orders) { const k = dkey(o.ts); if (o.status !== 'done' || k < a || k > b) continue; for (const i of o.items) { const p = S.products.find(x => x.id === i.pid); const c = p ? p.cat : 'Удалённые товары'; byCat[c] = (byCat[c] || 0) + i.qty * i.price; } }
+  for (const o of S.orders) { const k = dkey(o.ts); if (o.status !== 'done' || k < a || k > b) continue; for (const i of lines(o)) { const p = S.products.find(x => x.id === i.pid); const c = p ? p.cat : 'Удалённые товары'; byCat[c] = (byCat[c] || 0) + i.qty * i.price; } }
   const cats = Object.entries(byCat).sort((x, y) => y[1] - x[1]), catMax = Math.max(1, ...cats.map(c => c[1]));
   const dayRows = [...list].reverse().filter(d => d.orders || d.exp || d.cancelled);
   return `
