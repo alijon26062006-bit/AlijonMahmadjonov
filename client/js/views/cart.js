@@ -1,6 +1,6 @@
 import { FREE_FROM, IF_MISSING, WEIGHT_UNITS } from '../config.js';
-import { bump, clear, totals } from '../data/cart.js';
-import { eta, openState } from '../data/catalog.js';
+import { bump, clear, totals } from '../model/cart.js';
+import { eta, openState } from '../model/catalog.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
 import { C } from '../state.js';
 import { pic } from '../ui/art.js';

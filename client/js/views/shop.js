@@ -1,7 +1,7 @@
 import { FREE_FROM, WEIGHT_UNITS } from '../config.js';
-import { add, qtyInCart, stepOf, unitPrice } from '../data/cart.js';
+import { add, qtyInCart, stepOf, unitPrice } from '../model/cart.js';
 import { DELIVERY_FEE } from '../config.js';
-import { eta, kindName, openState, productIn, ratingText, shopById } from '../data/catalog.js';
+import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
 import { esc, money, qtyLabel, r2 } from '../lib/format.js';
 import { C, save, ui } from '../state.js';
 import { art } from '../ui/art.js';

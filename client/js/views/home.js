@@ -1,6 +1,6 @@
 import { KINDS } from '../config.js';
-import { eta, kindName, openState, shopById, shops } from '../data/catalog.js';
-import { STAGES, view } from '../data/orders.js';
+import { eta, kindName, openState, shopById, shops } from '../model/catalog.js';
+import { STAGES, view } from '../model/orders.js';
 import { esc } from '../lib/format.js';
 import { C, ui } from '../state.js';
 import { pic } from '../ui/art.js';

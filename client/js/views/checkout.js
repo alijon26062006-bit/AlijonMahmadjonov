@@ -1,6 +1,6 @@
-import { totals } from '../data/cart.js';
-import { eta, openState } from '../data/catalog.js';
-import { addrLine, placeOrder } from '../data/orders.js';
+import { totals } from '../model/cart.js';
+import { eta, openState } from '../model/catalog.js';
+import { addrLine, placeOrder } from '../model/orders.js';
 import { esc, fmtPhone, money, pad } from '../lib/format.js';
 import { C } from '../state.js';
 import { ico, toast } from '../ui/dom.js';

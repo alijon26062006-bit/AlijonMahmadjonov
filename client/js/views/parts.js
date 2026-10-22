@@ -1,6 +1,6 @@
 import { WEIGHT_UNITS } from '../config.js';
-import { qtyInCart, stepOf } from '../data/cart.js';
-import { eta, openState, ratingText } from '../data/catalog.js';
+import { qtyInCart, stepOf } from '../model/cart.js';
+import { eta, openState, ratingText } from '../model/catalog.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
 import { C } from '../state.js';
 import { pic } from '../ui/art.js';

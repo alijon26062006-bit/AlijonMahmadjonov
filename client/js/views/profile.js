@@ -1,5 +1,5 @@
 import { BRAND } from '../config.js';
-import { productIn, shopById } from '../data/catalog.js';
+import { productIn, shopById } from '../model/catalog.js';
 import { esc, fmtPhone } from '../lib/format.js';
 import { C, save } from '../state.js';
 import { ico, toast, twice } from '../ui/dom.js';

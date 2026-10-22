@@ -1,7 +1,7 @@
 import { REVIEW_BAD, REVIEW_GOOD, PROBLEMS, WEIGHT_UNITS } from '../config.js';
-import { add, clear } from '../data/cart.js';
-import { productIn, shopById } from '../data/catalog.js';
-import { addrLine, answerSub, cancel, received, reportProblem, sendReview, STAGES, view } from '../data/orders.js';
+import { add, clear } from '../model/cart.js';
+import { productIn, shopById } from '../model/catalog.js';
+import { addrLine, answerSub, cancel, received, reportProblem, sendReview, STAGES, view } from '../model/orders.js';
 import { esc, hhmm, money, qtyLabel, whenText } from '../lib/format.js';
 import { C } from '../state.js';
 import { $, closeSheet, ico, openSheet, starFill, toast, twice } from '../ui/dom.js';

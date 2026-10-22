@@ -1,7 +1,7 @@
 import { BRAND } from './config.js';
-import { add, bumpSimple, totals } from './data/cart.js';
-import { productIn, shopById } from './data/catalog.js';
-import { view } from './data/orders.js';
+import { add, bumpSimple, totals } from './model/cart.js';
+import { productIn, shopById } from './model/catalog.js';
+import { view } from './model/orders.js';
 import { SELLER_KEY } from './services/bridge.js';
 import { C, save, ui } from './state.js';
 import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } from './ui/dom.js';

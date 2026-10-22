@@ -1,4 +1,4 @@
-import { shops } from '../data/catalog.js';
+import { shops } from '../model/catalog.js';
 import { esc, money } from '../lib/format.js';
 import { C, save, ui } from '../state.js';
 import { $, ico } from '../ui/dom.js';
