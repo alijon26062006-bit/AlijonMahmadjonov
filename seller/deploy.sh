@@ -35,10 +35,13 @@ fi
 chmod -R a+rX "$WEB_ROOT"
 
 log "Настраиваю nginx"
+# IPv6 включаем, только если он есть на сервере
+LISTEN6=""
+[ -f /proc/net/if_inet6 ] && LISTEN6="listen [::]:80;"
 cat > /etc/nginx/sites-available/seller-panel <<NGINX
 server {
     listen 80;
-    listen [::]:80;
+    $LISTEN6
     server_name ${DOMAIN:-_};
     root $WEB_ROOT;
     index index.html;
@@ -63,8 +66,12 @@ NGINX
 ln -sf /etc/nginx/sites-available/seller-panel /etc/nginx/sites-enabled/seller-panel
 rm -f /etc/nginx/sites-enabled/default
 nginx -t -q
-systemctl enable -q --now nginx
-systemctl reload nginx
+if [ -d /run/systemd/system ]; then
+  systemctl enable -q --now nginx
+  systemctl reload nginx
+else
+  nginx -s reload 2>/dev/null || nginx   # контейнер без systemd
+fi
 
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ufw allow 'Nginx Full' >/dev/null
