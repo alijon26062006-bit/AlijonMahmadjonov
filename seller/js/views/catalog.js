@@ -1,9 +1,9 @@
 import { render } from '../app.js';
-import { CUR, kindOf, LABELS, LOW, WEIGHT_STEPS, WEIGHT_UNITS } from '../config.js';
+import { EXPIRY_SOON, kindOf, LOW } from '../config.js';
 import { prodSales, ZERO } from '../domain/analytics.js';
 import { addDays, esc, money, num, today, uid } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
-import { $, closeSheet, fmtQty, isStopped, onSheetClose, ICON, openSheet, plusI, showErrors, stockPill, thumb, toast } from '../ui/dom.js';
+import { $, closeSheet, daysLeft, expiryBlock, expiryPill, fmtQty, ICON, isStopped, openSheet, plusI, stockPill, thumb, toast } from '../ui/dom.js';
 
 // Товары
 export function filtered(sales) {
@@ -11,9 +11,10 @@ export function filtered(sales) {
   const by = { sales: (a, b) => (sales[b.id] || ZERO).qty - (sales[a.id] || ZERO).qty, new: (a, b) => b.created - a.created, cheap: (a, b) => a.price - b.price, stock: (a, b) => a.stock - b.stock }[ui.psort];
   return S.products.filter(p =>
     (ui.cat === 'Все' || p.cat === ui.cat) && (!q || p.name.toLowerCase().includes(q)) &&
-    (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice) || (ui.stock === 'stopped' && isStopped(p)))
+    (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice) || (ui.stock === 'stopped' && isStopped(p)) || (ui.stock === 'expiry' && expiringOrBlocked(p)))
   ).sort(by);
 }
+export const expiringOrBlocked = p => !!expiryBlock(p) || (daysLeft(p) ?? 99) <= EXPIRY_SOON;
 export function vCatalog() {
   const sales = prodSales(addDays(today(), -29), today());
   const list = filtered(sales);
@@ -22,7 +23,7 @@ export function vCatalog() {
   const rows = list.map(p => {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
-      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
+      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
       <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="tgl" role="switch" aria-checked="${!isStopped(p)}" data-stop="${p.id}" aria-label="${esc(p.name)}: в наличии сегодня" title="${isStopped(p) ? 'Закончилось на сегодня. Включите, чтобы вернуть в продажу' : 'В продаже. Выключите, если закончилось на сегодня'}"></button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
@@ -41,6 +42,7 @@ export function vCatalog() {
         <option value="low" ${ui.stock === 'low' ? 'selected' : ''}>Заканчиваются (${cnt(p => p.active && p.stock <= LOW)})</option>
         <option value="nophoto" ${ui.stock === 'nophoto' ? 'selected' : ''}>Без фото (${cnt(p => !p.imgs.length)})</option>
         <option value="sale" ${ui.stock === 'sale' ? 'selected' : ''}>Со скидкой (${cnt(p => p.oldPrice)})</option>
+        ${kindOf(S.shop).expiry ? `<option value="expiry" ${ui.stock === 'expiry' ? 'selected' : ''}>Срок годности (${cnt(expiringOrBlocked)})</option>` : ''}
         <option value="stopped" ${ui.stock === 'stopped' ? 'selected' : ''}>На стопе сегодня (${cnt(isStopped)})</option>
         <option value="hidden" ${ui.stock === 'hidden' ? 'selected' : ''}>Скрытые (${cnt(p => !p.active)})</option>
       </select>
@@ -53,109 +55,6 @@ export function vCatalog() {
     </div>
     ${cats.length > 2 ? `<div class="chips" role="group" aria-label="Категории">${cats.map(c => `<button class="chip" data-cat="${esc(c)}" aria-pressed="${ui.cat === c}">${esc(c)}</button>`).join('')}</div>` : ''}
     ${list.length ? `<div class="plist">${rows}</div>` : empty}`;
-}
-
-// ----- карточка товара -----
-export let editing = null;
-onSheetClose(() => { editing = null; });
-export function openProduct(id, copyFrom) {
-  const src = copyFrom || (id ? S.products.find(x => x.id === id) : null);
-  const base = { id: uid(), name: '', cat: S.cats[0] || '', price: null, oldPrice: null, cost: null, stock: 10, unit: kindOf(S.shop).units[0], minStep: 0.5, desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() };
-  const draft = src ? JSON.parse(JSON.stringify(src)) : base;
-  if (copyFrom) { draft.id = uid(); draft.name = src.name + ' (копия)'; draft.created = Date.now(); draft.variants.forEach(v => { v.id = uid(); }); }
-  editing = { isNew: !id || !!copyFrom, draft };
-  drawProduct();
-}
-export function drawProduct() {
-  const d = editing.draft;
-  const units = [...new Set([...kindOf(S.shop).units, d.unit])];
-  const weight = WEIGHT_UNITS.includes(d.unit);
-  const ph = d.imgs.map((src, i) => `<div class="ph"><img src="${src}" alt="Фото ${i + 1}">${i === 0 ? '<span class="main">главное</span>' : `<button type="button" class="mk" data-mainph="${i}" title="Сделать главным" aria-label="Сделать главным">${ICON.star}</button>`}<button type="button" data-rmph="${i}" aria-label="Удалить фото">${ICON.close}</button></div>`).join('');
-  openSheet(editing.isNew ? 'Новый товар' : 'Изменить товар', `
-    <div class="field"><span class="lbl">Фото, до 4 штук</span><div class="photos">${ph}${d.imgs.length < 4 ? `<label class="ph" for="pFile">+ Добавить фото</label>` : ''}</div><input type="file" id="pFile" accept="image/*" multiple hidden>
-      ${d.imgs.length ? '' : '<span class="small muted">Товары с фото покупают в несколько раз чаще. Снимайте при дневном свете на светлом фоне.</span>'}</div>
-    <form id="pForm" class="col" novalidate style="gap:16px">
-      <div class="field"><label for="p_name">Название *</label><input class="input" id="p_name" name="name" value="${esc(d.name)}" maxlength="80" placeholder="Например, Помидоры местные"></div>
-      <div class="grid2">
-        <div class="field"><label for="p_cat">Категория</label><select class="input" id="p_cat" name="cat">${S.cats.map(c => `<option ${c === d.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__new">+ Новая категория…</option></select>
-          <input class="input" id="p_newcat" name="newcat" placeholder="Название категории" hidden maxlength="30"></div>
-        <div class="field"><label for="p_stock">Остаток</label><div class="suffix"><input class="input num" id="p_stock" name="stock" inputmode="${weight ? 'decimal' : 'numeric'}" value="${d.stock}"><span>${esc(d.unit)}</span></div></div>
-      </div>
-      <div class="field"><span class="lbl">Продаю в</span><div class="chips wrap" role="radiogroup" aria-label="Единица">${units.map(u => `<label class="chip unit-chip"><input type="radio" name="unit" value="${u}" ${u === d.unit ? 'checked' : ''}>${u}</label>`).join('')}</div></div>
-      ${weight ? `<div class="field"><span class="lbl">Покупатель может взять от</span><div class="chips wrap" role="radiogroup" aria-label="Минимальное количество">${WEIGHT_STEPS.map(s => `<label class="chip unit-chip"><input type="radio" name="minStep" value="${s}" ${s === (d.minStep ?? 0.5) ? 'checked' : ''}>${stepLabel(s, d.unit)}</label>`).join('')}</div></div>` : ''}
-      <div class="grid3">
-        <div class="field"><label for="p_price">${weight ? `Цена за 1 ${esc(d.unit)} *` : 'Цена продажи *'}</label><div class="suffix"><input class="input num" id="p_price" name="price" inputmode="decimal" value="${d.price ?? ''}" placeholder="0"><span>${CUR}</span></div></div>
-        <div class="field"><label for="p_cost">Закупочная цена</label><div class="suffix"><input class="input num" id="p_cost" name="cost" inputmode="decimal" value="${d.cost ?? ''}" placeholder="0"><span>${CUR}</span></div></div>
-        <div class="field"><label for="p_old">Цена до скидки</label><div class="suffix"><input class="input num" id="p_old" name="oldPrice" inputmode="decimal" value="${d.oldPrice ?? ''}" placeholder="—"><span>${CUR}</span></div></div>
-      </div>
-      <div class="hintline" id="marginLine"></div>
-      <div class="field"><label for="p_desc">Описание</label><textarea class="input" id="p_desc" name="desc" maxlength="400" placeholder="Состав, размер, срок свежести: что важно знать покупателю">${esc(d.desc)}</textarea></div>
-      <div class="field"><span class="lbl">Метки на карточке</span><div class="chips wrap">${LABELS.map(l => `<label class="chip" style="cursor:pointer"><input type="checkbox" name="label" value="${esc(l)}" ${d.labels.includes(l) ? 'checked' : ''} style="accent-color:var(--accent);margin:0 6px 0 0;vertical-align:-2px">${esc(l)}</label>`).join('')}</div></div>
-      <details class="more" ${d.variants.length ? 'open' : ''}><summary>Варианты товара ${d.variants.length ? `(${d.variants.length})` : ''}</summary>
-        <div class="col">
-          <span class="small muted">Например, яйца по 10 или 30 штук, плов на одного или на компанию. У каждого варианта своя цена. Если варианты есть, покупатель выбирает один из них.</span>
-          <div class="variants" id="variants">${d.variants.map(v => variantRow(v)).join('')}</div>
-          <div><button type="button" class="btn sm" data-act="addvar">${plusI} Добавить вариант</button></div>
-        </div></details>
-      <details class="more" ${d.prep ? 'open' : ''}><summary>Время сборки</summary>
-        <div class="field"><label for="p_prep">Сколько минут собирать этот товар</label><div class="suffix"><input class="input num" id="p_prep" name="prep" inputmode="numeric" value="${d.prep ?? ''}" placeholder="${S.shop.prep} (как у магазина)"><span>мин</span></div></div></details>
-      <label class="switch" for="p_active"><span><b style="font-weight:600">Показывать покупателям</b><br><span class="small muted">Выключите, чтобы временно скрыть товар</span></span><input type="checkbox" id="p_active" name="active" ${d.active ? 'checked' : ''}></label>
-      <button type="submit" hidden></button>
-    </form>`,
-    `<div class="row">${editing.isNew ? '' : `<button class="btn danger" data-act="delete">Удалить</button><button class="btn" data-act="dup">Копия</button>`}</div>
-     <div class="row"><button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="saveP">${editing.isNew ? 'Добавить товар' : 'Сохранить'}</button></div>`);
-  updateMargin();
-}
-export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="Название, напр. 30 шт" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
-export function readVariants() {
-  return [...document.querySelectorAll('#variants .variant')].map(el => ({ id: el.dataset.vid, name: el.querySelector('.vn').value.trim(), price: num(el.querySelector('.vp').value), cost: el.querySelector('.vc').value.trim() === '' ? null : num(el.querySelector('.vc').value) }));
-}
-export function syncDraft() {
-  // сохраняем введённое перед перерисовкой (добавили фото или вариант)
-  const f = $('#pForm'); if (!f || !editing) return;
-  const fd = new FormData(f), d = editing.draft;
-  d.name = fd.get('name'); d.cat = fd.get('cat') === '__new' ? d.cat : fd.get('cat'); d.stock = num(fd.get('stock')) ?? d.stock; d.unit = fd.get('unit') || d.unit; d.minStep = num(fd.get('minStep')) ?? d.minStep;
-  d.price = num(fd.get('price')); d.cost = num(fd.get('cost')); d.oldPrice = num(fd.get('oldPrice')); d.desc = fd.get('desc');
-  d.labels = fd.getAll('label'); d.prep = num(fd.get('prep')); d.active = !!fd.get('active'); d.variants = readVariants();
-}
-export function updateMargin() {
-  const el = $('#marginLine'); if (!el) return;
-  const pr = num($('#p_price').value), co = num($('#p_cost').value), old = num($('#p_old').value);
-  const parts = [];
-  if (pr != null && co != null && pr > 0) { const m = pr - co; parts.push(`Прибыль с одной продажи: <b class="num ${m < 0 ? 'neg' : ''}">${money(m)}</b> (${Math.round(m / pr * 100)}% от цены)`); }
-  else parts.push('Укажите закупочную цену, и статистика покажет настоящую прибыль.');
-  if (old != null && pr != null && old > pr) parts.push(`Скидка для покупателя: <b class="num">−${Math.round((1 - pr / old) * 100)}%</b>`);
-  el.innerHTML = parts.join('<br>');
-}
-export function saveProduct() {
-  const f = $('#pForm'), fd = new FormData(f), errs = {};
-  const price = num(fd.get('price')), costRaw = fd.get('cost').trim(), cost = costRaw === '' ? null : num(costRaw), oldRaw = fd.get('oldPrice').trim(), old = oldRaw === '' ? null : num(oldRaw), stock = num(fd.get('stock')), prepRaw = fd.get('prep').trim(), prep = prepRaw === '' ? null : num(prepRaw);
-  if (!fd.get('name').trim()) errs.name = 'Введите название';
-  if (price == null || price <= 0) errs.price = 'Цена больше нуля';
-  if (costRaw && (cost == null || cost < 0)) errs.cost = 'Число от нуля';
-  if (oldRaw && (old == null || price == null || old <= price)) errs.oldPrice = 'Должна быть больше цены';
-  const weightUnit = WEIGHT_UNITS.includes(fd.get('unit'));
-  if (stock == null || stock < 0 || (!weightUnit && !Number.isInteger(stock))) errs.stock = weightUnit ? 'Число от 0, например 12,5' : 'Целое число от 0';
-  if (prepRaw && (prep == null || prep <= 0 || prep > 600)) errs.prep = 'От 1 до 600 минут';
-  let cat = fd.get('cat');
-  if (cat === '__new') { cat = (fd.get('newcat') || '').trim(); if (!cat) errs.newcat = 'Введите категорию'; }
-  const variants = readVariants();
-  let vErr = '';
-  variants.forEach((v, i) => { const el = document.querySelectorAll('#variants .variant')[i]; el.querySelectorAll('.input').forEach(x => x.classList.remove('invalid'));
-    if (!v.name) { el.querySelector('.vn').classList.add('invalid'); vErr = 'У каждого варианта нужны название и цена'; }
-    if (v.price == null || v.price <= 0) { el.querySelector('.vp').classList.add('invalid'); vErr = 'У каждого варианта нужны название и цена'; } });
-  const ok = showErrors(f, errs);
-  f.querySelector('#varErr')?.remove();
-  if (vErr) { $('#variants').insertAdjacentHTML('afterend', `<span class="err" id="varErr">${vErr}</span>`); f.querySelector('details.more').open = true; }
-  if (!ok || vErr) return;
-  if (!S.cats.includes(cat)) S.cats.push(cat);
-  const d = editing.draft;
-  Object.assign(d, { name: fd.get('name').trim(), cat, price, cost, oldPrice: old, stock: weightUnit ? Math.round(stock * 1000) / 1000 : stock, unit: fd.get('unit'), minStep: weightUnit ? (num(fd.get('minStep')) ?? 0.5) : 1, desc: fd.get('desc').trim(), labels: fd.getAll('label'), prep, active: !!fd.get('active'), variants });
-  // если есть варианты, цена товара = самая низкая цена варианта
-  if (variants.length) { const min = variants.reduce((a, b) => a.price <= b.price ? a : b); d.price = min.price; if (min.cost != null) d.cost = min.cost; }
-  const i = S.products.findIndex(p => p.id === d.id);
-  if (i < 0) S.products.push(d); else S.products[i] = d;
-  const wasNew = editing.isNew; save(); closeSheet(); render(); toast(wasNew ? 'Товар добавлен' : 'Изменения сохранены');
 }
 
 // фото: уменьшаем, чтобы не раздувать хранилище
@@ -205,7 +104,7 @@ export function doImport() {
   const { ok } = parseImport($('#impText').value);
   for (const r of ok) {
     if (!S.cats.includes(r.cat)) S.cats.push(r.cat);
-    S.products.push({ id: uid(), name: r.name, cat: r.cat, price: r.price, oldPrice: null, cost: r.cost, stock: r.stock, unit: kindOf(S.shop).units[0], desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() });
+    S.products.push({ id: uid(), name: r.name, cat: r.cat, price: r.price, oldPrice: null, cost: r.cost, stock: r.stock, unit: kindOf(S.shop).units[0], desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], attrs: {}, expiry: '', created: Date.now() });
   }
   save(); closeSheet(); ui.stock = 'all'; ui.cat = 'Все'; render(); toast(`Добавлено товаров: ${ok.length}. Теперь добавьте к ним фото`);
 }

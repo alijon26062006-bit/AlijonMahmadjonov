@@ -1,5 +1,6 @@
-import { LOW } from '../config.js';
-import { esc } from '../lib/format.js';
+import { EXPIRY_SOON, kindOf, LOW, NO_EXPIRY_CATS } from '../config.js';
+import { esc, today } from '../lib/format.js';
+import { S } from '../state.js';
 
 // общие куски интерфейса
 export const $ = sel => document.querySelector(sel);
@@ -32,6 +33,22 @@ export const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['ca
 export const TABS = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['more', 'Ещё']];
 // товар на стопе до конца дня: «Закончилось на сегодня»
 export const isStopped = p => !!p.stopUntil && p.stopUntil > Date.now();
+/** Сколько дней осталось до конца срока годности; null — срок не указан. */
+export const daysLeft = p => p.expiry ? Math.round((new Date(p.expiry) - new Date(today())) / 864e5) : null;
+/** Продукт без срока (кроме свежих овощей и фруктов) или с истёкшим сроком продавать нельзя. */
+export function expiryBlock(p) {
+  const d = daysLeft(p);
+  if (d != null) return d < 0 ? 'expired' : '';
+  return kindOf(S.shop).expiry === 'required' && !NO_EXPIRY_CATS.includes(p.cat) ? 'missing' : '';
+}
+export const onSale = p => p.active && p.stock > 0 && !isStopped(p) && !expiryBlock(p);
+export function expiryPill(p) {
+  const b = expiryBlock(p), d = daysLeft(p);
+  if (b === 'expired') return '<span class="pill bad">Срок годности истёк</span>';
+  if (b === 'missing') return '<span class="pill bad">Не указан срок годности</span>';
+  if (d != null && d <= EXPIRY_SOON) return `<span class="pill warn">${d === 0 ? 'Годен до сегодня' : `Годен ещё ${d} дн.`}</span>`;
+  return '';
+}
 export const fmtQty = n => (+n).toLocaleString('ru-RU', { maximumFractionDigits: 3 });
 export function stockPill(p) {
   if (!p.active) return '<span class="pill off">Скрыт</span>';

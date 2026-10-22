@@ -3,7 +3,7 @@ import { CANCEL_REASONS, STATUS } from '../config.js';
 import { changeStockForOrder, orderTotal } from '../domain/orders.js';
 import { esc, hhmm, minsAgo, money, parseKey, today, uid, whenText } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
-import { closeSheet, ICON, isStopped, onSheetClose, openSheet, plusI, thumb, toast } from '../ui/dom.js';
+import { closeSheet, ICON, onSale, onSheetClose, openSheet, plusI, thumb, toast } from '../ui/dom.js';
 
 // Заказы
 export function vOrders() {
@@ -67,7 +67,7 @@ export function sheetCancel(o) {
     `<span></span><div class="row"><button class="btn" data-act="close">Назад</button><button class="btn danger" data-act="docancel" data-id="${o.id}">Отменить заказ</button></div>`);
 }
 export function testOrder() {
-  const avail = S.products.filter(p => p.active && p.stock > 0 && !isStopped(p));
+  const avail = S.products.filter(onSale);
   if (!avail.length) return toast('Нет товаров в наличии для тестового заказа');
   const p = avail[Math.floor(Math.random() * avail.length)], v = p.variants[0];
   const o = { id: uid(), no: S.nextNo++, ts: Date.now(), source: 'app', status: 'new', items: [{ pid: p.id, name: p.name, variant: v ? v.name : '', qty: 1, price: v ? v.price : p.price, cost: v ? v.cost : p.cost }], customer: { name: 'Тестовый покупатель', phone: '+992 00 000 00 00', address: 'Душанбе, ул. Примерная 1' }, delivery: 'courier', comment: 'Это тестовый заказ', cancelReason: '', pay: 'Наличные', test: true };

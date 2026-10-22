@@ -1,22 +1,22 @@
-import { DAYS } from './config.js';
+import { DAYS, SHOP_KINDS } from './config.js';
 import { addDays, pad, parseKey, today, uid } from './lib/format.js';
 
 // пример магазина
 export function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export function demo() {
   const R = rng(26062006);
-  const P = (name, cat, price, cost, stock, unit, desc, extra = {}) => ({ id: uid(), name, cat, price, oldPrice: null, cost, stock, unit, desc, imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() - Math.floor(R() * 9e8), ...extra });
+  const P = (name, cat, price, cost, stock, unit, desc, extra = {}) => ({ id: uid(), name, cat, price, oldPrice: null, cost, stock, unit, desc, imgs: [], active: true, labels: [], prep: null, variants: [], attrs: {}, expiry: '', created: Date.now() - Math.floor(R() * 9e8), ...extra });
   const products = [
-    P('Помидоры местные', 'Овощи', 12, 8, 40, 'кг', 'Грунтовые, сладкие. Собраны вчера.', { labels: ['Хит'], minStep: 0.5 }),
-    P('Огурцы', 'Овощи', 10, 6, 25, 'кг', 'Хрустящие, тепличные.', { minStep: 0.5 }),
-    P('Картофель', 'Овощи', 6, 4, 120, 'кг', 'Молодой картофель.', { minStep: 1 }),
-    P('Яблоки', 'Фрукты', 14, 9, 30, 'кг', 'Сорт «Семеренко».', { minStep: 0.5 }),
-    P('Гранат', 'Фрукты', 18, 12, 4, 'кг', 'Кандибадам, крупный.', { oldPrice: 22, minStep: 0.5, labels: ['Новинка'] }),
-    P('Курага исфаринская', 'Фрукты', 35, 24, 8, 'кг', 'Без косточки.', { minStep: 0.25 }),
-    P('Чакка домашняя', 'Молочное', 11, 7, 18, 'шт', 'Банка 500 г.'),
-    P('Молоко', 'Молочное', 9, 6, 0, 'л', 'Деревенское, 3,5%.', { minStep: 1 }),
-    P('Нон тандыри', 'Хлеб', 4, 2.5, 60, 'шт', 'Горячий, из тандыра.', { labels: ['Хит'] }),
-    P('Яйца деревенские', 'Молочное', 13, 9, 3, 'упак', 'Упаковка 10 шт.', { variants: [{ id: uid(), name: '10 шт', price: 13, cost: 9 }, { id: uid(), name: '30 шт', price: 36, cost: 26 }] }),
+    P('Помидоры местные', 'Овощи и зелень', 12, 8, 40, 'кг', 'Грунтовые, сладкие. Собраны вчера.', { labels: ['Хит'], minStep: 0.5 }),
+    P('Огурцы', 'Овощи и зелень', 10, 6, 25, 'кг', 'Хрустящие, тепличные.', { minStep: 0.5 }),
+    P('Картофель', 'Овощи и зелень', 6, 4, 120, 'кг', 'Молодой картофель.', { minStep: 1 }),
+    P('Яблоки', 'Фрукты и ягоды', 14, 9, 30, 'кг', 'Сорт «Семеренко».', { minStep: 0.5 }),
+    P('Гранат', 'Фрукты и ягоды', 18, 12, 4, 'кг', 'Кандибадам, крупный.', { oldPrice: 22, minStep: 0.5, labels: ['Новинка'] }),
+    P('Курага исфаринская', 'Орехи и сухофрукты', 35, 24, 8, 'кг', 'Без косточки.', { minStep: 0.25, expiry: addDays(today(), 90) }),
+    P('Чакка домашняя', 'Молочное и яйца', 11, 7, 18, 'шт', 'Банка 500 г.', { expiry: addDays(today(), 5), attrs: { pack: '500 г', country: 'Таджикистан' } }),
+    P('Молоко', 'Молочное и яйца', 9, 6, 0, 'л', 'Деревенское, 3,5%.', { minStep: 1, expiry: addDays(today(), 2) }),
+    P('Нон тандыри', 'Хлеб и выпечка', 4, 2.5, 60, 'шт', 'Горячий, из тандыра.', { labels: ['Хит'], expiry: addDays(today(), 1) }),
+    P('Яйца деревенские', 'Молочное и яйца', 13, 9, 3, 'упак', 'Упаковка 10 шт.', { expiry: addDays(today(), 14), variants: [{ id: uid(), name: '10 шт', price: 13, cost: 9 }, { id: uid(), name: '30 шт', price: 36, cost: 26 }] }),
   ];
   const names = ['Фарзона', 'Шерали', 'Мадина', 'Рустам', 'Нигина', 'Бахром', 'Зарина', 'Далер', 'Манижа', 'Сухроб'];
   const streets = ['ул. Айни 12', 'пр. Рудаки 98', 'ул. Шотемур 5', 'ул. Бохтар 31', 'мкр. Сино, д. 14', 'ул. Карамова 7'];
@@ -55,7 +55,7 @@ export function demo() {
   return {
     v: 2, demo: true,
     shop: { name: 'Бозори Сабз', type: 'Продукты', kind: 'grocery', city: 'Душанбе', landmark: 'Напротив ЦУМа', phone: '+992 93 555 12 34', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие овощи и фрукты каждый день.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), alif: { terminal: '200001', status: 'connected', holder: 'ИП Каримов Шерали', tin: '510012345' } },
-    cats: ['Овощи', 'Фрукты', 'Молочное', 'Мясо', 'Хлеб', 'Напитки'],
+    cats: [...SHOP_KINDS[0].cats],
     products, orders, expenses, nextNo: no + 1,
   };
 }
@@ -67,5 +67,5 @@ export function migrate(s) {
   if (!s || s === 'fresh' || s.v === 2) return s;
   const shop = { ...blankShop(s.shop), ...s.shop };
   return { v: 2, demo: s.demo, shop, cats: s.cats || [], orders: [], expenses: [], nextNo: 1001,
-    products: (s.products || []).map(p => ({ oldPrice: null, labels: [], prep: null, variants: [], ...p, imgs: p.imgs || (p.img ? [p.img] : []) })) };
+    products: (s.products || []).map(p => ({ oldPrice: null, labels: [], prep: null, variants: [], attrs: {}, expiry: '', ...p, imgs: p.imgs || (p.img ? [p.img] : []) })) };
 }

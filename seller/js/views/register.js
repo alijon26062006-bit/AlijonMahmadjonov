@@ -110,7 +110,7 @@ function stepReview() {
       ${row(`${esc(R.city)}, ${esc(R.address)}${R.landmark ? `<br><span class="small muted">${esc(R.landmark)}</span>` : ''}${R.lat ? '' : '<br><span class="small" style="color:var(--warn)">Метка на карте не поставлена</span>'}`, 2)}
       ${row(`${scheduleText()} · ${[R.delivery && 'доставка', R.pickup && 'самовывоз'].filter(Boolean).join(' и ')} · сборка ${R.prep} мин`, 3)}
     </div>
-    <p class="small muted" style="margin:0">Категории товаров создадутся сами: ${k.cats.join(', ')}. Их можно переименовать.</p>`;
+    <p class="small muted" style="margin:0">Создадим ${k.cats.length} готовых категорий: ${k.cats.slice(0, 4).join(', ')} и другие. Лишние можно не использовать, свои — добавить.</p>`;
 }
 
 const scheduleText = () => {

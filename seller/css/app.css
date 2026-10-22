@@ -560,3 +560,17 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
 @media (prefers-reduced-motion: reduce) { .intro-art { animation: none; } }
 .kind-ph { display: grid; place-items: center; }
 .kind-ph svg { width: 44%; fill: none; stroke: #21201c; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* карточка товара по шагам */
+.ptabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 10px -20px 18px; padding: 0 20px; }
+.ptabs::-webkit-scrollbar { display: none; }
+.ptab { flex: none; border: 0; border-radius: 99px; background: var(--surface); color: var(--muted); font-size: 13.5px; font-weight: 500; padding: 8px 12px; white-space: nowrap; }
+.ptab b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--field); color: var(--ink); font-size: 12px; margin-right: 4px; }
+.ptab[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.ptab[aria-selected="true"] b { background: var(--accent); color: var(--accent-ink); }
+.ptab:disabled { opacity: .45; }
+.sheet .wiz-prog { margin-top: 2px; }
+.preview-one { grid-template-columns: minmax(0, 200px); }
+.tips { margin: 0; padding: 12px 14px 12px 32px; border-radius: 14px; background: var(--warn-soft, var(--accent-soft)); font-size: 14px; display: grid; gap: 4px; }
+.agree.confirm { background: var(--surface); border-radius: 14px; padding: 14px; font-size: 14px; line-height: 1.45; }
+.agree.confirm input { accent-color: var(--ink); }

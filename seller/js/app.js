@@ -5,7 +5,8 @@ import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
 import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, openSheet, showErrors, TABS, toast } from './ui/dom.js';
-import { copyText, doImport, drawProduct, editing, openProduct, previewImport, readImage, saveProduct, sheetImport, syncDraft, updateMargin, variantRow, vCatalog } from './views/catalog.js';
+import { copyText, doImport, previewImport, readImage, sheetImport, vCatalog } from './views/catalog.js';
+import { drawProduct, editing, openProduct, saveProduct, submitProduct, syncDraft, updateMargin, variantRow } from './views/product.js';
 import { saveExpense, sheetExpense, vExpenses } from './views/expenses.js';
 import { vFinance } from './views/finance.js';
 import { vHome } from './views/home.js';
@@ -109,7 +110,7 @@ document.addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'q') { ui.q = e.target.value; render(); }
   if (id === 'oq') { ui.oq = e.target.value; render(); const el = $('#oq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-  if (id === 'p_price' || id === 'p_cost' || id === 'p_old') updateMargin();
+  if (id === 'p_price' || id === 'p_cost' || id === 'p_oldPrice') updateMargin();
   if (id === 'impText') previewImport();
   if (id === 'agIn') { flow.agree = e.target.checked; $('#agreeBtn').disabled = !flow.agree; }
   if (id === 'phoneIn') { const d = e.target.value.replace(/\D/g, '').replace(/^992(?=\d{9})/, '').slice(0, 9); flow.phone = d; e.target.value = fmtPhone(d); }
@@ -156,7 +157,7 @@ document.addEventListener('submit', e => {
     S.shop.alif = { terminal: t, holder: h, tin: n, status: 'pending' }; save(); render(); toast('Отправили на проверку');
   }
   if (id === 'catForm') { const v = $('#newCat').value.trim(); if (!v) return; if (S.cats.includes(v)) return toast('Такая категория уже есть'); S.cats.push(v); save(); render(); }
-  if (id === 'pForm') saveProduct();
+  if (id === 'pForm') submitProduct();
   if (id === 'expForm') saveExpense();
   if (id === 'phoneForm') {
     if (!$('#agIn').checked) return;
