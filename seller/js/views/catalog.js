@@ -23,7 +23,7 @@ export function vCatalog() {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
       <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
-      <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="btn sm ${isStopped(p) ? 'danger' : 'ghost'}" data-stop="${p.id}" title="${isStopped(p) ? 'Вернуть в продажу' : 'Скрыть до завтра: закончилось на сегодня'}">${isStopped(p) ? 'Вернуть' : 'Стоп'}</button></div>
+      <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="tgl" role="switch" aria-checked="${!isStopped(p)}" data-stop="${p.id}" aria-label="${esc(p.name)}: в наличии сегодня" title="${isStopped(p) ? 'Закончилось на сегодня. Включите, чтобы вернуть в продажу' : 'В продаже. Выключите, если закончилось на сегодня'}"></button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
   }).join('');
@@ -32,7 +32,8 @@ export function vCatalog() {
     : `<div class="empty panel"><b>Ничего не нашлось</b><span>Измените поиск или фильтр.</span></div>`;
   return `
     <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Товары <span class="num" style="color:var(--muted);font-weight:500">${S.products.length}</span></h1></div>
-      <div class="row"><button class="btn" data-act="import">${ICON.import} Из Excel</button><button class="btn" data-act="export">Копировать список</button><button class="btn primary" data-act="add">${plusI} Добавить товар</button></div></div>
+      <div class="row"><button class="btn" data-act="import">${ICON.import} Из Excel</button><button class="btn" data-act="export">Копировать список</button><button class="btn primary hide-m" data-act="add">${plusI} Добавить товар</button></div></div>
+    <button class="btn primary fab" data-act="add">${plusI} Добавить товар</button>
     <div class="toolbar">
       <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="q" type="search" placeholder="Поиск по названию" value="${esc(ui.q)}" aria-label="Поиск"></div>
       <select class="input" id="stockFilter" style="width:auto" aria-label="Фильтр">
@@ -74,7 +75,7 @@ export function drawProduct() {
     <div class="field"><span class="lbl">Фото, до 4 штук</span><div class="photos">${ph}${d.imgs.length < 4 ? `<label class="ph" for="pFile">+ Добавить фото</label>` : ''}</div><input type="file" id="pFile" accept="image/*" multiple hidden>
       ${d.imgs.length ? '' : '<span class="small muted">Товары с фото покупают в несколько раз чаще. Снимайте при дневном свете на светлом фоне.</span>'}</div>
     <form id="pForm" class="col" novalidate style="gap:16px">
-      <div class="field"><label for="p_name">Название *</label><input class="input" id="p_name" name="name" value="${esc(d.name)}" maxlength="80" placeholder="Например, Букет из 15 роз"></div>
+      <div class="field"><label for="p_name">Название *</label><input class="input" id="p_name" name="name" value="${esc(d.name)}" maxlength="80" placeholder="Например, Помидоры местные"></div>
       <div class="grid2">
         <div class="field"><label for="p_cat">Категория</label><select class="input" id="p_cat" name="cat">${S.cats.map(c => `<option ${c === d.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__new">+ Новая категория…</option></select>
           <input class="input" id="p_newcat" name="newcat" placeholder="Название категории" hidden maxlength="30"></div>
@@ -92,7 +93,7 @@ export function drawProduct() {
       <div class="field"><span class="lbl">Метки на карточке</span><div class="chips wrap">${LABELS.map(l => `<label class="chip" style="cursor:pointer"><input type="checkbox" name="label" value="${esc(l)}" ${d.labels.includes(l) ? 'checked' : ''} style="accent-color:var(--accent);margin:0 6px 0 0;vertical-align:-2px">${esc(l)}</label>`).join('')}</div></div>
       <details class="more" ${d.variants.length ? 'open' : ''}><summary>Варианты товара ${d.variants.length ? `(${d.variants.length})` : ''}</summary>
         <div class="col">
-          <span class="small muted">Например, букет из 15, 25 или 51 розы, или размер S/M/L. У каждого варианта своя цена. Если варианты есть, покупатель выбирает один из них.</span>
+          <span class="small muted">Например, яйца по 10 или 30 штук, плов на одного или на компанию. У каждого варианта своя цена. Если варианты есть, покупатель выбирает один из них.</span>
           <div class="variants" id="variants">${d.variants.map(v => variantRow(v)).join('')}</div>
           <div><button type="button" class="btn sm" data-act="addvar">${plusI} Добавить вариант</button></div>
         </div></details>
@@ -105,7 +106,7 @@ export function drawProduct() {
      <div class="row"><button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="saveP">${editing.isNew ? 'Добавить товар' : 'Сохранить'}</button></div>`);
   updateMargin();
 }
-export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="Название, напр. 25 роз" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
+export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="Название, напр. 30 шт" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
 export function readVariants() {
   return [...document.querySelectorAll('#variants .variant')].map(el => ({ id: el.dataset.vid, name: el.querySelector('.vn').value.trim(), price: num(el.querySelector('.vp').value), cost: el.querySelector('.vc').value.trim() === '' ? null : num(el.querySelector('.vc').value) }));
 }
@@ -176,7 +177,7 @@ export function sheetImport() {
   openSheet('Загрузить товары из Excel', `
     <p style="margin:0">Скопируйте строки из Excel или Google Таблиц и вставьте сюда. Столбцы по порядку:</p>
     <div class="tablewrap panel tight"><table><thead><tr><th>Название</th><th class="r">Цена</th><th class="r">Закупка</th><th class="r">Остаток</th><th>Категория</th></tr></thead>
-    <tbody><tr><td>Роза белая</td><td class="r">15</td><td class="r">8</td><td class="r">50</td><td>Розы</td></tr></tbody></table></div>
+    <tbody><tr><td>Помидоры</td><td class="r">12</td><td class="r">8</td><td class="r">40</td><td>Овощи</td></tr></tbody></table></div>
     <span class="small muted">Обязательны только название и цена. Строку с заголовками можно не убирать.</span>
     <textarea class="input" id="impText" style="min-height:180px;font-variant-numeric:tabular-nums" placeholder="Вставьте строки сюда"></textarea>
     <div id="impPreview" class="small"></div>`,
@@ -197,7 +198,7 @@ export function parseImport(text) {
 }
 export function previewImport() {
   const { ok, bad } = parseImport($('#impText').value);
-  $('#impPreview').innerHTML = (ok.length ? `<span style="color:var(--accent);font-weight:600">Готово к добавлению: ${ok.length}</span>` : '') + (bad.length ? `<br><span class="err">Не поняли строки: ${bad.slice(0, 12).join(', ')}${bad.length > 12 ? '…' : ''}. Проверьте, что во втором столбце цена.</span>` : '');
+  $('#impPreview').innerHTML = (ok.length ? `<span style="color:var(--ok);font-weight:600">Готово к добавлению: ${ok.length}</span>` : '') + (bad.length ? `<br><span class="err">Не поняли строки: ${bad.slice(0, 12).join(', ')}${bad.length > 12 ? '…' : ''}. Проверьте, что во втором столбце цена.</span>` : '');
   document.querySelector('[data-act="doimport"]').disabled = !ok.length;
 }
 export function doImport() {

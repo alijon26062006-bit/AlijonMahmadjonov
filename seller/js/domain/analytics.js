@@ -53,7 +53,7 @@ export function trend(cur, prev) {
   if (!prev && !cur) return '<span class="muted">—</span>';
   if (!prev) return '<span class="pill">новый</span>';
   const d = Math.round((cur - prev) / prev * 100);
-  return d >= 0 ? `<b style="color:var(--accent)">▲ ${d}%</b>` : `<b style="color:var(--bad)">▼ ${-d}%</b>`;
+  return d >= 0 ? `<b style="color:var(--ok)">▲ ${d}%</b>` : `<b style="color:var(--bad)">▼ ${-d}%</b>`;
 }
 
 export function readiness() {

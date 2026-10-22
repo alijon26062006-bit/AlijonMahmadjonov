@@ -17,15 +17,17 @@ export function vOrders() {
   return `
     <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Заказы</h1></div>
       <div class="row"><button class="btn" data-act="testorder">Тестовый заказ</button><button class="btn primary" data-act="sale">${plusI} Продажа в магазине</button></div></div>
+    <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="oq" type="search" inputmode="search" placeholder="Найти заказ по номеру, имени или телефону" value="${esc(ui.oq)}" aria-label="Поиск заказа"></div>
+    ${oq ? `<span class="small muted">Найдено: ${list.length}</span>` : ''}
+    <div class="seg" role="group" aria-label="Статус" ${oq ? 'hidden' : ''}>${tab('new', 'Новые')}${tab('work', 'В работе')}${tab('done', 'Выполненные')}${tab('cancelled', 'Отменённые')}</div>
+    ${list.length ? `<div class="orders">${list.map(orderCard).join('')}</div>${more ? '<p class="muted small" style="margin:0">Показаны последние 40 заказов. Все продажи по дням есть в «Статистике».</p>' : ''}` : `<div class="empty panel"><b>${ui.ordTab === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</b><span>${ui.ordTab === 'new' ? 'Когда покупатель оформит заказ, он появится здесь, а на телефон придёт уведомление со звуком. Нажмите «Тестовый заказ», чтобы посмотреть, как это выглядит.' : ''}</span></div>`}
+    <section class="col" style="gap:10px;margin-top:8px"><h2>Настройки приёма</h2>
     <label class="switch" for="pauseSw"><span><b style="font-weight:600">Принимаю заказы</b><br><span class="small muted">Выключите, если закрылись раньше или не успеваете. Покупатели увидят «Временно не работает».</span></span><input type="checkbox" id="pauseSw" ${S.shop.paused ? '' : 'checked'}></label>
     <div class="grid2">
       <label class="switch" for="soundSw"><span><b style="font-weight:600">Звук о новых заказах</b><br><span class="small muted">Звонит, пока вы не ответите</span></span><input type="checkbox" id="soundSw" ${S.shop.sound !== false ? 'checked' : ''}></label>
       <label class="switch" for="autoSw"><span><b style="font-weight:600">Принимать автоматически</b><br><span class="small muted">Со временем сборки ${S.shop.prep} мин</span></span><input type="checkbox" id="autoSw" ${S.shop.autoAccept ? 'checked' : ''}></label>
     </div>
-    <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="oq" type="search" inputmode="search" placeholder="Найти заказ по номеру, имени или телефону" value="${esc(ui.oq)}" aria-label="Поиск заказа"></div>
-    ${oq ? `<span class="small muted">Найдено: ${list.length}</span>` : ''}
-    <div class="chips" role="group" aria-label="Статус" ${oq ? 'hidden' : ''}>${tab('new', 'Новые')}${tab('work', 'В работе')}${tab('done', 'Выполненные')}${tab('cancelled', 'Отменённые')}</div>
-    ${list.length ? `<div class="orders">${list.map(orderCard).join('')}</div>${more ? '<p class="muted small" style="margin:0">Показаны последние 40 заказов. Все продажи по дням есть в «Статистике».</p>' : ''}` : `<div class="empty panel"><b>${ui.ordTab === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</b><span>${ui.ordTab === 'new' ? 'Когда покупатель оформит заказ, он появится здесь, а на телефон придёт уведомление со звуком. Нажмите «Тестовый заказ», чтобы посмотреть, как это выглядит.' : ''}</span></div>`}`;
+    </section>`;
 }
 export function orderCard(o) {
   const total = orderTotal(o);

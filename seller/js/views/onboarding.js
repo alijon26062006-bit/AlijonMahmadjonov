@@ -72,7 +72,7 @@ setInterval(() => {
 
 export function shopFields(s) {
   return `
-    <div class="field"><label for="s_name">Название магазина *</label><input class="input" id="s_name" name="name" value="${esc(s.name)}" placeholder="Например, Гулистон" maxlength="60"></div>
+    <div class="field"><label for="s_name">Название магазина *</label><input class="input" id="s_name" name="name" value="${esc(s.name)}" placeholder="Например, Бозори Сабз" maxlength="60"></div>
     <div class="grid2">
       <div class="field"><label for="s_type">Что продаёте *</label><select class="input" id="s_type" name="type"><option value="">Выберите</option>${SHOP_TYPES.map(t => `<option ${t === s.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
       <div class="field"><label for="s_phone">Телефон *</label><input class="input" id="s_phone" name="phone" type="tel" value="${esc(s.phone)}" placeholder="+992 __ ___ __ __"></div>

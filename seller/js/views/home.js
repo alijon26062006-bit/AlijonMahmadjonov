@@ -25,7 +25,7 @@ export function vHome() {
     ${hitsBlock()}
     <div class="split">
       <section class="panel col">
-        <div class="row between"><h2>Готовность к запуску</h2><b class="num" style="color:var(--accent)">${ready.pct}%</b></div>
+        <div class="row between"><h2>Готовность к запуску</h2><b class="num" style="color:var(--ink)">${ready.pct}%</b></div>
         <div class="bar"><i style="width:${ready.pct}%"></i></div>
         <ul class="checklist">${ready.checks.map(([ok, t, nav]) => `<li><span class="dot ${ok ? 'ok' : ''}">${ok ? ICON.check : ''}</span><span style="flex:1">${t}</span>${!ok && nav ? `<button class="btn sm" data-nav="${nav}">Исправить</button>` : ''}</li>`).join('')}</ul>
       </section>

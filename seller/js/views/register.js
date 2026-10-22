@@ -53,10 +53,10 @@ export function renderRegister() {
 
 function stepKind() {
   return `<h1>Что вы продаёте?</h1>
-    <p class="muted">От этого зависит, в чём вы будете продавать товары: в килограммах, штуках или порциях.</p>
+    <p class="muted">От этого зависят единицы товаров и готовые категории. Поменять можно позже в настройках.</p>
     <div class="kinds" role="radiogroup" aria-label="Тип магазина">
       ${SHOP_KINDS.map(k => `<button class="kind" role="radio" aria-checked="${R.kind === k.id}" data-reg-kind="${k.id}">
-        <svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg><b>${k.name}</b><small>${k.units.join(', ')}</small></button>`).join('')}
+        <svg viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg><span><b>${k.name}</b><small>${k.hint}</small><small class="units">${k.units.join(' · ')}</small></span></button>`).join('')}
     </div>
     <span class="err" id="r_err"></span>`;
 }
