@@ -1,0 +1,70 @@
+import { DAYS } from './config.js';
+import { addDays, pad, parseKey, today, uid } from './lib/format.js';
+
+// пример магазина
+export function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+export function demo() {
+  const R = rng(26062006);
+  const P = (name, cat, price, cost, stock, unit, desc, extra = {}) => ({ id: uid(), name, cat, price, oldPrice: null, cost, stock, unit, desc, imgs: [], active: true, labels: [], prep: null, variants: [], created: Date.now() - Math.floor(R() * 9e8), ...extra });
+  const products = [
+    P('Роза красная, 60 см', 'Розы', 15, 8, 120, 'шт', 'Эквадорская роза, стоит до 10 дней.', { labels: ['Хит'] }),
+    P('Букет из роз «Нежность»', 'Букеты', 290, 160, 6, 'букет', 'Розовые розы и эвкалипт в крафтовой упаковке.', { variants: [{ id: uid(), name: '15 роз', price: 290, cost: 160 }, { id: uid(), name: '25 роз', price: 450, cost: 255 }, { id: uid(), name: '51 роза', price: 850, cost: 500 }], labels: ['Выбор магазина'], prep: 30 }),
+    P('Букет «Весна»', 'Букеты', 199, 115, 4, 'букет', 'Тюльпаны, хризантемы и зелень.', { oldPrice: 240, labels: ['К празднику'], prep: 25 }),
+    P('Тюльпаны микс, 25 шт', 'Тюльпаны', 250, 140, 9, 'букет', 'Голландские тюльпаны пяти цветов.', { labels: ['Новинка'] }),
+    P('Тюльпан белый', 'Тюльпаны', 9, 5, 0, 'шт', 'Поштучно, можно собрать свой букет.'),
+    P('Орхидея фаленопсис', 'В горшках', 180, 105, 3, 'шт', 'Две ветки, в керамическом кашпо.'),
+    P('Корзина «Праздник», 51 роза', 'Букеты', 790, 470, 2, 'шт', 'Большая корзина из красных и белых роз.', { prep: 60 }),
+    P('Открытка с вашим текстом', 'Подарки', 10, 3, 200, 'шт', 'Подпишем от руки.'),
+    P('Мягкий мишка, 30 см', 'Подарки', 85, 50, 11, 'шт', ''),
+  ];
+  const names = ['Фарзона', 'Шерали', 'Мадина', 'Рустам', 'Нигина', 'Бахром', 'Зарина', 'Далер', 'Манижа', 'Сухроб'];
+  const streets = ['ул. Айни 12', 'пр. Рудаки 98', 'ул. Шотемур 5', 'ул. Бохтар 31', 'мкр. Сино, д. 14', 'ул. Карамова 7'];
+  const pickItems = () => {
+    const n = 1 + Math.floor(R() * 2), items = [];
+    for (let i = 0; i < n; i++) {
+      const p = products[Math.floor(R() * products.length)];
+      const v = p.variants.length ? p.variants[Math.floor(R() * p.variants.length)] : null;
+      const qty = p.unit === 'шт' && p.price < 30 ? 5 + Math.floor(R() * 20) : 1 + Math.floor(R() * 2);
+      items.push({ pid: p.id, name: p.name, variant: v ? v.name : '', qty, price: v ? v.price : p.price, cost: v ? v.cost : p.cost });
+    }
+    return items;
+  };
+  const orders = []; let no = 1000;
+  for (let back = 34; back >= 0; back--) {
+    const day = parseKey(addDays(today(), -back));
+    const weekend = day.getDay() === 0 || day.getDay() === 6;
+    const n = 3 + Math.floor(R() * (weekend ? 9 : 6)) + (back < 10 ? 2 : 0);
+    for (let i = 0; i < n; i++) {
+      const ts = new Date(day); ts.setHours(9 + Math.floor(R() * 12), Math.floor(R() * 60));
+      if (ts.getTime() > Date.now() - 60 * 60000) continue; // сегодня — только уже прошедшие часы
+      const app = R() < .6, cancel = R() < .06;
+      orders.push({ id: uid(), no: ++no, ts: ts.getTime(), source: app ? 'app' : 'shop', status: cancel ? 'cancelled' : 'done', items: pickItems(), customer: app ? { name: names[Math.floor(R() * names.length)], phone: '+992 9' + Math.floor(R() * 1e8).toString().padStart(8, '0'), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] } : null, delivery: app ? (R() < .8 ? 'courier' : 'pickup') : 'shop', comment: '', cancelReason: cancel ? 'Нет товара' : '', pay: R() < .5 ? 'Наличные' : 'Карта' });
+    }
+  }
+  const now = Date.now();
+  const live = (st, ago, comment) => ({ id: uid(), no: ++no, ts: now - ago * 60000, source: 'app', status: st, items: pickItems(), customer: { name: names[Math.floor(R() * names.length)], phone: '+992 93 555 12 ' + pad(Math.floor(R() * 99)), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] }, delivery: 'courier', comment, cancelReason: '', pay: 'Наличные', readyIn: st === 'accepted' ? 25 : null });
+  orders.push(live('ready', 41, ''), live('accepted', 18, 'Позвоните за 10 минут'), live('new', 3, 'Добавьте открытку «С днём рождения!»'), live('new', 1, ''));
+  const expenses = [];
+  const E = (back, cat, amount, note) => expenses.push({ id: uid(), date: addDays(today(), -back), cat, amount, note });
+  E(30, 'Аренда', 2500, 'Аренда павильона'); E(28, 'Закупка товара', 3200, 'Розы, тюльпаны'); E(21, 'Закупка товара', 2800, 'Розы, хризантемы');
+  E(16, 'Зарплата', 1800, 'Флорист, половина месяца'); E(14, 'Закупка товара', 3100, ''); E(12, 'Упаковка', 260, 'Крафт, ленты');
+  E(9, 'Реклама', 400, 'Instagram'); E(7, 'Закупка товара', 2950, ''); E(5, 'Коммунальные', 380, 'Свет, вода'); E(2, 'Доставка товара', 150, 'Такси с базы'); E(1, 'Зарплата', 1800, 'Флорист');
+  // в примере закупка товара считается и через закупочную цену, поэтому помечаем такие расходы, чтобы не учитывать дважды
+  expenses.forEach(e => { if (e.cat === 'Закупка товара') e.stockPurchase = true; });
+  return {
+    v: 2, demo: true,
+    shop: { name: 'Гулистон', type: 'Цветы', phone: '+992 90 123 45 67', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие цветы каждый день, сборка букета за 30 минут.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), alif: { terminal: '200001', status: 'connected', holder: 'ИП Каримова Фарзона', tin: '510012345' } },
+    cats: ['Розы', 'Букеты', 'Тюльпаны', 'В горшках', 'Подарки'],
+    products, orders, expenses, nextNo: no + 1,
+  };
+}
+export function blankShop(d) {
+  return { name: d.name, type: d.type, phone: d.phone, address: d.address, about: d.about || '', logo: '', paused: false, minOrder: 0, delivery: true, pickup: true, prep: 30, schedule: DAYS.map(() => ({ open: true, from: '09:00', to: '21:00' })), alif: { terminal: '', status: 'none', holder: '', tin: '' } };
+}
+// перевод данных из первой версии
+export function migrate(s) {
+  if (!s || s === 'fresh' || s.v === 2) return s;
+  const shop = { ...blankShop(s.shop), ...s.shop };
+  return { v: 2, demo: s.demo, shop, cats: s.cats || [], orders: [], expenses: [], nextNo: 1001,
+    products: (s.products || []).map(p => ({ oldPrice: null, labels: [], prep: null, variants: [], ...p, imgs: p.imgs || (p.img ? [p.img] : []) })) };
+}

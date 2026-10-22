@@ -1,4 +1,4 @@
-import { migrate } from './data/demo.js';
+import { migrate } from './demo.js';
 import { addDays, today } from './lib/format.js';
 import { auth, store } from './services/storage.js';
 import { toast } from './ui/dom.js';

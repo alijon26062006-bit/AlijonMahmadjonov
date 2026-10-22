@@ -1,5 +1,5 @@
 import { DAYS } from './config.js';
-import { blankShop, demo } from './data/demo.js';
+import { blankShop, demo } from './demo.js';
 import { changeStockForOrder } from './domain/orders.js';
 import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, saveAuth, store } from './services/storage.js';
