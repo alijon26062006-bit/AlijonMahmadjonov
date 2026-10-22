@@ -25,13 +25,13 @@ apt-get update -qq
 apt-get install -y -qq nginx git >/dev/null
 
 log "Скачиваю кабинет продавца"
-if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" fetch -q --depth 1 origin "$BRANCH"
-  git -C "$APP_DIR" reset -q --hard "origin/$BRANCH"
-else
-  rm -rf "$APP_DIR"
-  git clone -q --depth 1 --branch "$BRANCH" "$REPO" "$APP_DIR"
-fi
+# каждый раз скачиваем начисто во временную папку и подменяем — прерванный запуск ничего не ломает
+rm -rf "$APP_DIR.new"
+git clone -q --depth 1 --branch "$BRANCH" "$REPO" "$APP_DIR.new"
+rm -rf "$APP_DIR.old"
+[ -d "$APP_DIR" ] && mv "$APP_DIR" "$APP_DIR.old"
+mv "$APP_DIR.new" "$APP_DIR"
+rm -rf "$APP_DIR.old"
 chmod -R a+rX "$WEB_ROOT"
 
 log "Настраиваю nginx"
