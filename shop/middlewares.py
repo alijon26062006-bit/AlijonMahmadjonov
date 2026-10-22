@@ -188,14 +188,19 @@ class TenantMiddleware(BaseMiddleware):
     Боти асосӣ бо маълумоти Dispatcher кор мекунад; ботҳои шарикон — бо худашон.
     """
 
-    def __init__(self, resolve) -> None:
+    def __init__(self, resolve, is_main=None) -> None:
         self.resolve = resolve          # bot_id → TenantContext | None
+        self.is_main = is_main          # bot_id → bool (None — ҳама асосӣ)
 
     async def __call__(self, handler, event, data):
         from .i18n import set_lang, set_tenant
 
         bot = data.get("bot")
         ctx = self.resolve(bot.id) if bot is not None else None
+        if ctx is None and bot is not None and self.is_main is not None and not self.is_main(bot.id):
+            # Боти шарик ҳозир қатъ шуд: навсозии охирини онро бо базаи
+            # боти асосӣ коркард кардан мумкин нест — пули бегона мерафт.
+            return None
         if ctx is not None:
             data["db"], data["cfg"], data["supplier"] = ctx.db, ctx.cfg, ctx.supplier
             data["tenant"] = ctx

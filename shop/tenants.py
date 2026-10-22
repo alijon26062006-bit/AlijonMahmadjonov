@@ -9,8 +9,10 @@ Dispatcher ва ҳамон коди дӯкон кор мекунанд; TenantMi
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass, field, replace
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +36,9 @@ SUPPORT_KEY = "support_username"
 REVIEWS_KEY = "reviews_url"
 
 SYNC_EVERY = 60          # сония — ҳолати фармоишҳои яклухт
+ORPHAN_AFTER = timedelta(minutes=3)     # фармоиши нав, ки ба иҷро нарафт
+# Сабаби рад барои харидори боти шарик — бе ҷузъиёти дохилии платформа.
+PUBLIC_FAIL = "Таъминкунанда фармоишро иҷро накард"
 REPRICE_EVERY = 600      # сония — нархҳо аз нархи яклухт
 
 
@@ -59,6 +64,7 @@ class TenantContext:
     bot: Bot
     task: asyncio.Task | None = None
     username: str = ""
+    feeds: set = field(default_factory=set)     # навсозиҳое, ки ҳоло коркард мешаванд
 
 
 def constructor_open(db: Database) -> bool:
@@ -70,6 +76,19 @@ def max_bots_total(db: Database) -> int:
         return max(0, int(db.setting(MAX_BOTS_KEY) or DEFAULT_MAX_BOTS))
     except ValueError:
         return DEFAULT_MAX_BOTS
+
+
+@contextlib.contextmanager
+def bot_context(lang: str, tenant_id: int):
+    """Забон ва боти ҷорӣ барои кори паси парда (вазифаҳо контекстро мерос мегиранд)."""
+    from .i18n import LANG, TENANT
+
+    lang_token, tenant_token = LANG.set(lang or "tj"), TENANT.set(int(tenant_id or 0))
+    try:
+        yield
+    finally:
+        LANG.reset(lang_token)
+        TENANT.reset(tenant_token)
 
 
 def operators_of(db: Database) -> tuple[int, ...]:
@@ -86,10 +105,23 @@ class TenantManager:
     platform: Platform
     contexts: dict[int, TenantContext] = field(default_factory=dict)     # bot_id → ctx
     _tasks: set = field(default_factory=set)
+    # Базаҳо пас аз қатъи бот кушода мемонанд: вазифаҳои иҷрои фармоиш ҳанӯз
+    # метавонанд бо онҳо кор кунанд. Ҳангоми хомӯшии пурраи бот баста мешаванд.
+    _dbs: dict[int, Database] = field(default_factory=dict)
 
     # ── ёрирасонҳо ────────────────────────────────────────────────────
     def resolve(self, bot_id: int) -> TenantContext | None:
         return self.contexts.get(bot_id)
+
+    def is_main(self, bot_id: int) -> bool:
+        return bot_id == self.platform.bot.id
+
+    def open_db(self, bot_id: int) -> Database:
+        tdb = self._dbs.get(bot_id)
+        if tdb is None:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            tdb = self._dbs[bot_id] = Database(self.db_path(bot_id))
+        return tdb
 
     def by_tenant(self, tenant_id: int) -> TenantContext | None:
         return next((c for c in self.contexts.values() if c.id == tenant_id), None)
@@ -108,6 +140,7 @@ class TenantManager:
             main,
             token=row["token"],
             admin_ids=tuple(dict.fromkeys((row["owner_id"], *operators_of(tdb)))),
+            owner_ids=(row["owner_id"],),
             db_path=self.db_path(row["bot_id"]),
             support=(tdb.setting(SUPPORT_KEY) or "").lstrip("@"),
             reviews_url=tdb.setting(REVIEWS_KEY) or "",
@@ -142,14 +175,15 @@ class TenantManager:
             log.info("Конструктор: %s боти шарик кор мекунад", started)
         return started
 
-    async def start(self, row, *, poll: bool = True) -> TenantContext:
+    async def start(self, row, *, poll: bool = True) -> TenantContext | None:
         from .fulfillment import resume_in_background
         from .middlewares import ButtonStyleFallback
 
         if row["bot_id"] in self.contexts:
             return self.contexts[row["bot_id"]]
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        tdb = Database(self.db_path(row["bot_id"]))
+        if not constructor_open(self.platform.db) or row["status"] != "active":
+            return None
+        tdb = self.open_db(row["bot_id"])
         tdb.rotate_order_key_prefix()
         cfg = self.build_cfg(row, tdb)
         requisites.seed(tdb, cfg)
@@ -165,10 +199,16 @@ class TenantManager:
         if poll:
             ctx.task = self._spawn(self._poll(ctx))
             self._spawn(self._set_commands(ctx))
-            resume_in_background(bot, tdb, cfg, supplier)
+            with bot_context(cfg.lang, ctx.id):
+                resume_in_background(bot, tdb, cfg, supplier)
         return ctx
 
     async def stop(self, tenant_id: int) -> None:
+        """Ботро аз гирифтани навсозиҳо бозмедорад.
+
+        Навсозиҳое, ки ҳоло коркард мешаванд (масалан, харидор «Тасдиқ»-ро
+        пахш кард), то охир мерасанд — бекор кардани онҳо фармоишро нимкора мемонд.
+        """
         ctx = self.by_tenant(tenant_id)
         if ctx is None:
             return
@@ -176,19 +216,37 @@ class TenantManager:
         if ctx.task is not None and ctx.task is not asyncio.current_task():
             ctx.task.cancel()
             await asyncio.gather(ctx.task, return_exceptions=True)
+        self._spawn(self._close_when_idle(ctx))
+
+    async def _close_when_idle(self, ctx: TenantContext) -> None:
+        pending = [t for t in ctx.feeds if t is not asyncio.current_task()]
+        if pending:
+            await asyncio.wait(pending, timeout=120)
         try:
             await ctx.bot.session.close()
         except Exception:
             pass
-        ctx.db.close()
 
-    async def stop_all(self) -> None:
+    async def pause_all(self) -> None:
+        """Конструктор хомӯш шуд: ҳамаи ботҳои шарикон қатъ мешаванд (маълумот мемонад)."""
         for ctx in list(self.contexts.values()):
             await self.stop(ctx.id)
+
+    async def stop_all(self) -> None:
+        """Хомӯшии пурраи раванд (пас аз қатъи вазифаҳои иҷрои фармоиш)."""
+        for ctx in list(self.contexts.values()):
+            self.contexts.pop(ctx.bot_id, None)
+            try:
+                await ctx.bot.session.close()
+            except Exception:
+                pass
         for task in list(self._tasks):
             task.cancel()
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
+        for tdb in self._dbs.values():
+            tdb.close()
+        self._dbs.clear()
 
     def refresh(self, tenant_id: int) -> None:
         """Танзимот (операторон, забон, дастгирӣ) иваз шуд — бе азнавоғозкунӣ."""
@@ -239,7 +297,9 @@ class TenantManager:
                 continue
             for update in updates:
                 offset = update.update_id + 1
-                self._spawn(self._feed(ctx, update))
+                task = self._spawn(self._feed(ctx, update))
+                ctx.feeds.add(task)
+                task.add_done_callback(ctx.feeds.discard)
 
     async def _feed(self, ctx: TenantContext, update) -> None:
         try:
@@ -286,16 +346,29 @@ class TenantManager:
 
         Масалан, соҳиб фармоиши дастиро (Premium) иҷро кард — фармоиши харидор
         дар боти шарик низ баста мешавад ва чек меравад.
+
+        Фармоиши нимкора (бот дар миёнаи харид қатъ шуд) боз фиристода мешавад:
+        калиди такрор кафолат медиҳад, ки пули яклухт ду бор гирифта намешавад.
         """
-        from .fulfillment import finalize, is_busy
+        from .fulfillment import _age, deliver_order, finalize, is_busy, pick_supplier
 
         closed = 0
-        for row in ctx.db.open_orders(200):
-            ext = row["external_id"] or ""
-            if not ext.startswith("W") or is_busy(ctx.db, row["id"]):
-                continue
-            result = await ctx.supplier.order_status(ext)
-            if result.ok and result.status in ("completed", "failed"):
-                await finalize(ctx.bot, ctx.db, ctx.cfg, row["id"], result.status, result.error)
-                closed += 1
+        with bot_context(ctx.cfg.lang, ctx.id):
+            for row in ctx.db.open_orders(200):
+                if is_busy(ctx.db, row["id"]):
+                    continue
+                ext = row["external_id"] or ""
+                if ext.startswith("W"):
+                    result = await ctx.supplier.order_status(ext)
+                    if result.ok and result.status in ("completed", "failed"):
+                        await finalize(ctx.bot, ctx.db, ctx.cfg, row["id"], result.status,
+                                       PUBLIC_FAIL if result.status == "failed" else None)
+                        closed += 1
+                    continue
+                stuck = row["status"] == "new" and (
+                    row["supplier_ref"] or _age(row) > ORPHAN_AFTER
+                )
+                if stuck and pick_supplier(ctx.cfg, ctx.supplier, row["kind"] or "game",
+                                           row["sku"] or "") is not None:
+                    await deliver_order(ctx.bot, ctx.db, ctx.cfg, ctx.supplier, row["id"])
         return closed

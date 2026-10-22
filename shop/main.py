@@ -69,7 +69,8 @@ def build_dispatcher(db: Database, cfg: Config, supplier, tenants=None) -> Dispa
     dp.update.outer_middleware(ErrorGuardMiddleware())
     # Конструктор: аввал муайян мекунем, ки навсозӣ ба кадом бот тааллуқ дорад.
     dp.update.outer_middleware(
-        TenantMiddleware(tenants.resolve if tenants is not None else (lambda _bot_id: None))
+        TenantMiddleware(tenants.resolve, tenants.is_main) if tenants is not None
+        else TenantMiddleware(lambda _bot_id: None)
     )
     dp.update.outer_middleware(GuardMiddleware(db, cfg))
     dp.include_router(build_router())

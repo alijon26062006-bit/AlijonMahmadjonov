@@ -79,6 +79,8 @@ class Config:
     # Конструктор: 0 — боти асосӣ, вагарна рақами боти шарик (tenants.id).
     tenant_id: int = 0
     lang: str = "tj"
+    # Соҳиби боти шарик. Холӣ — ҳамаи админҳо соҳибанд (боти асосӣ).
+    owner_ids: tuple[int, ...] = ()
 
     @property
     def has_supplier(self) -> bool:
@@ -94,6 +96,10 @@ class Config:
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
+
+    def is_owner(self, user_id: int) -> bool:
+        """Соҳиб — на оператор: реквизитҳо, ҳисобҳо, нархҳо ва танзимот."""
+        return user_id in (self.owner_ids or self.admin_ids)
 
     @property
     def is_tenant(self) -> bool:

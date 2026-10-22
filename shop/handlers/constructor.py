@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sqlite3
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -51,6 +52,10 @@ partner_router.message.filter(InMain())
 partner_router.callback_query.filter(InMain())
 
 
+def _platform_full(db: Database) -> bool:
+    return len(db.tenants()) >= tenants_mod.max_bots_total(db)
+
+
 def _limits(db: Database, cfg: Config, user_id: int) -> tuple[bool, int]:
     """(дастрасӣ дорад?, чанд бот метавонад)."""
     if cfg.is_admin(user_id):
@@ -94,12 +99,20 @@ async def cb_c_new(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
     if not tenants_mod.constructor_open(db) or not allowed:
         await cb.answer(texts.CONSTRUCTOR_NO_ACCESS.replace("\n", " "), show_alert=True)
         return
-    if len(db.tenants(cb.from_user.id)) >= limit:
+    if len(db.tenants(cb.from_user.id)) >= limit or _platform_full(db):
         await cb.answer(texts.BOT_LIMIT.replace("❌ ", ""), show_alert=True)
         return
     await state.set_state(Constructor.waiting_token)
     await safe_edit(cb, texts.ASK_BOT_TOKEN, keyboards.constructor_cancel())
     await cb.answer()
+
+
+async def _forget(message: Message) -> None:
+    """Токенро дар чат намегузорем — ҳатто агар нодуруст бошад."""
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 
 async def _check_token(message: Message, token: str):
@@ -118,11 +131,14 @@ async def _check_token(message: Message, token: str):
 async def got_token(message: Message, state: FSMContext, db: Database, cfg: Config,
                     bot: Bot, tenants=None) -> None:
     token = message.text.strip()
+    if TOKEN_RE.match(token):
+        await _forget(message)
     me = await _check_token(message, token)
     if me is None:
         return
     allowed, limit = _limits(db, cfg, message.from_user.id)
-    if not allowed or len(db.tenants(message.from_user.id)) >= limit:
+    if (not allowed or not tenants_mod.constructor_open(db) or _platform_full(db)
+            or len(db.tenants(message.from_user.id)) >= limit):
         await state.clear()
         await message.answer(texts.BOT_LIMIT)
         return
@@ -134,14 +150,14 @@ async def got_token(message: Message, state: FSMContext, db: Database, cfg: Conf
         return
 
     await state.clear()
-    tenant_id = db.add_tenant(message.from_user.id, me.id, me.username or "", me.first_name or "", token)
+    try:
+        tenant_id = db.add_tenant(message.from_user.id, me.id, me.username or "",
+                                  me.first_name or "", token)
+    except sqlite3.IntegrityError:        # ҳамзамон ду бор фиристода шуд
+        await message.answer(texts.BOT_ALREADY_ADDED)
+        return
     if tenants is not None:
         await tenants.start(db.tenant(tenant_id))
-    # Токенро дар чат намегузорем.
-    try:
-        await message.delete()
-    except Exception:
-        pass
     await message.answer(texts.bot_created(me.username or ""))
     await _home(message, db, cfg, message.from_user.id, edit=False)
 
@@ -156,7 +172,12 @@ def _own_tenant(db: Database, user_id: int, raw: str):
 
 @partner_router.callback_query(F.data.startswith("c:bot:"))
 async def cb_c_bot(cb: CallbackQuery, db: Database, cfg: Config) -> None:
-    row = _own_tenant(db, cb.from_user.id, cb.data.rsplit(":", 1)[1])
+    await _show_bot(cb, db, cfg, cb.data.rsplit(":", 1)[1])
+
+
+async def _show_bot(cb: CallbackQuery, db: Database, cfg: Config, raw_id) -> None:
+    # Объектҳои aiogram тағйирнопазиранд (cb.data = ... хато медиҳад) — рақамро алоҳида медиҳем.
+    row = _own_tenant(db, cb.from_user.id, str(raw_id))
     if row is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
@@ -208,6 +229,8 @@ async def got_new_token(message: Message, state: FSMContext, db: Database, cfg: 
         await state.clear()
         return
     token = message.text.strip()
+    if TOKEN_RE.match(token):
+        await _forget(message)
     me = await _check_token(message, token)
     if me is None:
         return
@@ -225,10 +248,6 @@ async def got_new_token(message: Message, state: FSMContext, db: Database, cfg: 
         await tenants.stop(row["id"])
         if new_status == "active":
             await tenants.start(db.tenant(row["id"]))
-    try:
-        await message.delete()
-    except Exception:
-        pass
     await message.answer(f"✅ Токен нав шуд. @{me.username} боз кор мекунад.")
     await _home(message, db, cfg, message.from_user.id, edit=False)
 
@@ -246,7 +265,8 @@ async def cb_c_lang(cb: CallbackQuery, db: Database) -> None:
 
 @partner_router.callback_query(F.data.startswith("c:setlang:"))
 async def cb_c_setlang(cb: CallbackQuery, db: Database, cfg: Config, tenants=None) -> None:
-    _, _, raw_id, lang = cb.data.split(":")
+    parts = cb.data.split(":")
+    raw_id, lang = (parts[2], parts[3]) if len(parts) == 4 else ("", "")
     row = _own_tenant(db, cb.from_user.id, raw_id)
     if row is None or lang not in ("tj", "ru"):
         await cb.answer(texts.UNKNOWN, show_alert=True)
@@ -254,8 +274,7 @@ async def cb_c_setlang(cb: CallbackQuery, db: Database, cfg: Config, tenants=Non
     db.set_tenant(row["id"], lang=lang)
     if tenants is not None:
         tenants.refresh(row["id"])
-    cb.data = f"c:bot:{row['id']}"
-    await cb_c_bot(cb, db, cfg)
+    await _show_bot(cb, db, cfg, row["id"])
 
 
 # ══ Соҳиби платформа ═════════════════════════════════════════════════
@@ -290,7 +309,7 @@ async def cb_o_toggle(cb: CallbackQuery, db: Database, tenants=None) -> None:
     db.set_setting(tenants_mod.CONSTRUCTOR_ON_KEY, "0" if now_open else "1")
     if tenants is not None:
         if now_open:
-            await tenants.stop_all()
+            await tenants.pause_all()
         else:
             await tenants.start_all()
     await _owner_home(cb, db)
@@ -380,7 +399,11 @@ async def got_access(message: Message, state: FSMContext, db: Database, cfg: Con
 
 @owner_router.callback_query(F.data.startswith("o:revoke:"))
 async def cb_o_revoke(cb: CallbackQuery, db: Database, cfg: Config, tenants=None) -> None:
-    user_id = int(cb.data.rsplit(":", 1)[1])
+    raw = cb.data.rsplit(":", 1)[1]
+    if not raw.isdigit():
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    user_id = int(raw)
     db.revoke_constructor(user_id)
     # Бе дастрасӣ ботҳояш ҳам хомӯш мешаванд (маълумоташон нест намешавад).
     for row in db.tenants(user_id):
@@ -402,7 +425,8 @@ async def cb_o_bots(cb: CallbackQuery, db: Database) -> None:
 @owner_router.callback_query(F.data.startswith("o:block:") | F.data.startswith("o:unblock:"))
 async def cb_o_block(cb: CallbackQuery, db: Database, tenants=None) -> None:
     block = cb.data.startswith("o:block:")
-    row = db.tenant(int(cb.data.rsplit(":", 1)[1]))
+    raw = cb.data.rsplit(":", 1)[1]
+    row = db.tenant(int(raw)) if raw.isdigit() else None
     if row is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
@@ -431,6 +455,30 @@ OWNER_ONLY = ("a:supplier", "a:addgame", "a:costs", "a:rate", "a:markup",
                                                         for k in OWNER_ONLY)))
 async def cb_owner_only(cb: CallbackQuery) -> None:
     await cb.answer("Ин бахш танҳо барои соҳиби платформа.", show_alert=True)
+
+
+#: Оператор танҳо фармоишҳо, пардохтҳо, харидорон ва шарҳҳоро мебинад.
+OPERATOR_ALLOWED = ("a:home", "a:orders", "a:odone", "a:orej", "a:topups", "a:tok", "a:trej",
+                    "a:users", "a:find", "a:stats", "a:revok", "a:revno", "a:block", "a:unblock")
+
+
+class IsOperator(BaseFilter):
+    """Админи боти шарик, ки соҳиб нест."""
+
+    async def __call__(self, event: TelegramObject, cfg: Config) -> bool:
+        user = getattr(event, "from_user", None)
+        return bool(user and cfg.is_admin(user.id) and not cfg.is_owner(user.id))
+
+
+def _operator_forbidden(data: str | None) -> bool:
+    if not data or not data.startswith("a:"):
+        return False
+    return not any(data == k or data.startswith(k + ":") for k in OPERATOR_ALLOWED)
+
+
+@tenant_router.callback_query(IsOperator(), F.data.func(_operator_forbidden))
+async def cb_operator_forbidden(cb: CallbackQuery) -> None:
+    await cb.answer("Ин бахш танҳо барои соҳиби бот.", show_alert=True)
 
 
 @tenant_router.message(Command("sku", "rang", "colors"))
@@ -540,7 +588,11 @@ async def got_operator(message: Message, state: FSMContext, db: Database, tenant
 @tenant_router.callback_query(F.data.startswith("a:opdel:"))
 async def cb_t_opdel(cb: CallbackQuery, state: FSMContext, db: Database, tenant=None,
                      tenants=None) -> None:
-    gone = int(cb.data.rsplit(":", 1)[1])
+    raw = cb.data.rsplit(":", 1)[1]
+    if not raw.lstrip("-").isdigit():
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    gone = int(raw)
     ops = tuple(o for o in tenants_mod.operators_of(db) if o != gone)
     db.set_setting(tenants_mod.OPERATORS_KEY, ",".join(map(str, ops)))
     if tenants is not None and tenant is not None:
@@ -574,5 +626,4 @@ async def cb_t_unlock(cb: CallbackQuery, db: Database, cfg: Config, tenants=None
     db.unlock_price(code)
     if tenants is not None:
         wholesale.reprice_tenant(tenants.platform.db, db)
-    cb.data = f"a:price:{code}"
-    await cb_price_item(cb, db, cfg)
+    await cb_price_item(cb, db, cfg)          # рамзи мол охирин қисми cb.data аст

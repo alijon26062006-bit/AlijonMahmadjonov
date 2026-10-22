@@ -9,9 +9,17 @@ from urllib.parse import quote
 _DIGITS = re.compile(r"\D+")
 
 
-def make_code() -> str:
-    """Коди чоррақамаи тасдиқ, ки харидор дар шарҳи ҳавола менависад."""
-    return f"{secrets.randbelow(9000) + 1000}"
+def make_code(busy: set[str] | frozenset = frozenset()) -> str:
+    """Коди чоррақамаи тасдиқ, ки харидор дар шарҳи ҳавола менависад.
+
+    Код дар байни пардохтҳои интизорӣ такрор намешавад — вагарна админ
+    пулро ба харидори дигар мегузошт.
+    """
+    for _ in range(200):
+        code = f"{secrets.randbelow(9000) + 1000}"
+        if code not in busy:
+            return code
+    return f"{secrets.randbelow(90000) + 10000}"
 
 
 def card_digits(card: str) -> str:

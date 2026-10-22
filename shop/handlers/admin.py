@@ -196,12 +196,21 @@ async def cb_orders(cb: CallbackQuery, db: Database, cfg: Config) -> None:
 
 @router.callback_query(F.data.startswith("a:odone:") | F.data.startswith("a:orej:"))
 async def cb_order_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot) -> None:
+    from ..fulfillment import is_busy
+
     action = cb.data.split(":")[1]
-    order_id = int(cb.data.rsplit(":", 1)[1])
+    raw = cb.data.rsplit(":", 1)[1]
+    order_id = int(raw) if raw.isdigit() else 0
     status = ORDER_DONE if action == "odone" else ORDER_REJECTED
     before = db.order(order_id)
     if before is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    if is_busy(db, order_id):
+        # Бот ҳоло фармоишро ба таъминкунанда мефиристад — рад дар ин лаҳза
+        # метавонад ҳам пул ва ҳам молро ба харидор диҳад.
+        await cb.answer("⏳ Фармоиш ҳоло худкор иҷро мешавад. Пас аз 1–2 дақиқа санҷед.",
+                        show_alert=True)
         return
     if before["status"] not in ORDER_OPEN:
         # Фармоиш аллакай баста шудааст (худкор ё админи дигар). Ҳолати
@@ -557,7 +566,7 @@ async def cb_del_partner_price(cb: CallbackQuery, db: Database, cfg: Config) -> 
 
 # ── шарҳҳо ────────────────────────────────────────────────────────────
 # Шарҳҳое, ки ҳоло нашр мешаванд — пахши дуюм дар ин вақт рад мешавад.
-_REVIEWS_BUSY: set[int] = set()
+_REVIEWS_BUSY: set[tuple[str, int]] = set()     # (база, шарҳ): ботҳои шарикон алоҳида
 
 
 @router.callback_query(F.data.startswith("a:revok:") | F.data.startswith("a:revno:"))
@@ -566,12 +575,14 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
     from .reviews import publish_review
 
     action = cb.data.split(":")[1]
-    review_id = int(cb.data.rsplit(":", 1)[1])
+    raw = cb.data.rsplit(":", 1)[1]
+    review_id = int(raw) if raw.isdigit() else 0
+    busy_key = (str(db.path), review_id)
     row = db.review(review_id)
     if row is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
-    if row["status"] != REVIEW_PENDING or review_id in _REVIEWS_BUSY:
+    if row["status"] != REVIEW_PENDING or busy_key in _REVIEWS_BUSY:
         # Дубора пахш шуд ё админи дигар аллакай ҳал кард — шарҳ дар канал
         # набояд ду бор нашр шавад.
         await cb.answer("Аллакай ҳал шудааст", show_alert=True)
@@ -584,13 +595,13 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
         await cb.answer("❌")
         return
 
-    _REVIEWS_BUSY.add(review_id)
+    _REVIEWS_BUSY.add(busy_key)
     try:
         published, reason = await publish_review(bot, db, review_id)
         if published:
             db.set_review_status(review_id, REVIEW_PUBLISHED)
     finally:
-        _REVIEWS_BUSY.discard(review_id)
+        _REVIEWS_BUSY.discard(busy_key)
     if not published:
         await cb.answer("⚠️", show_alert=False)
         await cb.message.answer(
@@ -801,10 +812,8 @@ async def cb_group_screen(cb: CallbackQuery, db: Database, cfg: Config) -> None:
 async def cb_group_toggle(cb: CallbackQuery, db: Database, cfg: Config) -> None:
     action = cb.data.split(":")[1]
     code = cb.data.rsplit(":", 1)[1]
-    changed = db.set_group_products_active(code, action == "gon")
-    await cb.answer(
-        f"{'✅ Фаъол' if action == 'gon' else '🚫 Хомӯш'}: {changed} мол"
-    )
+    db.set_group_products_active(code, action == "gon", only_available=cfg.is_tenant)
+    # cb_group_screen худаш ба тугма ҷавоб медиҳад (ҷавоби дуюм хато медод).
     await cb_group_screen(cb, db, cfg)
 
 

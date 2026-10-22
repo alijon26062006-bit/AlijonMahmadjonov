@@ -87,7 +87,7 @@ async def _start_payment(
     if not req.any_enabled:
         await message.answer(texts.NO_REQUISITES, reply_markup=keyboards.back_home())
         return
-    code = payments.make_code()
+    code = payments.make_code(db.waiting_topup_codes())
     topup_id = db.create_topup(user_id, amount, code)
     link, alif = requisites.pay_links(req, cfg, amount, code)
     text = texts.payment_details(

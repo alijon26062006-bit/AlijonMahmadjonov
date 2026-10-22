@@ -130,6 +130,16 @@ async def _refund(
     ҳеҷ чиз намекунем — вагарна харидор хабари бардурӯғ мегирифт.
     """
     if not _is_open(db, order_id):
+        done = db.order(order_id)
+        if done is not None and done["status"] == ORDER_DONE:
+            # Админ дастӣ «иҷро» зад, аммо таъминкунанда фармоишро рад кард.
+            await _tell_admins(
+                bot, cfg,
+                f"⚠️ <b>Фармоиши #{order_id}</b> дастӣ «иҷрошуда» шуда буд, аммо "
+                f"таъминкунанда онро <b>рад кард</b> (<code>{texts.esc(reason or '—')}</code>).\n"
+                f"📦 {texts.esc(done['title'])} → <code>{texts.esc(done['target'])}</code>\n"
+                "Санҷед, ки харидор молро гирифт; агар не — пулро баргардонед.",
+            )
         return
     row = db.set_order_status(order_id, ORDER_REJECTED, note=reason)
     if row is None or row["status"] != ORDER_REJECTED:
@@ -290,7 +300,11 @@ async def _finish(
     if final.status == "completed":
         await _complete(bot, cfg, db, order_id)
     elif final.status in ("failed", "refunded"):
-        await _refund(bot, cfg, db, order_id, final.status)
+        await _refund(bot, cfg, db, order_id, final.error or final.status)
+    elif getattr(sup, "name", "") == "wholesale":
+        # Боти шарик: платформа фармоишро ҳанӯз иҷро мекунад (масалан, Premium-и
+        # дастӣ). Ба админи шарик намедиҳем — tenants.sync_orders худаш мебандад.
+        log.info("Фармоиши #%s ҳанӯз дар платформа — sync мебандад", order_id)
     else:
         # Ҳанӯз дар коркард — пулро намебардорем, админ месанҷад.
         await _to_admin(
@@ -519,6 +533,8 @@ async def _resume_one(
     )
     try:
         if row["status"] == ORDER_SENT and row["external_id"]:
+            if getattr(sup, "name", "") == "wholesale":
+                return "sync"          # tenants.sync_orders бе интизорӣ мебандад
             await _finish(bot, db, cfg, sup, job, row["external_id"], by_external=False)
             return "resumed"
         if getattr(sup, "idempotent", False):

@@ -159,10 +159,15 @@ class WholesaleSupplier:
                                status=STATUS.get(existing["status"], "processing"))
         except NotEnoughMoney:
             await self._warn_empty()
+            # Харидор сабаби дохилиро намебинад; шарик огоҳӣ гирифт.
             return OrderResult(ok=False, code="wholesale_balance",
-                               error="Баланси яклухти шарик кофӣ нест")
+                               error="Фармоиш ҳоло иҷро намешавад")
 
-        deliver_in_background(main.bot, main.db, main.cfg, main.supplier, order_id)
+        # Иҷрои фармоиши платформа бо забон ва контексти боти асосӣ, на боти шарик.
+        from .tenants import bot_context
+
+        with bot_context(main.cfg.lang, 0):
+            deliver_in_background(main.bot, main.db, main.cfg, main.supplier, order_id)
         await self._warn_low()
         return OrderResult(ok=True, external_id=f"W{order_id}", status="processing")
 
@@ -180,9 +185,9 @@ class WholesaleSupplier:
         row = self._main_order(external_id)
         if row is None or row["user_id"] != self.partner_id:
             return OrderResult(ok=False, code="order_not_found", error="order_not_found")
-        return OrderResult(ok=True, external_id=external_id,
-                           status=STATUS.get(row["status"], "processing"),
-                           error=row["note"])
+        status = STATUS.get(row["status"], "processing")
+        return OrderResult(ok=True, external_id=external_id, status=status,
+                           error="Таъминкунанда фармоишро иҷро накард" if status == "failed" else None)
 
     async def wait_until_done(self, external_id: str, *, by_external: bool = False,
                               max_wait: int = 240, interval: float = 3) -> OrderResult:

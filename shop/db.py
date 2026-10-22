@@ -208,7 +208,8 @@ def price_of(row: sqlite3.Row, partner: bool = False) -> int:
     if partner:
         special = row["partner_price"] if "partner_price" in row.keys() else None
         if special:
-            return int(special)
+            # Нархи оддӣ баъдтар паст шуда бошад — шарик аз харидори оддӣ зиёд намедиҳад.
+            return min(int(special), int(row["price"]))
     return int(row["price"])
 
 
@@ -431,12 +432,16 @@ class Database:
         )
         return int(row[0]) if row else 0
 
-    def set_group_products_active(self, group_code: str, active: bool) -> int:
-        """Тамоми зербахшро якбора фаъол ё хомӯш мекунад."""
-        cur = self._run(
-            "UPDATE products SET active = ? WHERE group_code = ?",
-            (1 if active else 0, group_code),
-        )
+    def set_group_products_active(self, group_code: str, active: bool, *,
+                                  only_available: bool = False) -> int:
+        """Тамоми зербахшро якбора фаъол ё хомӯш мекунад.
+
+        ``only_available`` — боти шарик: моли бе нархи яклухт фаъол намешавад.
+        """
+        sql = "UPDATE products SET active = ? WHERE group_code = ?"
+        if active and only_available:
+            sql += " AND wholesale IS NOT NULL"
+        cur = self._run(sql, (1 if active else 0, group_code))
         return cur.rowcount
 
     def group_products(self, group_code: str, *, only_active: bool = True) -> list[sqlite3.Row]:
@@ -1065,6 +1070,11 @@ class Database:
             (user_id, amount, code, TOPUP_WAITING, stamp, stamp),
         )
         return int(cur.lastrowid)
+
+    def waiting_topup_codes(self) -> set[str]:
+        return {r[0] for r in self._all(
+            "SELECT code FROM topups WHERE status = ?", (TOPUP_WAITING,)
+        )}
 
     def topup(self, topup_id: int) -> sqlite3.Row | None:
         return self._one("SELECT * FROM topups WHERE id = ?", (topup_id,))

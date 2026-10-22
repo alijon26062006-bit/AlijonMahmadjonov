@@ -131,7 +131,7 @@ async def got_target(
 
 
 async def _show_confirm(
-    message: Message, state: FSMContext, db: Database, cfg: Config
+    message: Message, state: FSMContext, db: Database, cfg: Config, *, user_id: int | None = None
 ) -> None:
     data = await state.get_data()
     row = db.product(data.get("code", ""))
@@ -140,9 +140,11 @@ async def _show_confirm(
         await show_main_menu(message, db, cfg, edit=False)
         return
     info = catalog.CATEGORY_INFO[row["category"]]
-    user = db.touch_user(message.chat.id)
+    user = db.touch_user(user_id or message.chat.id)
     partner = db.is_partner(user.id)
     await state.set_state(Buy.confirming)
+    # Нархе, ки харидор дид — ҳангоми «Тасдиқ» ҳамин нарх санҷида мешавад.
+    await state.update_data(price=price_of(row, partner))
     await message.answer(
         texts.confirm_order(
             info,
@@ -189,10 +191,10 @@ async def cb_id_no(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
 
 # Харидороне, ки ҳоло харид мекунанд. Пахши дуюми «Тасдиқ» дар ҳамин лаҳза
 # фармоиши дуюм намесозад ва пулро ду бор намегирад.
-_BUYING: set[int] = set()
+_BUYING: set[tuple[int, int]] = set()      # (бот, харидор): ботҳои шарикон алоҳида
 
 
-@router.callback_query(F.data == keyboards.CB_BUY_OK)
+@router.callback_query(Buy.confirming, F.data == keyboards.CB_BUY_OK)
 async def cb_buy(
     cb: CallbackQuery,
     state: FSMContext,
@@ -201,7 +203,7 @@ async def cb_buy(
     bot: Bot,
     supplier: Supplier,
 ) -> None:
-    uid = cb.from_user.id
+    uid = (bot.id, cb.from_user.id)
     if uid in _BUYING:
         await cb.answer("⏳")
         return
@@ -236,6 +238,11 @@ async def _buy(
     server = data.get("server", "")
     user = current_user(cb, db)
     price = price_of(row, db.is_partner(user.id))
+    if data.get("price") is not None and price != data["price"]:
+        # Нарх дар ҳамин миён иваз шуд — бо нархи нав аз нав тасдиқ мекунем.
+        await cb.answer("Нарх иваз шуд — лутфан аз нав тасдиқ кунед.", show_alert=True)
+        await _show_confirm(cb.message, state, db, cfg, user_id=user.id)
+        return
     if user.balance < price:
         await safe_edit(
             cb, texts.not_enough(price, user.balance, cfg.currency), keyboards.need_money()

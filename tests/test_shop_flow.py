@@ -76,11 +76,19 @@ class FakeCallback:
         self.message = message or FakeMessage(user_id=user_id)
         self.answers: list[str | None] = []
 
+    def __setattr__(self, name, value):
+        # Мисли aiogram: CallbackQuery тағйирнопазир аст (cb.data = ... хато медиҳад).
+        if name == "data" and "data" in self.__dict__:
+            raise TypeError("CallbackQuery is frozen")
+        super().__setattr__(name, value)
+
     async def answer(self, text=None, show_alert=False, **kwargs):
         self.answers.append(text)
 
 
 class FakeBot:
+    id = 1000
+
     def __init__(self):
         self.messages: list[tuple[int, str]] = []
 
