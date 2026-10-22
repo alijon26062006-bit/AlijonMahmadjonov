@@ -529,3 +529,6 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
 /* крупные кнопки действий в карточке заказа */
 .order .acts .btn { flex: 1; min-height: 46px; font-size: 15px; }
 .order .acts .btn.primary { flex: 2; }
+/* 3D-иконки типов магазина: фон картинки совпадает с серым карточек, поэтому даём им плитку того же цвета */
+.kind-img { width: 72px; height: 72px; flex: none; border-radius: 18px; background: #f5f4f2; object-fit: cover; }
+@media (min-width: 520px) { .kind-img { width: 84px; height: 84px; } }
