@@ -28,6 +28,7 @@ if [ -f "$ROOT/.env" ] || [ -f "$ROOT/data/shop.sqlite3" ]; then
   mkdir -p "$SAVE"
   [ -f "$ROOT/.env" ] && cp "$ROOT/.env" "$SAVE/"
   [ -f "$ROOT/data/shop.sqlite3" ] && cp "$ROOT/data/shop.sqlite3" "$SAVE/"
+  [ -d "$ROOT/data/tenants" ] && cp -r "$ROOT/data/tenants" "$SAVE/"
   warn "Здесь уже были данные — сохранил их в $SAVE"
 fi
 
@@ -41,6 +42,16 @@ if [ -f "$TMP/data/shop.sqlite3" ]; then
   # Старые WAL-файлы от прежней базы убираем, иначе они перекроют новую.
   rm -f "$ROOT/data/shop.sqlite3-wal" "$ROOT/data/shop.sqlite3-shm"
   cp "$TMP/data/shop.sqlite3" "$ROOT/data/shop.sqlite3"
+fi
+if [ -d "$TMP/data/tenants" ]; then
+  say "Ставлю базы ботов партнёров..."
+  mkdir -p "$ROOT/data/tenants"
+  for TDB in "$TMP"/data/tenants/*.sqlite3; do
+    [ -f "$TDB" ] || continue
+    NAME="$(basename "$TDB")"
+    rm -f "$ROOT/data/tenants/$NAME-wal" "$ROOT/data/tenants/$NAME-shm"
+    cp "$TDB" "$ROOT/data/tenants/$NAME"
+  done
 fi
 # Нишонаи «кӯчида» ба сервери нав тааллуқ надорад.
 rm -f "$ROOT/data/MOVED_TO"

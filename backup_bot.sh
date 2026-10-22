@@ -41,6 +41,26 @@ else
   say "Базы ещё нет — переносим только настройки."
 fi
 
+# Конструктор: у каждого бота партнёра своя база — переносим все.
+TENANTS=0
+if [ -d "$ROOT/data/tenants" ]; then
+  mkdir -p "$TMP/data/tenants"
+  for TDB in "$ROOT"/data/tenants/*.sqlite3; do
+    [ -f "$TDB" ] || continue
+    "$PYBIN" - "$TDB" "$TMP/data/tenants/$(basename "$TDB")" <<'PYEOF'
+import sqlite3, sys
+src = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+dst = sqlite3.connect(sys.argv[2])
+with dst:
+    src.backup(dst)
+src.close(); dst.close()
+PYEOF
+    [ $? -eq 0 ] || { bad "База бота партнёра $(basename "$TDB") не скопировалась"; exit 1; }
+    TENANTS=$((TENANTS + 1))
+  done
+  [ "$TENANTS" -gt 0 ] && say "Базы ботов партнёров: $TENANTS"
+fi
+
 tar -czf "$ARCHIVE" -C "$TMP" . || { bad "Архив не собрался"; exit 1; }
 chmod 600 "$ARCHIVE"
 
