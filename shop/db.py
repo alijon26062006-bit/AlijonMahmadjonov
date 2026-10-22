@@ -148,6 +148,28 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- Калидҳои API барои барномасозон. Худи калид нигоҳ дошта намешавад — танҳо хеш.
+CREATE TABLE IF NOT EXISTS api_keys (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    key_hash     TEXT    NOT NULL UNIQUE,
+    hint         TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL,
+    last_used_at TEXT,
+    revoked      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id, revoked);
+
+-- Idempotency-Key: такрори ҳамон дархост фармоиши дуюм намесозад.
+CREATE TABLE IF NOT EXISTS api_requests (
+    key_id     INTEGER NOT NULL,
+    idem_key   TEXT    NOT NULL,
+    body_hash  TEXT    NOT NULL,
+    order_id   INTEGER NOT NULL,
+    created_at TEXT    NOT NULL,
+    PRIMARY KEY (key_id, idem_key)
+);
 """
 
 
@@ -169,6 +191,15 @@ def price_of(row: sqlite3.Row, partner: bool = False) -> int:
 
 class NotEnoughMoney(Exception):
     """Дар ҳисоб маблағи кофӣ нест."""
+
+
+class DuplicateRequest(Exception):
+    """Ин Idempotency-Key аллакай истифода шуда буд."""
+
+    def __init__(self, order_id: int, same_body: bool) -> None:
+        super().__init__(f"order #{order_id}")
+        self.order_id = order_id
+        self.same_body = same_body
 
 
 @dataclass(frozen=True)
@@ -246,6 +277,8 @@ class Database:
         ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("orders", "kind", "TEXT NOT NULL DEFAULT 'game'"),
         ("orders", "supplier_ref", "TEXT"),
+        ("orders", "source", "TEXT NOT NULL DEFAULT 'bot'"),
+        ("orders", "api_key_id", "INTEGER"),
     )
 
     def _add_missing_columns(self) -> None:
@@ -645,10 +678,25 @@ class Database:
         nickname: str | None,
         sku: str = "",
         kind: str = "game",
+        source: str = "bot",
+        api_key_id: int | None = None,
+        idem: tuple[str, str] | None = None,
     ) -> int:
-        """Пулро аз ҳисоб мегирад ва фармоиш мекушояд. Ҳама дар як амалиёт."""
+        """Пулро аз ҳисоб мегирад ва фармоиш мекушояд. Ҳама дар як амалиёт.
+
+        ``idem`` = (Idempotency-Key, хеши дархост) — барои API. Агар ҳамин калид
+        аллакай буд, ``DuplicateRequest`` мепартояд ва пул намегирад.
+        """
         stamp = now()
         with self._lock:
+            if idem and api_key_id is not None:
+                seen = self._conn.execute(
+                    "SELECT order_id, body_hash FROM api_requests "
+                    "WHERE key_id = ? AND idem_key = ?",
+                    (api_key_id, idem[0]),
+                ).fetchone()
+                if seen is not None:
+                    raise DuplicateRequest(seen["order_id"], seen["body_hash"] == idem[1])
             row = self._conn.execute(
                 "SELECT balance FROM users WHERE id = ?", (user_id,)
             ).fetchone()
@@ -661,14 +709,20 @@ class Database:
             )
             cur = self._conn.execute(
                 "INSERT INTO orders(user_id, product_code, category, title, price, sku, kind, "
-                "target, nickname, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "target, nickname, status, created_at, updated_at, source, api_key_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user_id, product_code, category, title, price, sku, kind,
-                    target, nickname, ORDER_NEW, stamp, stamp,
+                    target, nickname, ORDER_NEW, stamp, stamp, source, api_key_id,
                 ),
             )
             order_id = int(cur.lastrowid)
+            if idem and api_key_id is not None:
+                self._conn.execute(
+                    "INSERT INTO api_requests(key_id, idem_key, body_hash, order_id, created_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (api_key_id, idem[0], idem[1], order_id, stamp),
+                )
             self._conn.execute(
                 "INSERT INTO balance_log(user_id, delta, balance_after, reason, admin_id, created_at) "
                 "VALUES (?, ?, ?, ?, NULL, ?)",
@@ -794,6 +848,64 @@ class Database:
             return self._conn.execute(
                 "SELECT * FROM orders WHERE id = ?", (order_id,)
             ).fetchone()
+
+    # ── калидҳои API ──────────────────────────────────────────────────
+    def create_api_key(self, user_id: int, key_hash: str, hint: str) -> int:
+        """Калиди нав. Калиди пешинаи ҳамин корбар фавран бекор мешавад."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0", (user_id,)
+            )
+            cur = self._conn.execute(
+                "INSERT INTO api_keys(user_id, key_hash, hint, created_at) VALUES (?, ?, ?, ?)",
+                (user_id, key_hash, hint, now()),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def active_api_key(self, user_id: int) -> sqlite3.Row | None:
+        return self._one(
+            "SELECT * FROM api_keys WHERE user_id = ? AND revoked = 0 ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        )
+
+    def revoke_api_keys(self, user_id: int) -> int:
+        return self._run(
+            "UPDATE api_keys SET revoked = 1 WHERE user_id = ? AND revoked = 0", (user_id,)
+        ).rowcount
+
+    def api_key_by_hash(self, key_hash: str) -> sqlite3.Row | None:
+        """Калиди фаъол бо хеш. Вақти истифодаро низ нав мекунад."""
+        row = self._one(
+            "SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0", (key_hash,)
+        )
+        if row is not None:
+            self._run("UPDATE api_keys SET last_used_at = ? WHERE id = ?", (now(), row["id"]))
+        return row
+
+    def api_orders(self, user_id: int, limit: int = 20, offset: int = 0) -> list[sqlite3.Row]:
+        return self._all(
+            "SELECT * FROM orders WHERE user_id = ? AND source = 'api' "
+            "ORDER BY id DESC LIMIT ? OFFSET ?",
+            (user_id, limit, offset),
+        )
+
+    def api_stats(self) -> dict[str, int]:
+        def scalar(sql: str) -> int:
+            row = self._one(sql)
+            return int(row[0] or 0) if row else 0
+
+        return {
+            "keys": scalar("SELECT COUNT(*) FROM api_keys WHERE revoked = 0"),
+            "orders": scalar("SELECT COUNT(*) FROM orders WHERE source = 'api'"),
+            "orders_today": scalar(
+                "SELECT COUNT(*) FROM orders WHERE source = 'api' "
+                "AND created_at >= date('now')"
+            ),
+            "revenue": scalar(
+                "SELECT SUM(price) FROM orders WHERE source = 'api' AND status = 'done'"
+            ),
+        }
 
     # ── пур кардани ҳисоб ─────────────────────────────────────────────
     def create_topup(self, user_id: int, amount: int, code: str) -> int:

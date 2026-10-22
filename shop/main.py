@@ -14,7 +14,7 @@ from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from . import catalog, guard, requisites
+from . import catalog, devapi, guard, requisites
 from .config import ROOT, Config, load_config
 from .db import Database
 from .fulfillment import resume_in_background
@@ -180,6 +180,7 @@ async def run() -> None:
     bot.session.middleware(ConflictWatch(_conflict_notifier(cfg, here)))
     dp = build_dispatcher(db, cfg, supplier)
 
+    api_runner = None
     try:
         try:
             me = await bot.get_me()
@@ -207,9 +208,13 @@ async def run() -> None:
         # Фармоишҳое, ки ҳангоми хомӯшшавии қаблӣ нимкора монданд, то охир
         # расонида мешаванд — дар паси парда, то бот фавран ҷавоб диҳад.
         resume_in_background(bot, db, cfg, supplier)
+        # API барои барномасозон — дар ҳамин раванд, бо ҳамин база ва ҳисобҳо.
+        api_runner = await devapi.start(db, cfg, supplier, bot)
         await dp.start_polling(bot)
     finally:
         # Ҳатто ҳангоми хатогӣ ҳама чиз тоза баста мешавад.
+        if api_runner is not None:
+            await api_runner.cleanup()
         await fulfillment_shutdown()
         await supplier.close()
         await bot.session.close()

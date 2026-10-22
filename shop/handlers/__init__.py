@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram import Router
 
-from . import admin, menu, purchase, reviews, settings, topup
+from . import admin, apikeys, menu, purchase, reviews, settings, topup
 
 
 _root: Router | None = None
@@ -26,6 +26,7 @@ def build_router() -> Router:
     root.include_router(purchase.router)
     root.include_router(topup.router)
     root.include_router(reviews.router)
+    root.include_router(apikeys.router)
     root.include_router(menu.fallback_router)
     _root = root
     return root

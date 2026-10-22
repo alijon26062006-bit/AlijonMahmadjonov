@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API магазина — документация</title>
+<meta name="description" content="API для разработчиков: покупайте алмазы Free Fire, UC PUBG, Telegram Stars и Premium автоматически.">
+<style>
+:root {
+  --bg: #f6f7fb; --card: #ffffff; --text: #1d2433; --muted: #5d6679; --line: #e3e7ef;
+  --accent: #3b6cf6; --accent-soft: #e8efff; --code-bg: #0f172a; --code-text: #e2e8f0;
+  --get: #12a150; --post: #3b6cf6; --warn: #b7791f; --warn-bg: #fff7e6; --bad: #d64545;
+  --ok-bg: #e9f8ef; --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020; --card: #121a2e; --text: #e6eaf3; --muted: #9aa4b8; --line: #23304d;
+    --accent: #6d93ff; --accent-soft: #1b2747; --code-bg: #070b16; --code-text: #dbe4f5;
+    --warn-bg: #2a2212; --ok-bg: #10261a;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+p code, li code, td code { background: var(--accent-soft); padding: 1px 6px; border-radius: 6px; }
+
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
+nav.side {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 28px 18px; border-right: 1px solid var(--line);
+}
+nav.side .brand { font-weight: 800; font-size: 18px; margin-bottom: 18px; display: block; color: var(--text); }
+nav.side a.item { display: block; padding: 6px 10px; border-radius: 8px; color: var(--muted); font-size: 15px; }
+nav.side a.item:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+nav.side .group { margin: 16px 0 6px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+main { padding: 28px 40px 80px; min-width: 0; }
+
+.hero {
+  background: linear-gradient(135deg, #3b6cf6 0%, #7a4cf0 55%, #c04ccf 100%);
+  color: #fff; border-radius: 20px; padding: 36px 34px; margin-bottom: 32px;
+}
+.hero h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.2; }
+.hero p { margin: 0; font-size: 18px; opacity: .95; max-width: 640px; }
+.hero .base {
+  margin-top: 22px; display: inline-flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  background: rgba(255,255,255,.16); padding: 10px 14px; border-radius: 12px;
+}
+.hero .base code { background: transparent; color: #fff; font-size: 15px; word-break: break-all; }
+
+section { margin: 0 0 40px; scroll-margin-top: 16px; }
+h2 { font-size: 26px; margin: 0 0 14px; }
+h3 { font-size: 19px; margin: 26px 0 10px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px; margin-bottom: 18px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+.step .num {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: grid; place-items: center; font-weight: 700; margin-bottom: 10px;
+}
+.step b { display: block; margin-bottom: 4px; }
+.step span { color: var(--muted); font-size: 15px; }
+
+.endpoint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.method { font: 700 13px/1 ui-monospace, Menlo, monospace; padding: 6px 9px; border-radius: 7px; color: #fff; letter-spacing: .04em; }
+.method.get { background: var(--get); } .method.post { background: var(--post); }
+.endpoint code.path { font-size: 17px; font-weight: 600; background: none; padding: 0; }
+.endpoint .tag { font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 2px 8px; border-radius: 99px; }
+
+.code { position: relative; margin: 12px 0; }
+.code pre {
+  margin: 0; background: var(--code-bg); color: var(--code-text); padding: 16px 18px;
+  border-radius: 12px; overflow-x: auto; font-size: 14px; line-height: 1.55;
+}
+.code .label { position: absolute; top: 8px; left: 14px; font-size: 11px; color: #8796b3; text-transform: uppercase; letter-spacing: .08em; }
+.code .label ~ pre { padding-top: 32px; }
+.code .copy ~ pre { padding-right: 104px; }
+.copy {
+  position: absolute; top: 8px; right: 8px; border: 0; cursor: pointer;
+  background: rgba(255,255,255,.1); color: #cbd5e1; font-size: 12px; padding: 5px 10px; border-radius: 7px;
+}
+.copy:hover { background: rgba(255,255,255,.2); }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.table-wrap { overflow-x: auto; }
+
+.note { border-radius: 12px; padding: 14px 16px; margin: 14px 0; font-size: 15px; }
+.note.warn { background: var(--warn-bg); border-left: 4px solid var(--warn); }
+.note.info { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+.note.ok { background: var(--ok-bg); border-left: 4px solid var(--get); }
+
+.status { display: inline-block; padding: 2px 10px; border-radius: 99px; font: 600 13px/1.6 ui-monospace, Menlo, monospace; }
+.status.processing { background: #fff3d6; color: #8a5a00; }
+.status.completed { background: #dcf5e6; color: #116b39; }
+.status.failed { background: #fde2e2; color: #a02626; }
+
+.tabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.tabs button {
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  padding: 7px 14px; border-radius: 9px; cursor: pointer; font-size: 14px;
+}
+.tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab-body { display: none; } .tab-body.active { display: block; }
+
+footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.side {
+    position: sticky; top: 0; z-index: 5; height: auto; border-right: 0;
+    border-bottom: 1px solid var(--line); padding: 10px 16px; background: var(--bg);
+  }
+  nav.side .brand { display: none; }
+  nav.side .items { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  nav.side .items::-webkit-scrollbar { display: none; }
+  nav.side .group { display: none; }
+  nav.side a.item {
+    white-space: nowrap; background: var(--card); border: 1px solid var(--line);
+    border-radius: 99px; padding: 6px 12px; font-size: 14px;
+  }
+  main { padding: 18px 16px 60px; }
+  .hero { padding: 24px 20px; } .hero h1 { font-size: 26px; } .hero p { font-size: 16px; }
+  .hero .base { display: block; } .hero .base code { display: block; font-size: 13px; margin-top: 4px; }
+  .steps { grid-template-columns: 1fr; }
+  .card { padding: 18px 16px; }
+  section { scroll-margin-top: 64px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="side">
+    <a class="brand" href="#top">🔌 API магазина</a>
+    <div class="items">
+      <div class="group">Начало</div>
+      <a class="item" href="#start">Быстрый старт</a>
+      <a class="item" href="#key">Ключ API</a>
+      <a class="item" href="#auth">Авторизация</a>
+      <a class="item" href="#money">Баланс и цены</a>
+      <div class="group">Методы</div>
+      <a class="item" href="#balance">Баланс</a>
+      <a class="item" href="#products">Товары</a>
+      <a class="item" href="#check">Проверка аккаунта</a>
+      <a class="item" href="#order">Создать заказ</a>
+      <a class="item" href="#order-get">Статус заказа</a>
+      <a class="item" href="#orders">История заказов</a>
+      <div class="group">Справка</div>
+      <a class="item" href="#statuses">Статусы заказа</a>
+      <a class="item" href="#idem">Повтор без двойной оплаты</a>
+      <a class="item" href="#errors">Ошибки</a>
+      <a class="item" href="#limits">Ограничения</a>
+      <a class="item" href="#examples">Примеры кода</a>
+      <a class="item" href="#security">Безопасность</a>
+    </div>
+  </nav>
+
+  <main id="top">
+    <div class="hero">
+      <h1>API для разработчиков</h1>
+      <p>Подключите свой бот, сайт или приложение и покупайте алмазы Free Fire, UC PUBG Mobile, Telegram Stars и Telegram Premium автоматически — без участия оператора.</p>
+      <div class="base">Базовый адрес: <code>{{BASE}}</code></div>
+    </div>
+
+    <section id="start">
+      <h2>Быстрый старт</h2>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><b>Получите ключ</b><span>В нашем Telegram-боте нажмите «🔌 API барои барномасозон», затем «🔑 Калид сохтан».</span></div>
+        <div class="step"><div class="num">2</div><b>Пополните баланс</b><span>Как обычно в боте. API тратит деньги с этого же баланса.</span></div>
+        <div class="step"><div class="num">3</div><b>Отправьте заказ</b><span>Один POST-запрос — и товар уходит игроку автоматически.</span></div>
+      </div>
+      <div class="code"><span class="label">Проверить ключ и баланс</span><button class="copy">Копировать</button><pre>curl {{BASE}}/balance \
+  -H "X-API-Key: ak_live_ВАШ_КЛЮЧ"</pre></div>
+      <div class="code"><span class="label">Ответ</span><pre>{"ok": true, "balance": "250.00", "currency": "TJS"}</pre></div>
+    </section>
+
+    <section id="key">
+      <h2>Ключ API</h2>
+      <div class="card">
+        <p>Ключ вы создаёте сами, прямо в боте — без писем и заявок:</p>
+        <ol>
+          <li>Откройте бота и нажмите кнопку <b>«🔌 API барои барномасозон»</b>.</li>
+          <li>Нажмите <b>«🔑 Калид сохтан»</b> (создать ключ).</li>
+          <li>Бот покажет ключ вида <code>ak_live_…</code> — <b>сразу скопируйте его</b>: повторно он не показывается.</li>
+        </ol>
+        <p>Если ключ потерялся или попал к постороннему — нажмите <b>«♻️ Калиди нав»</b>. Старый ключ перестанет работать мгновенно, а все ваши заказы и баланс останутся на месте.</p>
+      </div>
+    </section>
+
+    <section id="auth">
+      <h2>Авторизация</h2>
+      <p>Передавайте ключ в каждом запросе одним из двух способов:</p>
+      <div class="code"><button class="copy">Копировать</button><pre>X-API-Key: ak_live_ВАШ_КЛЮЧ</pre></div>
+      <div class="code"><button class="copy">Копировать</button><pre>Authorization: Bearer ak_live_ВАШ_КЛЮЧ</pre></div>
+      <p>Все запросы и ответы — в формате <code>JSON</code> (UTF-8). В POST-запросах укажите заголовок <code>Content-Type: application/json</code>.</p>
+      <p>Каждый ответ содержит поле <code>ok</code>: <code>true</code> — успех, <code>false</code> — ошибка с полями <code>code</code> и <code>error</code>.</p>
+    </section>
+
+    <section id="money">
+      <h2>Баланс и цены</h2>
+      <div class="card">
+        <ul>
+          <li>Баланс — <b>тот же, что в боте</b>. Пополнение — через бота (Душанбе Сити, Alif Mobi).</li>
+          <li>Цены — <b>те же, что вы видите в боте</b>. Партнёры магазина автоматически получают партнёрские цены.</li>
+          <li>Деньги списываются в момент создания заказа. Если заказ не выполнен — <b>вся сумма автоматически возвращается</b> на баланс.</li>
+          <li>Все суммы — строки с двумя знаками после точки, валюта <code>TJS</code> (сомони).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="balance">
+      <h2>Баланс</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method get">GET</span><code class="path">/balance</code></div>
+        <p>Текущий баланс вашего аккаунта.</p>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl {{BASE}}/balance -H "X-API-Key: ak_live_ВАШ_КЛЮЧ"</pre></div>
+        <div class="code"><span class="label">Ответ 200</span><pre>{"ok": true, "balance": "250.00", "currency": "TJS"}</pre></div>
+      </div>
+    </section>
+
+    <section id="products">
+      <h2>Товары</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method get">GET</span><code class="path">/products</code><span class="tag">?category=</span></div>
+        <p>Все доступные товары с <b>вашими</b> ценами. Поле <code>fields</code> говорит, что нужно передать при покупке.</p>
+        <div class="table-wrap"><table>
+          <tr><th>Параметр</th><th>Описание</th></tr>
+          <tr><td><code>category</code></td><td>Необязательно. Только одна категория: <code>tg_stars</code>, <code>tg_premium</code>, <code>ff_cis</code>, <code>ff_id</code>, <code>pubg</code>, <code>other_games</code></td></tr>
+        </table></div>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl "{{BASE}}/products?category=pubg" -H "X-API-Key: ak_live_ВАШ_КЛЮЧ"</pre></div>
+        <div class="code"><span class="label">Ответ 200</span><pre>{
+  "ok": true,
+  "count": 1,
+  "items": [{
+    "id": "pubg_60",
+    "title": "🎮 60 UC",
+    "category": "pubg",
+    "category_title": "PUBG Mobile",
+    "group": "🎮 UC",
+    "price": "10.00",
+    "currency": "TJS",
+    "fields": [{"key": "player_id", "label": "ID игрока", "required": true}]
+  }]
+}</pre></div>
+        <h3>Какие поля передавать</h3>
+        <div class="table-wrap"><table>
+          <tr><th>Поле</th><th>Где нужно</th><th>Формат</th></tr>
+          <tr><td><code>player_id</code></td><td>Игры: Free Fire, PUBG и другие</td><td>Только цифры, 6–12 знаков</td></tr>
+          <tr><td><code>server</code></td><td>Mobile Legends (если есть в <code>fields</code>)</td><td>Номер сервера (зоны), цифры</td></tr>
+          <tr><td><code>username</code></td><td>Telegram Stars и Premium</td><td><code>@username</code> или ссылка <code>t.me/username</code></td></tr>
+        </table></div>
+      </div>
+    </section>
+
+    <section id="check">
+      <h2>Проверка аккаунта</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method post">POST</span><code class="path">/check</code><span class="tag">бесплатно</span></div>
+        <p>Узнать ник игрока <b>до оплаты</b> — чтобы покупатель убедился, что ID его. Деньги не списываются.</p>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl -X POST {{BASE}}/check \
+  -H "X-API-Key: ak_live_ВАШ_КЛЮЧ" \
+  -H "Content-Type: application/json" \
+  -d '{"product": "pubg_60", "player_id": "5123456789"}'</pre></div>
+        <div class="code"><span class="label">Ответ 200 — аккаунт найден</span><pre>{"ok": true, "supported": true, "valid": true, "nickname": "PlayerOne"}</pre></div>
+        <div class="code"><span class="label">Ответ 200 — неверный ID</span><pre>{"ok": true, "supported": true, "valid": false, "nickname": null,
+ "message": "Аккаунт не найден или ID неверный"}</pre></div>
+        <p>Если <code>supported</code> = <code>false</code>, для этого товара проверка недоступна — покупать можно, но ник не будет известен заранее.</p>
+      </div>
+    </section>
+
+    <section id="order">
+      <h2>Создать заказ</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method post">POST</span><code class="path">/orders</code><span class="tag">списывает деньги</span></div>
+        <p>Покупка. Сумма списывается сразу, заказ уходит поставщику автоматически.</p>
+        <div class="table-wrap"><table>
+          <tr><th>Поле</th><th>Обязательно</th><th>Описание</th></tr>
+          <tr><td><code>product</code></td><td>да</td><td><code>id</code> товара из <a href="#products">/products</a></td></tr>
+          <tr><td><code>player_id</code> / <code>username</code></td><td>да</td><td>Кому зачислить — смотрите <code>fields</code> товара</td></tr>
+          <tr><td><code>server</code></td><td>если требуется</td><td>Только для игр с сервером (Mobile Legends)</td></tr>
+        </table></div>
+        <div class="note info"><b>Совет:</b> всегда передавайте заголовок <code>Idempotency-Key</code> с уникальным значением для каждой покупки. Тогда повтор запроса после обрыва связи <b>не спишет деньги дважды</b> — подробнее в разделе <a href="#idem">«Повтор без двойной оплаты»</a>.</div>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl -X POST {{BASE}}/orders \
+  -H "X-API-Key: ak_live_ВАШ_КЛЮЧ" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: my-shop-order-1001" \
+  -d '{"product": "pubg_60", "player_id": "5123456789"}'</pre></div>
+        <div class="code"><span class="label">Ответ 201</span><pre>{
+  "ok": true,
+  "balance": "240.00",
+  "order": {
+    "id": 1201,
+    "status": "processing",
+    "product": "pubg_60",
+    "title": "🎮 60 UC",
+    "target": "5123456789",
+    "server": null,
+    "nickname": null,
+    "price": "10.00",
+    "currency": "TJS",
+    "created_at": "2026-10-22T10:15:00+00:00",
+    "updated_at": "2026-10-22T10:15:00+00:00",
+    "error": null
+  }
+}</pre></div>
+        <p>Обычно заказ выполняется за 5–60 секунд. Узнавайте результат через <a href="#order-get">GET /orders/{id}</a>.</p>
+      </div>
+    </section>
+
+    <section id="order-get">
+      <h2>Статус заказа</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method get">GET</span><code class="path">/orders/{id}</code></div>
+        <p>Текущее состояние заказа. Опрашивайте раз в <b>5–10 секунд</b>, пока статус <span class="status processing">processing</span>.</p>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl {{BASE}}/orders/1201 -H "X-API-Key: ak_live_ВАШ_КЛЮЧ"</pre></div>
+        <div class="code"><span class="label">Ответ 200 — выполнен</span><pre>{"ok": true, "order": {"id": 1201, "status": "completed", "price": "10.00", ...}}</pre></div>
+        <div class="code"><span class="label">Ответ 200 — не выполнен</span><pre>{"ok": true, "order": {"id": 1201, "status": "failed",
+  "error": "Заказ не выполнен, деньги возвращены на баланс",
+  "reason": "ID игрока неверный", ...}}</pre></div>
+      </div>
+    </section>
+
+    <section id="orders">
+      <h2>История заказов</h2>
+      <div class="card">
+        <div class="endpoint"><span class="method get">GET</span><code class="path">/orders</code><span class="tag">?limit=&amp;offset=</span></div>
+        <p>Ваши заказы через API, от новых к старым.</p>
+        <div class="table-wrap"><table>
+          <tr><th>Параметр</th><th>По умолчанию</th><th>Описание</th></tr>
+          <tr><td><code>limit</code></td><td>20</td><td>Сколько заказов вернуть (1–100)</td></tr>
+          <tr><td><code>offset</code></td><td>0</td><td>Сколько пропустить — для постраничного вывода</td></tr>
+        </table></div>
+        <div class="code"><span class="label">Запрос</span><button class="copy">Копировать</button><pre>curl "{{BASE}}/orders?limit=10" -H "X-API-Key: ak_live_ВАШ_КЛЮЧ"</pre></div>
+      </div>
+    </section>
+
+    <section id="statuses">
+      <h2>Статусы заказа</h2>
+      <div class="card table-wrap"><table>
+        <tr><th>Статус</th><th>Что значит</th><th>Деньги</th></tr>
+        <tr><td><span class="status processing">processing</span></td><td>Заказ принят и выполняется</td><td>списаны</td></tr>
+        <tr><td><span class="status completed">completed</span></td><td>Товар зачислен игроку</td><td>списаны</td></tr>
+        <tr><td><span class="status failed">failed</span></td><td>Не выполнен (причина — в <code>reason</code>)</td><td><b>возвращены</b> на баланс</td></tr>
+      </table></div>
+      <div class="note ok">Статусы <code>completed</code> и <code>failed</code> — окончательные и больше не меняются.</div>
+    </section>
+
+    <section id="idem">
+      <h2>Повтор без двойной оплаты</h2>
+      <div class="card">
+        <p>Связь может оборваться ровно в момент покупки — и вы не узнаете, создан заказ или нет. Чтобы безопасно повторить запрос, передавайте заголовок:</p>
+        <div class="code"><button class="copy">Копировать</button><pre>Idempotency-Key: любая-уникальная-строка-до-100-символов</pre></div>
+        <ul>
+          <li><b>Тот же ключ и то же тело запроса</b> — вернётся уже созданный заказ с пометкой <code>"duplicate": true</code>. Деньги второй раз не списываются.</li>
+          <li><b>Тот же ключ, но другое тело</b> — ошибка <code>409 idempotency_key_reused</code>.</li>
+          <li>Удобно использовать номер заказа в вашей системе: <code>my-shop-order-1001</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="errors">
+      <h2>Ошибки</h2>
+      <div class="code"><span class="label">Пример</span><pre>{"ok": false, "code": "insufficient_balance",
+ "error": "Недостаточно средств: нужно 10.00 TJS, на балансе 5.00 TJS"}</pre></div>
+      <div class="card table-wrap"><table>
+        <tr><th>HTTP</th><th>code</th><th>Что делать</th></tr>
+        <tr><td>400</td><td><code>invalid_json</code></td><td>Проверьте, что тело — корректный JSON-объект</td></tr>
+        <tr><td>400</td><td><code>missing_field</code></td><td>Не хватает поля — его имя в <code>field</code></td></tr>
+        <tr><td>400</td><td><code>invalid_field</code></td><td>Неверный формат поля (<code>field</code>) — например, буквы в ID</td></tr>
+        <tr><td>401</td><td><code>unauthorized</code></td><td>Нет ключа, ключ неверный или отозван — создайте новый в боте</td></tr>
+        <tr><td>402</td><td><code>insufficient_balance</code></td><td>Пополните баланс в боте</td></tr>
+        <tr><td>403</td><td><code>account_blocked</code></td><td>Аккаунт заблокирован — свяжитесь с поддержкой</td></tr>
+        <tr><td>404</td><td><code>product_not_found</code></td><td>Товара нет или он временно недоступен — обновите список</td></tr>
+        <tr><td>404</td><td><code>not_found</code></td><td>Заказ не найден (или он не ваш)</td></tr>
+        <tr><td>409</td><td><code>idempotency_key_reused</code></td><td>Этот Idempotency-Key уже был с другим запросом</td></tr>
+        <tr><td>429</td><td><code>rate_limited</code></td><td>Слишком часто — подождите минуту</td></tr>
+        <tr><td>500</td><td><code>server_error</code></td><td>Временная ошибка — повторите позже с тем же Idempotency-Key</td></tr>
+        <tr><td>503</td><td><code>api_disabled</code></td><td>API временно выключено владельцем магазина</td></tr>
+      </table></div>
+    </section>
+
+    <section id="limits">
+      <h2>Ограничения</h2>
+      <div class="card"><ul>
+        <li>До <b>120 запросов в минуту</b> на один ключ.</li>
+        <li>До <b>30 заказов в минуту</b> на один ключ.</li>
+        <li>Статус заказа опрашивайте не чаще раза в <b>5 секунд</b>.</li>
+        <li>Размер тела запроса — до 32 КБ.</li>
+      </ul></div>
+    </section>
+
+    <section id="examples">
+      <h2>Примеры кода</h2>
+      <p>Полный цикл: проверка ника → покупка → ожидание результата.</p>
+      <div class="tabs" data-tabs>
+        <button class="active" data-tab="py">Python</button>
+        <button data-tab="php">PHP</button>
+        <button data-tab="js">JavaScript</button>
+      </div>
+
+      <div class="tab-body active" data-body="py"><div class="code"><button class="copy">Копировать</button><pre>import time, uuid, requests
+
+API = "{{BASE}}"
+HEADERS = {"X-API-Key": "ak_live_ВАШ_КЛЮЧ"}
+
+def buy(product: str, player_id: str) -> dict:
+    # 1. Проверяем ник (необязательно, но удобно)
+    check = requests.post(f"{API}/check", headers=HEADERS, timeout=30,
+                          json={"product": product, "player_id": player_id}).json()
+    if check.get("valid") is False:
+        raise ValueError("Неверный ID игрока")
+
+    # 2. Покупаем. Idempotency-Key защищает от двойной оплаты при повторе
+    r = requests.post(f"{API}/orders", timeout=30,
+                      headers={**HEADERS, "Idempotency-Key": str(uuid.uuid4())},
+                      json={"product": product, "player_id": player_id})
+    data = r.json()
+    if not data["ok"]:
+        raise RuntimeError(data["error"])
+    order = data["order"]
+
+    # 3. Ждём результат
+    while order["status"] == "processing":
+        time.sleep(5)
+        order = requests.get(f"{API}/orders/{order['id']}", headers=HEADERS,
+                             timeout=30).json()["order"]
+    return order
+
+print(buy("pubg_60", "5123456789"))</pre></div></div>
+
+      <div class="tab-body" data-body="php"><div class="code"><button class="copy">Копировать</button><pre>&lt;?php
+$api = "{{BASE}}";
+$key = "ak_live_ВАШ_КЛЮЧ";
+
+function call($method, $url, $key, $body = null, $extra = []) {
+    $ch = curl_init($url);
+    $headers = array_merge(["X-API-Key: $key", "Content-Type: application/json"], $extra);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    $out = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    return $out;
+}
+
+$order = call("POST", "$api/orders", $key,
+    ["product" => "pubg_60", "player_id" => "5123456789"],
+    ["Idempotency-Key: " . bin2hex(random_bytes(16))]);
+
+if (!$order["ok"]) die($order["error"]);
+$order = $order["order"];
+
+while ($order["status"] === "processing") {
+    sleep(5);
+    $order = call("GET", "$api/orders/" . $order["id"], $key)["order"];
+}
+echo $order["status"];</pre></div></div>
+
+      <div class="tab-body" data-body="js"><div class="code"><button class="copy">Копировать</button><pre>const API = "{{BASE}}";
+const KEY = process.env.SHOP_API_KEY; // храните ключ на сервере
+
+async function call(path, options = {}) {
+  const res = await fetch(API + path, {
+    ...options,
+    headers: { "X-API-Key": KEY, "Content-Type": "application/json", ...options.headers },
+  });
+  return res.json();
+}
+
+async function buy(product, playerId) {
+  const created = await call("/orders", {
+    method: "POST",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ product, player_id: playerId }),
+  });
+  if (!created.ok) throw new Error(created.error);
+
+  let order = created.order;
+  while (order.status === "processing") {
+    await new Promise((r) =&gt; setTimeout(r, 5000));
+    order = (await call(`/orders/${order.id}`)).order;
+  }
+  return order;
+}
+
+buy("pubg_60", "5123456789").then(console.log);</pre></div></div>
+    </section>
+
+    <section id="security">
+      <h2>Безопасность</h2>
+      <div class="note warn"><b>Ключ — это доступ к вашему балансу.</b> С ним можно покупать за ваши деньги.</div>
+      <div class="card"><ul>
+        <li>Храните ключ <b>только на своём сервере</b>. Не вставляйте его в код сайта, мобильного приложения или бота, который видят пользователи.</li>
+        <li>Не отправляйте ключ в чаты и не публикуйте на GitHub.</li>
+        <li>Если ключ мог утечь — в боте нажмите <b>«♻️ Калиди нав»</b>: старый перестанет работать сразу.</li>
+        <li>Подозрительные заказы? Проверьте <a href="#orders">историю</a> и напишите в поддержку магазина.</li>
+      </ul></div>
+    </section>
+
+    <footer>
+      Вопросы по подключению — в поддержку нашего Telegram-бота. Базовый адрес API: <code>{{BASE}}</code>
+    </footer>
+  </main>
+</div>
+
+<script>
+document.querySelectorAll(".copy").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var text = btn.parentElement.querySelector("pre").innerText;
+    var done = function () { btn.textContent = "Скопировано ✓"; setTimeout(function () { btn.textContent = "Копировать"; }, 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      var area = document.createElement("textarea");
+      area.value = text; document.body.appendChild(area); area.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(area);
+    }
+  });
+});
+document.querySelectorAll("[data-tabs]").forEach(function (tabs) {
+  tabs.querySelectorAll("button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      tabs.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      document.querySelectorAll("[data-body]").forEach(function (body) {
+        body.classList.toggle("active", body.getAttribute("data-body") === btn.getAttribute("data-tab"));
+      });
+    });
+  });
+});
+</script>
+</body>
+</html>

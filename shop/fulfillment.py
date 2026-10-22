@@ -60,9 +60,18 @@ async def _tell_admins(bot: Bot, cfg: Config, text: str, markup=None) -> None:
             log.warning("Ба админ %s нарасид: %s", admin_id, exc)
 
 
+def via_api(row) -> bool:
+    """Фармоиш аз API омадааст — харидор натиҷаро аз API мегирад, на дар Telegram."""
+    return row is not None and "source" in row.keys() and row["source"] == "api"
+
+
+def _api_mark(row) -> str:
+    return "🔌 API · " if via_api(row) else ""
+
+
 async def _send_receipt(bot: Bot, cfg: Config, db: Database, order_id: int) -> None:
     row = db.order(order_id)
-    if row is None:
+    if row is None or via_api(row):
         return
     info = catalog.CATEGORY_INFO.get(row["category"])
     receipt = texts.receipt(
@@ -104,15 +113,16 @@ async def _refund(
     row = db.set_order_status(order_id, ORDER_REJECTED, note=reason)
     if row is None or row["status"] != ORDER_REJECTED:
         return
-    await _tell(
-        bot,
-        row["user_id"],
-        texts.auto_refunded(order_id, row["price"], reason, cfg.currency),
-    )
+    if not via_api(row):
+        await _tell(
+            bot,
+            row["user_id"],
+            texts.auto_refunded(order_id, row["price"], reason, cfg.currency),
+        )
     await _tell_admins(
         bot,
         cfg,
-        f"↩️ <b>Фармоиши #{order_id} худкор баргардонида шуд.</b>\n"
+        f"↩️ {_api_mark(row)}<b>Фармоиши #{order_id} худкор баргардонида шуд.</b>\n"
         f"📦 {texts.esc(row['title'])} → <code>{texts.esc(row['target'])}</code>\n"
         f"💳 {texts.money(row['price'], cfg.currency)} ба харидор баргашт\n"
         f"📌 Сабаб: <code>{texts.esc(reason or '—')}</code>",
@@ -138,7 +148,7 @@ async def _complete(bot: Bot, cfg: Config, db: Database, order_id: int) -> None:
     await _send_receipt(bot, cfg, db, order_id)
     await _tell_admins(
         bot, cfg,
-        f"✅ <b>Фармоиши #{order_id} худкор иҷро шуд.</b>\n"
+        f"✅ {_api_mark(before)}<b>Фармоиши #{order_id} худкор иҷро шуд.</b>\n"
         f"📦 {texts.esc(before['title'])} → <code>{texts.esc(before['target'])}</code>\n"
         f"💰 {texts.money(before['price'], cfg.currency)}",
     )
@@ -151,9 +161,9 @@ async def _to_admin(
     row = db.order(order_id)
     if row is None or row["status"] not in ORDER_OPEN:
         return
-    if tell_user:
+    if tell_user and not via_api(row):
         await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
-    await _tell_admins(bot, cfg, why, keyboards.admin_order(order_id))
+    await _tell_admins(bot, cfg, _api_mark(row) + why, keyboards.admin_order(order_id))
 
 
 async def deliver_order(
@@ -315,11 +325,12 @@ async def _deliver(
 
     # ── моли дастӣ ё таъминкунанда хомӯш ──────────────────────────────
     if sup is None:
-        await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
+        if not via_api(row):
+            await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
         await _tell_admins(
             bot,
             cfg,
-            texts.admin_new_order(row, db.user(row["user_id"]), cfg.currency)
+            _api_mark(row) + texts.admin_new_order(row, db.user(row["user_id"]), cfg.currency)
             + "\n\n✋ <b>Дастӣ иҷро кунед.</b>",
             keyboards.admin_order(order_id),
         )

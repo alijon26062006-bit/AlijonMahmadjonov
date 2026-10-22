@@ -30,17 +30,37 @@ SKIP = ("-", "—", "нет", "не")
 
 
 # ── экрани танзимот ───────────────────────────────────────────────────
+def _api_info(db: Database, cfg: Config) -> dict:
+    from .. import devapi
+
+    return {**db.api_stats(), "open": devapi.api_open(db, cfg), "url": devapi.docs_url(cfg)}
+
+
 @router.callback_query(F.data == "a:settings")
-async def cb_settings(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+async def cb_settings(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
     await state.clear()
     await safe_edit(
         cb,
         texts.admin_settings(
-            len(db.channels()), db.setting(REVIEW_CHANNEL_KEY), db.setting(WHATSAPP_KEY)
+            len(db.channels()), db.setting(REVIEW_CHANNEL_KEY), db.setting(WHATSAPP_KEY),
+            api=_api_info(db, cfg),
         ),
         keyboards.admin_settings(),
     )
     await cb.answer()
+
+
+@router.callback_query(F.data == "a:apitoggle")
+async def cb_api_toggle(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+    """API-ро барои ҳама фавран фаъол ё хомӯш мекунад (калидҳо нест намешаванд)."""
+    from .. import devapi
+
+    if not cfg.api_enabled:
+        await cb.answer("API дар .env хомӯш аст (SHOP_API_ENABLED=0)", show_alert=True)
+        return
+    now_open = devapi.api_open(db, cfg)
+    db.set_setting(devapi.API_ON_KEY, "0" if now_open else "1")
+    await cb_settings(cb, state, db, cfg)
 
 
 # ── корбарон ──────────────────────────────────────────────────────────

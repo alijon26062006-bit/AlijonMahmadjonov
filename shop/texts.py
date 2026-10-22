@@ -62,6 +62,7 @@ BTN_TOP = "🏆 Беҳтарин харидорон"
 BTN_REVIEWS = "👍 Шарҳҳо"
 BTN_MY_ORDERS = "🧾 Фармоишҳои ман"
 BTN_BALANCE = "💰 Ҳисоби ман"
+BTN_API = "🔌 API барои барномасозон"
 
 BTN_STARS = "⭐️ Telegram Stars"
 BTN_PREMIUM = "👑 Telegram Premium"
@@ -765,13 +766,25 @@ def admin_requisites(req, currency: str = CURRENCY) -> str:
     )
 
 
-def admin_settings(channels: int, review_channel: str, whatsapp: str) -> str:
-    return (
+def admin_settings(
+    channels: int, review_channel: str, whatsapp: str, api: dict | None = None
+) -> str:
+    text = (
         "⚙️ <b>Танзимот</b>\n\n"
         f"📢 Каналҳои обунаи ҳатмӣ: <b>{channels}</b>\n"
         f"💬 Канали шарҳҳо: <code>{esc(review_channel or '—')}</code>\n"
         f"🟢 WhatsApp: <code>{esc(whatsapp or '—')}</code>"
     )
+    if api is not None:
+        state = "✅ фаъол" if api.get("open") else "🚫 хомӯш"
+        text += (
+            f"\n\n🔌 API барои барномасозон: <b>{state}</b>\n"
+            f"   калидҳо: <b>{api.get('keys', 0)}</b> · фармоишҳо имрӯз: "
+            f"<b>{api.get('orders_today', 0)}</b> · ҳамагӣ: <b>{api.get('orders', 0)}</b>"
+        )
+        if api.get("url"):
+            text += f"\n   📖 {esc(api['url'])}"
+    return text
 
 
 def admin_channels(rows: list) -> str:
@@ -867,7 +880,9 @@ def admin_order_card(row, user, currency: str = CURRENCY) -> str:
     if user and user.username:
         who += f" @{esc(user.username)}"
     return (
-        f"🧾 <b>Фармоиши #{row['id']}</b>\n\n"
+        f"🧾 <b>Фармоиши #{row['id']}</b>"
+        + (" · 🔌 API" if "source" in row.keys() and row["source"] == "api" else "")
+        + "\n\n"
         f"👤 Харидор: {who}\n"
         f"📦 Мол: <b>{esc(row['title'])}</b>\n"
         f"🎯 Бахш: {esc(row['category'])}\n"
@@ -1002,3 +1017,63 @@ def user_balance_removed(amount: int, balance: int, currency: str = CURRENCY) ->
 
 def broadcast_result(sent: int, failed: int) -> str:
     return f"📢 Эълон фиристода шуд.\n\n✅ Расид: <b>{sent}</b>\n❌ Нарасид: {failed}"
+
+
+# ── API барои барномасозон ────────────────────────────────────────────
+BTN_API_NEW = "🔑 Калид сохтан"
+BTN_API_RENEW = "♻️ Калиди нав"
+BTN_API_REVOKE = "🗑 Калидро бекор кардан"
+BTN_API_DOCS = "📖 Ҳуҷҷатҳо"
+BTN_API_YES_RENEW = "✅ Ҳа, калиди нав созед"
+BTN_API_YES_REVOKE = "✅ Ҳа, бекор кунед"
+
+
+def api_screen(key, balance: int, url: str, is_open: bool, currency: str = CURRENCY) -> str:
+    """Экрани «🔌 API» барои харидор."""
+    head = (
+        "🔌 <b>API барои барномасозон</b>\n\n"
+        "<blockquote>Боти ё сайти шумо метавонад аз мо <b>худкор</b> харид кунад: "
+        "алмоси Free Fire, UC-и PUBG, Telegram Stars ва Premium — бо ҳамон нархҳо "
+        "ва аз ҳамин ҳисоб.</blockquote>\n\n"
+        f"💳 Ҳисоб: <b>{money(balance, currency)}</b>\n"
+    )
+    if not is_open:
+        return head + "\n🚫 <b>API ҳоло хомӯш аст.</b> Каме дертар бинед."
+    if key is None:
+        body = "🔑 Калид: <i>ҳанӯз нест</i>\n\nБарои оғоз «🔑 Калид сохтан»-ро пахш кунед."
+    else:
+        used = (key["last_used_at"] or "")[:16].replace("T", " ") or "ҳанӯз не"
+        body = (
+            f"🔑 Калид: <code>{esc(key['hint'])}</code>\n"
+            f"📅 Сохта шуд: {esc(key['created_at'][:16].replace('T', ' '))}\n"
+            f"🕐 Охирин истифода: {esc(used)}"
+        )
+    if url:
+        body += f"\n\n📖 Ҳуҷҷатҳо (бо забони русӣ):\n{esc(url)}"
+    return head + body
+
+
+def api_key_created(plain: str) -> str:
+    return (
+        "✅ <b>Калиди API сохта шуд</b>\n\n"
+        f"<code>{esc(plain)}</code>\n\n"
+        "⚠️ <b>Онро ҳозир нусха бардоред</b> — бори дигар нишон дода намешавад.\n\n"
+        "🔒 Калидро ба касе надиҳед: бо он аз ҳисоби шумо харид кардан мумкин аст. "
+        "Агар ба дасти бегона афтад — «♻️ Калиди нав»-ро пахш кунед, калиди кӯҳна "
+        "фавран кор намекунад."
+    )
+
+
+API_CONFIRM_RENEW = (
+    "♻️ <b>Калиди нав созем?</b>\n\n"
+    "Калиди ҳозира <b>фавран кор намекунад</b> — барномаҳое, ки бо он кор мекунанд, "
+    "то иваз кардани калид харид карда наметавонанд.\n"
+    "Ҳисоб ва фармоишҳо ҷои худ мемонанд."
+)
+API_CONFIRM_REVOKE = (
+    "🗑 <b>Калидро бекор кунем?</b>\n\n"
+    "Пас аз ин ҳеҷ барнома бо калиди шумо харид карда наметавонад. "
+    "Ҳар вақт калиди нав сохтан мумкин аст."
+)
+API_REVOKED = "🗑 Калид бекор шуд."
+API_CLOSED = "API ҳоло хомӯш аст."

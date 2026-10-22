@@ -71,6 +71,11 @@ class Config:
     # Donatix — танҳо Telegram Stars ва Premium. Холӣ — Stars аз FireLoot, Premium дастӣ.
     donatix_key: str = ""
     donatix_url: str = DONATIX_BASE
+    # API барои барномасозон (дар худи бот кор мекунад).
+    api_enabled: bool = True
+    api_host: str = "0.0.0.0"
+    api_port: int = 8080
+    api_public_url: str = ""        # холӣ — аз IP-и сервер худкор
 
     @property
     def has_supplier(self) -> bool:
@@ -123,4 +128,8 @@ def load_config(env_file: str | os.PathLike[str] | None = None) -> Config:
         log_level=os.getenv("SHOP_LOG_LEVEL", "INFO").upper(),
         donatix_key=os.getenv("SHOP_DONATIX_KEY", "").strip(),
         donatix_url=(os.getenv("SHOP_DONATIX_URL", "").strip() or DONATIX_BASE),
+        api_enabled=os.getenv("SHOP_API_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off"),
+        api_host=os.getenv("SHOP_API_HOST", "0.0.0.0").strip() or "0.0.0.0",
+        api_port=_int(os.getenv("SHOP_API_PORT"), 8080),
+        api_public_url=os.getenv("SHOP_API_PUBLIC_URL", "").strip().rstrip("/"),
     )

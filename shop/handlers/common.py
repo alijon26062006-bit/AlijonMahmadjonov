@@ -77,6 +77,7 @@ async def show_main_menu(
         is_admin=cfg.is_admin(user_id),
         reviews_url=cfg.reviews_url,
         other_games=db.active_count(catalog.CAT_OTHER) > 0,
+        api=cfg.api_enabled and db.setting("api_enabled", "1") == "1",
     )
     if isinstance(event, CallbackQuery) and edit:
         await safe_edit(event, text, markup)

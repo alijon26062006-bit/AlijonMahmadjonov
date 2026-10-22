@@ -227,7 +227,10 @@ async def cb_order_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot
         if status == ORDER_DONE
         else texts.order_rejected_note(order_id, row["price"], cfg.currency)
     )
-    await notify_user(bot, row["user_id"], note)
+    from ..fulfillment import via_api
+
+    if not via_api(row):
+        await notify_user(bot, row["user_id"], note)
     await cb.answer("✅" if status == ORDER_DONE else "❌")
 
 

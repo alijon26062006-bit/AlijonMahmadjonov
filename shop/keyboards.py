@@ -28,6 +28,11 @@ CB_TOPUP_OTHER = "t:other"
 CB_TOPUP_PAID = "t:paid:"  # t:paid:<id>
 CB_CHECK_SUB = "sub:check"
 CB_REVIEW = "rev:new"
+CB_API = "k:menu"
+CB_API_NEW = "k:new"
+CB_API_NEW_OK = "k:new!"
+CB_API_DEL = "k:del"
+CB_API_DEL_OK = "k:del!"
 
 
 def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton:
@@ -45,7 +50,8 @@ def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton
 
 
 def main_menu(
-    *, is_admin: bool = False, reviews_url: str = "", other_games: bool = False
+    *, is_admin: bool = False, reviews_url: str = "", other_games: bool = False,
+    api: bool = False,
 ) -> InlineKeyboardMarkup:
     """Менюи асосӣ — ҳамон тарҳбандии намуна."""
     rows: list[list[InlineKeyboardButton]] = [
@@ -70,6 +76,8 @@ def main_menu(
     ]
     if reviews_url:
         rows.append([_url(texts.BTN_REVIEWS, reviews_url, style.PRIMARY)])
+    if api:
+        rows.append([_btn(texts.BTN_API, CB_API, style.PRIMARY)])
     if is_admin:
         rows.append([_btn(texts.BTN_ADMIN, "a:home", style.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -342,9 +350,37 @@ def admin_settings() -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_MARKUP, "a:markup", style.PRIMARY),
             ],
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
+            [_btn("🔌 API: фаъол / хомӯш", "a:apitoggle", style.PRIMARY)],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
     )
+
+
+def api_menu(has_key: bool, url: str, is_open: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if is_open:
+        if has_key:
+            rows.append([_btn(texts.BTN_API_RENEW, CB_API_NEW, style.PRIMARY)])
+            rows.append([_btn(texts.BTN_API_REVOKE, CB_API_DEL, style.DANGER)])
+        else:
+            rows.append([_btn(texts.BTN_API_NEW, CB_API_NEW, style.SUCCESS)])
+    if url:
+        rows.append([_url(texts.BTN_API_DOCS, url, style.PRIMARY)])
+    rows.append([_btn(texts.BTN_HOME, CB_HOME)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def api_confirm(yes_text: str, yes_data: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_btn(yes_text, yes_data, style.DANGER)],
+        [_btn(texts.BTN_CANCEL, CB_API)],
+    ])
+
+
+def api_after_create(url: str) -> InlineKeyboardMarkup:
+    rows = [[_url(texts.BTN_API_DOCS, url, style.PRIMARY)]] if url else []
+    rows.append([_btn(texts.BTN_BACK, CB_API)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def admin_requisites(req) -> InlineKeyboardMarkup:
