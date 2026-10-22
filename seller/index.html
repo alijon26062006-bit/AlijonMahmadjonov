@@ -251,6 +251,35 @@ details.more[open] > summary { margin-bottom: 14px; }
 .morelist small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
 .sched { display: grid; grid-template-columns: 110px auto minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; align-items: center; }
 
+/* auth: соглашение, три шага, вход */
+.auth { min-height: 100%; display: grid; place-items: center; padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.auth-card { max-width: 460px; width: 100%; display: flex; flex-direction: column; gap: 18px; }
+.auth-card h1 { font-size: clamp(24px, 6vw, 30px); }
+.auth-card p { margin: 0; color: var(--muted); }
+.terms { max-height: 46vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; font-size: 14px; display: flex; flex-direction: column; gap: 10px; }
+.terms h3 { font-size: 14.5px; margin-top: 4px; }
+.terms p { color: var(--ink); }
+.agree { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; cursor: pointer; }
+.agree input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; margin: 0; }
+.slide-art { aspect-ratio: 4 / 3; max-width: 100%; border-radius: 22px; background: var(--accent-soft); display: grid; place-items: center; position: relative; overflow: hidden; }
+.slide-art svg { width: 46%; height: auto; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.slide-art .big { position: absolute; right: 18px; bottom: 14px; font-family: var(--f-display); font-size: 44px; font-weight: 700; color: var(--accent); }
+.dots { display: flex; gap: 6px; justify-content: center; }
+.dots i { width: 8px; height: 8px; border-radius: 99px; background: var(--line); transition: width .2s; }
+.dots i.on { width: 24px; background: var(--accent); }
+.phone { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.phone:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.phone span { display: flex; align-items: center; gap: 6px; padding: 0 12px; background: var(--bg); border-right: 1px solid var(--line); font-weight: 600; font-variant-numeric: tabular-nums; }
+.phone input { border: 0; outline: 0; background: none; padding: 12px; font-size: 18px; letter-spacing: .04em; width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.code { font-size: 28px; letter-spacing: .5em; text-align: center; font-variant-numeric: tabular-nums; padding-left: .5em; }
+.testnote { background: var(--info-soft); border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+.linkbtn { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 0; }
+.linkbtn:disabled { color: var(--muted); font-weight: 500; cursor: default; }
+
+/* баланс */
+.ledger td:first-child { white-space: normal; }
+.plus { color: var(--accent); }
+
 /* welcome */
 .welcome { min-height: 100%; display: grid; place-items: center; padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .welcome-card { max-width: 540px; width: 100%; display: flex; flex-direction: column; gap: 18px; }
@@ -318,6 +347,8 @@ const PAYOUT = ['Банковская карта', 'Электронный ко�
 const STATUS = { new: 'Новый', accepted: 'Собирается', ready: 'Готов, ждёт курьера', done: 'Выполнен', cancelled: 'Отменён' };
 const CUR = 'смн';
 const LOW = 5;
+const FEE = 0.20;          // комиссия сервиса с заказов из приложения
+const MIN_PAYOUT = 100;    // минимальная сумма вывода
 
 // ================= утилиты =================
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -385,9 +416,15 @@ function demo() {
   E(9, 'Реклама', 400, 'Instagram'); E(7, 'Закупка товара', 2950, ''); E(5, 'Коммунальные', 380, 'Свет, вода'); E(2, 'Доставка товара', 150, 'Такси с базы'); E(1, 'Зарплата', 1800, 'Флорист');
   // в примере закупка товара считается и через закупочную цену, поэтому помечаем такие расходы, чтобы не учитывать дважды
   expenses.forEach(e => { if (e.cat === 'Закупка товара') e.stockPurchase = true; });
+  const payouts = []; let paid = 0;
+  for (const back of [29, 22, 15, 8]) {
+    const cut = parseKey(addDays(today(), -back)).getTime();
+    const earned = orders.filter(o => o.source === 'app' && o.status === 'done' && o.ts < cut).reduce((s, o) => s + orderTotal(o) - orderFee(o), 0);
+    const amount = r2(earned - paid); if (amount > 0) { payouts.push({ id: uid(), ts: cut + 10 * 36e5, amount, account: '•••• 4417' }); paid += amount; }
+  }
   return {
-    v: 2, demo: true,
-    shop: { name: 'Гулистон', type: 'Цветы', phone: '+992 90 123 45 67', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие цветы каждый день, сборка букета за 30 минут.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), payout: { method: 'Банковская карта', account: '', holder: '' }, tin: '' },
+    v: 2, demo: true, payouts,
+    shop: { name: 'Гулистон', type: 'Цветы', phone: '+992 90 123 45 67', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие цветы каждый день, сборка букета за 30 минут.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), payout: { method: 'Банковская карта', account: '4417 1200 3456 4417', holder: 'Каримова Фарзона' }, tin: '' },
     cats: ['Розы', 'Букеты', 'Тюльпаны', 'В горшках', 'Подарки'],
     products, orders, expenses, nextNo: no + 1,
   };
@@ -404,7 +441,14 @@ function migrate(s) {
 }
 
 let S = migrate(store.load());
-if (S === 'fresh') S = null; else if (!S) S = demo();
+if (S === 'fresh') S = null;
+if (S && !S.payouts) S.payouts = [];
+
+// вход: соглашение → три шага → номер телефона → SMS-код (сейчас тестовый режим, SMS не отправляется)
+const AKEY = 'seller-auth-v1';
+const auth = (() => { try { return JSON.parse(localStorage.getItem(AKEY)) || {}; } catch { return {}; } })();
+const saveAuth = () => { try { localStorage.setItem(AKEY, JSON.stringify(auth)); } catch {} };
+const flow = { step: auth.agreed ? (auth.onboarded ? 'phone' : 'intro') : 'terms', slide: 0, phone: '', code: '', sent: 0, err: '' };
 const save = () => { if (S && !store.save(S)) toast('Не удалось сохранить: хранилище браузера переполнено или недоступно. Уменьшите число фото.'); };
 
 let view = 'home';
@@ -426,10 +470,12 @@ const ICON = {
   preview: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   shop: '<svg viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 10l2-6h14l2 6M3 10h18M9 20v-6h6v6"/></svg>',
   more: '<svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg>',
+  finance: '<svg viewBox="0 0 24 24"><path d="M4 7h15a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"/></svg>',
+  logout: '<svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
   import: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>',
 };
 const plusI = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
-const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['expenses', 'Расходы'], ['preview', 'Витрина'], ['shop', 'Магазин']];
+const NAV = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['finance', 'Баланс'], ['expenses', 'Расходы'], ['preview', 'Витрина'], ['shop', 'Магазин']];
 const TABS = [['home', 'Главная'], ['orders', 'Заказы'], ['catalog', 'Товары'], ['stats', 'Статистика'], ['more', 'Ещё']];
 const newCount = () => S.orders.filter(o => o.status === 'new').length;
 
@@ -441,12 +487,16 @@ function stockPill(p) {
 }
 const orderTotal = o => o.items.reduce((s, i) => s + i.qty * i.price, 0);
 const orderCost = o => o.items.reduce((s, i) => s + i.qty * (i.cost || 0), 0);
+// с заказа из приложения сервис удерживает 20%, продажи в магазине без комиссии
+const orderFee = o => o.source === 'app' ? r2(orderTotal(o) * FEE) : 0;
+const fmtPhone = d => d.replace(/^(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (m, a, b, c, e) => [a, b, c, e].filter(Boolean).join(' '));
 
 // ================= рендер =================
 function render() {
+  if (!auth.phone) return renderAuth();
   if (!S) return renderWelcome();
   const nc = newCount();
-  const btn = ([k, label]) => `<button class="nav-btn" data-nav="${k}" ${view === k || (k === 'more' && ['expenses', 'preview', 'shop', 'more'].includes(view)) ? 'aria-current="page"' : ''}>${ICON[k]}<span>${label}</span>${k === 'orders' && nc ? `<span class="badge">${nc}</span>` : ''}</button>`;
+  const btn = ([k, label]) => `<button class="nav-btn" data-nav="${k}" ${view === k || (k === 'more' && ['finance', 'expenses', 'preview', 'shop', 'more'].includes(view)) ? 'aria-current="page"' : ''}>${ICON[k]}<span>${label}</span>${k === 'orders' && nc ? `<span class="badge">${nc}</span>` : ''}</button>`;
   app.innerHTML = `
   <div class="shell">
     <nav class="rail" aria-label="Разделы">
@@ -458,11 +508,74 @@ function render() {
     <nav class="tabs" aria-label="Разделы">${TABS.map(btn).join('')}</nav>
   </div>`;
   const banner = S.demo ? `<div class="alert"><span>Это <b>пример магазина</b> с выдуманными заказами, чтобы посмотреть, как всё работает.</span><button class="btn sm" data-act="reset">Удалить пример и завести свой магазин</button></div>` : '';
-  const V = { home: vHome, orders: vOrders, catalog: vCatalog, stats: vStats, expenses: vExpenses, preview: vPreview, shop: vShop, more: vMore };
+  const V = { finance: vFinance, home: vHome, orders: vOrders, catalog: vCatalog, stats: vStats, expenses: vExpenses, preview: vPreview, shop: vShop, more: vMore };
   $('#page').innerHTML = banner + V[view]();
   if (view === 'catalog' && ui.q) { const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 }
 function go(v) { view = v; render(); window.scrollTo(0, 0); }
+
+const SLIDES = [
+  { t: 'Добавьте свои товары', d: 'Фото, цена и остаток. Если товаров много, загрузите весь список из Excel за минуту.', art: '<svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10"/></svg>' },
+  { t: 'Принимайте заказы', d: 'Покупатель заказывает в приложении, вам приходит уведомление. Примите заказ, соберите и передайте курьеру.', art: '<svg viewBox="0 0 24 24"><path d="M6 3h12l1 4H5zM5 7h14v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM9 11h6M9 15h4"/></svg>' },
+  { t: 'Получайте деньги', d: `Покупатель платит онлайн. Сервис удерживает ${FEE * 100}%, остальное зачисляется на ваш баланс, когда покупатель получил заказ. Выводите на карту в любой момент.`, art: '<svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 10h18M7 15h3"/></svg>', big: `${100 - FEE * 100}%` },
+];
+function renderAuth() {
+  const f = flow;
+  let body = '';
+  if (f.step === 'terms') body = `
+    <div class="eyebrow">Шаг 1 из 3 · Соглашение</div>
+    <h1>Условия работы для продавцов</h1>
+    <div class="terms" tabindex="0" aria-label="Текст соглашения">
+      <p class="small muted">Тестовая версия. Окончательный текст оферты согласуем с юристом до запуска.</p>
+      <h3>1. Что мы делаем</h3><p>Сервис размещает ваши товары в приложении доставки, принимает от покупателей заказы и оплату и передаёт заказы вам.</p>
+      <h3>2. Комиссия</h3><p>С каждого выполненного заказа из приложения сервис удерживает ${FEE * 100}% от суммы товаров. Продажи, которые вы отмечаете сами в магазине, комиссией не облагаются.</p>
+      <h3>3. Выплаты</h3><p>Сумма заказа за вычетом комиссии зачисляется на ваш баланс после того, как покупатель получил заказ. Вывести деньги можно от ${MIN_PAYOUT} ${CUR} на указанные вами реквизиты.</p>
+      <h3>4. Ваши обязанности</h3><p>Указывать настоящие цены, остатки и фото товаров. Принимать или отклонять заказ без задержки, собирать его к обещанному времени, отвечать за качество товара.</p>
+      <h3>5. Отмены и возвраты</h3><p>Если заказ отменён по вине продавца, покупателю возвращаются деньги, комиссия не удерживается. Частые отмены снижают позицию магазина в приложении.</p>
+      <h3>6. Персональные данные</h3><p>Мы храним ваш номер телефона и данные магазина, чтобы вы могли войти и получать выплаты. Данные покупателей можно использовать только для выполнения заказа.</p>
+    </div>
+    <form id="termsForm" class="col" style="gap:14px">
+      <label class="agree"><input type="checkbox" id="ag1"> <span>Я прочитал(а) и принимаю условия работы для продавцов</span></label>
+      <label class="agree"><input type="checkbox" id="ag2"> <span>Согласен(на) на обработку персональных данных</span></label>
+      <button class="btn primary" type="submit" id="agreeBtn" disabled>Принять и продолжить</button>
+    </form>`;
+  if (f.step === 'intro') { const s = SLIDES[f.slide]; body = `
+    <div class="row between"><div class="eyebrow">Шаг 2 из 3 · Как это работает</div><button class="linkbtn" data-auth="skip">Пропустить</button></div>
+    <div class="slide-art" aria-hidden="true">${s.art}${s.big ? `<span class="big">${s.big}</span>` : ''}</div>
+    <div class="col" style="gap:8px"><h1>${s.t}</h1><p>${s.d}</p></div>
+    <div class="dots" aria-label="Слайд ${f.slide + 1} из 3">${SLIDES.map((_, i) => `<i class="${i === f.slide ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="row between">${f.slide ? '<button class="btn" data-auth="prev">Назад</button>' : '<span></span>'}<button class="btn primary" data-auth="next">${f.slide < 2 ? 'Далее' : 'Понятно, войти'}</button></div>`; }
+  if (f.step === 'phone') body = `
+    <div class="eyebrow">Шаг 3 из 3 · Вход</div>
+    <h1>Ваш номер телефона</h1>
+    <p>Пришлём SMS с кодом. По этому номеру вы будете входить в кабинет.</p>
+    <form id="phoneForm" class="col" novalidate style="gap:12px">
+      <label class="lbl" for="phoneIn">Номер телефона</label>
+      <div class="phone"><span aria-hidden="true">🇹🇯 +992</span><input id="phoneIn" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="90 123 45 67" value="${fmtPhone(f.phone)}" aria-describedby="phoneErr"></div>
+      <span class="err" id="phoneErr">${esc(f.err)}</span>
+      <button class="btn primary" type="submit">Получить код</button>
+    </form>`;
+  if (f.step === 'code') { const left = Math.max(0, 60 - Math.round((Date.now() - f.sent) / 1000)); body = `
+    <div class="eyebrow">Шаг 3 из 3 · Вход</div>
+    <h1>Введите код из SMS</h1>
+    <p>Отправили на номер <b style="color:var(--ink)" class="num">+992 ${fmtPhone(f.phone)}</b>. <button class="linkbtn" data-auth="chphone">Изменить</button></p>
+    <div class="testnote">Тестовый режим: SMS не отправляется. Ваш код: <b class="num">${f.code}</b></div>
+    <form id="codeForm" class="col" novalidate style="gap:12px">
+      <input class="input code" id="codeIn" inputmode="numeric" autocomplete="one-time-code" maxlength="4" placeholder="····" aria-label="Код из SMS" aria-describedby="codeErr">
+      <span class="err" id="codeErr">${esc(f.err)}</span>
+      <button class="btn primary" type="submit">Войти</button>
+      <button type="button" class="linkbtn" data-auth="resend" id="resendBtn" ${left ? 'disabled' : ''}>${left ? `Отправить код ещё раз через ${left} с` : 'Отправить код ещё раз'}</button>
+    </form>`; }
+  app.innerHTML = `<div class="auth"><div class="auth-card">${body}</div></div>`;
+  const focus = { phone: '#phoneIn', code: '#codeIn' }[f.step]; if (focus) $(focus).focus();
+}
+function sendCode() { flow.code = String(Math.floor(1000 + Math.random() * 9000)); flow.sent = Date.now(); flow.err = ''; flow.step = 'code'; render(); }
+setInterval(() => {
+  if (flow.step !== 'code' || auth.phone) return;
+  const b = $('#resendBtn'); if (!b) return;
+  const left = Math.max(0, 60 - Math.round((Date.now() - flow.sent) / 1000));
+  b.disabled = !!left; b.textContent = left ? `Отправить код ещё раз через ${left} с` : 'Отправить код ещё раз';
+}, 1000);
 
 function renderWelcome() {
   app.innerHTML = `
@@ -472,7 +585,7 @@ function renderWelcome() {
     <p>Покупатели увидят ваш каталог в приложении доставки в день старта рекламы. Заполните его заранее, тогда первые заказы придут сразу.</p>
     <ol class="steps"><li>Укажите название, адрес и телефон магазина</li><li>Добавьте товары с фото и ценой, можно сразу списком из Excel</li><li>Проверьте витрину глазами покупателя</li></ol>
     <form class="panel col" id="shopForm" novalidate>
-      ${shopFields({ name: '', type: '', phone: '', address: '', about: '' })}
+      ${shopFields({ name: '', type: '', phone: '+992 ' + fmtPhone(auth.phone || ''), address: '', about: '' })}
       <button class="btn primary" type="submit">Создать магазин</button>
     </form>
     <button class="btn ghost" data-act="demo">Сначала посмотреть пример магазина цветов</button>
@@ -524,24 +637,25 @@ function range() {
 }
 function calc(a, b) {
   const days = []; for (let k = a; k <= b; k = addDays(k, 1)) days.push(k);
-  const D = Object.fromEntries(days.map(k => [k, { k, rev: 0, cogs: 0, exp: 0, orders: 0, qty: 0, cancelled: 0 }]));
+  const D = Object.fromEntries(days.map(k => [k, { k, rev: 0, cogs: 0, fee: 0, exp: 0, orders: 0, qty: 0, cancelled: 0 }]));
   const prod = {};
   for (const o of S.orders) {
     const k = dkey(o.ts); const d = D[k]; if (!d) continue;
     if (o.status === 'cancelled') { d.cancelled++; continue; }
     if (o.status !== 'done') continue;
-    d.orders++;
+    d.orders++; d.fee += orderFee(o);
+    const feeK = o.source === 'app' ? FEE : 0;
     for (const i of o.items) {
       d.rev += i.qty * i.price; d.cogs += i.qty * (i.cost || 0); d.qty += i.qty;
       const key = i.name + (i.variant ? ' · ' + i.variant : '');
       const p = prod[key] || (prod[key] = { name: key, qty: 0, rev: 0, profit: 0 });
-      p.qty += i.qty; p.rev += i.qty * i.price; p.profit += i.qty * (i.price - (i.cost || 0));
+      p.qty += i.qty; p.rev += i.qty * i.price; p.profit += i.qty * (i.price * (1 - feeK) - (i.cost || 0));
     }
   }
   // закупка товара уже учтена через закупочную цену — её не вычитаем второй раз
   for (const e of S.expenses) { const d = D[e.date]; if (d && !e.stockPurchase) d.exp += e.amount; }
-  const list = days.map(k => ({ ...D[k], profit: D[k].rev - D[k].cogs - D[k].exp }));
-  const T = list.reduce((t, d) => { for (const f of ['rev', 'cogs', 'exp', 'orders', 'qty', 'cancelled', 'profit']) t[f] += d[f]; return t; }, { rev: 0, cogs: 0, exp: 0, orders: 0, qty: 0, cancelled: 0, profit: 0 });
+  const list = days.map(k => ({ ...D[k], profit: D[k].rev - D[k].cogs - D[k].fee - D[k].exp }));
+  const T = list.reduce((t, d) => { for (const f of ['rev', 'cogs', 'fee', 'exp', 'orders', 'qty', 'cancelled', 'profit']) t[f] += d[f]; return t; }, { rev: 0, cogs: 0, fee: 0, exp: 0, orders: 0, qty: 0, cancelled: 0, profit: 0 });
   return { list, T, top: Object.values(prod).sort((x, y) => y.rev - x.rev) };
 }
 
@@ -917,6 +1031,7 @@ function vStats() {
       <div class="tablewrap"><table><tbody>
         <tr><td>Выручка от продаж</td><td class="r">${money(T.rev)}</td></tr>
         <tr><td>− Закупочная стоимость проданного товара</td><td class="r">${money(T.cogs)}</td></tr>
+        <tr><td>− Комиссия сервиса ${FEE * 100}% (только заказы из приложения)</td><td class="r">${money(T.fee)}</td></tr>
         <tr><td>− Расходы (аренда, зарплата и др.)</td><td class="r">${money(T.exp)}</td></tr>
         <tr><td><b>= Чистая прибыль</b></td><td class="r"><b class="${T.profit < 0 ? 'neg' : ''}">${money(T.profit)}</b></td></tr>
       </tbody></table></div>
@@ -925,9 +1040,9 @@ function vStats() {
     ${list.length > 1 ? `<section class="panel chart">
       <div class="row between"><h2>Продажи по дням</h2><div class="legend"><span><i style="background:var(--bar2)"></i>Выручка</span><span><i style="background:var(--accent)"></i>Валовая прибыль</span></div></div>
       <div class="tip num">${pick ? `<b>${ddmm(pick.k)}</b>: выручка ${money(pick.rev)}, заказов ${pick.orders}, чистая прибыль ${money(pick.profit)}` : '<span class="muted">Нажмите на столбик, чтобы увидеть день</span>'}</div>
-      <div class="bars">${list.map(d => `<button class="b" data-day="${d.k}" aria-pressed="${ui.pickDay === d.k}" aria-label="${ddmm(d.k)}: ${money(d.rev)}"><i style="height:${d.rev / max * 100}%"><em style="height:${d.rev ? Math.max(0, (d.rev - d.cogs) / d.rev * 100) : 0}%"></em></i></button>`).join('')}</div>
+      <div class="bars">${list.map(d => `<button class="b" data-day="${d.k}" aria-pressed="${ui.pickDay === d.k}" aria-label="${ddmm(d.k)}: ${money(d.rev)}"><i style="height:${d.rev / max * 100}%"><em style="height:${d.rev ? Math.max(0, (d.rev - d.cogs - d.fee) / d.rev * 100) : 0}%"></em></i></button>`).join('')}</div>
       <div class="axis">${list.map((d, i) => `<span>${i % step === 0 ? ddmm(d.k).slice(0, 2) : ''}</span>`).join('')}</div>
-      <span class="small muted">Валовая прибыль: выручка минус закупочная цена. Высота столбика — выручка за день, самый высокий: ${money(max)}.</span>
+      <span class="small muted">Валовая прибыль: выручка минус закупочная цена и комиссия сервиса. Высота столбика — выручка за день, самый высокий: ${money(max)}.</span>
     </section>` : ''}
     <div class="split">
       <section class="panel tight"><div style="padding:16px 16px 6px"><h2>Лучшие товары</h2></div>
@@ -938,12 +1053,12 @@ function vStats() {
       </section>
     </div>
     <section class="panel tight"><div style="padding:16px 16px 6px"><h2>По дням</h2></div>
-      ${dayRows.length ? `<div class="tablewrap"><table><thead><tr><th>Дата</th><th class="r">Заказов</th><th class="r">Продано</th><th class="r">Выручка</th><th class="r">Закупка</th><th class="r">Расходы</th><th class="r">Прибыль</th></tr></thead><tbody>${dayRows.map(d => `<tr><td>${ddmm(d.k)}, ${parseKey(d.k).toLocaleDateString('ru-RU', { weekday: 'short' })}</td><td class="r">${d.orders}</td><td class="r">${d.qty}</td><td class="r">${money(d.rev)}</td><td class="r">${money(d.cogs)}</td><td class="r">${d.exp ? money(d.exp) : '—'}</td><td class="r"><span class="${d.profit < 0 ? 'neg' : ''}">${money(d.profit)}</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">За этот период продаж и расходов нет</div>'}
+      ${dayRows.length ? `<div class="tablewrap"><table><thead><tr><th>Дата</th><th class="r">Заказов</th><th class="r">Продано</th><th class="r">Выручка</th><th class="r">Закупка</th><th class="r">Комиссия</th><th class="r">Расходы</th><th class="r">Прибыль</th></tr></thead><tbody>${dayRows.map(d => `<tr><td>${ddmm(d.k)}, ${parseKey(d.k).toLocaleDateString('ru-RU', { weekday: 'short' })}</td><td class="r">${d.orders}</td><td class="r">${d.qty}</td><td class="r">${money(d.rev)}</td><td class="r">${money(d.cogs)}</td><td class="r">${money(d.fee)}</td><td class="r">${d.exp ? money(d.exp) : '—'}</td><td class="r"><span class="${d.profit < 0 ? 'neg' : ''}">${money(d.profit)}</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">За этот период продаж и расходов нет</div>'}
     </section>`;
 }
 function exportStats() {
   const [a, b] = range(), { list } = calc(a, b);
-  const rows = [['Дата', 'Заказов', 'Продано', 'Выручка', 'Закупка', 'Расходы', 'Прибыль'], ...list.map(d => [d.k, d.orders, d.qty, r2(d.rev), r2(d.cogs), r2(d.exp), r2(d.profit)])];
+  const rows = [['Дата', 'Заказов', 'Продано', 'Выручка', 'Закупка', 'Комиссия', 'Расходы', 'Прибыль'], ...list.map(d => [d.k, d.orders, d.qty, r2(d.rev), r2(d.cogs), r2(d.fee), r2(d.exp), r2(d.profit)])];
   copyText(rows.map(r => r.join('\t')).join('\n'), 'Таблица скопирована. Вставьте её в Excel');
 }
 
@@ -982,6 +1097,56 @@ function saveExpense() {
   const cat = fd.get('cat');
   S.expenses.push({ id: uid(), date: fd.get('date') || today(), cat, amount, note: fd.get('note').trim(), stockPurchase: cat === 'Закупка товара' && !!fd.get('stockPurchase') });
   ui.expMonth = (fd.get('date') || today()).slice(0, 7); save(); closeSheet(); render(); toast('Расход добавлен');
+}
+
+// ================= Баланс =================
+function balance() {
+  const credits = S.orders.filter(o => o.source === 'app' && o.status === 'done').map(o => ({ ts: o.ts, no: o.no, total: orderTotal(o), fee: orderFee(o), net: r2(orderTotal(o) - orderFee(o)) }));
+  const pending = S.orders.filter(o => o.source === 'app' && ['new', 'accepted', 'ready'].includes(o.status)).reduce((s, o) => s + orderTotal(o) - orderFee(o), 0);
+  const earned = credits.reduce((s, c) => s + c.net, 0), out = S.payouts.reduce((s, p) => s + p.amount, 0);
+  return { credits, pending, available: r2(earned - out) };
+}
+function vFinance() {
+  const B = balance(), from = parseKey(addDays(today(), -29)).getTime();
+  const last30 = B.credits.filter(c => c.ts >= from), fee30 = last30.reduce((s, c) => s + c.fee, 0), net30 = last30.reduce((s, c) => s + c.net, 0);
+  const ledger = [...B.credits.map(c => ({ ts: c.ts, t: `Заказ № ${c.no}`, d: `оплачено ${money(c.total)}, комиссия ${money(c.fee)}`, a: c.net })),
+                  ...S.payouts.map(p => ({ ts: p.ts, t: 'Вывод на карту', d: p.account, a: -p.amount }))].sort((x, y) => y.ts - x.ts).slice(0, 60);
+  return `
+    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Баланс</h1></div><button class="btn primary" data-act="payout" ${B.available >= MIN_PAYOUT ? '' : 'disabled'}>Вывести деньги</button></div>
+    <div class="kpis">
+      <div class="kpi hero"><span>Доступно к выводу</span><b class="num">${money(B.available)}</b></div>
+      <div class="kpi"><span>Ожидает, заказы в работе</span><b class="num">${money(B.pending)}</b></div>
+      <div class="kpi"><span>Зачислено за 30 дней</span><b class="num">${money(net30)}</b></div>
+      <div class="kpi"><span>Комиссия сервиса за 30 дней</span><b class="num">${money(fee30)}</b></div>
+    </div>
+    <section class="panel col">
+      <h2>Как приходят деньги</h2>
+      <div class="tablewrap"><table><tbody>
+        <tr><td>Покупатель оплатил заказ в приложении, например торт</td><td class="r">100 ${CUR}</td></tr>
+        <tr><td>− Комиссия сервиса ${FEE * 100}%</td><td class="r">20 ${CUR}</td></tr>
+        <tr><td><b>= Зачисляется на ваш баланс, когда покупатель получил заказ</b></td><td class="r"><b>80 ${CUR}</b></td></tr>
+      </tbody></table></div>
+      <span class="small muted">Пока заказ собирается и едет, деньги видны в строке «Ожидает». Если заказ отменён, покупателю возвращаются деньги, комиссия не удерживается. В тестовой версии кнопка «Передан курьеру» считается получением заказа.</span>
+    </section>
+    <section class="panel tight"><div style="padding:16px 16px 6px"><h2>История</h2></div>
+      ${ledger.length ? `<div class="tablewrap"><table class="ledger"><thead><tr><th>Дата</th><th>Операция</th><th class="r">Сумма</th></tr></thead><tbody>${ledger.map(l => `<tr><td>${whenText(l.ts)}</td><td>${esc(l.t)}<br><span class="small muted">${esc(l.d)}</span></td><td class="r"><b class="${l.a > 0 ? 'plus' : ''}">${l.a > 0 ? '+' : '−'}${money(Math.abs(l.a))}</b></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Пока нет операций</b><span>Деньги за первый выполненный заказ из приложения появятся здесь.</span></div>'}
+    </section>`;
+}
+function sheetPayout() {
+  const B = balance(), p = S.shop.payout;
+  if (!p.account || !p.holder) { go('shop'); return toast('Сначала укажите реквизиты для выплат'); }
+  openSheet('Вывод денег', `<form id="payoutForm" class="col" novalidate style="gap:16px">
+    <div class="field"><label for="po_amount">Сумма</label><div class="suffix"><input class="input num" id="po_amount" name="amount" inputmode="decimal" value="${Math.floor(B.available)}"><span>${CUR}</span></div><span class="small muted">Доступно ${money(B.available)}, минимум ${MIN_PAYOUT} ${CUR}</span></div>
+    <div class="panel" style="padding:12px 14px"><span class="small muted">Куда</span><br><b>${esc(p.method)}</b> · <span class="num">•••• ${esc(p.account.replace(/\s/g, '').slice(-4))}</span><br><span class="small">${esc(p.holder)}</span></div>
+    <span class="small muted">Тестовый режим: деньги не переводятся, операция только записывается в историю.</span>
+    <button type="submit" hidden></button></form>`,
+    `<span></span><div class="row"><button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="dopayout">Вывести</button></div>`);
+}
+function doPayout() {
+  const f = $('#payoutForm'), a = num(new FormData(f).get('amount')), B = balance();
+  if (!showErrors(f, a == null || a < MIN_PAYOUT ? { amount: `Минимум ${MIN_PAYOUT} ${CUR}` } : a > B.available ? { amount: 'Больше, чем доступно' } : {})) return;
+  S.payouts.push({ id: uid(), ts: Date.now(), amount: r2(a), account: '•••• ' + S.shop.payout.account.replace(/\s/g, '').slice(-4) });
+  save(); closeSheet(); render(); toast(`Заявка на вывод ${money(a)} принята`);
 }
 
 // ================= Витрина =================
@@ -1048,14 +1213,15 @@ function vShop() {
     <section class="panel col">
       <h2>Данные</h2>
       <span class="small muted">Сейчас всё хранится в этом браузере. После подключения сервера товары и заказы будут в общей базе, и войти можно будет с любого телефона.</span>
-      <div><button class="btn danger" data-act="wipe">Удалить магазин и все данные</button></div>
+      <div class="row"><button class="btn" data-act="logout">Выйти из кабинета</button><button class="btn danger" data-act="wipe">Удалить магазин и все данные</button></div>
     </section>`;
 }
 function vMore() {
   const item = (k, t, s) => `<button data-nav="${k}">${ICON[k]}<span>${t}<small>${s}</small></span></button>`;
   return `<div class="head"><h1>Ещё</h1></div>
-    <div class="panel tight morelist">${item('expenses', 'Расходы', 'Аренда, зарплата и другие траты')}${item('preview', 'Витрина', 'Как покупатели видят магазин')}${item('shop', 'Магазин', 'Профиль, график, выплаты, категории')}
-    <button data-act="import">${ICON.import}<span>Загрузить товары из Excel<small>Сразу весь список</small></span></button></div>`;
+    <div class="panel tight morelist">${item('finance', 'Баланс', 'Деньги за заказы и вывод на карту')}${item('expenses', 'Расходы', 'Аренда, зарплата и другие траты')}${item('preview', 'Витрина', 'Как покупатели видят магазин')}${item('shop', 'Магазин', 'Профиль, график, выплаты, категории')}
+    <button data-act="import">${ICON.import}<span>Загрузить товары из Excel<small>Сразу весь список</small></span></button>
+    <button data-act="logout">${ICON.logout}<span>Выйти<small>+992 ${fmtPhone(auth.phone || '')}</small></span></button></div>`;
 }
 
 // ================= боковая панель =================
@@ -1095,7 +1261,19 @@ document.addEventListener('click', async e => {
   if (ds.rmph) { syncDraft(); editing.draft.imgs.splice(+ds.rmph, 1); return drawProduct(); }
   if (ds.mainph) { syncDraft(); const im = editing.draft.imgs; im.unshift(im.splice(+ds.mainph, 1)[0]); return drawProduct(); }
   if (ds.rmvar) { t.closest('.variant').remove(); return; }
+  if (ds.auth) {
+    const a = ds.auth;
+    if (a === 'skip' || (a === 'next' && flow.slide === 2)) { auth.onboarded = true; saveAuth(); flow.step = 'phone'; }
+    else if (a === 'next') flow.slide++;
+    else if (a === 'prev') flow.slide--;
+    else if (a === 'chphone') { flow.step = 'phone'; flow.err = ''; }
+    else if (a === 'resend') return sendCode();
+    return render();
+  }
   switch (ds.act) {
+    case 'logout': if (confirmTwice(t, 'Нажмите ещё раз, чтобы выйти')) { auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; render(); } return;
+    case 'payout': return sheetPayout();
+    case 'dopayout': return doPayout();
     case 'demo': S = demo(); save(); return go('home');
     case 'reset': if (confirmTwice(t, 'Нажмите ещё раз — пример удалится')) { store.fresh(); S = null; render(); } return;
     case 'wipe': if (confirmTwice(t, 'Точно удалить всё? Нажмите ещё раз')) { store.fresh(); S = null; render(); } return;
@@ -1123,6 +1301,9 @@ document.addEventListener('input', e => {
   if (id === 'q') { ui.q = e.target.value; render(); }
   if (id === 'p_price' || id === 'p_cost' || id === 'p_old') updateMargin();
   if (id === 'impText') previewImport();
+  if (id === 'ag1' || id === 'ag2') $('#agreeBtn').disabled = !($('#ag1').checked && $('#ag2').checked);
+  if (id === 'phoneIn') { const d = e.target.value.replace(/\D/g, '').replace(/^992(?=\d{9})/, '').slice(0, 9); flow.phone = d; e.target.value = fmtPhone(d); }
+  if (id === 'codeIn') { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); if (e.target.value.length === 4) $('#codeForm').requestSubmit(); }
 });
 document.addEventListener('change', async e => {
   const t = e.target, id = t.id;
@@ -1147,7 +1328,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target, id = f.id;
-  if (id === 'shopForm') { const d = validateShop(f); if (!d) return; S = { v: 2, demo: false, shop: blankShop(d), cats: ['Основное'], products: [], orders: [], expenses: [], nextNo: 1001 }; save(); go('catalog'); toast('Магазин создан. Добавьте первый товар'); }
+  if (id === 'shopForm') { const d = validateShop(f); if (!d) return; S = { v: 2, demo: false, shop: blankShop(d), cats: ['Основное'], products: [], orders: [], expenses: [], payouts: [], nextNo: 1001 }; save(); go('catalog'); toast('Магазин создан. Добавьте первый товар'); }
   if (id === 'shopEdit') { const d = validateShop(f); if (!d) return; Object.assign(S.shop, d); save(); render(); toast('Профиль сохранён'); }
   if (id === 'opsForm') {
     const fd = new FormData(f), prep = num(fd.get('prep')), min = fd.get('minOrder').trim() === '' ? 0 : num(fd.get('minOrder'));
@@ -1160,6 +1341,13 @@ document.addEventListener('submit', e => {
   if (id === 'catForm') { const v = $('#newCat').value.trim(); if (!v) return; if (S.cats.includes(v)) return toast('Такая категория уже есть'); S.cats.push(v); save(); render(); }
   if (id === 'pForm') saveProduct();
   if (id === 'expForm') saveExpense();
+  if (id === 'payoutForm') doPayout();
+  if (id === 'termsForm') { if (!$('#ag1').checked || !$('#ag2').checked) return; auth.agreed = true; auth.agreedAt = Date.now(); saveAuth(); flow.step = 'intro'; render(); }
+  if (id === 'phoneForm') { if (flow.phone.length !== 9) { flow.err = 'Введите 9 цифр номера после +992'; return render(); } sendCode(); }
+  if (id === 'codeForm') {
+    if ($('#codeIn').value !== flow.code) { $('#codeErr').textContent = 'Неверный код. Проверьте и введите ещё раз'; $('#codeIn').value = ''; return $('#codeIn').focus(); }
+    auth.phone = flow.phone; auth.loginAt = Date.now(); saveAuth(); flow.err = ''; render(); toast('Вы вошли');
+  }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 // обновляем «ждёт N мин» у новых заказов
