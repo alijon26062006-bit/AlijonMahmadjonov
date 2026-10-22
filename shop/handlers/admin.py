@@ -449,7 +449,8 @@ async def got_price(message: Message, state: FSMContext, db: Database, cfg: Conf
         f"✅ Нархи оддии <b>{texts.esc(row['title'])}</b> акнун "
         f"<b>{texts.money(price, cfg.currency)}</b>",
         reply_markup=keyboards.admin_price_item(
-            code, bool(row["active"]), bool(row["partner_price"])
+            code, bool(row["active"]), bool(row["partner_price"]),
+            locked=bool(row["price_locked"]),
         ),
     )
 
@@ -552,7 +553,8 @@ async def got_partner_price(
     await message.answer(
         f"✅ Нархи шарикии <b>{texts.esc(row['title'])}</b> {note}",
         reply_markup=keyboards.admin_price_item(
-            code, bool(row["active"]), bool(row["partner_price"])
+            code, bool(row["active"]), bool(row["partner_price"]),
+            locked=bool(row["price_locked"]),
         ),
     )
 

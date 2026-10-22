@@ -25,6 +25,7 @@ from .middlewares import (
     ConflictWatch,
     ErrorGuardMiddleware,
     GuardMiddleware,
+    NavClearsState,
     TenantMiddleware,
 )
 from .tenants import Platform, TenantManager
@@ -73,6 +74,7 @@ def build_dispatcher(db: Database, cfg: Config, supplier, tenants=None) -> Dispa
         else TenantMiddleware(lambda _bot_id: None)
     )
     dp.update.outer_middleware(GuardMiddleware(db, cfg))
+    dp.callback_query.middleware(NavClearsState())
     dp.include_router(build_router())
     return dp
 
@@ -219,7 +221,8 @@ async def run() -> None:
             except Exception as exc:
                 log.warning("Фармонҳои админ барои %s танзим нашуданд: %s", admin_id, exc)
 
-        await bot.delete_webhook(drop_pending_updates=True)
+        # Навсозиҳои вақти азнавоғозкунӣ (чеки пардохт, пахши тугма) гум намешаванд.
+        await bot.delete_webhook(drop_pending_updates=False)
         # Фармоишҳое, ки ҳангоми хомӯшшавии қаблӣ нимкора монданд, то охир
         # расонида мешаванд — дар паси парда, то бот фавран ҷавоб диҳад.
         resume_in_background(bot, db, cfg, supplier)

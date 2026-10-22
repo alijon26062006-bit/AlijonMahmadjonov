@@ -7,7 +7,7 @@ import logging
 import math
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramRetryAfter
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.fsm.context import FSMContext
 
@@ -123,6 +123,12 @@ async def got_channel(message: Message, state: FSMContext, db: Database, bot: Bo
         title = chat.title or chat.full_name or chat_id
         if not link and chat.username:
             link = f"https://t.me/{chat.username}"
+        if not link and chat.invite_link:
+            link = chat.invite_link          # канали пӯшида — бе ҳавола тугмаи «обуна» намебуд
+        me = await bot.get_chat_member(chat.id, bot.id)
+        if getattr(me.status, "value", me.status) not in ("administrator", "creator"):
+            # Бе админ бот обунаро санҷида наметавонад ва ҳамаро мегузаронад.
+            raise ValueError("бот дар ин канал админ нест")
     except Exception as exc:
         await message.answer(
             f"❌ Каналро кушода натавонистам: <code>{texts.esc(exc)}</code>\n\n"
@@ -286,10 +292,22 @@ def parse_buttons(raw: str) -> list[list[InlineKeyboardButton]] | None:
         if not line:
             continue
         title, sep, url = (part.strip() for part in line.partition("|"))
-        if not sep or not title or not url.lower().startswith(("http://", "https://", "tg://")):
+        if not sep or not title or len(title) > 64 or not _good_url(url):
             return None
         rows.append([InlineKeyboardButton(text=title, url=url)])
     return rows or None
+
+
+def _good_url(url: str) -> bool:
+    """Telegram ҳаволаи нодурустро рад мекунад — он гоҳ эълон ба ҳеҷ кас намерасад."""
+    from urllib.parse import urlparse
+
+    if not url or len(url) > 2000 or any(ch.isspace() for ch in url):
+        return False
+    parsed = urlparse(url)
+    if parsed.scheme in ("http", "https"):
+        return "." in parsed.netloc and not parsed.netloc.startswith(".")
+    return parsed.scheme == "tg" and bool(parsed.netloc or parsed.path)
 
 
 @router.callback_query(F.data == "a:bc")
@@ -379,29 +397,46 @@ async def cb_broadcast_send(
         else None
     )
 
-    await safe_edit(cb, "📤 Мефиристам...", None)
-    await cb.answer()
+    # Тугмаҳо ба паёми охирин мечаспанд.
+    parts = [(mid, markup if mid == (body_id or media_id) else None)
+             for mid in (media_id, body_id) if mid]
 
-    async def deliver(user_id: int) -> None:
-        if media_id:
-            # Тугмаҳо ба паёми охирин мечаспанд.
-            await bot.copy_message(
-                user_id, source, media_id,
-                reply_markup=None if body_id else markup,
-            )
-        if body_id:
-            await bot.copy_message(user_id, source, body_id, reply_markup=markup)
+    async def send_part(user_id: int, message_id: int, part_markup) -> None:
+        try:
+            await bot.copy_message(chat_id=user_id, from_chat_id=source, message_id=message_id,
+                                   reply_markup=part_markup)
+        except TelegramRetryAfter as exc:
+            # Telegram гуфт «сабр кун» — танҳо ҳамин қисмро боз мефиристем,
+            # то харидор расмро ду бор нагирад.
+            await asyncio.sleep(exc.retry_after + 1)
+            await bot.copy_message(chat_id=user_id, from_chat_id=source, message_id=message_id,
+                                   reply_markup=part_markup)
+
+    # Аввал ба худи админ: агар Telegram паём ё тугмаҳоро рад кунад, ба ҳеҷ кас
+    # намефиристем ва сабабро мегӯем (на «0 расид» пас аз ҳазор кӯшиш).
+    try:
+        for message_id, part_markup in parts:
+            await send_part(cb.from_user.id, message_id, part_markup)
+    except TelegramBadRequest as exc:
+        await cb.answer()
+        await cb.message.answer(
+            f"❌ Telegram эълонро қабул накард: <code>{texts.esc(str(exc))}</code>\n"
+            "Ҳаволаҳои тугмаҳоро санҷед ва аз нав оғоз кунед.",
+            reply_markup=keyboards.admin_home(),
+        )
+        return
+
+    await safe_edit(cb, "📤 Мефиристам... (нусхаи санҷишӣ ба шумо рафт)", None)
+    await cb.answer()
 
     sent = failed = 0
     for user_id in db.all_user_ids():
+        if user_id == cb.from_user.id:
+            sent += 1
+            continue
         try:
-            try:
-                await deliver(user_id)
-            except TelegramRetryAfter as exc:
-                # Telegram гуфт «сабр кун» — сабр мекунем ва боз мефиристем,
-                # вагарна қисми харидорон эълонро намегирифтанд.
-                await asyncio.sleep(exc.retry_after + 1)
-                await deliver(user_id)
+            for message_id, part_markup in parts:
+                await send_part(user_id, message_id, part_markup)
             sent += 1
         except Exception:
             failed += 1
@@ -503,9 +538,12 @@ async def cb_toggle_method(cb: CallbackQuery, db: Database, cfg: Config) -> None
     req = requisites.get(db, cfg)
     is_dc = cb.data == "a:dctoggle"
     turning_off = req.dc_enabled if is_dc else req.alif_enabled
-    other_on = req.alif_enabled if is_dc else req.dc_enabled
+    # «Фаъол» бе корт/ҳисоб кор намекунад — танҳо тарзи воқеан коркунанда ҳисоб мешавад.
+    dc_works = req.dc_enabled and bool(req.card)
+    alif_works = req.alif_enabled and bool(req.alif_account)
+    this_works, other_on = (dc_works, alif_works) if is_dc else (alif_works, dc_works)
 
-    if turning_off and not other_on:
+    if turning_off and this_works and not other_on:
         await cb.answer(texts.ADMIN_LAST_METHOD.replace("<b>", "").replace("</b>", ""),
                         show_alert=True)
         return
@@ -752,7 +790,7 @@ async def got_markup(message: Message, state: FSMContext, db: Database) -> None:
     raw = message.text.strip().replace("%", "").replace(",", ".")
     try:
         value = int(float(raw))
-    except ValueError:
+    except (ValueError, OverflowError):          # «inf», «nan»
         value = -1
     if not 0 <= value <= 500:
         await message.answer("❌ Фоиз нодуруст аст. Намуна: <code>20</code>")

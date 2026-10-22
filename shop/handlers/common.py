@@ -56,6 +56,13 @@ async def safe_edit(
     cb: CallbackQuery, text: str, markup: InlineKeyboardMarkup | None = None
 ) -> None:
     """Паёмро иваз мекунад; агар нашавад — паёми нав мефиристад."""
+    if not hasattr(cb.message, "edit_text"):
+        # Паёми хеле кӯҳна (InaccessibleMessage) ё нест — паёми нав мефиристем.
+        try:
+            await cb.bot.send_message(cb.from_user.id, text, reply_markup=markup)
+        except Exception:  # pragma: no cover
+            log.exception("Паём фиристода нашуд")
+        return
     try:
         await cb.message.edit_text(text, reply_markup=markup)
     except TelegramBadRequest as exc:

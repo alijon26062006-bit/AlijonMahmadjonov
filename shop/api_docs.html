@@ -375,6 +375,7 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
         <tr><td>400</td><td><code>invalid_json</code></td><td>Проверьте, что тело — корректный JSON-объект</td></tr>
         <tr><td>400</td><td><code>missing_field</code></td><td>Не хватает поля — его имя в <code>field</code></td></tr>
         <tr><td>400</td><td><code>invalid_field</code></td><td>Неверный формат поля (<code>field</code>) — например, буквы в ID</td></tr>
+        <tr><td>400</td><td><code>bad_idempotency_key</code></td><td>Idempotency-Key длиннее 100 символов</td></tr>
         <tr><td>401</td><td><code>unauthorized</code></td><td>Нет ключа, ключ неверный или отозван — создайте новый в боте</td></tr>
         <tr><td>402</td><td><code>insufficient_balance</code></td><td>Пополните баланс в боте</td></tr>
         <tr><td>403</td><td><code>account_blocked</code></td><td>Аккаунт заблокирован — свяжитесь с поддержкой</td></tr>

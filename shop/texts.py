@@ -635,6 +635,15 @@ ADMIN_ASK_PARTNER_PRICE = (
 )
 
 
+#: Рӯйхатҳо дар як паём: Telegram зиёда аз 4096 аломат ва 100 тугма қабул намекунад.
+LIST_CAP = 30
+
+
+def _more(rows: list) -> str:
+    extra = len(rows) - LIST_CAP
+    return f"\n<i>… ва боз {extra} нафар (танҳо {LIST_CAP}-тои аввал нишон дода шуд)</i>" if extra > 0 else ""
+
+
 def admin_partners(rows: list, currency: str = CURRENCY) -> str:
     if not rows:
         return (
@@ -643,7 +652,7 @@ def admin_partners(rows: list, currency: str = CURRENCY) -> str:
             "<i>Шарик нархи махсуси шуморо мебинад — ба ҷои нархи оддӣ.</i>"
         )
     lines = [f"🤝 <b>Шарикон</b> ({len(rows)} нафар)\n"]
-    for row in rows:
+    for row in rows[:LIST_CAP]:
         name = esc(row["first_name"] or "—")
         user = f"@{esc(row['username'])}" if row["username"] else "—"
         note = f" · {esc(row['note'])}" if row["note"] else ""
@@ -652,7 +661,7 @@ def admin_partners(rows: list, currency: str = CURRENCY) -> str:
             f"  💳 {money(row['balance'] or 0, currency)} · "
             f"харҷ: {money(row['spent'] or 0, currency)}"
         )
-    return "\n".join(lines)
+    return "\n".join(lines) + _more(rows)
 
 
 def partner_added(user) -> str:
@@ -1245,25 +1254,25 @@ def admin_c_partners(rows: list, currency: str = CURRENCY) -> str:
     if not rows:
         return "👥 <b>Шарикони конструктор</b>\n\nҲоло касе дастрасӣ надорад."
     lines = ["👥 <b>Шарикони конструктор</b>\n"]
-    for row in rows:
+    for row in rows[:LIST_CAP]:
         who = f"@{row['username']}" if row["username"] else (row["first_name"] or "")
         lines.append(
             f"• <code>{row['user_id']}</code> {esc(who)} — ботҳо {row['bots']}/{row['max_bots']}, "
             f"ҳисоб {money(row['balance'] or 0, currency)}"
         )
-    return "\n".join(lines)
+    return "\n".join(lines) + _more(rows)
 
 
 def admin_tenants(rows: list) -> str:
     if not rows:
         return "🤖 <b>Ботҳои шарикон</b>\n\nҲоло бот нест."
     lines = ["🤖 <b>Ботҳои шарикон</b>\n"]
-    for row in rows:
+    for row in rows[:LIST_CAP]:
         lines.append(
             f"• @{esc(row['username'] or '?')} — шарик <code>{row['owner_id']}</code> — "
             f"{TENANT_STATUS.get(row['status'], row['status'])}"
         )
-    return "\n".join(lines)
+    return "\n".join(lines) + _more(rows)
 
 
 # ── боти шарик: панели админ ──

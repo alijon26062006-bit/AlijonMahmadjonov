@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 router = Router(name="reviews")
 
 MIN_LENGTH = 10
+# Паёми админ ва канал бояд аз 4096 аломат нагузарад (бо ном ва тугмаҳо).
+MAX_LENGTH = 3000
 REVIEW_CHANNEL_KEY = "review_channel"
 
 
@@ -36,6 +38,12 @@ async def got_review(
     text = message.text.strip()
     if len(text) < MIN_LENGTH:
         await message.answer(texts.REVIEW_TOO_SHORT, reply_markup=keyboards.cancel_only())
+        return
+    if len(text) > MAX_LENGTH:
+        await message.answer(
+            f"✂️ Шарҳ хеле дароз аст ({len(text)} аломат). Лутфан то {MAX_LENGTH} аломат нависед.",
+            reply_markup=keyboards.cancel_only(),
+        )
         return
     await state.clear()
     review_id = db.create_review(message.from_user.id, text)

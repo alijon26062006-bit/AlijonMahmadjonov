@@ -328,15 +328,26 @@ def build_app(db: Database, cfg: Config, supplier, bot) -> web.Application:
 
     async def create_order(request: web.Request) -> web.Response:
         key, user = auth(request)
+        idem_key = request.headers.get("Idempotency-Key", "").strip()
+        if len(idem_key) > 100:
+            raise ApiError(400, "bad_idempotency_key", "Idempotency-Key длиннее 100 символов")
+        body, raw = await _body(request)
+        idem = (idem_key, hashlib.sha256(raw).hexdigest()) if idem_key else None
+        if idem:
+            # Повтор проверяем первым: повтор всегда получает тот же заказ,
+            # даже если сейчас лимит запросов или товар выключен.
+            seen = db.idem_order(user.id, key["id"], idem_key)
+            if seen is not None:
+                if seen[1] != idem[1]:
+                    raise ApiError(409, "idempotency_key_reused",
+                                   "Этот Idempotency-Key уже использован для другого заказа")
+                return _json({"ok": True, "duplicate": True, "order": order_json(db.order(seen[0]))})
         if not orders_limit.allow(key["id"]):
             raise ApiError(429, "rate_limited", "Не больше 30 заказов в минуту")
-        body, raw = await _body(request)
         row = _product(db, body)
         target, server = _target_for(row, body)
         price = costs.api_price_of(db, row)
 
-        idem_key = request.headers.get("Idempotency-Key", "").strip()[:100]
-        idem = (idem_key, hashlib.sha256(raw).hexdigest()) if idem_key else None
         try:
             order_id = db.create_order(
                 user_id=user.id, product_code=row["code"], category=row["category"],

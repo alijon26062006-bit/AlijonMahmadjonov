@@ -19,7 +19,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramUnauthorizedError
+from aiogram.exceptions import TelegramConflictError, TelegramUnauthorizedError
 from aiogram.methods import GetUpdates
 
 from . import requisites, wholesale
@@ -76,6 +76,18 @@ def max_bots_total(db: Database) -> int:
         return max(0, int(db.setting(MAX_BOTS_KEY) or DEFAULT_MAX_BOTS))
     except ValueError:
         return DEFAULT_MAX_BOTS
+
+
+CONFLICT_ALERT_AFTER = 6          # ~1 дақиқа низоъи пайваста
+
+
+def texts_conflict(username: str) -> str:
+    return (
+        f"⚠️ <b>Боти @{username} дар ду ҷо кор мекунад</b>\n\n"
+        "Ҳамин токен дар барнома ё сервери дигар низ истифода мешавад — харидорон "
+        "ҷавобро аз он мегиранд, на аз дӯкони шумо. Онро хомӯш кунед ё дар "
+        "@BotFather токени нав гиред ва дар «🤖 Ботҳои ман» гузоред."
+    )
 
 
 @contextlib.contextmanager
@@ -281,15 +293,26 @@ class TenantManager:
             return
         except Exception:
             pass
+        conflicts = 0
         while True:
             try:
                 updates = await ctx.bot(GetUpdates(offset=offset, timeout=25), request_timeout=40)
                 backoff = 1.0
+                conflicts = 0
             except asyncio.CancelledError:
                 raise
             except TelegramUnauthorizedError:
                 await self._token_revoked(ctx)
                 return
+            except TelegramConflictError:
+                # Ҳамин токен дар ҷои дигар низ кор мекунад — харидорон ҷавоби
+                # нусхаи дигарро мегиранд. Ба шарик як бор мегӯем.
+                conflicts += 1
+                if conflicts == CONFLICT_ALERT_AFTER:
+                    await self._tell_owner(ctx, texts_conflict(ctx.username))
+                await asyncio.sleep(min(backoff, 10))
+                backoff = min(backoff * 2, 30)
+                continue
             except Exception as exc:
                 log.warning("Боти шарик #%s: навсозӣ гирифта нашуд: %s", ctx.id, exc)
                 await asyncio.sleep(backoff)
@@ -306,6 +329,12 @@ class TenantManager:
             await self.platform.dp.feed_update(ctx.bot, update)
         except Exception:
             log.exception("Боти шарик #%s: хатои коркард", ctx.id)
+
+    async def _tell_owner(self, ctx: TenantContext, text: str) -> None:
+        try:
+            await self.platform.bot.send_message(ctx.owner_id, text)
+        except Exception:
+            pass
 
     async def _token_revoked(self, ctx: TenantContext) -> None:
         """Шарик токенро бекор кард ё бот нест шуд — ботро хомӯш мекунем ва хабар медиҳем."""

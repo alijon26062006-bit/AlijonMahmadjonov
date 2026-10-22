@@ -43,7 +43,11 @@ async def missing_channels(bot: Bot, db: Database, user_id: int) -> list:
         except Exception as exc:
             log.warning("Каналро тафтиш карда натавонистам %s: %s", row["chat_id"], exc)
             continue
-        if member.status not in MEMBER_STATUSES:
+        status = getattr(member.status, "value", member.status)
+        # «restricted» бо is_member=True — аъзои гурӯҳ бо маҳдудият, обуна ҳисоб мешавад.
+        if status not in MEMBER_STATUSES and not (
+            status == "restricted" and getattr(member, "is_member", False)
+        ):
             missing.append(row)
     return missing
 

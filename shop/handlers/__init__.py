@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from aiogram import Router
+from aiogram import F, Router
 
 from . import admin, apikeys, constructor, menu, purchase, reviews, settings, topup
 
@@ -20,6 +20,9 @@ def build_router() -> Router:
     if _root is not None:
         return _root
     root = Router(name="shop")
+    # Бот танҳо дар чати шахсӣ ҷавоб медиҳад (дар гурӯҳи обуна хомӯш аст).
+    root.message.filter(F.chat.type == "private")
+    root.include_router(menu.commands_router)
     # Конструктор пеш аз админ: дар боти шарик бахшҳои соҳибро мебандад.
     root.include_router(constructor.tenant_router)
     root.include_router(constructor.owner_router)

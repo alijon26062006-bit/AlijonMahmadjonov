@@ -39,6 +39,11 @@ class _Texts:
 texts = _Texts()
 
 
+def has_translations() -> bool:
+    """Тарҷумаи русӣ ҳаст? То пайдо шудани он интихоби забон нишон дода намешавад."""
+    return _module("ru") is not None
+
+
 def set_lang(lang: str) -> None:
     LANG.set(lang if lang in LANGS else "tj")
 

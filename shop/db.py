@@ -734,7 +734,7 @@ class Database:
         query = query.strip()
         if not query:
             return None
-        if query.lstrip("-").isdigit():
+        if query.lstrip("-").isdigit() and len(query) <= 16:     # SQLite: то 2^63
             found = self.user(int(query))
             if found:
                 return found
@@ -832,11 +832,7 @@ class Database:
         stamp = now()
         with self._lock:
             if idem and api_key_id is not None:
-                seen = self._conn.execute(
-                    "SELECT order_id, body_hash FROM api_requests "
-                    "WHERE key_id = ? AND idem_key = ?",
-                    (api_key_id, idem[0]),
-                ).fetchone()
+                seen = self._idem_seen(user_id, api_key_id, idem[0])
                 if seen is not None:
                     raise DuplicateRequest(seen["order_id"], seen["body_hash"] == idem[1])
             row = self._conn.execute(
@@ -872,6 +868,31 @@ class Database:
             )
             self._conn.commit()
         return order_id
+
+    def _idem_seen(self, user_id: int, key_id: int, idem_key: str):
+        """Дархост бо ҳамин Idempotency-Key аллакай буд?
+
+        Калидҳои API (key_id > 0) — барои ҳамон харидор, ҳатто пас аз калиди нав:
+        вагарна такрори дархост бо калиди нав фармоиш ва пулро дубора мегирифт.
+        Боти шарик (key_id < 0) — танҳо дар доираи ҳамон бот.
+        """
+        if key_id < 0:
+            return self._conn.execute(
+                "SELECT order_id, body_hash FROM api_requests WHERE key_id = ? AND idem_key = ?",
+                (key_id, idem_key),
+            ).fetchone()
+        return self._conn.execute(
+            "SELECT r.order_id, r.body_hash FROM api_requests r "
+            "JOIN orders o ON o.id = r.order_id "
+            "WHERE r.key_id > 0 AND o.user_id = ? AND r.idem_key = ? LIMIT 1",
+            (user_id, idem_key),
+        ).fetchone()
+
+    def idem_order(self, user_id: int, key_id: int, idem_key: str) -> tuple[int, str] | None:
+        """(рақами фармоиш, хеши дархост) барои Idempotency-Key, агар бошад."""
+        with self._lock:
+            seen = self._idem_seen(user_id, key_id, idem_key)
+        return (seen["order_id"], seen["body_hash"]) if seen is not None else None
 
     def order(self, order_id: int) -> sqlite3.Row | None:
         return self._one("SELECT * FROM orders WHERE id = ?", (order_id,))

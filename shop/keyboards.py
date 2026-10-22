@@ -7,7 +7,7 @@ from typing import Sequence
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from . import catalog, db, style
-from .i18n import in_tenant, texts
+from .i18n import has_translations, in_tenant, texts
 
 # ── калидҳои callback ─────────────────────────────────────────────────
 CB_HOME = "m:home"
@@ -346,7 +346,7 @@ def admin_partners(rows: Sequence) -> InlineKeyboardMarkup:
     buttons: list[list[InlineKeyboardButton]] = [
         [_btn(texts.ADM_BTN_ADD_PARTNER, "a:padd", style.SUCCESS)]
     ]
-    for row in rows:
+    for row in rows[:texts.LIST_CAP]:
         name = row["first_name"] or (f"@{row['username']}" if row["username"] else row["user_id"])
         buttons.append(
             [_btn(f"🗑 {name}", f"a:pdel:{row['user_id']}", style.DANGER)]
@@ -394,10 +394,8 @@ def admin_settings(*, tenant: bool | None = None) -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY),
                 _btn("🎧 Дастгирӣ", "a:support", style.PRIMARY),
             ],
-            [
-                _btn("👥 Операторон", "a:ops", style.PRIMARY),
-                _btn("🌐 Забон / Язык", "a:lang", style.PRIMARY),
-            ],
+            [_btn("👥 Операторон", "a:ops", style.PRIMARY)]
+            + ([_btn("🌐 Забон / Язык", "a:lang", style.PRIMARY)] if has_translations() else []),
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
             [_btn(texts.BTN_BACK, "a:home")],
         ])
@@ -624,7 +622,8 @@ def tenant_manage(row) -> InlineKeyboardMarkup:
         rows.append([_btn("▶️ Фаъол кардан", f"c:resume:{tid}", style.SUCCESS)])
     if row["status"] in ("disabled", "paused", "active"):
         rows.append([_btn("🔑 Токени нав", f"c:token:{tid}", style.PRIMARY)])
-    rows.append([_btn("🌐 Забон: тоҷикӣ / русӣ", f"c:lang:{tid}", style.PRIMARY)])
+    if has_translations():
+        rows.append([_btn("🌐 Забон: тоҷикӣ / русӣ", f"c:lang:{tid}", style.PRIMARY)])
     rows.append([_btn(texts.BTN_BACK, "c:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -650,7 +649,7 @@ def admin_constructor(is_open: bool) -> InlineKeyboardMarkup:
 
 def admin_c_partners(rows) -> InlineKeyboardMarkup:
     buttons = [[_btn("➕ Додани дастрасӣ", "o:grant", style.SUCCESS)]]
-    for row in rows:
+    for row in rows[:texts.LIST_CAP]:
         name = f"@{row['username']}" if row["username"] else str(row["user_id"])
         buttons.append([_btn(f"🗑 {name}", f"o:revoke:{row['user_id']}", style.DANGER)])
     buttons.append([_btn(texts.BTN_BACK, "o:home")])
@@ -659,7 +658,7 @@ def admin_c_partners(rows) -> InlineKeyboardMarkup:
 
 def admin_tenants(rows) -> InlineKeyboardMarkup:
     buttons = []
-    for row in rows:
+    for row in rows[:texts.LIST_CAP]:
         blocked = row["status"] == "blocked"
         buttons.append([_btn(
             f"{'✅ Кушодан' if blocked else '🚫 Бастан'} @{row['username'] or row['id']}",

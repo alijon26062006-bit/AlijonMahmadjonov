@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.exceptions import TelegramBadRequest, TelegramConflictError
-from aiogram.types import TelegramObject, Update
+from aiogram.types import CallbackQuery, TelegramObject, Update
 
 from . import keyboards, style
 from .i18n import texts
@@ -56,10 +57,16 @@ class GuardMiddleware(BaseMiddleware):
         data["user"] = user
 
         if user.is_blocked and not cfg.is_admin(src.id):
-            await _tell(data.get("bot"), src.id, texts.BLOCKED)
+            if isinstance(inner, CallbackQuery):
+                # Тугма бе ҷавоб «чарх мезад» ва ҳар пахш паёми нав меомад.
+                await _ack(inner, texts.BLOCKED)
+            else:
+                await _tell(data.get("bot"), src.id, texts.BLOCKED)
             return None
 
         if not await self._subscribed(inner, data, src.id, db, cfg):
+            if isinstance(inner, CallbackQuery):
+                await _ack(inner, None)
             return None
 
         return await handler(event, data)
@@ -84,6 +91,39 @@ class GuardMiddleware(BaseMiddleware):
         except Exception as exc:
             log.info("Дархости обуна ба %s нарасид: %s", user_id, exc)
         return False
+
+
+class NavClearsState(BaseMiddleware):
+    """Гузариш ба бахши дигари панел ворид кардани нимкораро бекор мекунад.
+
+    Вагарна админ «➕ пул»-ро пахш карда, ба омор мерафт ва рақаме, ки
+    баъдтар менавишт, ба ҳисоби ҳамон харидори пештара мерафт.
+    """
+
+    EXACT = frozenset({
+        "a:home", "a:stats", "a:orders", "a:topups", "a:supplier", "a:users", "a:prices",
+        "a:settings", "a:partners", "a:channels", "a:req", "a:groups", "a:ops", "o:home",
+        "o:partners", "o:bots", "c:home", "m:home",
+    })
+    PREFIXES = ("a:pcat:", "a:price:", "a:gcat:", "a:pgroup:", "c:bot:")
+
+    async def __call__(self, handler, event, data):
+        cb_data = getattr(event, "data", None) or ""
+        state = data.get("state")
+        if state is not None and (cb_data in self.EXACT or cb_data.startswith(self.PREFIXES)):
+            await state.clear()
+        return await handler(event, data)
+
+
+async def _ack(cb: CallbackQuery, text: str | None) -> None:
+    try:
+        if text:
+            plain = re.sub(r"<[^>]+>", "", text)[:190]
+            await cb.answer(plain, show_alert=True)
+        else:
+            await cb.answer()
+    except Exception:
+        pass
 
 
 class ErrorGuardMiddleware(BaseMiddleware):

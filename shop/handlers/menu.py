@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
@@ -15,6 +15,23 @@ from .common import current_user, safe_edit, show_main_menu
 
 router = Router(name="menu")
 fallback_router = Router(name="fallback")
+# Пеш аз ҳама роутерҳо: фармон ҳангоми интизории ворид амалро бекор мекунад.
+# Вагарна «/bekor» ҳамчун номи соҳиби корт ё номи мол сабт мешуд.
+commands_router = Router(name="commands")
+
+
+class InState(BaseFilter):
+    async def __call__(self, message: Message, raw_state: str | None = None) -> bool:
+        return raw_state is not None
+
+
+@commands_router.message(InState(), F.text.regexp(r"^/[A-Za-z_]+(@\w+)?(\s|$)"))
+async def command_during_input(message: Message, state: FSMContext, db: Database,
+                               cfg: Config) -> None:
+    await state.clear()
+    current_user(message, db)
+    await message.answer(texts.CANCELLED)
+    await show_main_menu(message, db, cfg, edit=False)
 
 
 async def _drop_bottom_keyboard(message: Message, db: Database) -> None:

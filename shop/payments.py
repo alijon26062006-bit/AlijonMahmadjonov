@@ -15,11 +15,17 @@ def make_code(busy: set[str] | frozenset = frozenset()) -> str:
     Код дар байни пардохтҳои интизорӣ такрор намешавад — вагарна админ
     пулро ба харидори дигар мегузошт.
     """
-    for _ in range(200):
+    for _ in range(50):
         code = f"{secrets.randbelow(9000) + 1000}"
         if code not in busy:
             return code
-    return f"{secrets.randbelow(90000) + 10000}"
+    free = [str(n) for n in range(1000, 10000) if str(n) not in busy]
+    if free:
+        return secrets.choice(free)
+    while True:                       # 9000 пардохти интизорӣ — коди панҷрақама
+        code = f"{secrets.randbelow(90000) + 10000}"
+        if code not in busy:
+            return code
 
 
 def card_digits(card: str) -> str:

@@ -577,17 +577,30 @@ async def resume_open_orders(
     лаҳза иҷро мешуд, то абад «дар коркард» мемонд, пул аз харидор гирифта.
     """
     counts: dict[str, int] = {}
+    stale: list[int] = []
     for row in db.open_orders(200):
         sup = pick_supplier(cfg, supplier, row["kind"] or "game", row["sku"] or "")
         if sup is None:
             continue          # фармоишҳои дастӣ — кори админ
         if _age(row) > RESUME_MAX_AGE:
             counts["old"] = counts.get("old", 0) + 1
+            if getattr(sup, "name", "") != "wholesale":    # онҳоро sync мебандад
+                stale.append(row["id"])
             continue
         outcome = await _resume_one(bot, db, cfg, supplier, sup, row)
         counts[outcome] = counts.get(outcome, 0) + 1
     if counts:
         log.info("Фармоишҳои нимкора пас аз оғоз: %s", counts)
+    if stale:
+        # Худкор намефиристем (шояд админ аллакай дастӣ иҷро кард), вале
+        # пули харидор гирифта шудааст — админ бояд донад.
+        listed = ", ".join(f"#{i}" for i in stale[:20]) + (" …" if len(stale) > 20 else "")
+        await _tell_admins(
+            bot, cfg,
+            f"⏳ <b>Фармоишҳои кушодаи кӯҳна ({len(stale)})</b>: {listed}\n"
+            "Онҳо аз 6 соат зиёд «дар коркард» мондаанд ва худкор фиристода намешаванд. "
+            "Дар /admin → Фармоишҳо санҷед: «иҷро» ё «рад».",
+        )
     return counts
 
 
