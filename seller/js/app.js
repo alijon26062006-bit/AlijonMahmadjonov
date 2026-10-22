@@ -4,12 +4,12 @@ import { changeStockForOrder } from './domain/orders.js';
 import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
-import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, showErrors, TABS, toast } from './ui/dom.js';
+import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, openSheet, showErrors, TABS, toast } from './ui/dom.js';
 import { copyText, doImport, drawProduct, editing, openProduct, previewImport, readImage, saveProduct, sheetImport, syncDraft, updateMargin, variantRow, vCatalog } from './views/catalog.js';
 import { saveExpense, sheetExpense, vExpenses } from './views/expenses.js';
 import { vFinance } from './views/finance.js';
 import { vHome } from './views/home.js';
-import { renderAuth, sendCode, validateShop } from './views/onboarding.js';
+import { PRIVACY, renderAuth, SLIDES, sendCode, TERMS, validateShop } from './views/onboarding.js';
 import { renderRegister, sheetPlace } from './views/register.js';
 import './services/alerts.js';
 import { cart, drawSale, orderAction, saveSale, sheetSale, testOrder, vOrders } from './views/orders.js';
@@ -68,7 +68,10 @@ document.addEventListener('click', async e => {
   if (ds.rmvar) { t.closest('.variant').remove(); return; }
   if (ds.auth) {
     const a = ds.auth;
-    if (a === 'skip' || (a === 'next' && flow.slide === 2)) { auth.onboarded = true; saveAuth(); flow.step = 'phone'; }
+    if (a === 'skip' || (a === 'next' && flow.slide === SLIDES.length - 1)) { auth.onboarded = true; saveAuth(); flow.step = 'phone'; }
+    else if (a === 'intro') { flow.step = 'intro'; flow.slide = SLIDES.length - 1; }
+    else if (a === 'terms') return openSheet('Условия работы', `<div class="terms">${TERMS}</div>`);
+    else if (a === 'privacy') return openSheet('Персональные данные', `<div class="terms">${PRIVACY}</div>`);
     else if (a === 'next') flow.slide++;
     else if (a === 'prev') flow.slide--;
     else if (a === 'chphone') { flow.step = 'phone'; flow.err = ''; }
@@ -108,7 +111,7 @@ document.addEventListener('input', e => {
   if (id === 'oq') { ui.oq = e.target.value; render(); const el = $('#oq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   if (id === 'p_price' || id === 'p_cost' || id === 'p_old') updateMargin();
   if (id === 'impText') previewImport();
-  if (id === 'ag1' || id === 'ag2') $('#agreeBtn').disabled = !($('#ag1').checked && $('#ag2').checked);
+  if (id === 'agIn') { flow.agree = e.target.checked; $('#agreeBtn').disabled = !flow.agree; }
   if (id === 'phoneIn') { const d = e.target.value.replace(/\D/g, '').replace(/^992(?=\d{9})/, '').slice(0, 9); flow.phone = d; e.target.value = fmtPhone(d); }
   if (id === 'codeIn') { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); if (e.target.value.length === 4) $('#codeForm').requestSubmit(); }
 });
@@ -155,8 +158,12 @@ document.addEventListener('submit', e => {
   if (id === 'catForm') { const v = $('#newCat').value.trim(); if (!v) return; if (S.cats.includes(v)) return toast('Такая категория уже есть'); S.cats.push(v); save(); render(); }
   if (id === 'pForm') saveProduct();
   if (id === 'expForm') saveExpense();
-  if (id === 'termsForm') { if (!$('#ag1').checked || !$('#ag2').checked) return; auth.agreed = true; auth.agreedAt = Date.now(); saveAuth(); flow.step = 'intro'; render(); }
-  if (id === 'phoneForm') { if (flow.phone.length !== 9) { flow.err = 'Введите 9 цифр номера после +992'; return render(); } sendCode(); }
+  if (id === 'phoneForm') {
+    if (!$('#agIn').checked) return;
+    if (flow.phone.length !== 9) { flow.err = 'Введите 9 цифр номера после +992'; return render(); }
+    if (!auth.agreed) { auth.agreed = true; auth.agreedAt = Date.now(); saveAuth(); }
+    sendCode();
+  }
   if (id === 'codeForm') {
     if ($('#codeIn').value !== flow.code) { $('#codeErr').textContent = 'Неверный код. Проверьте и введите ещё раз'; $('#codeIn').value = ''; return $('#codeIn').focus(); }
     auth.phone = flow.phone; auth.loginAt = Date.now(); saveAuth(); flow.err = ''; render(); toast('Вы вошли');

@@ -274,9 +274,6 @@ details.more[open] > summary { margin-bottom: 14px; }
 .terms p { color: var(--ink); }
 .agree { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; cursor: pointer; }
 .agree input { width: 22px; height: 22px; accent-color: var(--link); flex: none; margin: 0; }
-.slide-art { aspect-ratio: 4 / 3; max-width: 100%; border-radius: 22px; background: var(--accent-soft); display: grid; place-items: center; position: relative; overflow: hidden; }
-.slide-art svg { width: 46%; height: auto; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.slide-art .big { position: absolute; right: 18px; bottom: 14px; font-family: var(--f-display); font-size: 44px; font-weight: 700; color: var(--link); }
 .dots { display: flex; gap: 6px; justify-content: center; }
 .dots i { width: 8px; height: 8px; border-radius: 99px; background: var(--line); transition: width .2s; }
 .dots i.on { width: 24px; background: var(--accent); }
@@ -532,3 +529,32 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
 /* 3D-иконки типов магазина: фон картинки совпадает с серым карточек, поэтому даём им плитку того же цвета */
 .kind-img { width: 72px; height: 72px; flex: none; border-radius: 18px; background: #f5f4f2; object-fit: cover; }
 @media (min-width: 520px) { .kind-img { width: 84px; height: 84px; } }
+
+/* экраны входа во всю высоту: шапка, содержимое, кнопка внизу у большого пальца */
+.screen { min-height: 100vh; min-height: 100dvh; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.screen-top { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+.screen-top .iconbtn { width: 44px; height: 44px; border: 0; border-radius: 14px; background: var(--surface); }
+.screen-top .iconbtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.screen-top .linkbtn { color: var(--muted); font-size: 15px; padding: 10px 4px; }
+.screen-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.screen h1 { font-size: clamp(28px, 8vw, 34px); line-height: 1.1; }
+.screen p { margin: 0; color: var(--muted); font-size: 16px; }
+.screen-foot { display: flex; flex-direction: column; gap: 14px; }
+.btn.big { min-height: 56px; font-size: 17px; border-radius: 16px; width: 100%; }
+.phone.big { margin-top: 12px; }
+.phone.big span { font-size: 20px; padding: 0 16px; background: none; border-right: 0; }
+.phone.big input { font-size: 22px; padding: 16px 16px 16px 0; }
+.screen .code { margin-top: 12px; padding-block: 14px; }
+.screen .agree { font-size: 14px; color: var(--muted); line-height: 1.45; }
+.screen .agree .linkbtn { font-size: inherit; font-weight: 600; text-align: left; }
+.screen .testnote { margin-top: auto; }
+
+.intro { gap: 20px; }
+.intro-art { flex: 1; min-height: 240px; position: relative; display: grid; place-items: center; border-radius: 32px; background: #f5f4f2; overflow: hidden; animation: pop .35s ease; }
+.intro-art svg { width: 38%; fill: none; stroke: #21201c; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.intro-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.intro-text { display: flex; flex-direction: column; gap: 10px; }
+.intro .dots { justify-content: flex-start; }
+@keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .intro-art { animation: none; } }
