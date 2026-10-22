@@ -53,6 +53,8 @@ RESUME_MAX_AGE = timedelta(hours=6)
 
 # Пауза пеш аз санҷиши фармоиш, агар таъминкунанда ҷавоб надод (сония).
 UNCERTAIN_DELAY = 3.0
+# Пас аз ҷавоби номуайян: то санҷиши дуюм, вақте дархости аввал бешубҳа анҷом ёфт.
+SETTLE_DELAY = 90.0
 
 
 async def _tell(bot: Bot, chat_id: int, text: str) -> None:
@@ -273,7 +275,7 @@ async def _finish(
     """То ҳолати ниҳоӣ интизор мешавад ва фармоишро мебандад."""
     order_id = job.order_id
     final = await sup.wait_until_done(poll_id, by_external=by_external)
-    if not by_external and (not final.ok or final.status not in FINAL):
+    if job.ref and not by_external and (not final.ok or final.status not in FINAL):
         # Бо рақами дохилии худамон боз як бор мепурсем.
         fallback = await sup.order_status(job.ref, by_external=True)
         if fallback.ok:
@@ -400,12 +402,22 @@ async def _deliver(
                 return
         else:
             state, _ = await _lookup(sup, job)
+            if state == "absent" and result.code != "duplicate_order":
+                # Сервер шояд дархостро ҳанӯз коркард мекунад: 3 сония кам аст.
+                # Пас аз ин вақт дархости аввал бешубҳа ба охир расидааст.
+                await asyncio.sleep(SETTLE_DELAY)
+                state, _ = await _lookup(sup, job)
+                if state == "absent":
+                    # Ҳамон рақами нодир: агар фармоиш дар ҳамин миён сабт шуда
+                    # бошад, таъминкунанда duplicate_order медиҳад — дубора намехарем.
+                    again = await place()
+                    if again.ok or not again.uncertain:
+                        await _after_place(bot, db, cfg, sup, job, again)
+                        return
+                    state, _ = await _lookup(sup, job)
             if state == "found":
                 db.set_order_status(order_id, ORDER_SENT)
                 await _finish(bot, db, cfg, sup, job, job.ref, by_external=True)
-                return
-            if state == "absent" and result.code != "duplicate_order":
-                await _refund(bot, cfg, db, order_id, result.error)
                 return
         db.set_order_status(order_id, ORDER_SENT)
         await _to_admin(
@@ -484,12 +496,26 @@ async def _resume_one(
     key = busy_key(db, order_id)
     if key in _BUSY:
         return "busy"
+    if not row["supplier_ref"] and not (row["status"] == ORDER_SENT and row["external_id"]):
+        if row["status"] == ORDER_NEW:
+            # Ба таъминкунанда нарафта буд (масалан, дар навбати дастӣ буд) —
+            # бо рақами нави беҳамто мефиристем.
+            await deliver_order(bot, db, cfg, supplier, order_id)
+            return "resent"
+        # Рақами оддии кӯҳна («283») метавонад ба фармоиши бегона мувофиқ ояд —
+        # худкор намесанҷем, ба админ медиҳем.
+        await _to_admin(
+            bot, cfg, db, order_id,
+            f"⚠️ Фармоиши #{order_id} ҳангоми азнавоғозкунии бот нимкора монд. "
+            f"Дар {_title(sup)} санҷед ва «иҷро» ё «рад»-ро пахш кунед.",
+            tell_user=False,
+        )
+        return "admin"
     _BUSY.add(key)
     target, _ = _split_target(row)
-    # Фармоишҳои пеш аз навсозӣ бо рақами оддӣ («283») фиристода шуда буданд.
+    # Бе supplier_ref (фармоиши кӯҳна) танҳо бо рақами худи таъминкунанда месанҷем.
     job = _Job(
-        order_id=order_id, ref=row["supplier_ref"] or str(order_id),
-        sku=row["sku"] or "", target=target,
+        order_id=order_id, ref=row["supplier_ref"] or "", sku=row["sku"] or "", target=target,
     )
     try:
         if row["status"] == ORDER_SENT and row["external_id"]:

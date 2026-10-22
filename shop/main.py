@@ -176,6 +176,8 @@ async def run() -> None:
         )
 
     db = Database(cfg.db_path)
+    # Пешванди нави рақами фармоиш: базаи барқароршуда рақамҳои кӯҳнаро такрор намекунад.
+    db.rotate_order_key_prefix()
     requisites.seed(db, cfg)
     supplier = build_shop_supplier(cfg, db)
     bot = Bot(

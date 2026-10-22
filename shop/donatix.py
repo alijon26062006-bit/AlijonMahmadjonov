@@ -124,12 +124,18 @@ class DonatixSupplier:
         return ERRORS.get(code or "", message or f"HTTP {status}"), code
 
     def idempotency_key(self, order_id: str) -> str:
-        # Бот рақами беҳамтои «пешванд-рақам» медиҳад — ҳамонро истифода мебарем.
-        if order_id.startswith(self.key_prefix):
+        # Бот рақами беҳамтои «пешванд-рақам» медиҳад — ҳамонро бетағйир истифода
+        # мебарем (пешванд ҳангоми оғоз нав мешавад, калиди фармоиши кушода не).
+        order_id = str(order_id)
+        if not order_id.isdigit():
             return order_id
         return f"{self.key_prefix}-order-{order_id}"
 
     # ── каталог ───────────────────────────────────────────────────────
+    def catalog_ok(self, kind: str) -> bool:
+        """Каталоги ин навъ ягон бор бомуваффақият гирифта шуд?"""
+        return kind in self._catalog
+
     async def items(self, kind: str) -> list[dict]:
         """Молҳои як навъ (бо нархи шумо). Хато → рӯйхати холӣ."""
         cached = self._catalog.get(kind)
@@ -239,7 +245,14 @@ class DonatixSupplier:
     ) -> OrderResult:
         found = await self.resolve(kind, amount)
         if found is None:
-            # Ҳеҷ чиз фиристода нашуд — пулро баргардонидан бехатар аст.
+            if not self.catalog_ok(KIND_STARS if kind == "stars" else KIND_PREMIUM):
+                # Каталог дастнорас аст (масалан, пас аз азнавоғозкунӣ) — шояд ин
+                # фармоиш бо ҳамин калид аллакай қабул шуда бошад: пулро барнамегардонем.
+                return OrderResult(
+                    ok=False, code="catalog_unavailable", uncertain=True,
+                    error="Каталоги Donatix дастнорас аст",
+                )
+            # Мол воқеан нест — ҳеҷ чиз фиристода нашуд, пулро баргардонидан бехатар аст.
             return OrderResult(
                 ok=False, code="product_not_found",
                 error=f"Donatix барои «{kind} × {amount}» мол надорад",
@@ -269,13 +282,18 @@ class DonatixSupplier:
                 continue
 
             order = data.get("order") if isinstance(data.get("order"), dict) else None
-            if status in (200, 201) and data.get("ok") is not False and order:
-                return OrderResult(
-                    ok=True,
-                    external_id=str(order.get("order_id") or "") or None,
-                    status=order.get("status"),
-                    details=order,
-                )
+            if 200 <= status < 300 and data.get("ok") is not False:
+                if order:
+                    return OrderResult(
+                        ok=True,
+                        external_id=str(order.get("order_id") or "") or None,
+                        status=order.get("status"),
+                        details=order,
+                    )
+                # Фармоиш қабул шуд, аммо ҷавоб шакли дигар дорад — рад нест.
+                log.warning("Donatix: фармоиши %s — ҷавоби 2xx бе order: %s", order_id, data)
+                return OrderResult(ok=False, uncertain=True, code="bad_response",
+                                   error=f"HTTP {status}: ҷавоби номаълум")
             message, code = self._error(data, status)
             if status == 429 and attempt < RETRIES:
                 wait = min(_money(resp_headers.get("Retry-After")) or 5, 15)
@@ -285,9 +303,9 @@ class DonatixSupplier:
                 last_error = message
                 await asyncio.sleep(self.retry_pause * attempt)
                 continue
-            return OrderResult(
-                ok=False, error=message, code=code, uncertain=code in UNSURE_CODES
-            )
+            # Бе коди хато ё 409 (дар коркард) — шояд фармоиш ҳаст.
+            unsure = code in UNSURE_CODES or not code or status == 409
+            return OrderResult(ok=False, error=message, code=code, uncertain=unsure)
         return OrderResult(ok=False, error=last_error, uncertain=True)
 
     # ── ҳолат ─────────────────────────────────────────────────────────

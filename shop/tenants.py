@@ -150,6 +150,7 @@ class TenantManager:
             return self.contexts[row["bot_id"]]
         self.data_dir.mkdir(parents=True, exist_ok=True)
         tdb = Database(self.db_path(row["bot_id"]))
+        tdb.rotate_order_key_prefix()
         cfg = self.build_cfg(row, tdb)
         requisites.seed(tdb, cfg)
         supplier = wholesale.WholesaleSupplier(self.platform, row["id"], row["owner_id"], tdb)

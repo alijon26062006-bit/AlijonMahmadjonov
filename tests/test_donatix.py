@@ -299,7 +299,7 @@ async def test_donatix_silence_never_refunds(db, cfg, bot, monkeypatch):
     assert "Donatix санҷед" in bot.to(ADMIN_ID)
     # Ҳамаи кӯшишҳо бо ҳамон калид — ҳатто агар ҳамааш расида бошад, як фармоиш.
     ref = db.order(order_id)["supplier_ref"]
-    assert {r["headers"]["Idempotency-Key"] for r in dx.orders_sent()} == {f"pfx-order-{ref}"}
+    assert {r["headers"]["Idempotency-Key"] for r in dx.orders_sent()} == {ref}
 
 
 async def test_immediate_completed_answer_skips_waiting(db, cfg, bot):
@@ -322,7 +322,7 @@ async def test_resume_resends_with_same_key(db, cfg, bot):
     assert counts == {"resent": 1}
     assert db.order(order_id)["status"] == ORDER_DONE
     ref = db.order(order_id)["supplier_ref"]
-    assert dx.orders_sent()[0]["headers"]["Idempotency-Key"] == f"pfx-order-{ref}"
+    assert dx.orders_sent()[0]["headers"]["Idempotency-Key"] == ref
 
 
 async def test_old_manual_premium_orders_stay_manual(db, cfg, bot):
@@ -388,3 +388,31 @@ def test_config_reads_donatix_key(tmp_path, monkeypatch):
     monkeypatch.setenv("SHOP_DONATIX_KEY", " dx_live_abc ")
     cfg = load_config(tmp_path / "none.env")
     assert cfg.donatix_key == "dx_live_abc" and cfg.has_donatix
+
+
+# ── аудит: ҷавобҳои номуайян пулро барнамегардонанд ───────────────────
+async def test_catalog_down_is_uncertain_not_refund():
+    dx = FakeDonatix([_order()])
+
+    async def down(method, path, **kwargs):
+        raise OSError("network down")
+
+    dx._request = down
+    result = await dx.place_order(kind="stars", sku="", target="@a_lijon", amount=100,
+                                  order_id="pfx-1")
+    assert not result.ok and result.uncertain and result.code == "catalog_unavailable"
+
+
+async def test_2xx_without_order_is_uncertain():
+    dx = FakeDonatix([(201, {"ok": True, "order_id": "dx-1", "status": "processing"})])
+    result = await dx.place_order(kind="stars", sku="", target="@a_lijon", amount=100,
+                                  order_id="pfx-2")
+    assert not result.ok and result.uncertain
+
+
+async def test_409_and_codeless_4xx_are_uncertain():
+    for reply in ((409, {"ok": False, "code": "in_progress"}), (400, {"ok": False})):
+        dx = FakeDonatix([reply])
+        result = await dx.place_order(kind="stars", sku="", target="@a_lijon", amount=100,
+                                      order_id="pfx-3")
+        assert not result.ok and result.uncertain

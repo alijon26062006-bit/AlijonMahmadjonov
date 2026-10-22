@@ -907,6 +907,18 @@ class Database:
             self._conn.commit()
             return prefix
 
+    def rotate_order_key_prefix(self) -> str:
+        """Пешванди нав ҳангоми ҳар оғоз.
+
+        Агар база аз нусхаи кӯҳна барқарор шавад, рақамҳои фармоиш аз нав
+        такрор мешаванд (283, 284…) — бо пешванди кӯҳна онҳо ба фармоишҳои
+        пештараи таъминкунанда мувофиқ меомаданд. Фармоишҳои кушода рақами
+        худро (supplier_ref) дар база доранд, бинобар ин иваз бехатар аст.
+        """
+        prefix = "almaz-" + secrets.token_hex(4)
+        self.set_setting("order_key_prefix", prefix)
+        return prefix
+
     def set_supplier_ref(self, order_id: int, ref: str) -> None:
         self._run("UPDATE orders SET supplier_ref = ? WHERE id = ?", (ref, order_id))
 

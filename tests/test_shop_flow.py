@@ -1443,6 +1443,7 @@ def no_wait(monkeypatch):
     from shop import fulfillment
 
     monkeypatch.setattr(fulfillment, "UNCERTAIN_DELAY", 0)
+    monkeypatch.setattr(fulfillment, "SETTLE_DELAY", 0)
 
 
 class LookupSupplier(FakeSupplier):
@@ -1486,12 +1487,56 @@ async def test_timeout_but_order_exists_is_delivered_not_refunded(db, cfg_api, b
     assert supplier.lookups == [db.order(order_id)["supplier_ref"]]
 
 
-async def test_timeout_and_order_absent_is_refunded(db, cfg_api, bot, no_wait):
+async def test_timeout_and_order_absent_is_resent_with_same_ref(db, cfg_api, bot, no_wait):
+    """Таймаут ва фармоиш ёфт нашуд: пулро фавран барнамегардонем (сервер шояд
+    ҳанӯз коркард кунад) — пас аз интизорӣ бо ҳамон рақам боз мефиристем."""
     order_id = _paid_order(db)
     supplier = LookupSupplier(
         place=OrderResult(ok=False, error="Хатои шабака", uncertain=True),
         lookup=OrderResult(ok=False, code="order_not_found", error="Фармоиш пайдо нашуд"),
     )
+    results = [OrderResult(ok=False, error="Хатои шабака", uncertain=True),
+               OrderResult(ok=True, external_id="FL-9", status="processing")]
+
+    async def place_order(**kwargs):
+        supplier.calls.append(kwargs["order_id"])
+        return results.pop(0)
+
+    supplier.place_order = place_order
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    ref = db.order(order_id)["supplier_ref"]
+    assert supplier.calls == [ref, ref]                  # ҳамон рақам — дубора харида намешавад
+    assert db.order(order_id)["status"] == ORDER_DONE
+    assert db.user(USER_ID).balance == 20000 - 9370
+
+
+async def test_timeout_absent_and_no_answer_again_goes_to_admin(db, cfg_api, bot, no_wait):
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, error="Хатои шабака", uncertain=True),
+        lookup=OrderResult(ok=False, code="order_not_found", error="Фармоиш пайдо нашуд"),
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert db.user(USER_ID).balance == 20000 - 9370      # пул бе санҷиши админ барнамегардад
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+
+
+async def test_timeout_absent_then_refused_is_refunded(db, cfg_api, bot, no_wait):
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, error="Хатои шабака", uncertain=True),
+        lookup=OrderResult(ok=False, code="order_not_found", error="Фармоиш пайдо нашуд"),
+    )
+    results = [OrderResult(ok=False, error="Хатои шабака", uncertain=True),
+               OrderResult(ok=False, code="invalid_uid", error="ID нодуруст")]
+
+    async def place_order(**kwargs):
+        return results.pop(0)
+
+    supplier.place_order = place_order
     await deliver_order(bot, db, cfg_api, supplier, order_id)
 
     assert db.order(order_id)["status"] == ORDER_REJECTED
@@ -1772,14 +1817,16 @@ async def test_resume_does_not_resend_order_supplier_already_has(db, cfg_api, bo
     from shop.fulfillment import resume_open_orders
 
     order_id = _paid_order(db)
+    db.set_supplier_ref(order_id, "almaz-test-1")         # фиристода шуд, ҷавоб гум шуд
     supplier = LookupSupplier(
         place=OrderResult(ok=True, external_id="FL-2"),
-        lookup=OrderResult(ok=True, external_id=str(order_id), status="completed"),
+        lookup=OrderResult(ok=True, external_id="almaz-test-1", status="completed"),
     )
     counts = await resume_open_orders(bot, db, cfg_api, supplier)
 
     assert counts == {"resumed": 1}
     assert supplier.calls == []                            # дубора нафиристодем
+    assert supplier.lookups == ["almaz-test-1"]
     assert db.order(order_id)["status"] == ORDER_DONE
 
 
@@ -1970,11 +2017,12 @@ async def test_username_case_does_not_count_as_foreign(db, cfg_api, bot):
     assert db.order(order_id)["status"] == ORDER_DONE
 
 
-async def test_legacy_order_is_looked_up_by_old_number(db, cfg_api, bot):
-    """Фармоиши пеш аз навсозӣ бо рақами оддӣ фиристода шуда буд — бо ҳамон меҷӯем."""
+async def test_order_without_ref_is_never_looked_up_by_bare_number(db, cfg_api, bot):
+    """Рақами оддӣ («283») метавонад фармоиши бегонаро ёбад ва чеки бардурӯғ диҳад.
+    Фармоиши нав бе рақам — бо рақами нави беҳамто фиристода мешавад."""
     from shop.fulfillment import resume_open_orders
 
-    order_id = _paid_order(db)                       # supplier_ref холӣ — фармоиши кӯҳна
+    order_id = _paid_order(db)
     supplier = LookupSupplier(
         place=OrderResult(ok=True, external_id="FL-2"),
         lookup=OrderResult(ok=True, external_id=str(order_id), status="completed",
@@ -1982,9 +2030,22 @@ async def test_legacy_order_is_looked_up_by_old_number(db, cfg_api, bot):
     )
     counts = await resume_open_orders(bot, db, cfg_api, supplier)
 
-    assert counts == {"resumed": 1}
-    assert supplier.lookups == [str(order_id)]
-    assert supplier.calls == []
+    assert counts == {"resent": 1}
+    assert str(order_id) not in supplier.lookups
+    assert supplier.calls[0][4] == db.order(order_id)["supplier_ref"] != str(order_id)
+
+
+async def test_sent_order_without_any_number_goes_to_admin(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)
+    db.set_order_status(order_id, ORDER_SENT)
+    supplier = LookupSupplier(place=OrderResult(ok=True, external_id="FL-2"),
+                              lookup=OrderResult(ok=True, status="completed"))
+    counts = await resume_open_orders(bot, db, cfg_api, supplier)
+
+    assert counts == {"admin": 1} and supplier.lookups == [] and supplier.calls == []
+    assert db.order(order_id)["status"] == ORDER_SENT
 
 
 async def test_orders_report_runs_without_supplier(db, cfg, capsys):
