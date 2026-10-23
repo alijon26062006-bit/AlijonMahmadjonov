@@ -1,26 +1,13 @@
-import { kindSrc, WEIGHT_UNITS } from '../config.js';
-import { qtyInCart, stepOf } from '../model/cart.js';
-import { eta, openState, ratingText } from '../model/catalog.js';
+import { FREE_FROM, WEIGHT_UNITS } from '../config.js';
+import { qtyInCart, stepOf, totals } from '../model/cart.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
 import { C } from '../state.js';
 import { pic } from '../ui/art.js';
 import { ico } from '../ui/dom.js';
 
-// Общие куски: карточка магазина, карточка товара, шапка с кнопкой «назад»
+// Общие куски: карточка товара, полоса корзины, шапка с кнопкой «назад»
 
 export const logo = s => `<span class="logo">${s.logo ? `<img src="${s.logo}" alt="">` : esc(s.name.charAt(0))}</span>`;
-export const kindImg = (kind, cls = 'k') => `<img class="${cls}" src="${kindSrc(kind)}" alt="" width="160" height="160" loading="lazy">`;
-
-export function shopCard(s) {
-  const st = openState(s);
-  return `<button class="shop-card ${st.open ? '' : 'closed'}" data-go="#/shop/${s.id}">
-    <span class="shop-cover" style="background:${s.color}">${kindImg(s.kind)}${logo(s)}
-      ${st.open ? '' : `<span class="tag dark">${esc(st.text)}</span>`}</span>
-    <span class="col" style="gap:4px"><h3>${esc(s.name)}</h3>
-      <span class="shop-meta"><span class="rate"><span class="star">★</span>${ratingText(s)}</span>${s.count ? `<span>${s.count} оценок</span>` : ''}<span>${ico('clock', 'sm')} ${eta(s)}</span>${s.minOrder ? `<span>от ${money(s.minOrder)}</span>` : ''}</span></span>
-  </button>`;
-}
-
 export const attrLine = p => {
   const a = p.attrs || {};
   return [a.brand, a.volume && `${a.volume} мл`, a.pack, a.portion && `${a.portion} г`, a.origin === 'Тестер' || a.origin === 'Разлив' ? a.origin.toLowerCase() : ''].filter(Boolean).join(' · ');
@@ -48,6 +35,14 @@ export function productCard(shop, p, small = false) {
     <span class="meta">${esc(unitLine(p))}</span>
     ${small ? '' : likesLine(p)}
   </article>`;
+}
+
+/** Одна полоса корзины внизу: сумма, сколько осталось до бесплатной доставки и полоска прогресса. */
+export function cartBar() {
+  const T = totals(); if (!T.rows.length) return '';
+  const left = Math.max(0, FREE_FROM - T.sum), n = T.rows.reduce((s, r) => s + (WEIGHT_UNITS.includes(r.p.unit) ? 1 : r.qty), 0);
+  return `<button class="cartbar" data-go="#/cart"><span class="cb-n num">${n}</span><span class="grow"><b>Корзина</b><small>${left ? `Ещё ${money(left)} до бесплатной доставки` : 'Доставка бесплатная'}</small></span><b class="num">${money(T.total)}</b>
+    <span class="cb-track" aria-hidden="true"><i style="width:${Math.min(100, T.sum / FREE_FROM * 100)}%"></i></span></button>`;
 }
 
 export const backBar = (title, right = '', to = '') => `<div class="back"><button class="round" data-a="back" ${to ? `data-to="${to}"` : ''} aria-label="Назад">${ico('back')}</button><h3 class="grow">${esc(title)}</h3>${right}</div>`;

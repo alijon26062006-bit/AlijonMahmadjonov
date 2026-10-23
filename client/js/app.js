@@ -13,14 +13,15 @@ import { skeleton, vHome, vKind } from './views/home.js';
 import { orderActions, vOrder, vOrders } from './views/order.js';
 import { applyTheme, introActions, profileActions, vFavorites, vIntro, vProfile } from './views/profile.js';
 import { refreshResults, remember, vSearch } from './views/search.js';
-import { askReplace, openProduct, productActions, refreshProduct, shopDock, shopInfo, spyTabs, vShop } from './views/shop.js';
+import { askReplace, openProduct, productActions, refreshProduct, shopInfo, spyTabs, vShop } from './views/shop.js';
+import { cartBar } from './views/parts.js';
 
 // Экраны: адрес → функция, вкладка снизу, нужна ли полоска корзины, закреплённая кнопка
 const ROUTES = [
   [/^#\/?$/, () => ({ html: vHome(), tab: 'home', cartbar: true })],
   [/^#\/search$/, () => ({ html: vSearch(), tab: 'home', cartbar: true, after: () => { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })],
   [/^#\/kind\/(\w+)$/, k => ({ html: vKind(k), tab: 'home', cartbar: true })],
-  [/^#\/shop\/([\w-]+)$/, id => ({ html: vShop(id), tab: 'home', dock: shopDock(id), after: spyTabs })],
+  [/^#\/shop\/([\w-]+)$/, id => ({ html: vShop(id), notabs: true, cartbar: true, after: spyTabs })],   // внутри магазина вкладки не нужны: больше места товарам
   [/^#\/cart$/, () => ({ html: vCart(), tab: 'cart', dock: cartDock() })],
   [/^#\/checkout$/, () => ({ html: vCheckout(), flow: true, dock: checkoutDock() })],
   [/^#\/orders$/, () => ({ html: vOrders(), tab: 'profile' })],
@@ -39,11 +40,10 @@ export function render() {
   for (const [re, fn] of ROUTES) { const m = h.match(re); if (m) { r = fn(m[1]); break; } }
   if (!r) { location.replace('#/'); return; }
   const T = totals(), active = C.orders.some(o => { const v = view(o); return v.stage >= 0 && v.stage < 4; });
-  const bar = r.cartbar && T.rows.length ? `<button class="cartbar" data-go="#/cart">${ico('cart')}<span class="grow" style="text-align:left">Корзина<small>${T.shop.name}</small></span><span class="num">${T.total.toLocaleString('ru-RU')} смн</span></button>` : '';
-  const dock = r.dock || bar;
-  app.innerHTML = `<main class="page ${r.flow ? 'flow' : dock ? 'has-bar' : ''}" id="main">${r.html}</main>
-    ${dock ? `<div class="dock ${r.flow ? '' : 'over-tabs'}">${dock}</div>` : ''}
-    ${r.flow ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
+  const dock = r.dock || (r.cartbar ? cartBar() : ''), tabs = !r.flow && !r.notabs;
+  app.innerHTML = `<main class="page ${tabs ? '' : 'no-tabs'} ${dock ? 'has-bar' : ''}" id="main">${r.html}</main>
+    ${dock ? `<div class="dock ${tabs ? 'over-tabs' : ''}">${dock}</div>` : ''}
+    ${!tabs ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
   if (enter) { $('#main').classList.add('enter', enter); enter = ''; }
   r.after?.();
   topBtn();

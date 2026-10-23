@@ -1,5 +1,5 @@
 import { FREE_FROM, WEIGHT_UNITS } from '../config.js';
-import { add, stepOf, totals, unitPrice } from '../model/cart.js';
+import { add, stepOf, unitPrice } from '../model/cart.js';
 import { DELIVERY_FEE } from '../config.js';
 import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
 import { esc, money, qtyLabel, r2 } from '../lib/format.js';
@@ -22,25 +22,18 @@ export function vShop(id) {
     ${s.cover ? `<img class="shop-cover-img" src="${s.cover}" alt="" width="1200" height="600">` : ''}
     <h1 class="shop-name" translate="no">${esc(s.name)}</h1>
     <div class="shop-info">
-      <button class="si" data-a="shopInfo" data-id="${s.id}"><span class="si-ico">${ico('starFill')}</span><span><b>${ratingText(s)}${s.count ? ` (${s.count})` : ''}</b><small>Подробнее ${ico('right', 'xs')}</small></span></button>
+      <button class="si" data-a="shopInfo" data-id="${s.id}"><span class="si-ico">${ico('starFill')}</span><span><b>${ratingText(s)}${s.count ? ` <small class="inl">(${s.count})</small>` : ''}</b><small>Рейтинг ${ico('right', 'xs')}</small></span></button>
       <i class="sep"></i>
-      <div class="si"><span class="si-ico">${ico('bike')}</span><span><b>${eta(s).replace('мин', 'минут')}</b><small>Доставка</small></span></div>
+      <div class="si"><span class="si-ico">${ico('clock')}</span><span><b>${eta(s)}</b><small>Доставка</small></span></div>
       <i class="sep"></i>
-      <button class="si dots" data-a="shopInfo" data-id="${s.id}" aria-label="О магазине">${ico('dots')}</button>
+      <div class="si"><span class="si-ico">${ico('bike')}</span><span><b>${money(DELIVERY_FEE)}</b><small>бесплатно от ${FREE_FROM}</small></span></div>
     </div>
-    ${st.open ? (s.minOrder ? `<p class="small muted" style="margin-top:-14px">${esc(st.text)} · заказ от ${money(s.minOrder)}</p>` : `<p class="small muted" style="margin-top:-14px">${esc(st.text)}</p>`)
+    ${st.open ? `<p class="shop-sub">${esc(st.text)}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</p>`
       : `<div class="notice">${ico('clock', 'sm')}<span><b>${esc(st.text)}.</b> Соберите корзину сейчас — оформим заказ к открытию.</span></div>`}
     ${deals.length ? `<div class="deals">${deals.map(p => `<button class="deal" data-a="product" data-shop="${s.id}" data-pid="${p.id}"><span class="deal-ico">${ico('tag')}</span><b>−${money(p.oldPrice - p.price)}</b><small>${esc(p.name)}</small>${ico('right', 'sm')}</button>`).join('')}</div>` : ''}
     ${s.cats.length > 1 ? `<nav class="utabs" aria-label="Разделы меню">${s.cats.map((c, i) => `<button class="ut ${i ? '' : 'on'}" data-a="jump" data-to="${slug(c)}">${esc(c)}</button>`).join('')}</nav>` : ''}
     ${s.products.length ? s.cats.map(c => `<section class="section menu-sec" id="${slug(c)}"><h2>${esc(c)}</h2><div class="grid">${s.products.filter(p => p.cat === c).map(p => productCard(s, p)).join('')}</div></section>`).join('')
       : '<div class="empty"><p>Магазин ещё не добавил товары.</p></div>'}`;
-}
-/** Полоса бесплатной доставки внизу магазина, как в приложениях доставки. */
-export function shopDock(id) {
-  const T = totals(), sum = T.shop?.id === id ? T.sum : 0, left = Math.max(0, FREE_FROM - sum);
-  const bar = `<div class="deliv"><span class="d-ico">${ico('bike')}</span><b class="num">${left ? money(DELIVERY_FEE) : 'Бесплатно'}</b><span class="d-track"><i style="width:${Math.min(100, sum / FREE_FROM * 100)}%"></i></span><span class="d-free num">0 смн</span></div>
-    <span class="d-cap">${left ? (sum ? `Ещё ${money(left)} — и доставка бесплатная` : `Бесплатно на заказ от ${money(FREE_FROM)}`) : 'Доставка бесплатная'}</span>`;
-  return T.rows.length ? `<div class="col" style="gap:8px">${bar}<button class="cartbar" data-go="#/cart">${ico('basket')}<span class="grow" style="text-align:left">Корзина<small>${esc(T.shop.name)}</small></span><span class="num">${money(T.total)}</span></button></div>` : `<div class="col" style="gap:4px">${bar}</div>`;
 }
 /** Подсветка раздела меню при прокрутке. */
 export function spyTabs() {
@@ -81,10 +74,10 @@ function drawProduct(keep) {
   const more = s.products.filter(x => x.id !== p.id).sort((x, y) => (y.cat === p.cat) - (x.cat === p.cat)).slice(0, 6);
   const fav = C.favProducts.includes(s.id + '::' + p.id);
   openSheet(`
-    <div class="p-gallery" translate="no">${imgs}</div>
+    <div class="p-gallery ${p.imgs?.length ? "" : "no-photo"}" translate="no">${imgs}</div>
     <div class="p-head">
       <div class="row" style="gap:8px;flex-wrap:wrap">${p.oldPrice > p.price ? `<span class="off static">−${money(p.oldPrice - p.price)}</span>` : ''}${likesLine(p)}</div>
-      <div class="row" style="align-items:flex-start"><h2 class="grow p-title" translate="no">${esc(p.name)}</h2><button class="icon-btn ${fav ? 'faved' : ''}" data-a="pfav" data-id="${s.id}::${p.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
+      <div class="row"><h2 class="grow p-title" translate="no">${esc(p.name)}</h2><button class="icon-btn ${fav ? 'faved' : ''}" data-a="pfav" data-id="${s.id}::${p.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
       <span class="muted">${esc(unitLine(p))}</span>
       ${p.desc ? `<p class="p-desc" translate="no">${esc(p.desc)}</p>` : ''}
     </div>
@@ -92,9 +85,8 @@ function drawProduct(keep) {
     ${p.options.length ? `<div class="grp"><span class="grp-t">Добавки и пожелания</span>${p.options.map(o => `<label class="ropt"><input type="checkbox" value="${o.id}" ${opts.includes(o.id) ? 'checked' : ''} data-a="po"><span class="circle sq"></span><span class="grow" translate="no">${esc(o.name)}</span><span class="muted num">+${money(o.price)}</span></label>`).join('')}</div>` : ''}
     ${specs.length ? `<div class="grp"><span class="grp-t">Характеристики</span><dl class="specs">${specs.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>` : ''}
     ${more.length ? `<div class="grp"><h2>Вам может понравиться</h2><div class="grid three">${more.map(x => productCard(s, x, true)).join('')}</div></div>` : ''}`,
-  { label: p.name, keepScroll: keep, foot: `<div class="pfoot"><div class="row between" style="gap:12px"><span class="pf-name" translate="no">${esc(p.name)}</span><span class="pf-price num">${old ? `<s>${money(old)}</s>` : ''}<b class="${old ? 'sale' : ''}">${money(total)}</b></span></div>
-      <div class="row" style="gap:10px"><div class="stepper light pf-step"><button data-a="pq" data-d="-1" aria-label="Меньше" ${qty <= stepOf(p) ? 'disabled' : ''}>${ico('minus', 'sm')}</button><span class="num">${weight ? qtyLabel(qty, p.unit) : qty}</span><button data-a="pq" data-d="1" aria-label="Больше" ${qty + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>
-      <button class="btn primary grow" data-a="padd">Добавить</button></div></div>`, onClose: () => { pick = null; } });
+  { label: p.name, keepScroll: keep, foot: `<div class="pfoot"><div class="stepper light pf-step"><button data-a="pq" data-d="-1" aria-label="Меньше" ${qty <= stepOf(p) ? 'disabled' : ''}>${ico('minus', 'sm')}</button><span class="num">${weight ? qtyLabel(qty, p.unit) : qty}</span><button data-a="pq" data-d="1" aria-label="Больше" ${qty + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>
+      <button class="btn primary grow" data-a="padd"><span>Добавить</span><span class="sum num">${old ? `<s>${money(old)}</s> ` : ''}${money(total)}</span></button></div>`, onClose: () => { pick = null; } });
 }
 /** Корзина поменялась из «Вам может понравиться» — перерисовать открытую карточку. */
 export function refreshProduct() { if (pick) drawProduct(true); }

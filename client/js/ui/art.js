@@ -1,6 +1,7 @@
 import { esc } from '../lib/format.js';
 
-// Пока у товара нет фото, рисуем аккуратную плитку с иконкой категории — не пустой серый квадрат.
+// Пока у товара нет фото — спокойная серая плитка с маленьким знаком категории, как заглушка в больших приложениях.
+// Яркие цветные плитки с крупной иконкой выглядят как сломанная картинка, поэтому только нейтральный фон.
 const ICONS = {
   veg: '<path d="M14 4c2 0 4 1 5 3-1 0-2 1-3 1M12 6c0-2 1-3 2-3M6 20l9-9a3.5 3.5 0 0 0-5-5L4 14c-1 1-1 3 0 4l2 2c1 1 3 1 4 0"/>',
   fruit: '<path d="M12 7c-2-2-7-2-7 4 0 5 3 9 5 9 1 0 1-1 2-1s1 1 2 1c2 0 5-4 5-9 0-6-5-6-7-4zM12 7c0-2 1-4 3-4"/>',
@@ -38,12 +39,10 @@ const RULES = [
   [/парфюм|духи|аромат|разлив|унисекс|дезодор/i, 'perfume'], [/уход|крем|макияж|тушь|волос|маникюр|брить/i, 'cream'], [/подар|набор|аксесс/i, 'gift'],
   [/суп|шурбо/i, 'soup'], [/салат/i, 'salad'], [/бургер|закуск|фри|наггет/i, 'burger'], [/горяч|плов|курутоб|блюд/i, 'dish'],
 ];
-const TINTS = ['#eef4e6', '#fdf3d0', '#f6ebdf', '#e9eef8', '#f5e6ef', '#e7f2f1', '#f3eee4'];
 
 export function art(p) {
   const text = `${p.cat} ${p.name}`;
   const key = (RULES.find(([re]) => re.test(text)) || [, 'bag'])[1];
-  const tint = TINTS[[...p.cat].reduce((s, c) => s + c.charCodeAt(0), 0) % TINTS.length];
-  return `<span class="art" style="background:${tint}" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[key]}</svg></span>`;
+  return `<span class="art" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[key]}</svg></span>`;
 }
 export const pic = (p, cls = '') => p.imgs?.[0] ? `<img class="${cls}" src="${p.imgs[0]}" alt="${esc(p.name)}" loading="lazy">` : art(p);

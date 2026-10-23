@@ -4,7 +4,8 @@ import { productIn, shopById } from '../model/catalog.js';
 import { esc, fmtPhone } from '../lib/format.js';
 import { C, save } from '../state.js';
 import { ico, toast, twice } from '../ui/dom.js';
-import { backBar, productCard, shopCard } from './parts.js';
+import { backBar, productCard } from './parts.js';
+import { bigCard } from './home.js';
 
 // Профиль, избранное, первый запуск
 
@@ -38,7 +39,7 @@ export function vFavorites() {
   const prods = C.favProducts.map(k => { const [sid, ...rest] = k.split('::'); const s = shopById(sid); const p = productIn(s, rest.join('::')); return p && [s, p]; }).filter(Boolean);
   return `${backBar('Избранное')}
     ${!shops.length && !prods.length ? '<div class="empty"><p>Нажмите на сердечко у магазина или товара — они появятся здесь.</p></div>' : ''}
-    ${shops.length ? `<section class="section"><h2>Магазины</h2><div class="shops">${shops.map(shopCard).join('')}</div></section>` : ''}
+    ${shops.length ? `<section class="section"><h2>Магазины</h2><div class="cards">${shops.map(bigCard).join('')}</div></section>` : ''}
     ${prods.length ? `<section class="section"><h2>Товары</h2><div class="grid">${prods.map(([s, p]) => productCard(s, p)).join('')}</div></section>` : ''}`;
 }
 

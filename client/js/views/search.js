@@ -2,11 +2,12 @@ import { shops } from '../model/catalog.js';
 import { esc, money } from '../lib/format.js';
 import { C, save, ui } from '../state.js';
 import { $, ico } from '../ui/dom.js';
-import { productCard, shopCard } from './parts.js';
+import { productCard } from './parts.js';
+import { bigCard, kindTiles } from './home.js';
 
 // Общий поиск по всем магазинам: «молоко» — где есть, где дешевле
 const norm = s => String(s).toLowerCase().replace(/ё/g, 'е');
-const SUGGEST = ['Помидоры', 'Молоко', 'Плов', 'Lattafa', 'Хлеб', 'Бургер'];
+const SUGGEST = ['Помидоры', 'Молоко', 'Хлеб', 'Плов', 'Бургер', 'Наушники', 'Чехол', 'Lattafa', 'Dior'];
 
 export function vSearch() {
   return `<div class="row"><button class="round" data-a="back" aria-label="Назад">${ico('back')}</button>
@@ -18,7 +19,8 @@ export function results() {
   if (q.length < 2) {
     const recent = C.recent.slice(0, 6);
     return `${recent.length ? `<section class="section"><div class="section-head"><h3>Вы искали</h3><button class="link" data-a="clearRecent">Очистить</button></div><div class="chips wrap">${recent.map(t => `<button class="chip" data-a="searchFor" data-q="${esc(t)}">${ico('repeat', 'sm')} ${esc(t)}</button>`).join('')}</div></section>` : ''}
-      <section class="section"><h3>Часто ищут</h3><div class="chips wrap">${SUGGEST.map(t => `<button class="chip" data-a="searchFor" data-q="${t}">${t}</button>`).join('')}</div></section>`;
+      <section class="section"><h3>Часто ищут</h3><div class="chips wrap">${SUGGEST.map(t => `<button class="chip" data-a="searchFor" data-q="${t}">${ico('search', 'xs')} ${t}</button>`).join('')}</div></section>
+      <section class="section"><h3>Разделы</h3>${kindTiles()}</section>`;
   }
   const all = shops();
   const sh = all.filter(s => norm(s.name).includes(q) || norm(s.about).includes(q));
@@ -26,7 +28,7 @@ export function results() {
   found.sort((a, b) => a.p.price - b.p.price);
   if (!sh.length && !found.length) return `<div class="empty"><p>По запросу «${esc(ui.q)}» ничего не нашлось. Проверьте написание или поищите похожее.</p></div>`;
   const cheapest = found.length > 1 ? found[0] : null;
-  return `${sh.length ? `<section class="section"><h2>Магазины</h2><div class="shops">${sh.map(shopCard).join('')}</div></section>` : ''}
+  return `${sh.length ? `<section class="section"><h2>Магазины</h2><div class="cards">${sh.map(bigCard).join('')}</div></section>` : ''}
     ${found.length ? `<section class="section"><div class="section-head"><h2>Товары · ${found.length}</h2>${cheapest ? `<span class="small muted" style="flex-basis:100%">дешевле всего — ${money(cheapest.p.price)} в «${esc(cheapest.s.name)}»</span>` : ''}</div>
       <div class="grid">${found.slice(0, 40).map(({ s, p }) => productCard(s, p).replace('<span class="meta">', `<span class="meta"><b style="color:var(--ink)">${esc(s.name)}</b> · `)).join('')}</div></section>` : ''}`;
 }
