@@ -12,13 +12,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from aiogram.filters import BaseFilter
 
-from .. import keyboards, tenants as tenants_mod, wholesale
+from .. import catalog, keyboards, pricelist, tenants as tenants_mod, wholesale
 from ..config import Config
 from ..db import Database
 from ..i18n import texts
 from ..states import Admin, Constructor
 from .admin import IsAdmin
-from .common import current_user, safe_edit
+from .common import current_user, safe_edit, send_long
 
 log = logging.getLogger(__name__)
 
@@ -479,6 +479,25 @@ def _operator_forbidden(data: str | None) -> bool:
 @tenant_router.callback_query(IsOperator(), F.data.func(_operator_forbidden))
 async def cb_operator_forbidden(cb: CallbackQuery) -> None:
     await cb.answer("Ин бахш танҳо барои соҳиби бот.", show_alert=True)
+
+
+@tenant_router.callback_query(F.data == "a:wlist")
+async def cb_t_wholesale_list(cb: CallbackQuery, db: Database) -> None:
+    cats = [c for c in catalog.CATEGORIES if db.products(c, only_active=False)]
+    await safe_edit(cb, texts.WHOLESALE_LIST_HEAD, keyboards.wholesale_categories(cats))
+    await cb.answer()
+
+
+@tenant_router.callback_query(F.data.startswith("a:wlist:"))
+async def cb_t_wholesale_category(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    category = cb.data.rsplit(":", 1)[1]
+    if category not in catalog.CATEGORY_INFO:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    rows = db.products(category, only_active=False)
+    lines = texts.wholesale_lines(category, rows, cfg.currency)
+    await send_long(cb, pricelist.chunks(lines), keyboards.wholesale_back())
+    await cb.answer()
 
 
 @tenant_router.message(Command("sku", "rang", "colors"))

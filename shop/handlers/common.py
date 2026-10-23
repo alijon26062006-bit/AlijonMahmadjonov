@@ -74,6 +74,30 @@ async def safe_edit(
             log.exception("Паём фиристода нашуд")
 
 
+async def send_long(cb: CallbackQuery, parts: list[str],
+                    markup: InlineKeyboardMarkup | None = None) -> None:
+    """Матни дарозро дар чанд паём: аввалӣ ҷои паёми ҷорӣ, тугмаҳо — дар охирин."""
+    parts = parts or [texts.UNKNOWN]
+    for index, part in enumerate(parts):
+        last = index == len(parts) - 1
+        if index == 0:
+            await safe_edit(cb, part, markup if last else None)
+            continue
+        try:
+            await cb.bot.send_message(cb.from_user.id, part, reply_markup=markup if last else None)
+        except Exception:  # pragma: no cover
+            log.exception("Паём фиристода нашуд")
+
+
+def _show_prices(db: Database, cfg: Config, user_id: int) -> bool:
+    """Тугмаи «💰 Нархҳо» — соҳиби калиди API ё шарики конструктор (на дар боти шарик)."""
+    from .. import pricelist
+
+    if cfg.is_tenant:
+        return False
+    return pricelist.viewer_of(db, user_id, is_admin=cfg.is_admin(user_id)).any
+
+
 def _show_constructor(db: Database, cfg: Config, user_id: int) -> bool:
     """Тугмаи «🤖 Ботҳои ман» — танҳо дар боти асосӣ ва барои касе, ки дастрасӣ ё бот дорад."""
     from .. import tenants
@@ -97,6 +121,7 @@ async def show_main_menu(
         other_games=db.active_count(catalog.CAT_OTHER) > 0,
         api=cfg.api_enabled and db.setting("api_enabled", "1") == "1",
         constructor=_show_constructor(db, cfg, user_id),
+        prices=_show_prices(db, cfg, user_id),
         hidden=frozenset(c for c in catalog.CATEGORIES if db.active_count(c) == 0),
         titles={c: db.setting(f"title:{c}") for c in (*catalog.CATEGORIES, "telegram")
                 if db.setting(f"title:{c}")},

@@ -11,6 +11,8 @@ from .i18n import has_translations, in_tenant, texts
 
 # ── калидҳои callback ─────────────────────────────────────────────────
 CB_HOME = "m:home"
+CB_PRICES = "pl:home"
+CB_PRICES_CAT = "pl:cat:"
 CB_TG_MENU = "m:tg"
 CB_SUPPORT = "m:support"
 CB_TOP = "m:top"
@@ -53,7 +55,7 @@ def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton
 def main_menu(
     *, is_admin: bool = False, reviews_url: str = "", other_games: bool = False,
     api: bool = False, constructor: bool = False,
-    hidden: frozenset = frozenset(), titles: dict | None = None,
+    hidden: frozenset = frozenset(), titles: dict | None = None, prices: bool = False,
 ) -> InlineKeyboardMarkup:
     """Менюи асосӣ — ҳамон тарҳбандии намуна.
 
@@ -66,6 +68,9 @@ def main_menu(
         return titles.get(cat) or default
 
     rows: list[list[InlineKeyboardButton]] = []
+    if prices:
+        # Соҳиби калиди API ва шарики конструктор нархҳои худро аввал мебинанд.
+        rows.append([_btn(texts.BTN_PRICES, CB_PRICES, style.SUCCESS)])
     if not {catalog.CAT_STARS, catalog.CAT_PREMIUM} <= hidden:
         rows.append([_btn(title("telegram", texts.BTN_TELEGRAM), CB_TG_MENU, style.PRIMARY)])
     for cat, default in (
@@ -286,6 +291,7 @@ def admin_home(*, tenant: bool | None = None) -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_PARTNERS, "a:partners", style.PRIMARY),
                 _btn(texts.ADM_BTN_USERS, "a:users", style.PRIMARY),
             ],
+            [_btn(texts.BTN_WHOLESALE_LIST, "a:wlist", style.SUCCESS)],
             [_btn(texts.ADM_BTN_SETTINGS, "a:settings", style.PRIMARY)],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ])
@@ -427,10 +433,46 @@ def api_menu(has_key: bool, url: str, is_open: bool) -> InlineKeyboardMarkup:
             rows.append([_btn(texts.BTN_API_REVOKE, CB_API_DEL, style.DANGER)])
         else:
             rows.append([_btn(texts.BTN_API_NEW, CB_API_NEW, style.SUCCESS)])
+    if has_key:
+        rows.append([_btn(texts.BTN_PRICES_SHORT, CB_PRICES, style.SUCCESS)])
     if url:
         rows.append([_url(texts.BTN_API_DOCS, url, style.PRIMARY)])
     rows.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def prices_categories(cats) -> InlineKeyboardMarkup:
+    rows = [
+        [_btn(f"{catalog.CATEGORY_INFO[code].icon} {catalog.CATEGORY_INFO[code].title} ({count})",
+              CB_PRICES_CAT + code, style.PRIMARY)]
+        for code, count in cats
+    ]
+    rows.append([_btn(texts.BTN_HOME, CB_HOME)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def prices_back() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_btn(texts.BTN_BACK, CB_PRICES)],
+        [_btn(texts.BTN_HOME, CB_HOME)],
+    ])
+
+
+def wholesale_categories(cats) -> InlineKeyboardMarkup:
+    rows = [
+        [_btn(f"{catalog.CATEGORY_INFO[code].icon} {catalog.CATEGORY_INFO[code].title}",
+              f"a:wlist:{code}", style.PRIMARY)]
+        for code in cats
+    ]
+    rows.append([_btn(texts.BTN_BACK, "a:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def wholesale_back() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_btn(texts.BTN_BACK, "a:wlist")],
+        [_btn(texts.ADM_BTN_PRICES, "a:prices", style.PRIMARY)],
+    ])
 
 
 def api_confirm(yes_text: str, yes_data: str) -> InlineKeyboardMarkup:
@@ -556,22 +598,24 @@ def admin_price_list(
 ) -> InlineKeyboardMarkup:
     """Рӯйхати нархҳо. Моле, ки бо зарар фурӯхта мешавад, фавран нишон дода мешавад."""
     buttons: list[list[InlineKeyboardButton]] = []
+    tenant = in_tenant()
     for row in rows:
         cost = row["cost"] if "cost" in row.keys() else None
-        losing = bool(cost) and row["price"] < round(cost / 1000 * rate * 100)
+        whole = row["wholesale"] if tenant and "wholesale" in row.keys() else None
+        if tenant:
+            losing = whole is not None and row["price"] < whole
+        else:
+            losing = bool(cost) and row["price"] < round(cost / 1000 * rate * 100)
         if not row["active"]:
             mark, color = "🚫 ", style.DANGER
         elif losing:
             mark, color = "🔴 ", style.DANGER   # зарар
         else:
             mark, color = "", style.PRIMARY
-        buttons.append([
-            _btn(
-                f"{mark}{row['title']} — {texts.money(row['price'], currency)}",
-                f"a:price:{row['code']}",
-                color,
-            )
-        ])
+        label = f"{mark}{row['title']} — {texts.money(row['price'], currency)}"
+        if whole is not None:
+            label += f" (🏷 {texts.money(whole, currency)})"   # нархи яклухт
+        buttons.append([_btn(label, f"a:price:{row['code']}", color)])
     buttons.append([_btn(texts.BTN_BACK, back)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -606,6 +650,7 @@ def constructor_home(rows, can_add: bool) -> InlineKeyboardMarkup:
     ]
     if can_add:
         buttons.append([_btn(texts.BTN_NEW_BOT, "c:new", style.SUCCESS)])
+    buttons.append([_btn(texts.BTN_PRICES_SHORT + " (яклухт)", CB_PRICES, style.SUCCESS)])
     buttons.append([_btn(texts.BTN_TOPUP_WHOLESALE, CB_TOPUP, style.SUCCESS)])
     buttons.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

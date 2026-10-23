@@ -1303,3 +1303,90 @@ def tenant_settings(markup: float, operators: tuple, support: str, lang: str,
         f"🎧 Дастгирӣ: {('@' + esc(support)) if support else '—'}\n"
         f"🌐 Забон: {LANG_TITLE.get(lang, lang)}"
     )
+
+
+# ── нархҳо барои API ва конструктор ───────────────────────────────────
+BTN_PRICES = "💰 Нархҳои шумо (API / яклухт)"
+BTN_PRICES_SHORT = "💰 Нархҳо"
+BTN_WHOLESALE_LIST = "💰 Нархи яклухт ва фоида"
+
+
+def _price_kinds(api: bool, whole: bool) -> str:
+    if api and whole:
+        return "🔌 <b>API</b> — нархи харид тавассути API\n🤖 <b>Яклухт</b> — нархе, ки аз боти шумо гирифта мешавад"
+    if api:
+        return "🔌 Нархи харид тавассути API (аз ҳисоби шумо)"
+    return "🤖 Нархи яклухт — ҳар фармоиши боти шумо аз ҳисоби шумо ҳамин қадар мегирад"
+
+
+def prices_home(cats: list, balance: int, api: bool, whole: bool, updated: str | None,
+                currency: str = CURRENCY) -> str:
+    lines = [
+        "💰 <b>Нархҳои шумо</b>\n",
+        _price_kinds(api, whole) + "\n",
+        f"💳 Ҳисоб: <b>{money(balance, currency)}</b>",
+    ]
+    if updated:
+        lines.append(f"🔄 Нархҳо нав шуданд: {esc(updated[:16].replace('T', ' '))} (UTC)")
+    lines.append("<i>Нархҳо худкор аз нархи харид ҳисоб мешаванд.</i>\n")
+    if not cats:
+        lines.append("Ҳоло моли нархдор нест.")
+    else:
+        for code, count in cats:
+            info = catalog.CATEGORY_INFO[code]
+            lines.append(f"{info.icon} {esc(info.title)} — {count} мол")
+        lines.append("\nБахшро интихоб кунед 👇")
+    return "\n".join(lines)
+
+
+def price_lines(category: str, rows: list, api: bool, whole: bool,
+                currency: str = CURRENCY) -> list[str]:
+    """Сатрҳои рӯйхат: «• 60 UC — 10.50 · pubg_60», бо сарлавҳаи зербахшҳо."""
+    info = catalog.CATEGORY_INFO[category]
+    lines = [f"{info.icon} <b>{esc(info.title)}</b>"]
+    if api and whole:
+        lines.append("<i>🔌 API · 🤖 яклухт</i>")
+    group = None
+    for item in rows:
+        if item.group != group:
+            group = item.group
+            if group:
+                lines.append(f"\n<b>{esc(group)}</b>")
+        parts = []
+        if api and item.api is not None:
+            parts.append(("🔌 " if whole else "") + f"<b>{money(item.api, currency)}</b>")
+        if whole and item.wholesale is not None:
+            parts.append(("🤖 " if api else "") + f"<b>{money(item.wholesale, currency)}</b>")
+        line = f"• {esc(item.title)} — {' · '.join(parts)}"
+        if api:
+            line += f" · <code>{esc(item.code)}</code>"
+        lines.append(line)
+    if api:
+        lines.append("\n<i><code>код</code> — барои майдони «product» дар API.</i>")
+    return lines
+
+
+def wholesale_lines(category: str, rows: list, currency: str = CURRENCY) -> list[str]:
+    """Боти шарик: яклухт → нархи шумо → фоида, барои ҳар мол."""
+    info = catalog.CATEGORY_INFO[category]
+    lines = [f"{info.icon} <b>{esc(info.title)}</b>",
+             "<i>яклухт → нархи шумо (фоида)</i>"]
+    for row in rows:
+        whole, price = row["wholesale"], row["price"]
+        if whole is None:
+            lines.append(f"⛔ {esc(row['title'])} — платформа намефурӯшад")
+            continue
+        profit = price - whole
+        mark = "🔴" if profit < 0 else ("🚫" if not row["active"] else "•")
+        lines.append(
+            f"{mark} {esc(row['title'])} — {money(whole, currency)} → "
+            f"<b>{money(price, currency)}</b> ({'+' if profit >= 0 else ''}{money(profit, currency)})"
+        )
+    return lines
+
+
+WHOLESALE_LIST_HEAD = (
+    "💰 <b>Нархи яклухт ва фоидаи шумо</b>\n\n"
+    "🔴 — бо зарар · 🚫 — хомӯш · ⛔ — платформа ҳоло намефурӯшад\n"
+    "Нархро дар «💲 Нархҳо» иваз кунед.\n\nБахшро интихоб кунед 👇"
+)
