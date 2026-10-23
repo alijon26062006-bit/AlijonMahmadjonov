@@ -118,11 +118,21 @@ def Run(*outputs, error=False):
     return {"type": "run", "outputs": list(outputs), "error": error}
 
 
+def Boxes():
+    """Сцена с «коробками»-переменными."""
+    return {"type": "boxes"}
+
+
+def Box(name, value):
+    """Положить значение в коробку name (если коробка есть — заменить значение)."""
+    return {"type": "box", "name": name, "value": value}
+
+
 def Beat(say=None, sub=None, do=()):
     return {"say": say, "sub": sub if sub is not None else say, "do": list(do)}
 
 
-MODE_TYPES = {"title", "card", "syntax", "term"}
+MODE_TYPES = {"title", "card", "syntax", "term", "boxes"}
 RUN_CMD = "$ python main.py"
 
 
@@ -297,6 +307,9 @@ class Timeline:
         if typ == "hl":
             self.sfx.append((t0, "tick"))
             return 0.3
+        if typ == "box":
+            self.sfx.append((t0 + 0.35, "pop"))
+            return 0.7
         if typ == "type":
             t = t0
             lines = []
@@ -386,6 +399,15 @@ class Timeline:
                 st["bullets"].append((a["text"], a["t0"]))
             elif typ == "syntax":
                 st["syntax"], st["hls"] = a, []
+            elif typ == "boxes":
+                st["boxes"] = []
+            elif typ == "box":
+                for b in st["boxes"]:
+                    if b["name"] == a["name"]:
+                        b.update(old=b["value"], value=a["value"], t0=a["t0"])
+                        break
+                else:
+                    st["boxes"].append({"name": a["name"], "value": a["value"], "old": None, "t0": a["t0"]})
             elif typ == "hl":
                 st["hls"].append((a["i"], a["t0"]))
             elif typ == "term":
@@ -553,6 +575,54 @@ def draw_syntax(d, st, t, dy):
         d.text(p(x0 + i * cw, y0), ch, font=F_SYN, fill=lerp_col(PANEL, colors[i], e0))
 
 
+F_BOX_VAL = font("JetBrainsMono-Bold.ttf", 64)
+F_BOX_NAME = font("JetBrainsMono-Bold.ttf", 46)
+
+
+def draw_boxes(d, st, t, dy):
+    boxes = st["boxes"]
+    if not boxes:
+        return
+    bw, bh, gap = 300, 270, 60
+    total = len(boxes) * bw + (len(boxes) - 1) * gap
+    x = (W - total) / 2
+    top = PY0 + 250 + dy
+    for b in boxes:
+        first = b["old"] is None
+        if first:
+            ka = ease((t - b["t0"]) / 0.35)  # коробка появляется
+        else:
+            ka = 1.0
+        if ka <= 0:
+            x += bw + gap
+            continue
+        edge = lerp_col(PANEL, YELLOW, ka)
+        body = lerp_col(PANEL, (58, 50, 26), ka)
+        # значение «падает» в коробку сверху
+        def drop(val, k, out=False):
+            col = C_STRING if val.startswith('"') else C_NUMBER
+            vw = text_w(F_BOX_VAL, val)
+            if out:   # старое значение вылетает вверх и тает
+                yy = top + 30 - k * 200
+                c = lerp_col(PANEL, col, 1 - k)
+            else:
+                yy = top + 30 - (1 - k) * 170
+                c = lerp_col(PANEL, col, k)
+            d.text(p(x + bw / 2 - vw / 2, yy), val, font=F_BOX_VAL, fill=c)
+        if not first:
+            drop(b["old"], ease((t - b["t0"]) / 0.35), out=True)
+        drop(b["value"], ease((t - b["t0"] - (0 if first else 0.2)) / 0.45))
+        # передняя стенка коробки рисуется поверх нижней части значения
+        d.rounded_rectangle(p(x, top + 110, x + bw, top + bh), radius=18 * S, fill=body, outline=edge, width=5 * S)
+        thick_line(d, [(x - 14, top + 110), (x + bw + 14, top + 110)], 8, edge)
+        # табличка с именем
+        nw = text_w(F_BOX_NAME, b["name"]) + 40
+        tx = x + bw / 2 - nw / 2
+        d.rounded_rectangle(p(tx, top + 158, tx + nw, top + 222), radius=12 * S, fill=lerp_col(PANEL, (25, 25, 25), ka))
+        d.text(p(tx + 20, top + 162), b["name"], font=F_BOX_NAME, fill=lerp_col(PANEL, C_NAME, ka))
+        x += bw + gap
+
+
 def draw_markup(d, x, y, line, f, base, accent, center=False):
     """Текст, где слова в `обратных кавычках` выделены цветом."""
     parts = re.split(r"(`[^`]*`)", line)
@@ -674,6 +744,8 @@ def render_frame(f):
         draw_card(d, st, t, dy)
     elif mode == "syntax":
         draw_syntax(d, st, t, dy)
+    elif mode == "boxes":
+        draw_boxes(d, st, t, dy)
     if mode and k < 1:  # плавное появление новой сцены
         region = p(PX0 + 10, PY0 + 70, PX1 - 10, PY1 - 10)
         crop = img.crop(region)
