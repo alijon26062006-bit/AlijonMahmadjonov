@@ -26,7 +26,7 @@ function localShop() {
   }));
   const R = rating(S.reviews || []);
   return {
-    id: 'local', local: true, name: sh.name, kind, about: sh.about || '', logo: sh.logo || '', rating: R.value, count: R.count, isNew: R.count < 10,
+    id: 'local', local: true, name: sh.name, kind, about: sh.about || '', logo: sh.logo || '', cover: sh.cover || '', banner: sh.banner || '', rating: R.value, count: R.count, isNew: R.count < 10,
     prep: sh.prep || 30, minOrder: sh.minOrder || 0, address: sh.address || '', schedule: sh.schedule || [], paused: !!sh.paused, delivery: sh.delivery !== false,
     phone: sh.phone || '', color: '#fff6c2', tile: { bg: '#fce000', fg: '#21201f' }, cats: (S.cats || []).filter(c => products.some(p => p.cat === c)).concat([...new Set(products.map(p => p.cat))].filter(c => !(S.cats || []).includes(c))), products,
   };

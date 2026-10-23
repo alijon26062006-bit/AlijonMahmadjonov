@@ -62,6 +62,7 @@ export function readiness() {
   const checks = [
     [!!(sh.name && sh.phone && sh.address), 'Магазин: название, телефон, адрес', 'shop'],
     [!!sh.logo, 'Загружен логотип', 'shop'],
+    [!!sh.cover, 'Загружена обложка магазина', 'shop'],
     [sh.schedule.some(d => d.open), 'Указан график работы', 'shop'],
     [sh.alif.status === 'connected', 'Магазин подключён к Alif для приёма оплаты', 'finance'],
     [ps.length >= 5, `Не меньше 5 товаров (сейчас ${ps.length})`, 'catalog'],

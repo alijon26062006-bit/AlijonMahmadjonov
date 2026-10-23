@@ -16,10 +16,11 @@ export function vShop(id) {
   const st = openState(s), on = C.favShops.includes(s.id);
   const deals = s.products.filter(p => p.oldPrice > p.price).sort((x, y) => (y.oldPrice - y.price) - (x.oldPrice - x.price)).slice(0, 4);
   return `<div class="shop-top">
-      <button class="icon-btn" data-a="back" aria-label="Назад">${ico('arrowL')}</button><b class="t">${esc(s.name)}</b>
+      <button class="icon-btn" data-a="back" aria-label="Назад">${ico('arrowL')}</button><b class="t" translate="no">${esc(s.name)}</b>
       <button class="icon-btn" data-go="#/search" aria-label="Поиск">${ico('search')}</button>
       <button class="icon-btn ${on ? 'faved' : ''}" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${on}" aria-label="${on ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
-    <h1 class="shop-name">${esc(s.name)}</h1>
+    ${s.cover ? `<img class="shop-cover-img" src="${s.cover}" alt="" width="1200" height="600">` : ''}
+    <h1 class="shop-name" translate="no">${esc(s.name)}</h1>
     <div class="shop-info">
       <button class="si" data-a="shopInfo" data-id="${s.id}"><span class="si-ico">${ico('starFill')}</span><span><b>${ratingText(s)}${s.count ? ` (${s.count})` : ''}</b><small>Подробнее ${ico('right', 'xs')}</small></span></button>
       <i class="sep"></i>
@@ -80,18 +81,18 @@ function drawProduct(keep) {
   const more = s.products.filter(x => x.id !== p.id).sort((x, y) => (y.cat === p.cat) - (x.cat === p.cat)).slice(0, 6);
   const fav = C.favProducts.includes(s.id + '::' + p.id);
   openSheet(`
-    <div class="p-gallery">${imgs}</div>
+    <div class="p-gallery" translate="no">${imgs}</div>
     <div class="p-head">
       <div class="row" style="gap:8px;flex-wrap:wrap">${p.oldPrice > p.price ? `<span class="off static">−${money(p.oldPrice - p.price)}</span>` : ''}${likesLine(p)}</div>
-      <div class="row" style="align-items:flex-start"><h2 class="grow p-title">${esc(p.name)}</h2><button class="icon-btn ${fav ? 'faved' : ''}" data-a="pfav" data-id="${s.id}::${p.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
+      <div class="row" style="align-items:flex-start"><h2 class="grow p-title" translate="no">${esc(p.name)}</h2><button class="icon-btn ${fav ? 'faved' : ''}" data-a="pfav" data-id="${s.id}::${p.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
       <span class="muted">${esc(unitLine(p))}</span>
-      ${p.desc ? `<p class="p-desc">${esc(p.desc)}</p>` : ''}
+      ${p.desc ? `<p class="p-desc" translate="no">${esc(p.desc)}</p>` : ''}
     </div>
-    ${p.variants.length ? `<div class="grp"><span class="grp-t">Выберите вариант</span>${p.variants.map(v => `<label class="ropt"><input type="radio" name="pv" value="${v.id}" ${v.id === vid ? 'checked' : ''} data-a="pv"><span class="circle"></span><span class="grow">${esc(v.name)}</span><span class="muted num">${v.price === base ? money(v.price) : '+' + money(v.price - base)}</span></label>`).join('')}</div>` : ''}
-    ${p.options.length ? `<div class="grp"><span class="grp-t">Добавки и пожелания</span>${p.options.map(o => `<label class="ropt"><input type="checkbox" value="${o.id}" ${opts.includes(o.id) ? 'checked' : ''} data-a="po"><span class="circle sq"></span><span class="grow">${esc(o.name)}</span><span class="muted num">+${money(o.price)}</span></label>`).join('')}</div>` : ''}
+    ${p.variants.length ? `<div class="grp"><span class="grp-t">Выберите вариант</span>${p.variants.map(v => `<label class="ropt"><input type="radio" name="pv" value="${v.id}" ${v.id === vid ? 'checked' : ''} data-a="pv"><span class="circle"></span><span class="grow" translate="no">${esc(v.name)}</span><span class="muted num">${v.price === base ? money(v.price) : '+' + money(v.price - base)}</span></label>`).join('')}</div>` : ''}
+    ${p.options.length ? `<div class="grp"><span class="grp-t">Добавки и пожелания</span>${p.options.map(o => `<label class="ropt"><input type="checkbox" value="${o.id}" ${opts.includes(o.id) ? 'checked' : ''} data-a="po"><span class="circle sq"></span><span class="grow" translate="no">${esc(o.name)}</span><span class="muted num">+${money(o.price)}</span></label>`).join('')}</div>` : ''}
     ${specs.length ? `<div class="grp"><span class="grp-t">Характеристики</span><dl class="specs">${specs.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>` : ''}
     ${more.length ? `<div class="grp"><h2>Вам может понравиться</h2><div class="grid three">${more.map(x => productCard(s, x, true)).join('')}</div></div>` : ''}`,
-  { label: p.name, keepScroll: keep, foot: `<div class="pfoot"><div class="row between" style="gap:12px"><span class="pf-name">${esc(p.name)}</span><span class="pf-price num">${old ? `<s>${money(old)}</s>` : ''}<b class="${old ? 'sale' : ''}">${money(total)}</b></span></div>
+  { label: p.name, keepScroll: keep, foot: `<div class="pfoot"><div class="row between" style="gap:12px"><span class="pf-name" translate="no">${esc(p.name)}</span><span class="pf-price num">${old ? `<s>${money(old)}</s>` : ''}<b class="${old ? 'sale' : ''}">${money(total)}</b></span></div>
       <div class="row" style="gap:10px"><div class="stepper light pf-step"><button data-a="pq" data-d="-1" aria-label="Меньше" ${qty <= stepOf(p) ? 'disabled' : ''}>${ico('minus', 'sm')}</button><span class="num">${weight ? qtyLabel(qty, p.unit) : qty}</span><button data-a="pq" data-d="1" aria-label="Больше" ${qty + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>
       <button class="btn primary grow" data-a="padd">Добавить</button></div></div>`, onClose: () => { pick = null; } });
 }

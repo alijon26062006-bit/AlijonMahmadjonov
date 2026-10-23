@@ -5,7 +5,7 @@ import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, KEY, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
 import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, openSheet, showErrors, TABS, toast } from './ui/dom.js';
-import { copyText, doImport, previewImport, readImage, readProductImage, sheetImport, vCatalog } from './views/catalog.js';
+import { copyText, doImport, MEDIA, previewImport, readImageExact, readProductImage, sheetImport, vCatalog } from './views/catalog.js';
 import { drawProduct, editing, openProduct, saveProduct, submitProduct, syncDraft, updateMargin, variantRow } from './views/product.js';
 import { saveExpense, sheetExpense, vExpenses } from './views/expenses.js';
 import { vFinance } from './views/finance.js';
@@ -24,6 +24,8 @@ import { unansweredBad } from './domain/reviews.js';
 import { can, me, role } from './domain/staff.js';
 import { deleteStaff, saveStaff, sheetStaff, vStaff } from './views/staff.js';
 import { ROLES } from './config.js';
+import { setLang, startTranslating, tr } from './i18n.js';
+import { applyTheme, isDark, setTheme } from './services/prefs.js';
 
 let view = 'home';
 // рендер
@@ -41,7 +43,7 @@ export function render() {
     <nav class="rail" aria-label="Разделы">
       <div class="brand"><span class="brand-mark">${ICON.shop}</span>Кабинет продавца</div>
       ${NAV.filter(([k]) => can(k)).map(btn).join('')}
-      <div class="rail-foot"><span><span class="status-dot ${S.shop.paused ? 'off' : ''}"></span>${S.shop.paused ? 'Приём заказов на паузе' : 'Принимаем заказы'}</span><span>${esc(S.shop.name)} · ${who === 'owner' ? esc(S.shop.type) : esc(me().name) + ', ' + ROLES[who].name.toLowerCase()}</span></div>
+      <div class="rail-foot"><span><span class="status-dot ${S.shop.paused ? 'off' : ''}"></span>${S.shop.paused ? 'Приём заказов на паузе' : 'Принимаем заказы'}</span><span><span translate="no">${esc(S.shop.name)}</span> · ${who === 'owner' ? esc(S.shop.type) : esc(me().name) + ', ' + ROLES[who].name.toLowerCase()}</span></div>
     </nav>
     <main class="main"><div class="content" id="page"></div></main>
     <nav class="tabs" aria-label="Разделы">${TABS.filter(([k]) => can(k)).map(btn).join('')}</nav>
@@ -51,7 +53,7 @@ export function render() {
   $('#page').innerHTML = banner + V[view]();
   if (view === 'catalog' && ui.q) { const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 }
-export function go(v) { if (S && !S.shop.owner) S.shop.owner = auth.phone; if (!can(v)) return; view = v; render(); window.scrollTo(0, 0); }
+export function go(v) { if (S && !S.shop.owner) S.shop.owner = auth.phone; if (!can(v)) return; const same = view === v; view = v; render(); if (!same) $('#page')?.classList.add('enter'); window.scrollTo(0, 0); }
 function renderNoAccess() {
   app.innerHTML = `<div class="screen"><div class="screen-top"></div><div class="screen-body"><h1>Нет доступа</h1>
     <p>Номер +992 ${fmtPhone(auth.phone)} не добавлен в этот магазин. Попросите владельца добавить вас в разделе «Сотрудники» или войдите с другим номером.</p></div>
@@ -91,6 +93,7 @@ document.addEventListener('click', async e => {
   if (ds.rmph) { syncDraft(); editing.draft.imgs.splice(+ds.rmph, 1); return drawProduct(); }
   if (ds.mainph) { syncDraft(); const im = editing.draft.imgs; im.unshift(im.splice(+ds.mainph, 1)[0]); return drawProduct(); }
   if (ds.rmvar) { t.closest('.variant').remove(); return; }
+  if (ds.lang) { setLang(ds.lang); document.title = tr('Кабинет продавца'); return render(); }
   if (ds.auth) {
     const a = ds.auth;
     if (a === 'skip' || (a === 'next' && flow.slide === SLIDES.length - 1)) { auth.onboarded = true; saveAuth(); flow.step = 'phone'; }
@@ -121,6 +124,9 @@ document.addEventListener('click', async e => {
     case 'savesale': return saveSale();
     case 'testorder': return testOrder();
     case 'testsound': return testSound();
+    case 'delmedia': S.shop[ds.k] = ''; save(); render(); return toast('Убрали');
+    case 'themeToggle': setTheme(isDark() ? 'light' : 'dark'); return render();
+    case 'themeAuto': setTheme('auto'); return render();
     case 'testreview': return testReview();
     case 'install': return install();
     case 'addstaff': return sheetStaff();
@@ -159,7 +165,13 @@ document.addEventListener('change', async e => {
     if (t.files.length > room) toast('Можно не больше 4 фото');
     drawProduct();
   }
-  if (id === 'logoFile' && t.files[0]) { try { S.shop.logo = await readImage(t.files[0], 400); save(); render(); toast('Логотип обновлён'); } catch (err) { toast(err.message); } }
+  for (const k of ['logo', 'cover', 'banner']) if (id === k + 'File' && t.files[0]) {
+    try {
+      const m = MEDIA[k], r = await readImageExact(t.files[0], m.w, m.h);
+      S.shop[k] = r.src; save(); render();
+      toast(r.small ? `Картинка маленькая — лучше ${m.w} × ${m.h}, иначе будет размыто` : r.cropped ? `Края обрезали под ${m.w} × ${m.h}. Проверьте, всё ли видно` : `${m.name} обновлён`);
+    } catch (err) { toast(err.message); }
+  }
   if (id === 'soundSw') { S.shop.sound = t.checked; save(); toast(t.checked ? 'Звук включён' : 'Звук выключен'); }
   if (id === 'awakeSw') { S.shop.awake = t.checked; save(); toast(t.checked ? 'Экран не будет гаснуть' : 'Экран гаснет как обычно'); }
   if (id === 'autoSw') { S.shop.autoAccept = t.checked; save(); render(); toast(t.checked ? 'Новые заказы будут приниматься сами' : 'Автопринятие выключено'); }
@@ -214,4 +226,7 @@ window.addEventListener('storage', e => {
   if ($('#sheet').hidden) render(); else refreshSheet?.();
 });
 
+applyTheme();
+startTranslating();
+document.title = tr('Кабинет продавца');
 render();

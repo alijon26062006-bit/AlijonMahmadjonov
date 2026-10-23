@@ -27,12 +27,12 @@ function draw(keep = true) {
   const done = o.items.filter(handled).length, wait = o.items.some(i => i.sub?.status === 'wait');
   const rows = o.items.map((i, n) => {
     const p = S.products.find(x => x.id === i.pid) || { imgs: [] };
-    const sub = i.sub ? `<div class="sub ${i.sub.status}">Замена: ${esc(i.sub.name)} × ${fmtQty(i.sub.qty)} — ${money(i.sub.qty * i.sub.price)}<br><b>${{ wait: 'Ждём ответа покупателя…', ok: 'Покупатель согласился', no: 'Покупатель отказался — позиция убрана' }[i.sub.status]}</b></div>` : '';
-    if (i.missing) return `<div class="pick-row is-missing">${thumb(p)}<div><div class="pname">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</div><div class="small muted">Нет в наличии · −${money(i.qty * i.price)}</div>${sub}</div>
+    const sub = i.sub ? `<div class="sub ${i.sub.status}">Замена: <span translate="no">${esc(i.sub.name)}</span> × ${fmtQty(i.sub.qty)} — ${money(i.sub.qty * i.sub.price)}<br><b>${{ wait: 'Ждём ответа покупателя…', ok: 'Покупатель согласился', no: 'Покупатель отказался — позиция убрана' }[i.sub.status]}</b></div>` : '';
+    if (i.missing) return `<div class="pick-row is-missing">${thumb(p)}<div><div class="pname" translate="no">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</div><div class="small muted">Нет в наличии · −${money(i.qty * i.price)}</div>${sub}</div>
       <button class="btn sm" data-pk="undo" data-n="${n}">Вернуть</button></div>`;
     const w = isWeight(i), q = i.actual ?? i.qty, max = r2(i.qty * (1 + OVER));
     return `<div class="pick-row ${i.picked ? 'is-done' : ''}">${thumb(p)}<div style="min-width:0">
-        <div class="pname">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</div>
+        <div class="pname" translate="no">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</div>
         <div class="small muted num">Заказано ${fmtQty(i.qty)} ${esc(unitOf(i))} × ${money(i.price)}${i.opts?.length ? ' · ' + i.opts.map(x => esc(x.name)).join(', ') : ''}</div>
         ${w ? `<div class="weigh"><label class="small" for="w${n}">Взвесили</label><div class="suffix"><input class="input num" id="w${n}" data-weigh="${n}" inputmode="decimal" value="${fmtQty(q)}"><span>${esc(unitOf(i))}</span></div><span class="small num ${q > max ? 'neg' : 'muted'}">${money(q * i.price)}${q > max ? ` · не больше ${fmtQty(max)} ${esc(unitOf(i))}` : ''}</span></div>` : ''}
       </div>
@@ -41,7 +41,7 @@ function draw(keep = true) {
   const was = orderedTotal(o), now = orderTotal(o);
   openSheet(`Сборка заказа № ${o.no}`, `
     <div class="row between"><span class="small muted">Собрано ${done} из ${o.items.length}</span><div class="bar" style="flex:1;max-width:160px"><i style="width:${done / o.items.length * 100}%"></i></div></div>
-    ${o.comment ? `<div class="ocomment small">${esc(o.comment)}</div>` : ''}
+    ${o.comment ? `<div class="ocomment small"><span translate="no">${esc(o.comment)}</span></div>` : ''}
     <div class="pick-list">${rows}</div>
     <p class="small muted" style="margin:0">Весовой товар взвесьте и впишите точный вес — сумма пересчитается. Положить больше заказанного можно не более чем на 10 %. Если товара нет, предложите замену: покупатель ответит в приложении.</p>`,
     `<div class="col" style="gap:2px"><span class="small muted">Было ${money(was)}</span><b class="num" style="font-size:17px">Итого ${money(now)}</b></div>
@@ -52,7 +52,7 @@ function drawSubs() {
   const i = order().items[subFor], base = S.products.find(p => p.id === i.pid);
   const avail = S.products.filter(p => p.active && p.stock > 0 && !isStopped(p) && p.id !== i.pid);
   const same = avail.filter(p => base && p.cat === base.cat), other = avail.filter(p => !base || p.cat !== base.cat);
-  const row = p => `<button class="sale-line subpick" data-subpid="${p.id}">${thumb(p)}<div style="min-width:0;text-align:left"><div class="pname">${esc(p.name)}</div><div class="small muted num">${money(p.price)} за ${esc(p.unit)} · ост. ${fmtQty(p.stock)}</div></div><span class="small ${p.price > i.price ? 'neg' : 'muted'}">${p.price > i.price ? 'дороже' : p.price < i.price ? 'дешевле' : 'та же цена'}</span></button>`;
+  const row = p => `<button class="sale-line subpick" data-subpid="${p.id}">${thumb(p)}<div style="min-width:0;text-align:left"><div class="pname" translate="no">${esc(p.name)}</div><div class="small muted num">${money(p.price)} за ${esc(p.unit)} · ост. ${fmtQty(p.stock)}</div></div><span class="small ${p.price > i.price ? 'neg' : 'muted'}">${p.price > i.price ? 'дороже' : p.price < i.price ? 'дешевле' : 'та же цена'}</span></button>`;
   openSheet(`Нет «${i.name}»`, `
     <div class="col" style="gap:8px">
       <button class="btn" data-pk="drop">Просто убрать из заказа (−${money(i.qty * i.price)})</button>

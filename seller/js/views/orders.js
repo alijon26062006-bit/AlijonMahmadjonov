@@ -17,7 +17,7 @@ export function vOrders() {
   const more = list.length > 40; list = list.slice(0, 40);
   const tab = (k, l) => `<button class="chip" data-otab="${k}" aria-pressed="${ui.ordTab === k}">${l} <b class="num">${cnt(k)}</b></button>`;
   return `
-    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Заказы</h1></div>
+    <div class="head"><div><div class="eyebrow"><span translate="no">${esc(S.shop.name)}</span></div><h1>Заказы</h1></div>
       <div class="row"><button class="btn" data-act="testorder">Тестовый заказ</button><button class="btn primary" data-act="sale">${plusI} Продажа в магазине</button></div></div>
     <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="oq" type="search" inputmode="search" placeholder="Найти заказ по номеру, имени или телефону" value="${esc(ui.oq)}" aria-label="Поиск заказа"></div>
     ${oq ? `<span class="small muted">Найдено: ${list.length}</span>` : ''}
@@ -37,9 +37,9 @@ export function vOrders() {
     </section>`;
 }
 const itemLine = i => {
-  const name = `${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}`;
+  const name = `<span translate="no">${esc(i.name)}</span>${i.variant ? ', ' + esc(i.variant) : ''}`;
   const opts = i.opts?.length ? `<br><small class="muted">${i.opts.map(x => esc(x.name) + (x.price ? ` +${money(x.price)}` : '')).join(', ')}</small>` : '';
-  const sub = i.sub ? `<li class="subline"><span>→ замена: ${esc(i.sub.name)} × ${fmtQty(i.sub.qty)} <small class="pill ${i.sub.status === 'ok' ? '' : i.sub.status === 'no' ? 'bad' : 'warn'}">${{ wait: 'ждём ответа', ok: 'согласен', no: 'отказался' }[i.sub.status]}</small></span><span class="num">${i.sub.status === 'ok' ? money(i.sub.qty * i.sub.price) : ''}</span></li>` : '';
+  const sub = i.sub ? `<li class="subline"><span>→ замена: <span translate="no">${esc(i.sub.name)}</span> × ${fmtQty(i.sub.qty)} <small class="pill ${i.sub.status === 'ok' ? '' : i.sub.status === 'no' ? 'bad' : 'warn'}">${{ wait: 'ждём ответа', ok: 'согласен', no: 'отказался' }[i.sub.status]}</small></span><span class="num">${i.sub.status === 'ok' ? money(i.sub.qty * i.sub.price) : ''}</span></li>` : '';
   if (i.missing) return `<li class="missing"><span><s>${name} × ${fmtQty(i.qty)}</s> <small class="pill bad">нет в наличии</small>${opts}</span><span class="num"><s>${money(i.qty * i.price)}</s></span></li>${sub}`;
   const q = i.actual ?? i.qty;
   return `<li><span>${name} × ${i.actual != null && i.actual !== i.qty ? `<s class="muted">${fmtQty(i.qty)}</s> ${fmtQty(q)}` : fmtQty(q)}${i.picked ? ' <small class="pill">собрано</small>' : ''}${opts}</span><span class="num">${money(q * i.price)}</span></li>`;
@@ -57,10 +57,10 @@ export function orderCard(o) {
     <div class="row">${statusLine}${src}</div>
     <ul>${o.items.map(itemLine).join('')}</ul>
     <div class="total"><span>Итого</span><span class="num">${total !== orderedTotal(o) ? `<s class="muted">${money(orderedTotal(o))}</s> ` : ''}${money(total)}</span></div>
-    ${o.comment ? `<div class="ocomment small">${ICON.note}<span>${esc(o.comment)}</span></div>` : ''}
+    ${o.comment ? `<div class="ocomment small">${ICON.note}<span><span translate="no">${esc(o.comment)}</span></span></div>` : ''}
     ${o.receivedAt ? `<span class="pill">Покупатель получил заказ — деньги ваши</span>` : ''}
     ${o.problem ? `<div class="alert bad small"><span><b>Покупатель сообщил о проблеме:</b> ${esc(o.problem.reason)}${o.problem.text ? ' — ' + esc(o.problem.text) : ''}</span></div>` : ''}
-    ${o.customer ? `<div class="who">${esc(o.customer.name)} · ${esc(o.customer.phone)}${o.delivery === 'courier' ? '<br>' + esc(o.customer.address) : ''}</div>` : ''}
+    ${o.customer ? `<div class="who" translate="no">${esc(o.customer.name)} · ${esc(o.customer.phone)}${o.delivery === 'courier' ? '<br>' + esc(o.customer.address) : ''}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
   </article>`;
 }
@@ -111,7 +111,7 @@ export function drawSale() {
     const opts = p.variants.length ? p.variants : [null];
     for (const v of opts) {
       const key = p.id + '|' + (v ? v.id : ''), q = cart.items[key] || 0, price = v ? v.price : p.price;
-      lines.push(`<div class="sale-line">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}${v ? ', ' + esc(v.name) : ''}</div><div class="small muted num">${money(price)} · ост. ${p.stock}</div></div>
+      lines.push(`<div class="sale-line">${thumb(p)}<div style="min-width:0"><div class="pname" translate="no">${esc(p.name)}${v ? ', ' + esc(v.name) : ''}</div><div class="small muted num">${money(price)} · ост. ${p.stock}</div></div>
         <div class="stepper"><button class="iconbtn" data-cart="${key}" data-d="-1" ${q ? '' : 'disabled'} aria-label="Меньше">−</button><b class="num">${q}</b><button class="iconbtn" data-cart="${key}" data-d="1" aria-label="Больше">+</button></div></div>`);
     }
   }

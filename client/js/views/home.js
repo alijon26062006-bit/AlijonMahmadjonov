@@ -19,17 +19,17 @@ export const head = (title, more) => `<div class="sec-head"><h2>${title}</h2>${m
 const off = s => Math.max(0, ...s.products.filter(p => p.oldPrice > p.price).map(p => Math.round((1 - p.price / p.oldPrice) * 100)));
 
 // логотип магазина плиткой: фирменный цвет и название
-export const shopTile = s => `<button class="logo-tile" data-go="#/shop/${s.id}"><span class="lt" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}">${s.logo ? `<img src="${s.logo}" alt="">` : `<b>${esc(s.name)}</b>`}</span><span class="small">${eta(s)}</span></button>`;
+export const shopTile = s => `<button class="logo-tile" data-go="#/shop/${s.id}"><span class="lt" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}">${s.logo ? `<img src="${s.logo}" alt="">` : `<b translate="no">${esc(s.name)}</b>`}</span><span class="small">${eta(s)}</span></button>`;
 
 // большая карточка магазина: картинка, название и рейтинг, время, плашка доставки
 export function bigCard(s) {
   const st = openState(s), d = off(s), fav = C.favShops.includes(s.id);
   return `<article class="big ${st.open ? '' : 'closed'}">
     <button class="big-pic" data-go="#/shop/${s.id}" style="background:${s.color}" aria-label="${esc(s.name)}">
-      <img src="${kindSrc(s.kind)}" alt="" width="220" height="220" loading="lazy">
+      ${s.cover ? `<img class="cover" src="${s.cover}" alt="" width="1200" height="600" loading="lazy">` : `<img src="${kindSrc(s.kind)}" alt="" width="220" height="220" loading="lazy">`}
       ${d ? `<span class="badge-off">−${d}%</span>` : ''}${st.open ? '' : `<span class="badge-closed">${esc(st.text)}</span>`}</button>
     <button class="big-fav" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button>
-    <button class="big-info" data-go="#/shop/${s.id}"><span class="row between"><b>${esc(s.name)}</b><span class="rate">★ ${ratingText(s)}</span></span>
+    <button class="big-info" data-go="#/shop/${s.id}"><span class="row between"><b translate="no">${esc(s.name)}</b><span class="rate">★ ${ratingText(s)}</span></span>
       <span class="eta">${ico('bike', 'sm')} ${eta(s)}</span>
       <span class="free">Бесплатная доставка от ${FREE_FROM}</span></button>
   </article>`;
@@ -44,7 +44,7 @@ const WHAT = [['Плов', 'Горячее'], ['Бургеры', 'Бургеры
 const FILTERS = [['open', 'Открыто сейчас'], ['sale', 'Акции'], ['fast', 'До 40 минут']];
 const pass = { open: s => openState(s).open, sale: s => off(s) > 0, fast: s => s.prep <= 20 };
 
-const banner = b => `<button class="banner" style="background:${b.bg}" data-go="${b.go || '#/shop/' + b.id}"><span class="bt"><b>${esc(b.t)}</b><span class="code">${esc(b.code)}</span></span><img src="${b.img}" alt="" width="200" height="200" loading="lazy"></button>`;
+const banner = b => b.src ? `<button class="banner photo" data-go="#/shop/${b.id}" aria-label="${esc(b.t)}"><img src="${b.src}" alt="" width="1200" height="520"></button>` : `<button class="banner" style="background:${b.bg}" data-go="${b.go || '#/shop/' + b.id}"><span class="bt"><b>${esc(b.t)}</b><span class="code">${esc(b.code)}</span></span><img src="${b.img}" alt="" width="200" height="200" loading="lazy"></button>`;
 
 export function vHome() {
   const all = shops(), live = C.orders.map(view).find(v => v.stage >= 0 && v.stage < 4);
@@ -61,7 +61,7 @@ export function vHome() {
     </header>
     <button class="search-pill" data-go="#/search">${ico('search')}<span>Поиск</span></button>
     ${live ? `<button class="live" data-go="#/order/${live.o.id}"><span class="pulse"></span><span class="grow"><b>${STAGES[live.stage]}</b><small>Заказ № ${live.o.no} · ${esc(live.o.shopName)}${live.waiting ? ' · нужен ваш ответ' : ''}</small></span>${ico('right', 'sm')}</button>` : ''}
-    <div class="banners">${BANNERS.map(banner).join('')}</div>
+    <div class="banners">${[...all.filter(s => s.banner).map(s => ({ id: s.id, src: s.banner, t: s.name })), ...BANNERS].map(banner).join('')}</div>
     <div class="bento">
       <button class="tile tall" data-go="#/kind/food"><img src="img/kind-food.webp" alt="" width="200" height="200"><b>Рестораны</b></button>
       <button class="tile" data-go="#/kind/grocery"><img src="img/kind-grocery.webp" alt="" width="120" height="120"><b>Продукты</b></button>
@@ -70,7 +70,7 @@ export function vHome() {
     </div>
     <div class="minis">
       <button class="mini" data-a="filterSale"><span class="m" style="background:#ff5a36;color:#fff">%</span><b>Акции</b></button>
-      ${all.slice(0, 3).map(s => `<button class="mini" data-go="#/shop/${s.id}"><span class="m" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}">${esc(s.name.charAt(0))}</span><b>${esc(s.name.split(' ')[0])}</b></button>`).join('')}
+      ${all.slice(0, 3).map(s => `<button class="mini" data-go="#/shop/${s.id}"><span class="m" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}">${esc(s.name.charAt(0))}</span><b translate="no">${esc(s.name.split(' ')[0])}</b></button>`).join('')}
     </div>
     <section class="section">${head('Скидки и не только')}${banner({ id: promo.id, t: `Всё для дома в «${promo.name}»`, code: 'ЗАКАЗАТЬ', img: kindSrc(promo.kind), bg: '#fbefd9' })}</section>
     <section class="section">${head('Магазины', '#/kind/grocery')}<div class="logo-row">${all.filter(s => s.kind !== 'food').map(shopTile).join('')}</div></section>

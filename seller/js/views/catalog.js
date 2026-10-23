@@ -25,7 +25,7 @@ export function vCatalog() {
   const rows = list.map(p => {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
-      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${likePill(likes[p.id])}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
+      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname" translate="no">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${likePill(likes[p.id])}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
       <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="tgl" role="switch" aria-checked="${!isStopped(p)}" data-stop="${p.id}" aria-label="${esc(p.name)}: в наличии сегодня" title="${isStopped(p) ? 'Закончилось на сегодня. Включите, чтобы вернуть в продажу' : 'В продаже. Выключите, если закончилось на сегодня'}"></button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
@@ -34,7 +34,7 @@ export function vCatalog() {
     ? `<div class="empty panel"><b>Пока нет ни одного товара</b><span>Добавьте первый товар или загрузите сразу весь список из Excel.</span><div class="row" style="justify-content:center"><button class="btn primary" data-act="add">${plusI} Добавить товар</button><button class="btn" data-act="import">${ICON.import} Загрузить из Excel</button></div></div>`
     : `<div class="empty panel"><b>Ничего не нашлось</b><span>Измените поиск или фильтр.</span></div>`;
   return `
-    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Товары <span class="num" style="color:var(--muted);font-weight:500">${S.products.length}</span></h1></div>
+    <div class="head"><div><div class="eyebrow"><span translate="no">${esc(S.shop.name)}</span></div><h1>Товары <span class="num" style="color:var(--muted);font-weight:500">${S.products.length}</span></h1></div>
       <div class="row"><button class="btn" data-act="import">${ICON.import} Из Excel</button><button class="btn" data-act="export">Копировать список</button><button class="btn primary hide-m" data-act="add">${plusI} Добавить товар</button></div></div>
     <button class="btn primary fab" data-act="add">${plusI} Добавить товар</button>
     <div class="toolbar">
@@ -96,6 +96,28 @@ export function readProductImage(file) {
     r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
   });
 }
+/** Картинка точно под размер витрины (обложка, баннер, логотип): обрезаем по центру до нужных пропорций. */
+export function readImageExact(file, W, H) {
+  return new Promise((res, rej) => {
+    if (!file || !file.type.startsWith('image/')) return rej(new Error('Это не картинка'));
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => {
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const k = Math.max(W / img.width, H / img.height), sw = W / k, sh = H / k;
+      c.getContext('2d').drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, W, H);
+      const off = Math.abs(img.width / img.height - W / H) > 0.08;
+      res({ src: c.toDataURL('image/jpeg', 0.82), cropped: off, small: img.width < W * 0.8 });
+    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = r.result; };
+    r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
+  });
+}
+// размеры картинок витрины — подсказываем продавцу, чтобы он сразу делал такие
+export const MEDIA = {
+  logo: { w: 512, h: 512, name: 'Логотип', ratio: '1 : 1' },
+  cover: { w: 1200, h: 600, name: 'Обложка магазина', ratio: '2 : 1' },
+  banner: { w: 1200, h: 520, name: 'Рекламный баннер', ratio: '2,3 : 1' },
+};
+
 // средний цвет по краям фото — им заполняем поля
 function edgeColor(img) {
   const c = document.createElement('canvas'), S = 40; c.width = c.height = S;

@@ -1,3 +1,4 @@
+import { startTranslating, tr } from './i18n.js';
 import { BRAND } from './config.js';
 import { add, bumpSimple, totals } from './model/cart.js';
 import { productIn, shopById } from './model/catalog.js';
@@ -43,13 +44,14 @@ export function render() {
   app.innerHTML = `<main class="page ${r.flow ? 'flow' : dock ? 'has-bar' : ''}" id="main">${r.html}</main>
     ${dock ? `<div class="dock ${r.flow ? '' : 'over-tabs'}">${dock}</div>` : ''}
     ${r.flow ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
+  if (enter) { $('#main').classList.add('enter', enter); enter = ''; }
   r.after?.();
   topBtn();
 }
 let depth = 0;   // сколько шагов сделали внутри приложения — «назад» не уводит с сайта
 export function go(to) { if (location.hash === to) render(); else { depth++; location.hash = to; } }
-let lastHash = location.hash;
-window.addEventListener('hashchange', () => { closeSheet(); const deeper = location.hash.length > lastHash.length; lastHash = location.hash; render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); });
+let lastHash = location.hash, enter = '';   // enter — с какой стороны въезжает новый экран
+window.addEventListener('hashchange', () => { closeSheet(); const deeper = location.hash.length > lastHash.length; lastHash = location.hash; enter = deeper ? 'fwd' : 'back'; render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); });
 
 // ----- действия -----
 Object.entries({ ...productActions, ...cartActions, ...checkoutActions, ...orderActions, ...profileActions, ...introActions, ...addressActions, ...loginActions }).forEach(([k, fn]) => on(k, fn));
@@ -125,7 +127,8 @@ function topBtn() {
 }
 addEventListener('scroll', () => { const b = $('#toTop'); if (b) b.hidden = window.scrollY < 1400; }, { passive: true });
 
-document.title = BRAND + ' — доставка из магазинов рядом';
+document.title = tr(BRAND + ' — доставка из магазинов рядом');
+startTranslating();
 // первый экран: скелет, пока не загрузился шрифт, чтобы текст не прыгал
 if (C.onboarded && (!location.hash || location.hash === '#/')) {
   app.innerHTML = skeleton();

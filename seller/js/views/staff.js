@@ -7,10 +7,10 @@ import { closeSheet, ICON, openSheet, plusI, showErrors, toast } from '../ui/dom
 // Сотрудники
 export function vStaff() {
   const rows = S.staff.map(x => `<div class="staff-row"><span class="avatar">${esc(x.name.charAt(0).toUpperCase())}</span>
-    <div style="min-width:0"><b>${esc(x.name)}</b><div class="small muted num">+992 ${fmtPhone(x.phone)} · ${ROLES[x.role].name}</div></div>
+    <div style="min-width:0"><b translate="no">${esc(x.name)}</b><div class="small muted num">+992 ${fmtPhone(x.phone)} · ${ROLES[x.role].name}</div></div>
     <button class="btn sm" data-staffedit="${x.id}">Изменить</button></div>`).join('');
   return `
-    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Сотрудники</h1></div>
+    <div class="head"><div><div class="eyebrow"><span translate="no">${esc(S.shop.name)}</span></div><h1>Сотрудники</h1></div>
       <div class="row"><button class="btn primary" data-act="addstaff">${plusI} Добавить сотрудника</button></div></div>
     <p class="muted" style="margin:0">Сотрудник входит в кабинет по своему номеру телефона и видит только свои разделы. Деньги и список сотрудников видит только владелец.</p>
     <div class="panel tight staff-list">

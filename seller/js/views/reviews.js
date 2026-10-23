@@ -18,7 +18,7 @@ export function vReviews() {
   const bad = tagStats(all.filter(isBad)).filter(([t]) => REVIEW_BAD.includes(t)).slice(0, 4);
   const cnt = k => all.filter(pass[k]).length;
   return `
-    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Отзывы</h1></div>
+    <div class="head"><div><div class="eyebrow"><span translate="no">${esc(S.shop.name)}</span></div><h1>Отзывы</h1></div>
       <div class="row"><button class="btn" data-act="testreview">Тестовый отзыв</button></div></div>
     <section class="panel rating-box">
       <div class="rating-big">${R.isNew ? '<b>Новый</b><span class="small muted">магазин</span>' : `<b class="num">${R.value.toLocaleString('ru-RU', { minimumFractionDigits: 1 })}</b><span class="stars">${stars(R.value)}</span>`}
@@ -35,10 +35,10 @@ export function vReviews() {
 
 function card(r) {
   return `<article class="review ${isBad(r) ? 'is-bad' : ''}">
-    <div class="row between"><span><span class="stars">${stars(r.rating)}</span> <b>${esc(r.name)}</b></span><span class="small muted">${whenText(r.ts)} · заказ № ${r.orderNo}</span></div>
+    <div class="row between"><span><span class="stars">${stars(r.rating)}</span> <b><span translate="no">${esc(r.name)}</span></b></span><span class="small muted">${whenText(r.ts)} · заказ № ${r.orderNo}</span></div>
     ${r.tags?.length ? `<div class="chips wrap">${r.tags.map(t => `<span class="pill ${REVIEW_BAD.includes(t) ? 'bad' : ''}">${esc(t)}</span>`).join('')}</div>` : ''}
-    ${r.text ? `<p>${esc(r.text)}</p>` : ''}
-    ${r.items?.length ? `<div class="small muted">${r.items.map(i => `${i.like === true ? '👍' : i.like === false ? '👎' : '·'} ${esc(i.name)}`).join('&nbsp;&nbsp; ')}</div>` : ''}
+    ${r.text ? `<p><span translate="no">${esc(r.text)}</span></p>` : ''}
+    ${r.items?.length ? `<div class="small muted">${r.items.map(i => `${i.like === true ? '👍' : i.like === false ? '👎' : '·'} <span translate="no">${esc(i.name)}</span>`).join('&nbsp;&nbsp; ')}</div>` : ''}
     ${r.reply ? `<div class="reply"><b>Ваш ответ</b><span>${esc(r.reply)}</span></div>` : ''}
     <div class="row">${r.complaint ? `<span class="pill warn">Жалоба на проверке: ${esc(r.complaint.reason)}</span>` : ''}
       <button class="btn sm ${needsReply(r) ? 'primary' : ''}" data-reply="${r.id}">${r.reply ? 'Изменить ответ' : 'Ответить'}</button>
@@ -50,7 +50,7 @@ export function sheetReply(id) {
   const r = S.reviews.find(x => x.id === id); if (!r) return;
   const tpl = REPLY_TEMPLATES.filter((_, i) => isBad(r) ? i >= 2 : i < 2);
   openSheet('Ответ на отзыв', `
-    <p style="margin:0"><span class="stars">${stars(r.rating)}</span> ${esc(r.name)}${r.text ? ': «' + esc(r.text) + '»' : ''}</p>
+    <p style="margin:0"><span class="stars">${stars(r.rating)}</span> <span translate="no">${esc(r.name)}</span>${r.text ? ': «' + esc(r.text) + '»' : ''}</p>
     <span class="lbl">Готовые ответы</span>
     <div class="col" style="gap:8px">${tpl.map((t, i) => `<button class="tpl" data-tpl="${i}">${esc(t)}</button>`).join('')}</div>
     <div class="field"><label for="replyText">Ваш ответ</label><textarea class="input" id="replyText" maxlength="500" placeholder="Ответ увидят все покупатели">${esc(r.reply || '')}</textarea></div>

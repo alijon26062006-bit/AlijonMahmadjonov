@@ -4,6 +4,9 @@ import { esc, fmtPhone } from '../lib/format.js';
 import { auth } from '../services/storage.js';
 import { flow } from '../state.js';
 import { $, app, showErrors } from '../ui/dom.js';
+import { lang, LANGS } from '../i18n.js';
+
+export const langSwitch = () => `<div class="seg2" role="radiogroup" aria-label="Язык">${LANGS.map(([k, t]) => `<button role="radio" aria-checked="${lang === k}" data-lang="${k}" translate="no">${t}</button>`).join('')}</div>`;
 
 // картинка 3D лежит в img/intro-N.webp; пока её нет, видна запасная линейная иконка
 export const SLIDES = [
@@ -19,7 +22,7 @@ export function renderAuth() {
   let html = '';
   if (f.step === 'intro') { const s = SLIDES[f.slide], last = f.slide === SLIDES.length - 1; html = `
     <div class="screen intro">
-      <div class="screen-top">${f.slide ? back('prev') : '<span></span>'}${last ? '' : '<button class="linkbtn" data-auth="skip">Пропустить</button>'}</div>
+      <div class="screen-top">${f.slide ? back('prev') : langSwitch()}${last ? '' : '<button class="linkbtn" data-auth="skip">Пропустить</button>'}</div>
       <div class="intro-art" aria-hidden="true">
         <svg viewBox="0 0 24 24">${s.art}</svg>
         <img src="img/${s.img}.webp" alt="" onerror="this.hidden=true">

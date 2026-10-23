@@ -43,7 +43,7 @@ export function vFinance() {
   const M = money30(), a = S.shop.alif;
   const ledger = M.paid.sort((x, y) => y.ts - x.ts).slice(0, 20);
   return `
-    <div class="head"><div><div class="eyebrow">${esc(S.shop.name)}</div><h1>Деньги</h1></div></div>
+    <div class="head"><div><div class="eyebrow"><span translate="no">${esc(S.shop.name)}</span></div><h1>Деньги</h1></div></div>
     ${a.status !== 'connected' ? `<div class="alert bad"><span><b>Онлайн-оплата не работает:</b> магазин ещё не подключён к Alif. Ниже показано, что сделать.</span></div>` : ''}
     <div class="kpis">
       <div class="kpi hero"><span>Переведено на ваш счёт за 30 дней</span><b class="num">${money(M.net30)}</b></div>

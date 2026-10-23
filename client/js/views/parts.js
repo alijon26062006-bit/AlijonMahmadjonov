@@ -41,10 +41,10 @@ export function productCard(shop, p, small = false) {
     : q ? `<div class="fab-step"><button data-a="minus" ${ids} aria-label="Убрать">${ico('minus', 'sm')}</button><span class="num">${qty}</span><button data-a="plus" ${ids} aria-label="Добавить" ${q + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>`
       : `<button class="fab" data-a="plus" ${ids} aria-label="Добавить ${esc(p.name)}">${ico('plus')}</button>`;
   return `<article class="card ${small ? 'small' : ''}">
-    <div class="pic-wrap"><button class="pic" data-a="product" ${ids} aria-label="${esc(p.name)}">${pic(p)}</button>
+    <div class="pic-wrap"><button class="pic" data-a="product" ${ids} aria-label="${esc(p.name)}" translate="no">${pic(p)}</button>
       ${save ? `<span class="off">−${money(save)}</span>` : p.labels[0] ? `<span class="lbl-tag">${esc(p.labels[0])}</span>` : ''}${ctl}</div>
     <div class="price num">${p.variants.length ? '<span class="from">от</span>' : ''}<b class="${save ? 'sale' : ''}">${money(priceFrom(p))}</b>${save ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
-    <button class="name" data-a="product" ${ids}>${esc(p.name)}</button>
+    <button class="name" data-a="product" ${ids} translate="no">${esc(p.name)}</button>
     <span class="meta">${esc(unitLine(p))}</span>
     ${small ? '' : likesLine(p)}
   </article>`;

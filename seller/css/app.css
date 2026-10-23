@@ -616,3 +616,57 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
 .subpick { width: 100%; border: 0; background: var(--surface); border-radius: 14px; padding: 10px; cursor: pointer; font: inherit; color: inherit; }
 .order li.missing { color: var(--muted); }
 .order li.subline { font-size: 13.5px; }
+
+/* оформление витрины: логотип, обложка, баннер */
+.media-row { display: flex; gap: 16px; align-items: flex-start; }
+.store-logo.big { width: 96px; height: 96px; border-radius: 24px; font-size: 36px; }
+.media-frame { display: grid; place-items: center; width: 100%; max-width: 520px; border-radius: 20px; overflow: hidden; background: var(--bg); border: 2px dashed var(--line); cursor: pointer; transition: border-color .15s; }
+.media-frame:hover { border-color: var(--ink); }
+.media-frame img { width: 100%; height: 100%; object-fit: cover; }
+.media-frame span { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); }
+.media-frame svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.media-frame b { color: var(--ink); }
+.size { font-size: 14px; background: var(--accent-soft); border-radius: 8px; padding: 4px 10px; align-self: flex-start; }
+
+/* настройки: язык и тема */
+.settings { display: flex; flex-direction: column; gap: 4px; }
+.set-row { display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.set-row .grow { flex: 1; min-width: 0; }
+.set-row small { display: block; color: var(--muted); font-size: 13px; }
+.set-ico { width: 40px; height: 40px; border-radius: 12px; background: var(--field); display: grid; place-items: center; flex: none; }
+.set-ico svg { width: 21px; height: 21px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.seg2 { display: inline-flex; background: var(--field); border-radius: 99px; padding: 3px; flex: none; }
+.seg2 button { border: 0; background: none; border-radius: 99px; padding: 8px 14px; min-height: 38px; font: inherit; font-weight: 600; font-size: 14.5px; color: var(--muted); transition: background .2s, color .2s; }
+.seg2 button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
+.switch-btn { width: 52px; height: 32px; border-radius: 99px; border: 0; background: var(--bar2); position: relative; flex: none; transition: background .2s; }
+.switch-btn i { position: absolute; left: 3px; top: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.switch-btn[aria-checked="true"] { background: var(--ink); }
+.switch-btn[aria-checked="true"] i { transform: translateX(20px); }
+.settings .linkbtn { align-self: flex-start; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; text-decoration: underline; padding: 8px 0; }
+.intro .seg2 button { padding: 7px 12px; }
+
+/* ===== плавные движения =====
+   Только transform и opacity: без перерисовки страницы и без лишней памяти.
+   Блоки раздела поднимаются по очереди только при переходе в раздел, а не при каждом изменении. */
+:root { --ease: cubic-bezier(.22, .8, .24, 1); }
+.btn, .iconbtn, .chip, .nav-btn svg, .morelist button, .prow .open, .hitrow, .seg2 button, .switch-btn { transition: transform .18s var(--ease), background-color .15s, border-color .15s, color .15s, box-shadow .15s; }
+.btn:active:not(:disabled), .iconbtn:active, .chip:active { transform: scale(.97); }
+.morelist button:active, .prow .open:active, .hitrow:active { transform: scale(.985); }
+.nav-btn:active svg { transform: scale(.86); }
+.toast:not([hidden]) { animation: toastIn .28s var(--ease); }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px); } }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: sheetIn .3s var(--ease); }
+  .sheet-bg { animation: bgIn .25s ease-out; }
+  @keyframes sheetIn { from { transform: translate3d(40px, 0, 0); opacity: .3; } }
+  @keyframes bgIn { from { opacity: 0; } }
+  @media (max-width: 800px) { @keyframes sheetIn { from { transform: translate3d(0, 40px, 0); opacity: .3; } } }
+  #page.enter > * { animation: rise .34s var(--ease) backwards; }
+  #page.enter > :nth-child(2) { animation-delay: 35ms; }
+  #page.enter > :nth-child(3) { animation-delay: 70ms; }
+  #page.enter > :nth-child(4) { animation-delay: 105ms; }
+  #page.enter > :nth-child(5) { animation-delay: 140ms; }
+  #page.enter > :nth-child(n+6) { animation-delay: 175ms; }
+  @keyframes rise { from { opacity: 0; transform: translate3d(0, 12px, 0); } }
+  .intro-text { animation: rise .34s var(--ease) 60ms backwards; }
+}
