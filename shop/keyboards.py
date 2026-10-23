@@ -705,13 +705,23 @@ def admin_tenants(rows) -> InlineKeyboardMarkup:
     buttons = []
     for row in rows[:texts.LIST_CAP]:
         blocked = row["status"] == "blocked"
-        buttons.append([_btn(
-            f"{'✅ Кушодан' if blocked else '🚫 Бастан'} @{row['username'] or row['id']}",
-            f"o:{'unblock' if blocked else 'block'}:{row['id']}",
-            style.SUCCESS if blocked else style.DANGER,
-        )])
+        buttons.append([
+            _btn(
+                f"{'✅ Кушодан' if blocked else '🚫 Бастан'} @{row['username'] or row['id']}",
+                f"o:{'unblock' if blocked else 'block'}:{row['id']}",
+                style.SUCCESS if blocked else style.PRIMARY,
+            ),
+            _btn("🗑 Нест кардан", f"o:del:{row['id']}", style.DANGER),
+        ])
     buttons.append([_btn(texts.BTN_BACK, "o:home")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def tenant_delete_confirm(tenant_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_btn("🗑 Ҳа, пурра нест кун", f"o:delok:{tenant_id}", style.DANGER)],
+        [_btn(texts.BTN_CANCEL, "o:bots", style.PRIMARY)],
+    ])
 
 
 def operators_menu(ops) -> InlineKeyboardMarkup:

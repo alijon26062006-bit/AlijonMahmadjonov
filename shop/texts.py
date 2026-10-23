@@ -1275,6 +1275,46 @@ def admin_tenants(rows: list) -> str:
     return "\n".join(lines) + _more(rows)
 
 
+def tenant_delete_confirm(row, stats: dict | None, sales: dict, currency: str = CURRENCY) -> str:
+    name = f"@{row['username']}" if row["username"] else f"#{row['id']}"
+    lines = [
+        f"🗑 <b>Боти {esc(name)}-ро пурра нест кунем?</b>\n",
+        f"👤 Шарик: <code>{row['owner_id']}</code>",
+        f"📶 Ҳолат: {TENANT_STATUS.get(row['status'], row['status'])}",
+    ]
+    if stats:
+        lines += [
+            f"👥 Харидорон: <b>{stats['users']}</b>",
+            f"💳 Пул дар ҳисобҳои харидорон: <b>{money(stats['balance'], currency)}</b>",
+            f"🧾 Фармоишҳо: {stats['orders']} (кушода: <b>{stats['orders_open']}</b>)",
+        ]
+    lines += [
+        f"💰 Харидҳои яклухт: {sales['orders']} фармоиш, {money(sales['revenue'], currency)}",
+        "",
+        "⚠️ <b>Ин амал баргашт надорад.</b> Бот хомӯш мешавад, базаи он (харидорон, "
+        "ҳисобҳо, фармоишҳо, нархҳо, танзимот) аз сервер пок мешавад.",
+        "📦 Пеш аз нест кардан нусхаи база ба шумо ҳамчун файл фиристода мешавад.",
+        "<i>Ҳисоби яклухти шарик дар боти асосӣ ва дастрасии ӯ ба конструктор мемонад.</i>",
+    ]
+    if stats and (stats["orders_open"] or stats["balance"]):
+        lines.insert(-3, "🔴 <b>Дар бот пул ё фармоишҳои кушода ҳаст</b> — аввал бо шарик ҳал кунед.")
+    return "\n".join(lines)
+
+
+def tenant_deleted(username: str) -> str:
+    return f"🗑 Боти @{esc(username)} пурра нест карда шуд."
+
+
+def tenant_deleted_partner(username: str) -> str:
+    return (
+        f"🗑 <b>Боти @{esc(username)} аз платформа нест карда шуд.</b>\n\n"
+        "Ҳисоби яклухти шумо дар ин бот мемонад. Саволҳо бошад — ба дастгирӣ нависед."
+    )
+
+
+TENANT_BUSY = "⏳ Дар ин бот ҳоло фармоиш иҷро мешавад. Пас аз 1–2 дақиқа боз кӯшиш кунед."
+
+
 # ── боти шарик: панели админ ──
 ADMIN_ASK_PARTNER_MARKUP = (
     "💹 <b>Наценкаи шумо</b>\n\n"

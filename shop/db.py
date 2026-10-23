@@ -279,6 +279,15 @@ class Database:
         with self._lock:
             self._conn.close()
 
+    def backup_to(self, path: str | Path) -> None:
+        """Нусхаи пурраи база (ҳатто ҳангоми кор) — пеш аз нест кардан."""
+        target = sqlite3.connect(str(path))
+        try:
+            with self._lock:
+                self._conn.backup(target)
+        finally:
+            target.close()
+
     def _init_schema(self) -> None:
         with self._lock:
             self._conn.executescript(_SCHEMA)
@@ -655,6 +664,10 @@ class Database:
         if owner_id is None:
             return self._all("SELECT * FROM tenants ORDER BY id")
         return self._all("SELECT * FROM tenants WHERE owner_id = ? ORDER BY id", (owner_id,))
+
+    def delete_tenant(self, tenant_id: int) -> bool:
+        """Боти шарикро аз платформа нест мекунад. Таърихи фармоишҳои яклухт мемонад."""
+        return self._run("DELETE FROM tenants WHERE id = ?", (tenant_id,)).rowcount > 0
 
     def set_tenant(self, tenant_id: int, **fields) -> None:
         allowed = {"status", "note", "token", "lang", "username", "title"}

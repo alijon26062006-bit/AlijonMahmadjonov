@@ -417,3 +417,61 @@ def test_tenant_db_is_separate(tmp_path):
     finally:
         a.close()
         b.close()
+
+
+# ── нест кардани боти шарик ───────────────────────────────────────────
+class _DocBot(FakeBot):
+    def __init__(self):
+        super().__init__()
+        self.documents = []
+
+    async def send_document(self, chat_id, document, caption=None, **kwargs):
+        from pathlib import Path
+
+        self.documents.append((chat_id, Path(document.path).read_bytes()[:16]))
+
+
+async def test_owner_deletes_tenant_bot_completely(platform):
+    ctx = await _tenant(platform)
+    _buyer_order(ctx)
+    path = platform.manager.db_path(ctx.bot_id)
+    assert path.exists()
+
+    cb = FakeCallback(f"o:del:{ctx.id}", user_id=ADMIN_ID)
+    await con_h.cb_o_delete(cb, platform.db, platform.cfg, platform.manager)
+    assert "баргашт надорад" in cb.message.last and "Харидорон: <b>1</b>" in cb.message.last
+
+    bot = _DocBot()
+    cb = FakeCallback(f"o:delok:{ctx.id}", user_id=ADMIN_ID)
+    await con_h.cb_o_delete_ok(cb, platform.db, platform.cfg, bot, platform.manager)
+
+    assert platform.db.tenant(ctx.id) is None and platform.db.tenant_by_bot(ctx.bot_id) is None
+    assert not path.exists()
+    assert platform.manager.resolve(ctx.bot_id) is None
+    assert bot.documents and bot.documents[0][0] == ADMIN_ID
+    assert bot.documents[0][1].startswith(b"SQLite format 3")    # нусхаи база ба соҳиб
+    assert not list((path.parent.parent / "deleted").glob("*"))  # дар сервер намонд
+    assert "нест карда шуд" in bot.to(PARTNER_ID)
+    assert len(cb.answers) == 1
+
+
+async def test_delete_refused_while_order_is_being_sent(platform):
+    ctx = await _tenant(platform)
+    order_id = _buyer_order(ctx)
+    key = fulfillment.busy_key(ctx.db, order_id)
+    fulfillment._BUSY.add(key)
+    try:
+        cb = FakeCallback(f"o:delok:{ctx.id}", user_id=ADMIN_ID)
+        await con_h.cb_o_delete_ok(cb, platform.db, platform.cfg, _DocBot(), platform.manager)
+    finally:
+        fulfillment._BUSY.discard(key)
+    assert platform.db.tenant(ctx.id) is not None
+    assert platform.manager.db_path(ctx.bot_id).exists()
+
+
+async def test_partner_can_add_same_bot_again_after_delete(platform):
+    ctx = await _tenant(platform)
+    await platform.manager.remove(platform.db.tenant(ctx.id), platform.manager.data_dir / "x")
+    tid = platform.db.add_tenant(PARTNER_ID, ctx.bot_id, "partner_shop_bot", "Shop", TOKEN)
+    new = await platform.manager.start(platform.db.tenant(tid), poll=False)
+    assert new.db.stats()["users"] == 0                           # база нав, тоза

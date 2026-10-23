@@ -42,6 +42,10 @@ PUBLIC_FAIL = "Таъминкунанда фармоишро иҷро накар
 REPRICE_EVERY = 600      # сония — нархҳо аз нархи яклухт
 
 
+class TenantBusy(Exception):
+    """Дар боти шарик фармоиш ҳоло иҷро мешавад — нест кардан мумкин нест."""
+
+
 @dataclass
 class Platform:
     """Боти асосӣ: база, танзимот, таъминкунанда ва худи бот."""
@@ -238,6 +242,47 @@ class TenantManager:
             await ctx.bot.session.close()
         except Exception:
             pass
+
+    def tenant_db(self, bot_id: int) -> Database | None:
+        """Базаи боти шарик (агар файл ҳаст), барои омор пеш аз нест кардан."""
+        if bot_id in self._dbs or self.db_path(bot_id).exists():
+            return self.open_db(bot_id)
+        return None
+
+    async def remove(self, row, backup_dir: Path) -> Path | None:
+        """Боти шарикро пурра нест мекунад: бот, база ва сабт дар платформа.
+
+        Пеш аз нест кардан нусхаи база дар ``backup_dir`` сохта мешавад
+        (бармегардонад роҳи он ё None, агар база набуд). Агар фармоише ҳоло
+        иҷро шавад — ``TenantBusy``: базаро зери вазифаи кушода пок намекунем.
+        """
+        from datetime import datetime
+
+        from .fulfillment import is_busy
+
+        tdb = self.tenant_db(row["bot_id"])
+        if tdb is not None and any(is_busy(tdb, o["id"]) for o in tdb.open_orders(500)):
+            raise TenantBusy(row["id"])
+
+        ctx = self.by_tenant(row["id"])
+        await self.stop(row["id"])
+        if ctx is not None and ctx.feeds:
+            await asyncio.wait(list(ctx.feeds), timeout=30)
+
+        backup = None
+        if tdb is not None:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d-%H%M")
+            backup = backup_dir / f"bot-{row['username'] or row['bot_id']}-{stamp}.sqlite3"
+            tdb.backup_to(backup)
+            self._dbs.pop(row["bot_id"], None)
+            tdb.close()
+        path = self.db_path(row["bot_id"])
+        for extra in ("", "-wal", "-shm"):
+            Path(f"{path}{extra}").unlink(missing_ok=True)
+        self.platform.db.delete_tenant(row["id"])
+        log.warning("Боти шарик #%s (@%s) пурра нест карда шуд", row["id"], row["username"])
+        return backup
 
     async def pause_all(self) -> None:
         """Конструктор хомӯш шуд: ҳамаи ботҳои шарикон қатъ мешаванд (маълумот мемонад)."""

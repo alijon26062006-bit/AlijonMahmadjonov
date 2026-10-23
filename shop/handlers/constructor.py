@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
+from pathlib import Path
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -439,6 +440,65 @@ async def cb_o_block(cb: CallbackQuery, db: Database, tenants=None) -> None:
         if tenants is not None:
             await tenants.start(db.tenant(row["id"]))
     await cb_o_bots(cb, db)
+
+
+def _tenant_of(raw: str, db: Database):
+    return db.tenant(int(raw)) if raw.isdigit() else None
+
+
+@owner_router.callback_query(F.data.startswith("o:del:"))
+async def cb_o_delete(cb: CallbackQuery, db: Database, cfg: Config, tenants=None) -> None:
+    row = _tenant_of(cb.data.rsplit(":", 1)[1], db)
+    if row is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    tdb = tenants.tenant_db(row["bot_id"]) if tenants is not None else None
+    await safe_edit(
+        cb,
+        texts.tenant_delete_confirm(row, tdb.stats() if tdb else None,
+                                    db.tenant_sales(row["id"]), cfg.currency),
+        keyboards.tenant_delete_confirm(row["id"]),
+    )
+    await cb.answer()
+
+
+@owner_router.callback_query(F.data.startswith("o:delok:"))
+async def cb_o_delete_ok(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot,
+                         tenants=None) -> None:
+    from aiogram.types import FSInputFile
+
+    row = _tenant_of(cb.data.rsplit(":", 1)[1], db)
+    if row is None:                      # аллакай нест шуд (пахши дуюм)
+        await cb_o_bots(cb, db)
+        return
+    backup = None
+    if tenants is not None:
+        try:
+            backup = await tenants.remove(row, Path(cfg.db_path).parent / "deleted")
+        except tenants_mod.TenantBusy:
+            await cb.answer(texts.TENANT_BUSY, show_alert=True)
+            return
+    else:
+        db.delete_tenant(row["id"])
+    name = row["username"] or str(row["bot_id"])
+    if backup is not None:
+        # Нусха танҳо ба соҳиб дар Telegram — дар сервер чизе намемонад.
+        try:
+            await bot.send_document(
+                cb.from_user.id, FSInputFile(backup),
+                caption=f"📦 Нусхаи базаи @{texts.esc(name)} — пеш аз нест кардан.",
+            )
+        except Exception as exc:
+            log.warning("Нусхаи базаи @%s фиристода нашуд: %s", name, exc)
+        finally:
+            backup.unlink(missing_ok=True)
+    try:
+        await bot.send_message(row["owner_id"], texts.tenant_deleted_partner(name))
+    except Exception:
+        pass
+    rows = db.tenants()
+    await safe_edit(cb, texts.admin_tenants(rows), keyboards.admin_tenants(rows))
+    await cb.answer(texts.tenant_deleted(name), show_alert=True)     # як ҷавоб ба тугма
 
 
 # ══ Боти шарик: танзимоти махсус ═════════════════════════════════════
