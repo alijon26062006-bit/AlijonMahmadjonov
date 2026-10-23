@@ -10,3 +10,6 @@ data/
 *.db-shm
 .venv/
 .pytest_cache/
+
+# видео-уроки: кэш озвучки
+reels/.cache/
