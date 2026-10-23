@@ -907,7 +907,8 @@ def render(lesson, out_base):
         make_audio(tl, wav, music=music)
         out = out_base + suffix + ".mp4"
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", silent, "-i", wav,
-                        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                        "-c:v", "copy", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "44100",
+                        "-c:a", "aac", "-b:a", "192k", "-shortest",
                         "-movflags", "+faststart", out], check=True)
         os.remove(wav)
         outputs.append(out)
