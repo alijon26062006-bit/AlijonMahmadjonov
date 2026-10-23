@@ -5,7 +5,7 @@
 голосом RHVoice, подгоняет тайминг под длину фраз, печатает код со звуком
 клавиш, добавляет звуковые эффекты, фоновую музыку и анимирует человечка.
 
-Нужно: ffmpeg, RHVoice (apt install rhvoice rhvoice-russian), numpy, Pillow.
+Нужно: ffmpeg, numpy, Pillow и голос Piper (reels/setup_voice.sh).
 """
 
 import bisect
@@ -31,6 +31,13 @@ S = 2  # суперсэмплинг для сглаживания
 FPS = 30
 SR = 44100
 
+# Голос: "piper" — нейросетевой (живой), "rhvoice" — запасной.
+# Piper ставится скриптом reels/setup_voice.sh.
+VOICE_ENGINE = "piper"
+TOOLS = os.path.join(HERE, ".tools")
+PIPER_BIN = os.path.join(TOOLS, "piper", "piper")
+PIPER_MODEL = os.path.join(TOOLS, "ru-irinia-medium.onnx")
+PIPER_SPEED = 0.92  # length_scale: меньше — быстрее речь
 VOICE = "aleksandr-hq"
 VOICE_RATE = 112
 
@@ -208,13 +215,21 @@ def wrap(text, f, max_w):
 #  Озвучка
 # ======================================================================
 def tts(text):
-    """Синтез речи RHVoice -> numpy float32 @ 44.1 кГц (с кэшем)."""
+    """Синтез речи (Piper или RHVoice) -> numpy float32 @ 44.1 кГц (с кэшем)."""
     os.makedirs(CACHE, exist_ok=True)
-    key = hashlib.md5(f"{VOICE}|{VOICE_RATE}|{text}".encode()).hexdigest()
+    if VOICE_ENGINE == "piper":
+        key = hashlib.md5(f"piper|{PIPER_MODEL}|{PIPER_SPEED}|{text}".encode()).hexdigest()
+    else:
+        key = hashlib.md5(f"{VOICE}|{VOICE_RATE}|{text}".encode()).hexdigest()
     path = os.path.join(CACHE, key + ".wav")
     if not os.path.exists(path):
-        subprocess.run(["RHVoice-test", "-p", VOICE, "-r", str(VOICE_RATE), "-o", path],
-                       input=text.encode(), check=True)
+        if VOICE_ENGINE == "piper":
+            subprocess.run([PIPER_BIN, "-m", PIPER_MODEL, "--length_scale", str(PIPER_SPEED),
+                            "--sentence_silence", "0.25", "-f", path, "-q"],
+                           input=text.encode(), check=True, stdout=subprocess.DEVNULL)
+        else:
+            subprocess.run(["RHVoice-test", "-p", VOICE, "-r", str(VOICE_RATE), "-o", path],
+                           input=text.encode(), check=True)
     with wave.open(path) as wf:
         sr = wf.getframerate()
         data = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768

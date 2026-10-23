@@ -6,8 +6,9 @@
 ## Как собрать урок
 
 ```bash
-sudo apt install ffmpeg rhvoice rhvoice-russian
+sudo apt install ffmpeg
 pip install numpy pillow
+reels/setup_voice.sh                                    # скачать голос (один раз)
 
 python3 reels/lessons/lesson01_print.py                 # видео -> reels/out/
 python3 reels/lessons/lesson01_print.py preview 5 60    # кадры на 5-й и 60-й секунде

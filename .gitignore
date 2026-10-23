@@ -13,3 +13,4 @@ data/
 
 # видео-уроки: кэш озвучки
 reels/.cache/
+reels/.tools/
