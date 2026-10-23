@@ -670,3 +670,7 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
   @keyframes rise { from { opacity: 0; transform: translate3d(0, 12px, 0); } }
   .intro-text { animation: rise .34s var(--ease) 60ms backwards; }
 }
+
+/* шрифт плотнее: на телефоне тонкие 400 читаются плохо */
+body { font-weight: 500; }
+.morelist small, .price s, .price small, .set-row small { font-weight: 500; }

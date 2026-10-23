@@ -575,7 +575,7 @@ h2 { font-size: clamp(26px, 7.2vw, 30px); }
 
 @media (prefers-reduced-motion: no-preference) {
   .page.enter { animation: pageIn .3s var(--ease) both; }
-  .page.enter.back { animation-name: pageBack; }
+  .page.enter.in-back { animation-name: pageBack; }
   @keyframes pageIn { from { opacity: 0; transform: translate3d(22px, 0, 0); } }
   @keyframes pageBack { from { opacity: 0; transform: translate3d(-22px, 0, 0); } }
   /* карточки появляются по очереди, но не дольше трети секунды на весь экран */
@@ -589,3 +589,9 @@ h2 { font-size: clamp(26px, 7.2vw, 30px); }
   @keyframes tabPop { 40% { transform: scale(1.14); } }
   @keyframes rise { from { opacity: 0; transform: translate3d(0, 14px, 0); } }
 }
+
+/* шрифт плотнее: на телефоне тонкие 400 читаются плохо, берём 500, заголовки строк — 600 */
+body { font-weight: 500; }
+.li > .grow, .opt .grow, .ropt { font-weight: 600; }
+.li small, .opt .grow small, .set-row small, .muted, .small.muted, .tiny { font-weight: 500; }
+input::placeholder, textarea::placeholder { font-weight: 500; }

@@ -51,7 +51,7 @@ export function render() {
 let depth = 0;   // сколько шагов сделали внутри приложения — «назад» не уводит с сайта
 export function go(to) { if (location.hash === to) render(); else { depth++; location.hash = to; } }
 let lastHash = location.hash, enter = '';   // enter — с какой стороны въезжает новый экран
-window.addEventListener('hashchange', () => { closeSheet(); const deeper = location.hash.length > lastHash.length; lastHash = location.hash; enter = deeper ? 'fwd' : 'back'; render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { closeSheet(); const deeper = location.hash.length > lastHash.length; lastHash = location.hash; enter = deeper ? 'in-fwd' : 'in-back'; render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); });
 
 // ----- действия -----
 Object.entries({ ...productActions, ...cartActions, ...checkoutActions, ...orderActions, ...profileActions, ...introActions, ...addressActions, ...loginActions }).forEach(([k, fn]) => on(k, fn));
