@@ -7,7 +7,7 @@ const P = (cat, name, price, unit, extra = {}) => ({ id: 'p' + ++n, cat, name, p
 
 export const DEMO_SHOPS = [
   {
-    id: 'sabz', name: 'Дехкон Маркет', kind: 'grocery', about: 'Свежие овощи и фрукты с Шохмансура каждое утро', rating: 4.8, count: 412, prep: 20, minOrder: 50,
+    id: 'sabz', tile: { bg: '#2e8b57', fg: '#ffffff' }, name: 'Дехкон Маркет', kind: 'grocery', about: 'Свежие овощи и фрукты с Шохмансура каждое утро', rating: 4.8, count: 412, prep: 20, minOrder: 50,
     address: 'Душанбе, пр. Рудаки 45', schedule: week('07:00', '23:00'), color: '#e8f3df',
     products: [
       P('Овощи и зелень', 'Помидоры местные', 12, 'кг', { labels: ['Хит'], desc: 'Грунтовые, сладкие. Собраны вчера.', likes: 96, attrs: { country: 'Таджикистан' } }),
@@ -30,7 +30,7 @@ export const DEMO_SHOPS = [
     ],
   },
   {
-    id: 'yovar', name: 'Супермаркет Ёвар', kind: 'grocery', about: 'Всё для дома рядом с вами, работаем круглосуточно', rating: 4.6, count: 1290, prep: 15, minOrder: 30,
+    id: 'yovar', tile: { bg: '#e53935', fg: '#ffffff' }, name: 'Супермаркет Ёвар', kind: 'grocery', about: 'Всё для дома рядом с вами, работаем круглосуточно', rating: 4.6, count: 1290, prep: 15, minOrder: 30,
     address: 'Душанбе, ул. Айни 54', schedule: week('00:00', '23:59'), color: '#fdf2c4',
     products: [
       P('Молочное и яйца', 'Кефир 2,5%', 8, 'шт', { attrs: { brand: 'Шароб', pack: '1 л' }, expiry: inDays(6) }),
@@ -49,7 +49,7 @@ export const DEMO_SHOPS = [
     ],
   },
   {
-    id: 'atir', name: 'Парфюм-хаус Атир', kind: 'perfume', about: 'Только оригиналы. Есть разлив и тестеры', rating: 4.9, count: 236, prep: 25, minOrder: 0,
+    id: 'atir', tile: { bg: '#1d1d1f', fg: '#e8c77a' }, name: 'Парфюм-хаус Атир', kind: 'perfume', about: 'Только оригиналы. Есть разлив и тестеры', rating: 4.9, count: 236, prep: 25, minOrder: 0,
     address: 'Душанбе, ТЦ «Садбарг», 2 этаж', schedule: week('09:00', '21:00'), color: '#f6ead2',
     products: [
       P('Мужская парфюмерия', 'Lattafa Khamrah', 450, 'шт', { attrs: { brand: 'Lattafa', gender: 'Унисекс', ptype: 'Парфюмерная вода', volume: '100', origin: 'Новый, в упаковке' }, labels: ['Хит'], likes: 98, desc: 'Ноты: корица, финики, ваниль, пралине. Стойкость 8–10 часов.' }),
@@ -64,7 +64,7 @@ export const DEMO_SHOPS = [
     ],
   },
   {
-    id: 'rohat', name: 'Чайхона Рохат', kind: 'food', about: 'Национальная кухня: плов, шашлык, самбуса', rating: 4.7, count: 870, prep: 30, minOrder: 40,
+    id: 'rohat', tile: { bg: '#f3e3cf', fg: '#7a3e12' }, name: 'Чайхона Рохат', kind: 'food', about: 'Национальная кухня: плов, шашлык, самбуса', rating: 4.7, count: 870, prep: 30, minOrder: 40,
     address: 'Душанбе, ул. Рудаки 84', schedule: week('10:00', '23:00'), color: '#fbe6d4',
     products: [
       P('Горячее', 'Плов праздничный', 35, 'порция', { labels: ['Хит'], likes: 98, attrs: { portion: '350' }, desc: 'Рис девзира, баранина, морковь, нут, изюм', options: [{ id: 'o1', name: 'Большая порция', price: 15 }, { id: 'o2', name: 'Без лука', price: 0 }, { id: 'o3', name: 'Добавить перепелиные яйца', price: 6 }] }),
@@ -79,7 +79,7 @@ export const DEMO_SHOPS = [
     ],
   },
   {
-    id: 'burger', name: 'Burger Town', kind: 'food', about: 'Бургеры на гриле, картофель фри, шейки', rating: 4.5, count: 512, prep: 20, minOrder: 30,
+    id: 'burger', tile: { bg: '#ff7a1a', fg: '#ffffff' }, name: 'Burger Town', kind: 'food', about: 'Бургеры на гриле, картофель фри, шейки', rating: 4.5, count: 512, prep: 20, minOrder: 30,
     address: 'Душанбе, ул. Мирзо Турсунзаде 30', schedule: week('11:00', '02:00'), color: '#fde3dc',
     products: [
       P('Бургеры', 'Чизбургер', 26, 'шт', { labels: ['Хит'], likes: 93, options: [{ id: 'b1', name: 'Двойной сыр', price: 5 }, { id: 'b2', name: 'Без лука', price: 0 }, { id: 'b3', name: 'Острый соус', price: 2 }] }),

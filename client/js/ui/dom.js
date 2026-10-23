@@ -5,6 +5,10 @@ export const app = $('#app');
 
 // иконки одного набора: линия 2px, скруглённые концы
 const P = {
+  homeFill: '<path d="M3.5 10.6 12 4l8.5 6.6V20a1 1 0 0 1-1 1H15v-5.5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1V21H4.5a1 1 0 0 1-1-1z" fill="currentColor" stroke="none"/>',
+  basket: '<path d="M3 9h18l-2 10.5a2 2 0 0 1-2 1.5H7a2 2 0 0 1-2-1.5zM8 9l3-5M16 9l-3-5" fill="currentColor" stroke="none"/><path d="M8 9l3-5M16 9l-3-5"/>',
+  userFill: '<circle cx="12" cy="7.5" r="4.5" fill="currentColor" stroke="none"/><path d="M3.5 21a8.5 7 0 0 1 17 0z" fill="currentColor" stroke="none"/>',
+  up2: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   cart: '<path d="M3 4h2l2.4 11h9.6l2-8H6"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/>',

@@ -8,7 +8,7 @@ import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } fro
 import { addressActions, loginActions, openAddress, openLogin } from './views/account.js';
 import { cartActions, cartDock, vCart } from './views/cart.js';
 import { checkoutActions, checkoutDock, vCheckout } from './views/checkout.js';
-import { vHome, vKind } from './views/home.js';
+import { skeleton, vHome, vKind } from './views/home.js';
 import { orderActions, vOrder, vOrders } from './views/order.js';
 import { applyTheme, introActions, profileActions, vFavorites, vIntro, vProfile } from './views/profile.js';
 import { refreshResults, remember, vSearch } from './views/search.js';
@@ -17,17 +17,18 @@ import { askReplace, openProduct, productActions, vShop } from './views/shop.js'
 // Экраны: адрес → функция, вкладка снизу, нужна ли полоска корзины, закреплённая кнопка
 const ROUTES = [
   [/^#\/?$/, () => ({ html: vHome(), tab: 'home', cartbar: true })],
-  [/^#\/search$/, () => ({ html: vSearch(), tab: 'search', cartbar: true, after: () => { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })],
+  [/^#\/search$/, () => ({ html: vSearch(), tab: 'home', cartbar: true, after: () => { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })],
   [/^#\/kind\/(\w+)$/, k => ({ html: vKind(k), tab: 'home', cartbar: true })],
   [/^#\/shop\/([\w-]+)$/, id => ({ html: vShop(id), tab: 'home', cartbar: true })],
   [/^#\/cart$/, () => ({ html: vCart(), tab: 'cart', dock: cartDock() })],
   [/^#\/checkout$/, () => ({ html: vCheckout(), flow: true, dock: checkoutDock() })],
-  [/^#\/orders$/, () => ({ html: vOrders(), tab: 'orders' })],
-  [/^#\/order\/([\w-]+)$/, id => ({ html: vOrder(id), tab: 'orders' })],
+  [/^#\/orders$/, () => ({ html: vOrders(), tab: 'profile' })],
+  [/^#\/order\/([\w-]+)$/, id => ({ html: vOrder(id), tab: 'profile' })],
   [/^#\/profile$/, () => ({ html: vProfile(), tab: 'profile' })],
   [/^#\/favorites$/, () => ({ html: vFavorites(), tab: 'profile', cartbar: true })],
 ];
-const TABS = [['home', '#/', 'Главная', 'home'], ['search', '#/search', 'Поиск', 'search'], ['cart', '#/cart', 'Корзина', 'cart'], ['orders', '#/orders', 'Заказы', 'orders'], ['profile', '#/profile', 'Профиль', 'user']];
+// три вкладки, как в больших приложениях доставки: поиск — сверху на главной, заказы — в профиле
+const TABS = [['home', '#/', 'Главная', 'homeFill'], ['cart', '#/cart', 'Корзина', 'basket'], ['profile', '#/profile', 'Профиль', 'userFill']];
 
 export function render() {
   applyTheme();
@@ -41,8 +42,9 @@ export function render() {
   const dock = r.dock || bar;
   app.innerHTML = `<main class="page ${r.flow ? 'flow' : dock ? 'has-bar' : ''}" id="main">${r.html}</main>
     ${dock ? `<div class="dock ${r.flow ? '' : 'over-tabs'}">${dock}</div>` : ''}
-    ${r.flow ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'orders' && active ? '<span class="badge">•</span>' : ''}</button>`).join('')}</div></nav>`}`;
+    ${r.flow ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
   r.after?.();
+  topBtn();
 }
 let depth = 0;   // сколько шагов сделали внутри приложения — «назад» не уводит с сайта
 export function go(to) { if (location.hash === to) render(); else { depth++; location.hash = to; } }
@@ -55,7 +57,9 @@ on('closeSheet', () => { closeSheet(); return false; });
 on('back', el => { if (depth > 0) { depth--; history.back(); } else location.replace(el.dataset.to || '#/'); return false; });
 on('address', () => { openAddress(render); return false; });
 on('login', () => { openLogin(render); return false; });
-on('filter', el => { ui.filter = el.dataset.v; });
+on('filterToggle', el => { ui.f = { ...ui.f, [el.dataset.v]: !ui.f?.[el.dataset.v] }; });
+on('sortRating', () => { ui.sort = ui.sort === 'rating' ? '' : 'rating'; });
+on('filterSale', () => { ui.f = { sale: true }; render(); document.querySelector('.filters')?.scrollIntoView({ block: 'start' }); return false; });
 on('jump', el => { $('#' + el.dataset.to)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return false; });
 on('product', el => { openProduct(el.dataset.shop, el.dataset.pid); return false; });
 on('plus', el => {
@@ -66,7 +70,7 @@ on('minus', el => { const s = shopById(el.dataset.shop); bumpSimple(s, productIn
 on('ifMissing', el => { C.cart.ifMissing = el.value; save(); return false; });
 on('cutlery', el => { C.cart.cutlery = el.checked; save(); return false; });
 on('cartComment', el => { C.cart.comment = el.value; save(); return false; });
-on('searchFor', el => { ui.q = el.dataset.q; remember(ui.q); render(); return false; });
+on('searchFor', el => { ui.q = el.dataset.q; remember(ui.q); if (el.dataset.goto) go('#/search'); else render(); return false; });
 on('clearRecent', () => { C.recent = []; save(); refreshResults(); return false; });
 on('about', () => {
   openSheet(`<h2>Как работает ${BRAND}</h2>
@@ -111,5 +115,17 @@ async function install() {
 }
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) navigator.serviceWorker.register('sw.js').catch(() => {});
 
+// кнопка «наверх» после долгой прокрутки
+function topBtn() {
+  let b = $('#toTop');
+  if (!b) { b = document.createElement('button'); b.id = 'toTop'; b.className = 'to-top'; b.setAttribute('aria-label', 'Наверх'); b.innerHTML = ico('up2'); b.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' }); document.body.append(b); }
+  b.hidden = window.scrollY < 1400;
+}
+addEventListener('scroll', () => { const b = $('#toTop'); if (b) b.hidden = window.scrollY < 1400; }, { passive: true });
+
 document.title = BRAND + ' — доставка из магазинов рядом';
-render();
+// первый экран: скелет, пока не загрузился шрифт, чтобы текст не прыгал
+if (C.onboarded && (!location.hash || location.hash === '#/')) {
+  app.innerHTML = skeleton();
+  Promise.race([document.fonts?.ready, new Promise(r => setTimeout(r, 700))]).then(render);
+} else render();
