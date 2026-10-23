@@ -56,7 +56,7 @@ function stepKind() {
     <p class="muted">От этого зависят единицы товаров и готовые категории. Поменять можно позже в настройках.</p>
     <div class="kinds" role="radiogroup" aria-label="Тип магазина">
       ${SHOP_KINDS.map(k => `<button class="kind" role="radio" aria-checked="${R.kind === k.id}" data-reg-kind="${k.id}">
-        <img class="kind-img" src="img/kind-${k.id}.${k.id === 'tech' ? 'svg' : 'webp'}" alt="" width="72" height="72" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="kind-img kind-ph" hidden><svg viewBox="0 0 24 24">${k.icon}</svg></span><span><b>${k.name}</b><small>${k.hint}</small><small class="units">${k.units.join(' · ')}</small></span></button>`).join('')}
+        <img class="kind-img" src="img/kind-${k.id}.webp" alt="" width="72" height="72" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="kind-img kind-ph" hidden><svg viewBox="0 0 24 24">${k.icon}</svg></span><span><b>${k.name}</b><small>${k.hint}</small><small class="units">${k.units.join(' · ')}</small></span></button>`).join('')}
     </div>
     <span class="err" id="r_err"></span>`;
 }
