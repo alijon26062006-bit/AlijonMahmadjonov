@@ -12,14 +12,14 @@ import { skeleton, vHome, vKind } from './views/home.js';
 import { orderActions, vOrder, vOrders } from './views/order.js';
 import { applyTheme, introActions, profileActions, vFavorites, vIntro, vProfile } from './views/profile.js';
 import { refreshResults, remember, vSearch } from './views/search.js';
-import { askReplace, openProduct, productActions, vShop } from './views/shop.js';
+import { askReplace, openProduct, productActions, refreshProduct, shopDock, shopInfo, spyTabs, vShop } from './views/shop.js';
 
 // Экраны: адрес → функция, вкладка снизу, нужна ли полоска корзины, закреплённая кнопка
 const ROUTES = [
   [/^#\/?$/, () => ({ html: vHome(), tab: 'home', cartbar: true })],
   [/^#\/search$/, () => ({ html: vSearch(), tab: 'home', cartbar: true, after: () => { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })],
   [/^#\/kind\/(\w+)$/, k => ({ html: vKind(k), tab: 'home', cartbar: true })],
-  [/^#\/shop\/([\w-]+)$/, id => ({ html: vShop(id), tab: 'home', cartbar: true })],
+  [/^#\/shop\/([\w-]+)$/, id => ({ html: vShop(id), tab: 'home', dock: shopDock(id), after: spyTabs })],
   [/^#\/cart$/, () => ({ html: vCart(), tab: 'cart', dock: cartDock() })],
   [/^#\/checkout$/, () => ({ html: vCheckout(), flow: true, dock: checkoutDock() })],
   [/^#\/orders$/, () => ({ html: vOrders(), tab: 'profile' })],
@@ -65,8 +65,10 @@ on('product', el => { openProduct(el.dataset.shop, el.dataset.pid); return false
 on('plus', el => {
   const s = shopById(el.dataset.shop), p = productIn(s, el.dataset.pid);
   if (bumpSimple(s, p, 1) === 'other') { askReplace(() => { add(s, p, {}, true); render(); }); return false; }
+  if (sheetOpen()) refreshProduct();
 });
-on('minus', el => { const s = shopById(el.dataset.shop); bumpSimple(s, productIn(s, el.dataset.pid), -1); });
+on('minus', el => { const s = shopById(el.dataset.shop); bumpSimple(s, productIn(s, el.dataset.pid), -1); if (sheetOpen()) refreshProduct(); });
+on('shopInfo', el => { shopInfo(el.dataset.id); return false; });
 on('ifMissing', el => { C.cart.ifMissing = el.value; save(); return false; });
 on('cutlery', el => { C.cart.cutlery = el.checked; save(); return false; });
 on('cartComment', el => { C.cart.comment = el.value; save(); return false; });

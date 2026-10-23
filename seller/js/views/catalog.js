@@ -73,6 +73,38 @@ export function readImage(file, size) {
   });
 }
 
+// Фото товара для витрины: всегда квадрат, как в приложениях доставки.
+// Почти квадратное фото обрезаем по центру; вытянутое (бутылка, кабель) вписываем целиком
+// и добиваем поля цветом краёв самого фото, чтобы не было заметных полос.
+export const PHOTO_SIZE = 800;   // пока фото хранятся в браузере; на сервере поднимем до 1200
+export function readProductImage(file) {
+  return new Promise((res, rej) => {
+    if (!file || !file.type.startsWith('image/')) return rej(new Error('Это не картинка'));
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => {
+      const N = PHOTO_SIZE, c = document.createElement('canvas'); c.width = c.height = N;
+      const g = c.getContext('2d'), w = img.width, h = img.height, ratio = w / h;
+      if (ratio >= 0.8 && ratio <= 1.25) {
+        const s = Math.min(w, h); g.drawImage(img, (w - s) / 2, (h - s) / 2, s, s, 0, 0, N, N);
+      } else {
+        g.fillStyle = edgeColor(img); g.fillRect(0, 0, N, N);
+        const k = Math.min(N / w, N / h) * 0.94, dw = w * k, dh = h * k;
+        g.drawImage(img, (N - dw) / 2, (N - dh) / 2, dw, dh);
+      }
+      res(c.toDataURL('image/jpeg', 0.82));
+    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = r.result; };
+    r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
+  });
+}
+// средний цвет по краям фото — им заполняем поля
+function edgeColor(img) {
+  const c = document.createElement('canvas'), S = 40; c.width = c.height = S;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0, S, S);
+  const d = g.getImageData(0, 0, S, S).data; let r = 0, gr = 0, b = 0, n = 0;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (x < 2 || y < 2 || x >= S - 2 || y >= S - 2) { const i = (y * S + x) * 4; r += d[i]; gr += d[i + 1]; b += d[i + 2]; n++; }
+  return `rgb(${Math.round(r / n)},${Math.round(gr / n)},${Math.round(b / n)})`;
+}
+
 // ----- импорт из Excel -----
 export function sheetImport() {
   openSheet('Загрузить товары из Excel', `

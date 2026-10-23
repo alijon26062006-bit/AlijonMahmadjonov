@@ -1,4 +1,4 @@
-import { BRAND, FREE_FROM, KINDS } from '../config.js';
+import { BRAND, FREE_FROM, KINDS, kindSrc } from '../config.js';
 import { eta, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
 import { esc } from '../lib/format.js';
@@ -26,7 +26,7 @@ export function bigCard(s) {
   const st = openState(s), d = off(s), fav = C.favShops.includes(s.id);
   return `<article class="big ${st.open ? '' : 'closed'}">
     <button class="big-pic" data-go="#/shop/${s.id}" style="background:${s.color}" aria-label="${esc(s.name)}">
-      <img src="img/kind-${s.kind}.webp" alt="" width="220" height="220" loading="lazy">
+      <img src="${kindSrc(s.kind)}" alt="" width="220" height="220" loading="lazy">
       ${d ? `<span class="badge-off">−${d}%</span>` : ''}${st.open ? '' : `<span class="badge-closed">${esc(st.text)}</span>`}</button>
     <button class="big-fav" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button>
     <button class="big-info" data-go="#/shop/${s.id}"><span class="row between"><b>${esc(s.name)}</b><span class="rate">★ ${ratingText(s)}</span></span>
@@ -40,7 +40,7 @@ const BANNERS = [
   { go: '#/kind/food', t: 'Бесплатная доставка от 200 смн', code: 'ДОСТАВКА 0', img: 'img/intro-bag.webp', bg: '#fce000' },
   { id: 'atir', t: 'Ароматы — только оригиналы', code: 'АТИР', img: 'img/kind-perfume.webp', bg: '#f1e7da' },
 ];
-const WHAT = [['Плов', 'Горячее'], ['Бургеры', 'Бургеры'], ['Овощи', 'Овощи и зелень'], ['Фрукты', 'Фрукты и ягоды'], ['Сладкое', 'Десерты'], ['Ароматы', 'Мужская парфюмерия'], ['Напитки', 'Напитки']];
+const WHAT = [['Плов', 'Горячее'], ['Бургеры', 'Бургеры'], ['Наушники', 'наушники'], ['Чехлы', 'Чехлы'], ['Овощи', 'Овощи и зелень'], ['Фрукты', 'Фрукты и ягоды'], ['Сладкое', 'Десерты'], ['Ароматы', 'Мужская парфюмерия'], ['Напитки', 'Напитки']];
 const FILTERS = [['open', 'Открыто сейчас'], ['sale', 'Акции'], ['fast', 'До 40 минут']];
 const pass = { open: s => openState(s).open, sale: s => off(s) > 0, fast: s => s.prep <= 20 };
 
@@ -66,12 +66,13 @@ export function vHome() {
       <button class="tile tall" data-go="#/kind/food"><img src="img/kind-food.webp" alt="" width="200" height="200"><b>Рестораны</b></button>
       <button class="tile" data-go="#/kind/grocery"><img src="img/kind-grocery.webp" alt="" width="120" height="120"><b>Продукты</b></button>
       <button class="tile" data-go="#/kind/perfume"><img src="img/kind-perfume.webp" alt="" width="120" height="120"><b>Парфюмерия</b></button>
+      <button class="tile wide" data-go="#/kind/tech"><img src="${kindSrc('tech')}" alt="" width="120" height="120"><span><b>Аксессуары</b><small>Наушники, чехлы, зарядки, кабели</small></span></button>
     </div>
     <div class="minis">
       <button class="mini" data-a="filterSale"><span class="m" style="background:#ff5a36;color:#fff">%</span><b>Акции</b></button>
       ${all.slice(0, 3).map(s => `<button class="mini" data-go="#/shop/${s.id}"><span class="m" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}">${esc(s.name.charAt(0))}</span><b>${esc(s.name.split(' ')[0])}</b></button>`).join('')}
     </div>
-    <section class="section">${head('Скидки и не только')}${banner({ id: promo.id, t: `Всё для дома в «${promo.name}»`, code: 'ЗАКАЗАТЬ', img: `img/kind-${promo.kind}.webp`, bg: '#fbefd9' })}</section>
+    <section class="section">${head('Скидки и не только')}${banner({ id: promo.id, t: `Всё для дома в «${promo.name}»`, code: 'ЗАКАЗАТЬ', img: kindSrc(promo.kind), bg: '#fbefd9' })}</section>
     <section class="section">${head('Магазины', '#/kind/grocery')}<div class="logo-row">${all.filter(s => s.kind !== 'food').map(shopTile).join('')}</div></section>
     ${past.length ? `<section class="section">${head('Вы заказывали', '#/orders')}<div class="hscroll">${past.map(bigCard).join('')}</div></section>` : ''}
     <section class="section">${head('Что заказать')}

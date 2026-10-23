@@ -16,13 +16,13 @@ export const kindName = id => KINDS.find(k => k.id === id)?.name || '';
 
 function localShop() {
   const S = readSeller(); if (!S) return null;
-  const sh = S.shop, kind = ['grocery', 'perfume', 'food'].includes(sh.kind) ? sh.kind : 'grocery';
+  const sh = S.shop, kind = ['grocery', 'perfume', 'food', 'tech'].includes(sh.kind) ? sh.kind : 'grocery';
   const likes = {};
   for (const r of S.reviews || []) for (const i of r.items || []) if (i.like != null) { const x = likes[i.pid] ||= { up: 0, all: 0 }; x.all++; if (i.like) x.up++; }
   const products = (S.products || []).filter(p => onSale(p, kind)).map(p => ({
     id: p.id, cat: p.cat, name: p.name, price: p.price, oldPrice: p.oldPrice, unit: p.unit, minStep: p.minStep || 1, stock: p.stock,
     imgs: p.imgs || [], desc: p.desc || '', attrs: p.attrs || {}, variants: p.variants || [], options: p.options || [], labels: p.labels || [], expiry: p.expiry || '',
-    likes: likes[p.id]?.all >= 3 ? Math.round(likes[p.id].up / likes[p.id].all * 100) : null,
+    likes: likes[p.id]?.all >= 3 ? Math.round(likes[p.id].up / likes[p.id].all * 100) : null, likesN: likes[p.id]?.all || 0,
   }));
   const R = rating(S.reviews || []);
   return {

@@ -1,4 +1,4 @@
-import { WEIGHT_UNITS } from '../config.js';
+import { kindSrc, WEIGHT_UNITS } from '../config.js';
 import { qtyInCart, stepOf } from '../model/cart.js';
 import { eta, openState, ratingText } from '../model/catalog.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
@@ -9,7 +9,7 @@ import { ico } from '../ui/dom.js';
 // Общие куски: карточка магазина, карточка товара, шапка с кнопкой «назад»
 
 export const logo = s => `<span class="logo">${s.logo ? `<img src="${s.logo}" alt="">` : esc(s.name.charAt(0))}</span>`;
-export const kindImg = (kind, cls = 'k') => `<img class="${cls}" src="img/kind-${kind}.webp" alt="" width="160" height="160" loading="lazy">`;
+export const kindImg = (kind, cls = 'k') => `<img class="${cls}" src="${kindSrc(kind)}" alt="" width="160" height="160" loading="lazy">`;
 
 export function shopCard(s) {
   const st = openState(s);
@@ -27,21 +27,26 @@ export const attrLine = p => {
 };
 export function priceFrom(p) { return p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price; }
 
-export function productCard(shop, p) {
+// цена со скидкой зелёным, старая — зачёркнута; скидка на картинке суммой, как в приложениях доставки
+export const unitLine = p => attrLine(p) || (WEIGHT_UNITS.includes(p.unit) ? `за 1 ${p.unit}` : `1 ${p.unit}`);
+export const likesLine = p => p.likes ? `<span class="likes">${ico('thumb', 'sm')}${p.likes}%${p.likesN ? ` (${p.likesN})` : ''}</span>` : '';
+
+export function productCard(shop, p, small = false) {
   const q = qtyInCart(p.id), weight = WEIGHT_UNITS.includes(p.unit), complex = p.variants.length || p.options.length;
-  const off = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
-  const meta = attrLine(p) || (weight ? `за 1 ${p.unit}` : p.unit !== 'шт' ? `за 1 ${p.unit}` : '');
+  const save = p.oldPrice && p.oldPrice > p.price ? p.oldPrice - p.price : 0;
+  const ids = `data-shop="${shop.id}" data-pid="${p.id}"`;
+  const qty = weight ? qtyLabel(q, p.unit) : q;
   const ctl = complex
-    ? `<button class="add" data-a="product" data-shop="${shop.id}" data-pid="${p.id}">${q ? `В корзине ${weight ? qtyLabel(q, p.unit) : q}` : `${ico('plus', 'sm')} Выбрать`}</button>`
-    : q ? `<div class="stepper"><button data-a="minus" data-shop="${shop.id}" data-pid="${p.id}" aria-label="Убрать">${ico('minus', 'sm')}</button><span class="num">${weight ? qtyLabel(q, p.unit) : q}</span><button data-a="plus" data-shop="${shop.id}" data-pid="${p.id}" aria-label="Добавить" ${q + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>`
-      : `<button class="add" data-a="plus" data-shop="${shop.id}" data-pid="${p.id}" aria-label="Добавить ${esc(p.name)}">${ico('plus', 'sm')} ${weight ? qtyLabel(stepOf(p), p.unit) : 'В корзину'}</button>`;
-  return `<article class="card">
-    <button class="pic" data-a="product" data-shop="${shop.id}" data-pid="${p.id}" aria-label="${esc(p.name)}">${pic(p)}
-      <span class="tags">${off ? `<span class="tag sale">−${off}%</span>` : ''}${p.labels.slice(0, 1).map(l => `<span class="tag">${esc(l)}</span>`).join('')}</span></button>
-    <div class="price num">${p.variants.length ? '<span class="tiny muted">от</span>' : ''}<b class="${off ? 'sale' : ''}">${money(priceFrom(p))}</b>${off ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
-    <button class="name" data-a="product" data-shop="${shop.id}" data-pid="${p.id}">${esc(p.name)}</button>
-    <span class="meta">${esc(meta) || '&nbsp;'}</span>
-    ${ctl}
+    ? `<button class="fab ${q ? 'on' : ''}" data-a="product" ${ids} aria-label="${q ? `В корзине: ${qty}. Изменить` : 'Выбрать и добавить'}">${q ? `<span class="num">${qty}</span>` : ico('plus')}</button>`
+    : q ? `<div class="fab-step"><button data-a="minus" ${ids} aria-label="Убрать">${ico('minus', 'sm')}</button><span class="num">${qty}</span><button data-a="plus" ${ids} aria-label="Добавить" ${q + stepOf(p) > p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div>`
+      : `<button class="fab" data-a="plus" ${ids} aria-label="Добавить ${esc(p.name)}">${ico('plus')}</button>`;
+  return `<article class="card ${small ? 'small' : ''}">
+    <div class="pic-wrap"><button class="pic" data-a="product" ${ids} aria-label="${esc(p.name)}">${pic(p)}</button>
+      ${save ? `<span class="off">−${money(save)}</span>` : p.labels[0] ? `<span class="lbl-tag">${esc(p.labels[0])}</span>` : ''}${ctl}</div>
+    <div class="price num">${p.variants.length ? '<span class="from">от</span>' : ''}<b class="${save ? 'sale' : ''}">${money(priceFrom(p))}</b>${save ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
+    <button class="name" data-a="product" ${ids}>${esc(p.name)}</button>
+    <span class="meta">${esc(unitLine(p))}</span>
+    ${small ? '' : likesLine(p)}
   </article>`;
 }
 

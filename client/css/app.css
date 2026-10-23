@@ -427,3 +427,120 @@ h2 { font-size: clamp(26px, 7.2vw, 30px); }
 .mini .m, .logo-tile .lt { box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini .m, :root:not([data-theme="light"]) .logo-tile .lt { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); } }
 :root[data-theme="dark"] .mini .m, :root[data-theme="dark"] .logo-tile .lt { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+
+/* ===== карточка товара как в приложениях доставки ===== */
+.grid { gap: 22px 12px; }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }
+.card { gap: 4px; }
+.pic-wrap { position: relative; }
+.card .pic { aspect-ratio: 1; border-radius: var(--r-big); background: #f5f5f4; }
+.card .pic > img { object-fit: cover; }
+.card .pic .art { background-blend-mode: multiply; }
+.off { position: absolute; left: 10px; top: 10px; background: #1fa055; color: #fff; font-weight: 600; font-size: 15px; padding: 3px 9px; border-radius: 10px; line-height: 1.3; }
+.off.static { position: static; display: inline-block; }
+.lbl-tag { position: absolute; left: 10px; top: 10px; background: #fff; color: #21201f; font-weight: 600; font-size: 13px; padding: 3px 9px; border-radius: 10px; }
+.fab { position: absolute; right: 8px; bottom: 8px; width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; color: #21201f; display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.12); transition: transform .12s ease-out; }
+.fab .ico { width: 26px; height: 26px; stroke-width: 2.2; }
+.fab:active { transform: scale(.92); }
+.fab.on { background: var(--accent); font-weight: 800; font-size: 15px; }
+.fab-step { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 52px; border-radius: 26px; background: var(--accent); color: #21201f; display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; text-align: center; font-weight: 800; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+.fab-step button { border: 0; background: none; height: 52px; display: grid; place-items: center; color: inherit; }
+.card .price { margin-top: 6px; gap: 6px; }
+.card .price b { font-size: 20px; font-weight: 700; }
+.card .price b.sale { color: #1fa055; }
+.card .price s { font-size: 15px; }
+.card .price .from { font-size: 14px; color: var(--muted); }
+.card .name { font-size: 16px; min-height: 0; -webkit-line-clamp: 2; }
+.card .meta { font-size: 14.5px; }
+.likes { display: inline-flex; align-items: center; gap: 4px; font-size: 14.5px; font-weight: 600; }
+.likes .ico { width: 16px; height: 16px; }
+.card .add, .card .stepper { display: none; }
+.card.small .pic { border-radius: 20px; }
+.card.small .fab { width: 40px; height: 40px; right: 6px; bottom: 6px; }
+.card.small .fab .ico { width: 20px; height: 20px; }
+.card.small .fab-step { height: 40px; grid-template-columns: 34px 1fr 34px; left: 4px; right: 4px; bottom: 4px; font-size: 14px; }
+.card.small .fab-step button { height: 40px; }
+.card.small .price b { font-size: 17px; }
+.card.small .name { font-size: 14.5px; }
+.card.small .off, .card.small .lbl-tag { font-size: 12px; left: 6px; top: 6px; }
+
+/* страница магазина */
+.shop-top { position: sticky; top: 0; z-index: 20; background: var(--bg); margin: 0 calc(-1 * var(--gutter)); padding: 6px 8px; display: grid; grid-template-columns: 48px 1fr 48px 48px; align-items: center; }
+.shop-top .t { text-align: center; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { width: 48px; height: 48px; border: 0; background: none; display: grid; place-items: center; border-radius: 50%; color: var(--ink); }
+.icon-btn .ico { width: 26px; height: 26px; }
+.icon-btn.faved .ico { fill: #ff3b30; stroke: #ff3b30; }
+.shop-name { font-size: clamp(36px, 10vw, 44px); line-height: 1; margin-top: -8px; }
+.shop-info { display: flex; align-items: center; gap: 14px; margin-top: -8px; }
+.si { border: 0; background: none; padding: 0; display: flex; align-items: center; gap: 10px; text-align: left; color: inherit; }
+.si b { display: block; font-size: 17px; font-weight: 600; }
+.si small { display: flex; align-items: center; gap: 2px; color: var(--muted); font-size: 14.5px; }
+.si .ico.xs, .ico.xs { width: 14px; height: 14px; }
+.si-ico .ico { width: 26px; height: 26px; }
+.si.dots { width: 44px; height: 44px; justify-content: center; }
+.sep { width: 1px; height: 36px; background: var(--line); flex: none; }
+.deals { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter); }
+.deals::-webkit-scrollbar { display: none; }
+.deal { flex: 0 0 auto; min-width: 72%; max-width: 320px; border: 0; border-radius: 22px; background: #e5f4ea; color: #1b7c43; display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; column-gap: 12px; align-items: center; padding: 12px 16px; text-align: left; }
+.deal .deal-ico { grid-row: span 2; width: 44px; height: 44px; border-radius: 14px; background: #1fa055; color: #fff; display: grid; place-items: center; }
+.deal b { font-family: var(--f-display); font-size: 28px; font-weight: 800; line-height: 1; }
+.deal small { grid-column: 2; font-size: 13.5px; color: #2c6e48; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deal > .ico:last-child { grid-row: 1 / span 2; grid-column: 3; }
+.utabs { position: sticky; top: 60px; z-index: 15; background: var(--bg); display: flex; gap: 26px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter) 0; border-bottom: 1px solid var(--line); }
+.utabs::-webkit-scrollbar { display: none; }
+.ut { flex: none; border: 0; background: none; padding: 10px 0 12px; font-size: 18px; font-weight: 500; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.ut.on { color: var(--ink); border-bottom-color: var(--ink); }
+.menu-sec { scroll-margin-top: 130px; }
+
+/* полоса бесплатной доставки */
+.deliv { display: grid; grid-template-columns: 40px auto 1fr auto; align-items: center; gap: 10px; background: var(--bg); border-radius: 99px; padding: 6px 10px 6px 6px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.d-ico { width: 40px; height: 40px; border-radius: 50%; background: #1fa055; color: #fff; display: grid; place-items: center; }
+.d-ico .ico { width: 22px; height: 22px; }
+.deliv b { color: #1fa055; font-size: 19px; }
+.d-track { height: 6px; border-radius: 6px; background: #d9efe1; overflow: hidden; }
+.d-track i { display: block; height: 100%; background: #1fa055; border-radius: 6px; transition: width .3s ease-out; }
+.d-free { color: #1fa055; font-weight: 700; border: 2px dashed #1fa055; border-radius: 99px; padding: 2px 10px; font-size: 15px; }
+.d-cap { text-align: center; font-size: 15px; }
+.dock:has(.deliv) { background: var(--bg); padding-top: 10px; box-shadow: 0 -1px 0 var(--line); }
+
+/* окно товара */
+.p-gallery { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: -8px calc(-1 * var(--gutter)) 0; aspect-ratio: 1; max-height: 52dvh; background: #f5f5f4; }
+.p-gallery::-webkit-scrollbar { display: none; }
+.p-gallery > * { flex: none; width: 100%; height: 100%; scroll-snap-align: center; object-fit: contain; }
+.p-gallery .art svg { width: 34%; height: 34%; }
+.p-head { display: flex; flex-direction: column; gap: 8px; }
+.p-title { font-family: var(--f); font-weight: 700; font-size: 22px; letter-spacing: -.01em; }
+.p-desc { font-size: 17px; line-height: 1.45; }
+.grp { display: flex; flex-direction: column; gap: 2px; border-top: 8px solid var(--surface); margin: 0 calc(-1 * var(--gutter)); padding: 16px var(--gutter) 4px; }
+.grp > h2 { margin-bottom: 12px; }
+.grp-t { color: var(--muted); font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.ropt { display: flex; align-items: center; gap: 14px; min-height: 56px; cursor: pointer; font-size: 17px; }
+.ropt input { position: absolute; opacity: 0; pointer-events: none; }
+.ropt .circle { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); flex: none; display: grid; place-items: center; transition: background .15s; }
+.ropt .circle.sq { border-radius: 9px; }
+.ropt input:checked + .circle { background: var(--ink); }
+.ropt input:checked + .circle::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); }
+.ropt input:checked + .circle.sq::after { width: 12px; height: 7px; border-radius: 0; background: none; border-left: 2.5px solid var(--bg); border-bottom: 2.5px solid var(--bg); transform: rotate(-45deg) translate(1px, -1px); }
+.ropt input:focus-visible + .circle { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sheet-foot:has(.pfoot) { padding-top: 10px; }
+.pfoot { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.pf-name { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-price { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.pf-price s { color: var(--muted); font-size: 15px; }
+.pf-price b { font-size: 22px; font-weight: 700; }
+.pf-price b.sale { color: #1fa055; }
+.pf-step { width: 150px; flex: none; min-height: 56px; border-radius: 18px; }
+.pf-step button { height: 56px; }
+.pfoot .btn.primary { min-height: 56px; border-radius: 18px; font-size: 18px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .deal { background: #173322; color: #6fd394; }
+  :root:not([data-theme="light"]) .deal small { color: #9ad7b0; }
+  :root:not([data-theme="light"]) .d-track { background: #1f3a2a; }
+  :root:not([data-theme="light"]) .card .pic, :root:not([data-theme="light"]) .p-gallery { background: #f5f5f4; }
+}
+.tile.wide { grid-column: 1 / -1; flex-direction: row; background: var(--surface); border-radius: var(--r-big); padding: 0 18px 0 0; gap: 14px; justify-content: flex-start; text-align: left; }
+.tile.wide img { width: 34%; aspect-ratio: 1.4 / 1; border-radius: var(--r-big); }
+.tile.wide b { display: block; font-family: var(--f-display); font-size: 24px; font-weight: 800; }
+.tile.wide small { color: var(--muted); font-size: 15px; }
+.sheet-in > * { flex-shrink: 0; }
+.si b { white-space: nowrap; }

@@ -11,6 +11,7 @@ export const KINDS = [
   { id: 'grocery', name: 'Продукты', hint: 'Овощи, молочное, хлеб' },
   { id: 'perfume', name: 'Парфюмерия', hint: 'Духи и косметика' },
   { id: 'food', name: 'Рестораны', hint: 'Готовая еда' },
+  { id: 'tech', name: 'Аксессуары', hint: 'Наушники, чехлы, зарядки' },
 ];
 export const WEIGHT_UNITS = ['кг', 'л'];
 export const CITIES = [
@@ -25,3 +26,5 @@ export const IF_MISSING = [['call', 'Позвонить мне'], ['replace', '�
 export const REVIEW_GOOD = ['Всё как на фото', 'Свежее, качественное', 'Хорошо упаковано', 'Быстро собрали', 'Вежливо'];
 export const REVIEW_BAD = ['Не тот товар', 'Несвежее', 'Не хватало товара', 'Плохо упаковано', 'Долго собирали'];
 export const PROBLEMS = ['Не привезли часть заказа', 'Товар испорчен или с истёкшим сроком', 'Привезли не тот товар', 'Курьер опоздал', 'Другое'];
+// картинка типа магазина: 3D-картинки готовы для трёх типов, для аксессуаров пока рисунок
+export const kindSrc = k => ['grocery', 'perfume', 'food'].includes(k) ? `img/kind-${k}.webp` : `img/kind-${k}.svg`;

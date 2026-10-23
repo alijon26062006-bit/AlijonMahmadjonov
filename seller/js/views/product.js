@@ -1,5 +1,5 @@
 import { render } from '../app.js';
-import { ATTRS, CUR, kindOf, LABELS, NO_EXPIRY_CATS, PERFUME_BRANDS, WEIGHT_STEPS, WEIGHT_UNITS } from '../config.js';
+import { ATTRS, CUR, kindOf, LABELS, NO_EXPIRY_CATS, PERFUME_BRANDS, TECH_BRANDS, WEIGHT_STEPS, WEIGHT_UNITS } from '../config.js';
 import { esc, money, num, today, uid } from '../lib/format.js';
 import { S, save } from '../state.js';
 import { $, closeSheet, ICON, onSheetClose, openSheet, pic, plusI, toast } from '../ui/dom.js';
@@ -12,6 +12,7 @@ const stepNames = kind => ['Фото и название', kind.id === 'food' ? 
 const CONFIRM = {
   grocery: 'Подтверждаю: название, цена, фото и срок годности указаны верно, товар свежий и хранится по правилам',
   perfume: 'Подтверждаю: товар оригинальный, не подделка, бренд, объём, цена и фото указаны верно',
+  tech: 'Подтверждаю: оригинальность, совместимость и гарантия указаны верно, товар новый и исправный',
   food: 'Подтверждаю: название, состав, цена и фото указаны верно',
 };
 const GENDER_BY_CAT = { 'Женская парфюмерия': 'Женский', 'Мужская парфюмерия': 'Мужской', 'Унисекс': 'Унисекс' };
@@ -41,24 +42,24 @@ const money3 = (k, label, v, ph = '0') => field(k, label, `<div class="suffix"><
 
 function stepPhoto(d, kind) {
   const ph = d.imgs.map((src, i) => `<div class="ph"><img src="${src}" alt="Фото ${i + 1}">${i === 0 ? '<span class="main">главное</span>' : `<button type="button" class="mk" data-mainph="${i}" title="Сделать главным" aria-label="Сделать главным">${ICON.star}</button>`}<button type="button" data-rmph="${i}" aria-label="Удалить фото">${ICON.close}</button></div>`).join('');
-  const ex = { grocery: 'Например, Молоко Шароб 3,2% 1 л', perfume: 'Например, Lattafa Khamrah', food: 'Например, Плов праздничный' }[kind.id];
+  const ex = { grocery: 'Например, Молоко Шароб 3,2% 1 л', perfume: 'Например, Lattafa Khamrah', tech: 'Например, Наушники Apple AirPods Pro 2', food: 'Например, Плов праздничный' }[kind.id];
   return `
     <div class="field"><span class="lbl">Фото товара, до 4 штук</span><div class="photos">${ph}${d.imgs.length < 4 ? `<label class="ph" for="pFile">+ Добавить фото</label>` : ''}</div><input type="file" id="pFile" accept="image/*" multiple hidden>
-      <span class="small muted">${d.imgs.length ? 'Первое фото — главное, его видно в каталоге.' : 'Снимайте при дневном свете на светлом фоне: товар целиком, потом упаковку и этикетку.'}</span></div>
+      <span class="small muted">${d.imgs.length ? 'Первое фото — главное, его видно в каталоге.' : 'Фото станет квадратным, как в приложении. Снимайте товар по центру, при дневном свете, на светлом фоне.'}</span></div>
     ${field('name', 'Название *', `<input class="input" id="p_name" name="name" value="${esc(d.name)}" maxlength="80" placeholder="${ex}">`, 'Как товар называется на упаковке, без слов «акция» и «лучший».')}
     <div class="field" data-f="newcat"><label for="p_cat">Категория</label><select class="input" id="p_cat" name="cat">${S.cats.map(c => `<option ${c === d.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__new" ${d.cat === '__new' ? 'selected' : ''}>+ Новая категория…</option></select>
       <input class="input" id="p_newcat" name="newcat" placeholder="Название категории" ${d.cat === '__new' ? '' : 'hidden'} maxlength="30" value="${esc(editing.newcat)}"></div>`;
 }
 
 function stepAttrs(d, kind) {
-  const brands = [...new Set([...(kind.id === 'perfume' ? PERFUME_BRANDS : []), ...S.products.map(p => p.attrs?.brand).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+  const brands = [...new Set([...({ perfume: PERFUME_BRANDS, tech: TECH_BRANDS }[kind.id] || []), ...S.products.map(p => p.attrs?.brand).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
   const rows = (ATTRS[kind.id] || []).map(a => {
     const v = d.attrs[a.k] || '', label = a.label + (a.req ? ' *' : '');
     if (a.opts) return `<div class="field" data-f="a_${a.k}"><span class="lbl">${label}</span><div class="chips wrap" role="radiogroup" aria-label="${a.label}">${a.opts.map(o => `<label class="chip unit-chip"><input type="radio" name="a_${a.k}" value="${o}" ${o === v ? 'checked' : ''}>${o}</label>`).join('')}</div></div>`;
     const chips = a.chips ? `<div class="chips wrap">${a.chips.map(c => `<button type="button" class="chip" data-pfill="p_a_${a.k}" data-v="${c}">${c}</button>`).join('')}</div>` : '';
     return field(`a_${a.k}`, label, `<input class="input" id="p_a_${a.k}" name="a_${a.k}" value="${esc(v)}" placeholder="${a.ph || ''}" ${a.numeric ? 'inputmode="numeric"' : ''} ${a.list ? 'list="brandList" autocomplete="off"' : ''} maxlength="60">${chips}`);
   }).join('');
-  const descPh = { grocery: 'Состав, жирность, условия хранения', perfume: 'Ноты аромата: верхние, сердце, база. Стойкость, сезон', food: 'Состав блюда, с чем подаётся' }[kind.id];
+  const descPh = { grocery: 'Состав, жирность, условия хранения', perfume: 'Ноты аромата: верхние, сердце, база. Стойкость, сезон', tech: 'Характеристики, что в комплекте, как подключать', food: 'Состав блюда, с чем подаётся' }[kind.id];
   return `${rows}
     <datalist id="brandList">${brands.map(b => `<option value="${esc(b)}">`).join('')}</datalist>
     ${field('desc', 'Описание', `<textarea class="input" id="p_desc" name="desc" maxlength="600" placeholder="${descPh}">${esc(d.desc)}</textarea>`)}`;
@@ -79,7 +80,7 @@ function stepPrice(d, kind) {
     ${field('stock', 'Сколько есть сейчас', `<div class="suffix"><input class="input num" id="p_stock" name="stock" inputmode="${weight ? 'decimal' : 'numeric'}" value="${d.stock ?? ''}"><span>${esc(d.unit)}</span></div>`)}
     <details class="more" ${d.variants.length ? 'open' : ''} data-f="variants"><summary>Варианты товара ${d.variants.length ? `(${d.variants.length})` : ''}</summary>
       <div class="col">
-        <span class="small muted">${kind.id === 'perfume' ? 'Например, один аромат в объёмах 30, 50 и 100 мл.' : 'Например, яйца по 10 или 30 штук, плов на одного или на компанию.'} У каждого варианта своя цена.</span>
+        <span class="small muted">${kind.id === 'perfume' ? 'Например, один аромат в объёмах 30, 50 и 100 мл.' : kind.id === 'tech' ? 'Например, один чехол в разных цветах или для разных моделей телефона.' : 'Например, яйца по 10 или 30 штук, плов на одного или на компанию.'} У каждого варианта своя цена.</span>
         <div class="variants" id="variants">${d.variants.map(v => variantRow(v)).join('')}</div>
         <div><button type="button" class="btn sm" data-act="addvar">${plusI} Добавить вариант</button></div>
       </div></details>
@@ -134,7 +135,7 @@ function markErrors(errs) {
   if (first) { first.scrollIntoView({ block: 'center' }); if (first.matches('.input')) first.focus(); }
 }
 
-export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="${kindOf(S.shop).id === 'perfume' ? 'Например, 50 мл' : 'Название, напр. 30 шт'}" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
+export const variantRow = v => `<div class="variant" data-vid="${v.id}"><input class="input vn" placeholder="${{ perfume: 'Например, 50 мл', tech: 'Например, iPhone 15, чёрный' }[kindOf(S.shop).id] || 'Название, напр. 30 шт'}" value="${esc(v.name)}" aria-label="Название варианта"><div class="suffix"><input class="input num vp" inputmode="decimal" placeholder="Цена" value="${v.price ?? ''}" aria-label="Цена варианта"><span>${CUR}</span></div><div class="suffix"><input class="input num vc" inputmode="decimal" placeholder="Закупка" value="${v.cost ?? ''}" aria-label="Закупочная цена варианта"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmvar="${v.id}" aria-label="Удалить вариант">${ICON.close}</button></div>`;
 export const optionRow = o => `<div class="variant opt-row" data-oid="${o.id}"><input class="input on" placeholder="Например, Без лука" value="${esc(o.name)}" aria-label="Название добавки"><div class="suffix"><input class="input num op" inputmode="decimal" placeholder="0" value="${o.price || ''}" aria-label="Доплата"><span>${CUR}</span></div><button type="button" class="iconbtn" data-rmopt="${o.id}" aria-label="Удалить добавку">${ICON.close}</button></div>`;
 const readOptions = () => [...document.querySelectorAll('#options .opt-row')].map(el => ({ id: el.dataset.oid, name: el.querySelector('.on').value.trim(), price: num(el.querySelector('.op').value) ?? 0 }));
 export function readVariants() {
@@ -196,7 +197,7 @@ function check(step) {
 function autofill() {
   const d = editing.draft, kind = kindOf(S.shop), a = d.attrs;
   if (!a.brand && kind.id !== 'food') {
-    const known = [...PERFUME_BRANDS, ...S.products.map(p => p.attrs?.brand).filter(Boolean)].sort((x, y) => y.length - x.length);
+    const known = [...PERFUME_BRANDS, ...TECH_BRANDS, ...S.products.map(p => p.attrs?.brand).filter(Boolean)].sort((x, y) => y.length - x.length);
     const hit = known.find(b => d.name.toLowerCase().startsWith(b.toLowerCase() + ' ') || d.name.toLowerCase() === b.toLowerCase());
     if (hit) a.brand = hit;
   }

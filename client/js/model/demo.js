@@ -64,6 +64,23 @@ export const DEMO_SHOPS = [
     ],
   },
   {
+    id: 'gadget', tile: { bg: '#2b59ff', fg: '#ffffff' }, name: 'Gadget Point', kind: 'tech', about: 'Наушники, чехлы и зарядки. Оригиналы с гарантией', rating: 4.7, count: 318, prep: 15, minOrder: 0,
+    address: 'Душанбе, ТЦ «Пайкар», павильон 12', schedule: week('09:00', '22:00'), color: '#e6ecfb',
+    products: [
+      P('Беспроводные наушники', 'Apple AirPods Pro 2', 2390, 'шт', { attrs: { brand: 'Apple', compat: 'iPhone, Android', origin: 'Оригинал', warranty: '12', color: 'Белый' }, labels: ['Хит'], likes: 96, desc: 'Активное шумоподавление, MagSafe-кейс с USB-C. Запечатанная коробка.' }),
+      P('Беспроводные наушники', 'Xiaomi Redmi Buds 5', 290, 'шт', { attrs: { brand: 'Xiaomi', origin: 'Оригинал', warranty: '6' }, oldPrice: 350, variants: [{ id: 'bk', name: 'Чёрные', price: 290 }, { id: 'wh', name: 'Белые', price: 290 }], likes: 91 }),
+      P('Наушники', 'JBL Tune 520BT', 520, 'шт', { attrs: { brand: 'JBL', origin: 'Оригинал', warranty: '12', power: 'до 57 часов' } }),
+      P('Чехлы', 'Чехол силиконовый для iPhone 15', 90, 'шт', { attrs: { brand: 'Apple', compat: 'iPhone 15', origin: 'Копия высокого качества' }, variants: [{ id: 'b', name: 'Чёрный', price: 90 }, { id: 'p', name: 'Розовый', price: 90 }, { id: 'n', name: 'Синий', price: 90 }], likes: 88 }),
+      P('Чехлы', 'Чехол-книжка Samsung A55', 75, 'шт', { attrs: { compat: 'Samsung A55', origin: 'Без бренда' } }),
+      P('Защитные стёкла и плёнки', 'Защитное стекло 9D', 35, 'шт', { attrs: { compat: 'iPhone 13–15', origin: 'Без бренда' }, desc: 'Наклеим бесплатно, если заберёте сами', labels: ['Хит'], likes: 94 }),
+      P('Зарядные устройства', 'Зарядка Baseus 20 Вт Type-C', 140, 'шт', { attrs: { brand: 'Baseus', power: '20 Вт', compat: 'Type-C', origin: 'Оригинал', warranty: '6' }, oldPrice: 170 }),
+      P('Кабели и переходники', 'Кабель Type-C — Lightning 1 м', 60, 'шт', { attrs: { brand: 'Hoco', power: '1 м, 20 Вт', compat: 'Lightning', origin: 'Оригинал' } }),
+      P('Пауэрбанки', 'Пауэрбанк Xiaomi 10 000 мАч', 260, 'шт', { attrs: { brand: 'Xiaomi', power: '10 000 мАч, 22,5 Вт', origin: 'Оригинал', warranty: '6' }, likes: 93 }),
+      P('Портативные колонки', 'JBL Flip 6', 1290, 'шт', { attrs: { brand: 'JBL', origin: 'Оригинал', warranty: '12' } }),
+      P('Держатели и подставки', 'Держатель в авто на решётку', 85, 'шт', { attrs: { brand: 'Borofone', compat: 'Универсальный', origin: 'Оригинал' } }),
+    ],
+  },
+  {
     id: 'rohat', tile: { bg: '#f3e3cf', fg: '#7a3e12' }, name: 'Чайхона Рохат', kind: 'food', about: 'Национальная кухня: плов, шашлык, самбуса', rating: 4.7, count: 870, prep: 30, minOrder: 40,
     address: 'Душанбе, ул. Рудаки 84', schedule: week('10:00', '23:00'), color: '#fbe6d4',
     products: [
@@ -92,4 +109,4 @@ export const DEMO_SHOPS = [
   },
 ];
 // товары с одинаковой картинкой не путаем между магазинами
-for (const s of DEMO_SHOPS) { s.demo = true; s.cats = [...new Set(s.products.map(p => p.cat))]; for (const p of s.products) p.id = s.id + '-' + p.id; }
+for (const s of DEMO_SHOPS) { s.demo = true; for (const p of s.products) if (p.likes) p.likesN = 12 + (p.price * 37) % 380; s.cats = [...new Set(s.products.map(p => p.cat))]; for (const p of s.products) p.id = s.id + '-' + p.id; }

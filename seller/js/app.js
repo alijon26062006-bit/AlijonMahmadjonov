@@ -5,7 +5,7 @@ import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, KEY, saveAuth, store } from './services/storage.js';
 import { flow, newCount, S, save, setS, ui } from './state.js';
 import { $, app, closeSheet, confirmTwice, ICON, isStopped, NAV, openSheet, showErrors, TABS, toast } from './ui/dom.js';
-import { copyText, doImport, previewImport, readImage, sheetImport, vCatalog } from './views/catalog.js';
+import { copyText, doImport, previewImport, readImage, readProductImage, sheetImport, vCatalog } from './views/catalog.js';
 import { drawProduct, editing, openProduct, saveProduct, submitProduct, syncDraft, updateMargin, variantRow } from './views/product.js';
 import { saveExpense, sheetExpense, vExpenses } from './views/expenses.js';
 import { vFinance } from './views/finance.js';
@@ -155,7 +155,7 @@ document.addEventListener('change', async e => {
   if (id === 'pFile' && t.files.length) {
     syncDraft();
     const room = 4 - editing.draft.imgs.length, files = [...t.files].slice(0, room);
-    try { for (const f of files) editing.draft.imgs.push(await readImage(f, 900)); } catch (err) { toast(err.message); }
+    try { for (const f of files) editing.draft.imgs.push(await readProductImage(f)); } catch (err) { toast(err.message); }
     if (t.files.length > room) toast('Можно не больше 4 фото');
     drawProduct();
   }

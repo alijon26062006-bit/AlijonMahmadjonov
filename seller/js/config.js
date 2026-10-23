@@ -11,6 +11,10 @@ export const SHOP_KINDS = [
     cats: ['Женская парфюмерия', 'Мужская парфюмерия', 'Унисекс', 'Парфюм на разлив', 'Уход за лицом', 'Уход за телом', 'Уход за волосами', 'Макияж',
       'Маникюр', 'Дезодоранты', 'Для бритья', 'Детская косметика', 'Подарочные наборы', 'Аксессуары'],
     icon: '<path d="M9 3h6v4H9zM7 9a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2zM10 14h4"/>' },
+  { id: 'tech', name: 'Аксессуары', hint: 'Наушники, чехлы, зарядки, кабели', units: ['шт', 'компл'],
+    cats: ['Наушники', 'Беспроводные наушники', 'Чехлы', 'Защитные стёкла и плёнки', 'Зарядные устройства', 'Кабели и переходники', 'Пауэрбанки',
+      'Портативные колонки', 'Держатели и подставки', 'Для автомобиля', 'Ремешки для часов', 'Карты памяти и флешки', 'Мыши и клавиатуры', 'Селфи-палки и штативы'],
+    icon: '<path d="M4 15v-3a8 8 0 0 1 16 0v3M4 15h3v5H5a1 1 0 0 1-1-1zM20 15h-3v5h2a1 1 0 0 0 1-1z"/>' },
   { id: 'food', name: 'Ресторан, кафе', hint: 'Готовая еда и напитки', units: ['порция', 'шт'], cats: ['Горячее', 'Супы', 'Салаты', 'Десерты', 'Напитки'],
     icon: '<path d="M4 11h16a8 8 0 0 1-16 0zM12 3v4M8 5v2M16 5v2"/>' },
 ]
@@ -59,6 +63,14 @@ export const ATTRS = {
     { k: 'origin', label: 'Состояние', req: true, opts: ['Новый, в упаковке', 'Тестер', 'Разлив'] },
     { k: 'country', label: 'Страна производства', ph: 'Франция', chips: ['Франция', 'ОАЭ', 'Италия', 'Турция', 'США', 'Россия'] },
   ],
+  tech: [
+    { k: 'brand', label: 'Бренд', req: true, ph: 'Начните вводить: Baseus, Anker, Hoco…', list: true },
+    { k: 'compat', label: 'Для каких устройств', ph: 'iPhone 15, Samsung A55, Type-C, Lightning', chips: ['Type-C', 'Lightning', 'iPhone', 'Samsung', 'Xiaomi', 'Универсальный'] },
+    { k: 'color', label: 'Цвет', ph: 'Чёрный', chips: ['Чёрный', 'Белый', 'Прозрачный', 'Синий', 'Розовый'] },
+    { k: 'power', label: 'Мощность или ёмкость', ph: '20 Вт, 10 000 мАч, кабель 1 м' },
+    { k: 'warranty', label: 'Гарантия, месяцев', numeric: true, ph: '6', chips: ['0', '1', '3', '6', '12'] },
+    { k: 'origin', label: 'Оригинальность', req: true, opts: ['Оригинал', 'Копия высокого качества', 'Без бренда'] },
+  ],
   food: [
     { k: 'portion', label: 'Вес порции, г', numeric: true, ph: '350', chips: ['250', '350', '500'] },
     { k: 'spicy', label: 'Острота', opts: ['Не острое', 'Слегка острое', 'Острое'] },
@@ -91,3 +103,7 @@ export const ROLES = {
   cashier: { name: 'Кассир', hint: 'Заказы, товары, продажи в магазине', views: ['home', 'orders', 'catalog', 'reviews', 'preview', 'more'] },
   picker: { name: 'Сборщик', hint: 'Только заказы: принять, собрать, отдать курьеру', views: ['orders', 'more'] },
 };
+// популярные марки аксессуаров
+export const TECH_BRANDS = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Honor', 'Realme', 'OPPO', 'JBL', 'Marshall', 'Beats', 'Sony', 'Sennheiser', 'Anker', 'Baseus',
+  'Ugreen', 'Hoco', 'Borofone', 'Remax', 'Usams', 'XO', 'Joyroom', 'Spigen', 'ESR', 'Nillkin', 'Belkin', 'Logitech', 'Razer', 'Defender', 'A4Tech',
+  'Kingston', 'SanDisk', 'Transcend', 'Amazfit', 'Haylou', 'QCY', 'Lenovo', 'Edifier'];
