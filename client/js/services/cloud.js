@@ -29,6 +29,10 @@ export function explain(e) {
   const m = e?.message || String(e || '');
   if (/fetch|network|load failed|timed? ?out/i.test(m)) return 'Нет связи с сервером';
   if (/confirm/i.test(m)) return 'Сервер просит подтвердить почту — в Supabase выключите «Confirm email»';
+  // в базе нет нужной таблицы или функции — значит, не применено обновление базы (миграция)
+  if (/schema cache|does not exist|Could not find the (table|function)|PGRST20[0-9]/i.test(m)) return 'Сервер ещё не обновлён для этой функции. Попробуйте позже — администратор уже знает';
+  // технический текст на английском человеку ничего не скажет
+  if (!/[а-яё]/i.test(m)) return 'Сервер ответил ошибкой. Попробуйте ещё раз';
   return m;
 }
 export const isNetErr = e => /fetch|network|load failed|timed? ?out/i.test(e?.message || String(e || ''));
