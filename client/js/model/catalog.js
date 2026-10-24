@@ -1,5 +1,5 @@
 import { KINDS } from '../config.js';
-import { route } from './delivery.js';
+import { inZone, route } from './delivery.js';
 import { today } from '../lib/format.js';
 import { readSeller } from '../services/bridge.js';
 import { DEMO_SHOPS } from './demo.js';
@@ -7,9 +7,10 @@ import { DEMO_SHOPS } from './demo.js';
 // Каталог: магазины-примеры и магазин из кабинета продавца на этом устройстве
 const FRESH = ['Овощи и зелень', 'Фрукты и ягоды'];
 
+/** Магазины, которые видит покупатель: только внутри зоны работы (Шахритусский район). */
 export function shops() {
   const local = localShop();
-  return local ? [local, ...DEMO_SHOPS] : DEMO_SHOPS;
+  return (local ? [local, ...DEMO_SHOPS] : DEMO_SHOPS).filter(inZone);
 }
 export const shopById = id => shops().find(s => s.id === id);
 export const productIn = (shop, pid) => shop?.products.find(p => p.id === pid);

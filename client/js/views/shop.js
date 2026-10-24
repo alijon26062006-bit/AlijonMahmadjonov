@@ -1,5 +1,5 @@
 import { WEIGHT_UNITS } from '../config.js';
-import { feeFor, kmText, route, TARIFF } from '../model/delivery.js';
+import { feeFor, route } from '../model/delivery.js';
 import { add, stepOf, unitPrice } from '../model/cart.js';
 import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
 import { esc, money, qtyLabel, r2 } from '../lib/format.js';
@@ -26,7 +26,7 @@ export function vShop(id) {
       <i class="sep"></i>
       <div class="si"><span class="si-ico">${ico('clock')}</span><span><b>${eta(s)}</b><small>Доставка</small></span></div>
       <i class="sep"></i>
-      <div class="si"><span class="si-ico">${ico('bike')}</span><span><b>${money(feeFor(s))}</b><small>${kmText(route(s).km)} до вас</small></span></div>
+      <div class="si"><span class="si-ico">${ico('bike')}</span><span><b>${money(feeFor(s))}</b><small>до двери</small></span></div>
     </div>
     ${st.open ? `<p class="shop-sub">${esc(st.text)}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</p>`
       : `<div class="notice">${ico('clock', 'sm')}<span><b>${esc(st.text)}.</b> Соберите корзину сейчас — оформим заказ к открытию.</span></div>`}
@@ -51,7 +51,7 @@ export function shopInfo(id) {
     <div class="list">
       <div class="li">${ico('starFill')}<span class="grow"><b>Рейтинг ${ratingText(s)}</b><small>${s.count ? `${s.count} оценок за 3 месяца` : 'Пока мало оценок'}</small></span></div>
       <div class="li">${ico('clock')}<span class="grow"><b>${esc(st.text)}</b><small>Сборка заказа ~${s.prep} мин</small></span></div>
-      <div class="li">${ico('bike')}<span class="grow"><b>Доставка ${money(feeFor(s))} · ${kmText(route(s).km)}</b><small>Такси: ${money(TARIFF.perKm)} за км, минимум ${money(TARIFF.minFee)}${route(s).exact ? '' : ' (примерно: нет метки на карте)'}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</small></span></div>
+      <div class="li">${ico('bike')}<span class="grow"><b>Доставка до двери — ${money(feeFor(s))}</b><small>до 2 км — 15 смн · до 5 км — 20 смн · дальше +2 смн за км${route(s).exact ? '' : ' · поставьте метку на карте — цена станет точной'}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</small></span></div>
       <div class="li">${ico('pin')}<span class="grow"><b>Адрес магазина</b><small>${esc(s.address || '—')}</small></span></div>
     </div>`, { label: s.name });
 }

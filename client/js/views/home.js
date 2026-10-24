@@ -1,5 +1,5 @@
 import { KINDS, kindSrc } from '../config.js';
-import { feeFor, kmText, route } from '../model/delivery.js';
+import { feeFor, route } from '../model/delivery.js';
 import { eta, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
 import { esc, money } from '../lib/format.js';
@@ -27,7 +27,7 @@ export const shopTile = s => `<button class="near" data-go="#/shop/${s.id}">${sh
 /** Строка «★ 4,8 · 35–45 мин · 2,1 км · 9 смн» — всё, по чему выбирают магазин. Цена доставки — по расстоянию до вашего адреса. */
 export function shopMeta(s) {
   const r = route(s);
-  return `<span class="meta-line"><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span>${r.ok ? `<span>${eta(s)}</span><span>${kmText(r.km)}</span><span>${ico('bike', 'xs')}${money(feeFor(s))}</span>` : `<span class="far">Не доставляет на ваш адрес</span>`}</span>`;
+  return `<span class="meta-line"><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span>${r.ok ? `<span>${eta(s)}</span><span>${ico('bike', 'xs')}${money(feeFor(s))}</span>` : `<span class="far">Не доставляет на ваш адрес</span>`}</span>`;
 }
 
 // большая карточка магазина: обложка магазина или фирменный цвет с картинкой раздела
@@ -46,7 +46,7 @@ export function bigCard(s) {
 // акции: без выдуманных промокодов — только то, что правда работает
 const BANNERS = [
   { go: '#/shop/sabz', t: 'Скидки до 18% на фрукты', s: 'Дехкон Маркет', img: 'img/kind-grocery.webp', bg: '#fdf1dc' },
-  { go: '#/kind/food', t: 'Привезёт такси — 10 смн за км', s: 'Цена по расстоянию до вас', img: 'img/intro-bag.webp', bg: '#e6f4ea' },
+  { go: '#/kind/food', t: 'Доставка до двери — от 15 смн', s: 'По всему Шахритусу', img: 'img/intro-bag.webp', bg: '#e6f4ea' },
   { go: '#/shop/atir', t: 'Ароматы — только оригиналы', s: 'Парфюм-хаус Атир', img: 'img/kind-perfume.webp', bg: '#f2ece4' },
 ];
 const FILTERS = [['open', 'Открыто сейчас'], ['sale', 'Со скидкой'], ['fast', 'До 40 минут']];
@@ -66,7 +66,7 @@ export function vHome() {
   const food = all.filter(s => s.kind === 'food');
   return `
     <header class="home-head">
-      <button class="where" data-a="address"><small>Доставка</small><b><span translate="no">${esc(addrShort()) || 'Укажите адрес'}</span>${ico('down', 'sm')}</b></button>
+      <button class="where" data-a="address"><small>Доставка</small><b>${addrShort() ? `<span translate="no">${esc(addrShort())}</span>` : '<span>Укажите адрес</span>'}${ico('down', 'sm')}</b></button>
       <button class="round" data-go="#/favorites" aria-label="Избранное">${ico('heart')}</button>
     </header>
     <button class="search-pill" data-go="#/search">${ico('search')}<span>Найти товар или магазин</span></button>

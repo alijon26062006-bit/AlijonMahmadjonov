@@ -27,18 +27,17 @@ export const SHOP_TYPES = SHOP_KINDS.map(k => k.name);
 export const WEIGHT_UNITS = ['кг', 'л'];
 export const WEIGHT_STEPS = [0.1, 0.25, 0.5, 1];
 
-export const CITIES = [
-  { name: 'Душанбе', lat: 38.5598, lng: 68.7870 },
-  { name: 'Худжанд', lat: 40.2826, lng: 69.6220 },
-  { name: 'Бохтар', lat: 37.8364, lng: 68.7803 },
-  { name: 'Куляб', lat: 37.9146, lng: 69.7845 },
-  { name: 'Истаравшан', lat: 39.9108, lng: 69.0064 },
-  { name: 'Вахдат', lat: 38.5563, lng: 69.0207 },
-  { name: 'Турсунзаде', lat: 38.5108, lng: 68.2303 },
-  { name: 'Гиссар', lat: 38.5266, lng: 68.5512 },
-  { name: 'Пенджикент', lat: 39.4952, lng: 67.6093 },
-  { name: 'Хорог', lat: 37.4897, lng: 71.5530 },
-];
+// Работаем только в Шахритусском районе: центр — посёлок Тус (бывш. Шахритус). Зона — круг 15 км вокруг посёлка.
+// То же значение стоит в приложении покупателя (client/js/config.js) — меняются вместе.
+export const SERVICE_AREA = { name: 'Шахритус', lat: 37.267, lng: 68.133, radiusKm: 15 };
+export const CITIES = [{ name: 'Шахритус', lat: 37.267, lng: 68.133 }];
+/** Точка в зоне работы? Без метки считаем, что магазин в посёлке. */
+export function inZone(p) {
+  if (p?.lat == null || p?.lng == null) return true;
+  const r = d => d * Math.PI / 180, dLat = r(p.lat - SERVICE_AREA.lat), dLng = r(p.lng - SERVICE_AREA.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(SERVICE_AREA.lat)) * Math.cos(r(p.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h)) <= SERVICE_AREA.radiusKm;
+}
 export const LABELS = ['Хит', 'Новинка', 'Выбор магазина', 'К празднику'];
 export const EXP_CATS = ['Аренда', 'Зарплата', 'Закупка товара', 'Доставка товара', 'Коммунальные', 'Реклама', 'Упаковка', 'Прочее'];
 export const CANCEL_REASONS = ['Нет товара', 'Магазин закрыт', 'Не успеваем собрать', 'Клиент попросил отменить', 'Другое'];

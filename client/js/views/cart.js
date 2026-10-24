@@ -1,5 +1,4 @@
 import { IF_MISSING, WEIGHT_UNITS } from '../config.js';
-import { kmText, TARIFF } from '../model/delivery.js';
 import { bump, clear, totals } from '../model/cart.js';
 import { eta, openState } from '../model/catalog.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
@@ -26,7 +25,7 @@ export function vCart() {
         <div class="stepper light"><button data-a="bump" data-key="${esc(r.key)}" data-d="-1" aria-label="Меньше">${ico('minus', 'sm')}</button><span class="num small">${w ? qtyLabel(r.qty, r.p.unit) : r.qty}</span><button data-a="bump" data-key="${esc(r.key)}" data-d="1" aria-label="Больше" ${r.qty >= r.p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div></div>`;
     }).join('')}</div>
     ${T.left ? `<div class="col" style="gap:8px"><span class="small">До минимального заказа <b>${money(T.left)}</b></span><div class="progress"><i style="width:${T.sum / shop.minOrder * 100}%"></i></div></div>`
-      : `<div class="notice info">${ico('bike', 'sm')}<span>До вас ${kmText(T.way.km)} — доставка ${money(T.fee)}. Возит такси, ${money(TARIFF.perKm)} за км.</span></div>`}
+      : `<div class="notice info">${ico('bike', 'sm')}<span>Доставка до двери — ${money(T.fee)}</span></div>`}
     <section class="section"><h3>Если товара не окажется</h3>
       <div class="col" style="gap:8px">${IF_MISSING.map(([k, t]) => `<label class="opt"><input type="radio" name="miss" value="${k}" ${C.cart.ifMissing === k ? 'checked' : ''} data-a="ifMissing"><span class="grow">${t}</span></label>`).join('')}</div>
       ${shop.kind === 'grocery' ? '<span class="small muted">Весовой товар взвешивают при сборке: сумма может немного измениться, разницу вернём.</span>' : ''}</section>

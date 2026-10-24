@@ -1,5 +1,5 @@
 import { go, render } from '../app.js';
-import { CITIES, DAYS, kindOf, SHOP_KINDS } from '../config.js';
+import { CITIES, DAYS, inZone, kindOf, SERVICE_AREA, SHOP_KINDS } from '../config.js';
 import { blankShop } from '../demo.js';
 import { esc, fmtPhone } from '../lib/format.js';
 import { addressAt, locate, mountPicker } from '../lib/map.js';
@@ -157,6 +157,7 @@ function check() {
     if (R.phone.length !== 9) return field('#r_phone', 'Номер из 9 цифр после +992');
   }
   if (R.step === 2 && !R.address.trim()) return field('#r_address', 'Укажите улицу и дом, или поставьте метку на карте');
+  if (R.step === 2 && !inZone(R)) return err(`Пока работаем только в Шахритусском районе — до ${SERVICE_AREA.radiusKm} км от центра посёлка. Поставьте метку там, где магазин`);
   if (R.step === 3) {
     if (!R.delivery && !R.pickup) return err('Включите доставку или самовывоз');
     if (R.from >= R.to) return err('Время закрытия должно быть позже открытия');
@@ -259,6 +260,7 @@ export function sheetPlace() {
 
 function savePlace() {
   if (!P.address.trim()) { toast('Укажите улицу и дом'); return $('#r_address').focus(); }
+  if (!inZone(P)) return toast('Пока работаем только в Шахритусском районе. Поставьте метку там, где магазин');
   Object.assign(S.shop, { city: P.city, lat: P.lat, lng: P.lng, landmark: P.landmark.trim(), address: `${P.city}, ${P.address.trim()}` });
   save(); closeSheet(); render(); toast('Адрес сохранён');
 }

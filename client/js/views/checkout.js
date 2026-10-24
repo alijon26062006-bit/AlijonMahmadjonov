@@ -6,7 +6,7 @@ import { C } from '../state.js';
 import { ico, toast } from '../ui/dom.js';
 import { openAddress, openLogin } from './account.js';
 import { backBar } from './parts.js';
-import { kmText, TARIFF } from '../model/delivery.js';
+import { SERVICE_AREA } from '../config.js';
 
 // Оформление заказа: адрес, время, получатель, оплата
 const chk = { when: 'asap', pay: 'card' };
@@ -28,8 +28,8 @@ export function vCheckout() {
     <section class="section"><h3>Адрес</h3>
       ${a ? `<button class="li list" data-a="address" style="border-radius:var(--r)">${ico('pin')}<span class="grow"><b>${esc(addrLine(a))}</b><small>${esc([a.entrance && 'подъезд ' + a.entrance, a.floor && 'этаж ' + a.floor, a.intercom && 'домофон ' + a.intercom].filter(Boolean).join(', ') || 'Подъезд и этаж не указаны')}${a.landmark ? ' · ' + esc(a.landmark) : ''}</small></span><span class="link">Изменить</span></button>`
         : `<button class="btn primary block" data-a="address">${ico('pin')} Укажите адрес доставки</button>`}
-      ${a ? (T.way.ok ? `<span class="small muted route">${ico('bike', 'xs')} ${kmText(T.way.km)} от магазина · доставка ${T.fee ? money(T.fee) : 'бесплатно'}${T.way.exact ? '' : ' · примерно, поставьте метку на карте — посчитаем точно'}</span>`
-        : `<div class="notice bad">${ico('alert', 'sm')}<span>До адреса ${kmText(T.way.km)} — магазин возит не дальше ${TARIFF.maxKm} км. Выберите другой адрес или магазин ближе.</span></div>`) : ''}</section>
+      ${a ? (T.way.ok ? `<span class="small muted route">${ico('bike', 'xs')} Доставка до двери — ${money(T.fee)}${T.way.exact ? '' : ' · поставьте метку на карте — цена станет точной'}</span>`
+        : `<div class="notice bad">${ico('alert', 'sm')}<span>Этот адрес вне зоны доставки. Пока возим только по Шахритусскому району — до ${SERVICE_AREA.radiusKm} км от центра посёлка.</span></div>`) : ''}</section>
     <section class="section"><h3>Когда доставить</h3>
       ${sl.length ? `<div class="chips">${sl.map(([k, t]) => `<button class="chip" data-a="when" data-v="${k}" aria-pressed="${chk.when === k}">${t}</button>`).join('')}</div>` : '<div class="notice bad">Магазин не работает ближайшие сутки. Выберите другой магазин.</div>'}
       ${!openState(shop).open && sl.length ? `<span class="small muted">Магазин сейчас закрыт — соберёт заказ к выбранному времени.</span>` : ''}</section>

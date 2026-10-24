@@ -59,6 +59,10 @@ export function demo() {
     if (bad && Date.now() - r.ts > 5 * 864e5) Object.assign(r, { reply: REPLY_TEMPLATES[2], replyTs: r.ts + 36e5 });
     reviews.push(r);
   }
+  // в примере всегда есть свежий плохой отзыв без ответа — чтобы было видно, как на него отвечать
+  const last = orders.filter(o => o.source === 'app' && o.status === 'done' && o.ts + 3 * 36e5 < Date.now()).sort((x, y) => y.ts - x.ts)[0];
+  if (last && !reviews.some(r => r.rating <= 3 && !r.reply)) reviews.push({ id: uid(), orderId: last.id, orderNo: last.no, ts: last.ts + 3 * 36e5, name: last.customer.name, rating: 2,
+    tags: [REVIEW_BAD[4]], text: 'Ждал почти час, помидоры помялись', items: last.items.map(i => ({ pid: i.pid, name: i.name, like: false })) });
   const expenses = [];
   const E = (back, cat, amount, note) => expenses.push({ id: uid(), date: addDays(today(), -back), cat, amount, note });
   E(30, 'Аренда', 2500, 'Аренда магазина'); E(28, 'Закупка товара', 3200, 'Овощи с базы'); E(21, 'Закупка товара', 2800, 'Фрукты, молочное');
@@ -68,7 +72,7 @@ export function demo() {
   expenses.forEach(e => { if (e.cat === 'Закупка товара') e.stockPurchase = true; });
   return {
     v: 2, demo: true,
-    shop: { name: 'Бозори Сабз', type: 'Продукты', kind: 'grocery', city: 'Душанбе', landmark: 'Напротив ЦУМа', phone: '+992 93 555 12 34', address: 'Душанбе, пр. Рудаки 45', about: 'Свежие овощи и фрукты каждый день.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), alif: { terminal: '200001', status: 'connected', holder: 'ИП Каримов Шерали', tin: '510012345' } },
+    shop: { name: 'Бозори Сабз', type: 'Продукты', kind: 'grocery', city: 'Шахритус', lat: 37.2655, lng: 68.1345, landmark: 'Рядом с рынком', phone: '+992 93 555 12 34', address: 'Шахритус, центр', about: 'Свежие овощи и фрукты каждый день.', logo: '', paused: false, minOrder: 50, delivery: true, pickup: true, prep: 30, schedule: DAYS.map((_, i) => ({ open: true, from: i === 6 ? '09:00' : '08:00', to: '21:00' })), alif: { terminal: '200001', status: 'connected', holder: 'ИП Каримов Шерали', tin: '510012345' } },
     cats: [...SHOP_KINDS[0].cats],
     products, orders, expenses, reviews, staff: [], nextNo: no + 1,
   };
