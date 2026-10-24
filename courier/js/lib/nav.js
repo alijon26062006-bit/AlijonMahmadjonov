@@ -12,7 +12,7 @@ export function straightKm(a, b) {
 const hasPin = p => p?.lat != null && p?.lng != null;
 /** Примерно по дороге, км (как считает база), или null, если одна из точек неизвестна. */
 export const roadKm = (a, b) => hasPin(a) && hasPin(b) ? Math.max(0.1, Math.round(straightKm(a, b) * ROAD_FACTOR * 10) / 10) : null;
-export const kmText = km => km == null ? '' : km < 1 ? `${Math.round(km * 1000 / 10) * 10} м` : `${km.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`;
+export const kmText = km => km == null ? '' : km < 0.05 ? 'рядом' : km < 1 ? `${Math.round(km * 1000 / 10) * 10} м` : `${km.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`;
 
 /**
  * Ссылка на маршрут до точки target. origin — откуда (по умолчанию — где курьер сейчас). Если метки нет — поиск по адресу.

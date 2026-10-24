@@ -20,3 +20,9 @@ export const NAVS = [
 export const WAIT_CLIENT_MIN = 10;
 // дорога длиннее прямой линии примерно на треть — так же считают база и приложение покупателя
 export const ROAD_FACTOR = 1.3;
+
+// Подложка карты (улицы). Сейчас — OpenStreetMap: бесплатно и без ключа, подходит для теста и небольшой нагрузки
+// (условия: https://operations.osmfoundation.org/policies/tiles/ — подпись © OpenStreetMap обязательна).
+// Перед запуском для людей впишите ключ MapTiler (бесплатно: 100 000 запросов в месяц, https://cloud.maptiler.com) —
+// карта сама переключится на него, остальной код менять не нужно.
+export const MAP = { maptilerKey: '' };

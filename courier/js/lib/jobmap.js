@@ -2,9 +2,11 @@
 // Карта живёт в отдельном слое #map-layer вне #app: экран перерисовывается каждые несколько секунд, а карта — нет
 // (не мигает, не сбрасывает масштаб). Библиотека Leaflet лежит в проекте (js/vendor/leaflet) — для APK ничего не нужно.
 //
-// Подложка: CARTO (светлая или тёмная под тему телефона), данные OpenStreetMap.
+// Подложка: OpenStreetMap (без ключа; в тёмной теме перекрашиваем сами) или MapTiler, если вписан ключ в config.js.
 // Маршрут по дорогам: открытый сервер OSRM (для теста; перед запуском заменим на свой или платный).
 // Нет интернета — вместо карты спокойный фон, всё остальное работает.
+
+import { MAP } from '../config.js';
 
 /** @typedef {{ lat: number, lng: number }} Pt */
 
@@ -43,9 +45,14 @@ function useTiles() {
   const want = dark();
   if (tiles && tileDark === want) return;
   tiles?.remove();
-  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${want ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, {
-    maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO',
-  }).addTo(map);
+  const key = MAP.maptilerKey;
+  tiles = key
+    ? L.tileLayer(`https://api.maptiler.com/maps/${want ? 'streets-v2-dark' : 'streets-v2'}/256/{z}/{x}/{y}.png?key=${key}`,
+      { maxZoom: 19, attribution: '&copy; MapTiler &copy; OpenStreetMap' })
+    : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+  tiles.addTo(map);
+  // у OpenStreetMap нет тёмной подложки — перекрашиваем плитки фильтром (у MapTiler тёмная своя)
+  layer().classList.toggle('dark-tiles', want && !key);
   tileDark = want;
 }
 

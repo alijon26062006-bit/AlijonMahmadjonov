@@ -249,6 +249,8 @@ body:has(.page.no-tabs.has-bar) .toast { bottom: calc(100px + env(safe-area-inse
 /* ---------- доставка: карта на весь экран + карточка снизу ---------- */
 /* Слои: карта (0) → кнопки над картой (5) → карточка (10) → шторки (50) → подсказки (80). */
 #map-layer { position: fixed; inset: 0; z-index: 0; background: var(--surface); }
+/* тёмная тема для OpenStreetMap: инвертируем плитки, точки и маршрут не трогаем */
+#map-layer.dark-tiles .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.92) saturate(.6); }
 #map-layer.nomap { background: radial-gradient(circle at 50% 35%, var(--surface-2), var(--surface) 70%); }
 body.has-map { overflow: hidden; }
 .job-page { padding: 0; max-width: none; min-height: 100dvh; position: relative; z-index: 1; pointer-events: none; }
