@@ -72,7 +72,7 @@ server {
     index index.html;
 
     # наружу отдаём только сам кабинет
-    location ~ ^/(supabase|README\.md|package\.json|deploy\.sh) { return 404; }
+    location ~ ^/(supabase|README\.md|package\.json|deploy\.sh|uninstall\.sh) { return 404; }
     location / { try_files \$uri \$uri/ =404; }
 
     # код браузер сверяет с сервером при каждом открытии: после обновления у всех сразу новая версия
