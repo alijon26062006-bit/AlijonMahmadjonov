@@ -63,7 +63,10 @@ export function view(o) {
     status = o.cancelled ? 'cancelled' : s < 12 ? 'new' : s < 35 ? 'accepted' : s < 50 ? 'ready' : 'done';
   }
   if (o.cancelled) status = 'cancelled';
-  const stage = status === 'cancelled' ? -1 : o.receivedAt || o.row?.receivedAt ? 4 : { new: 0, accepted: 1, ready: 2, done: 3 }[status];
+  // курьер взял заказ: едет в магазин — этап «передают курьеру», забрал — «в пути», передал — доставлен
+  const cs = o.row?.courierStatus;
+  const stage = status === 'cancelled' ? -1 : o.receivedAt || o.row?.receivedAt || cs === 'delivered' ? 4
+    : cs === 'picked' || cs === 'at_client' ? 3 : cs === 'going' || cs === 'at_shop' ? Math.max(2, { new: 0, accepted: 1, ready: 2, done: 3 }[status]) : { new: 0, accepted: 1, ready: 2, done: 3 }[status];
   const shop = shopById(o.shopId);
   const rows = [];
   for (const i of items) {
@@ -76,6 +79,7 @@ export function view(o) {
   return {
     o, status, stage, rows, subs, sum, fee, total: r2(sum + fee), diff: r2(o.sum - sum), shop,
     waiting: subs.some(x => x.i.sub.status === 'wait'), reason: sel?.cancelReason || o.cancelReason || '',
+    courier: o.row?.courier || null, cstep: cs || null,
     eta: o.ts + ((shop?.prep || 30) + (shop ? route(shop, o.addr).min : 15)) * 60000,
   };
 }
@@ -114,4 +118,10 @@ export async function reportProblem(o, reason, text) {
   o.problem = { reason, text, ts: Date.now() };
   if (o.local) updateSeller(S => { const x = S.orders.find(q => q.id === o.id); if (x) x.problem = o.problem; });
   save();
+}
+
+/** Оценка курьера — одна на заказ. */
+export async function rateCourier(o, rating) {
+  await act('buyer_rate_courier', { p_order: o.id, p_rating: rating });
+  o.courierRated = rating; save();
 }

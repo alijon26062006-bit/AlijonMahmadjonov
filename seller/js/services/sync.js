@@ -71,6 +71,7 @@ const fromOrder = (r, op) => {
     pay: app ? (r.pay === 'card' ? 'Онлайн' : 'Наличные курьеру') : r.pay, readyIn: r.ready_in, acceptedAt: ms(r.accepted_at), receivedAt: ms(r.received_at),
     client: app, ifMissing: r.if_missing, fee: n(r.fee), km: n(r.km), problem: r.problem || undefined, paid: n(r.total),
     whenLabel: r.when_label || '',
+    courier: r.courier || null, courierStatus: r.courier_status || null,
   };
 };
 const fromReview = r => ({ id: r.id, cloud: true, orderId: r.order_id, orderNo: n(r.order_no), ts: ms(r.created_at), name: r.name, rating: r.rating, tags: r.tags || [],

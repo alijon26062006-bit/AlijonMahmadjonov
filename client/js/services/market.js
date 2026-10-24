@@ -84,7 +84,8 @@ export async function logout() { uid = null; ordersChan?.unsubscribe(); ordersCh
 // ---------- заказы ----------
 /** Что меняет магазин в заказе: этап, сборка, причина отмены. */
 export const rowOf = r => ({ status: r.status, items: (r.items || []).map(i => ({ ...i, qty: n(i.qty), price: n(i.price) })), cancelReason: r.cancel_reason || '',
-  receivedAt: ms(r.received_at), acceptedAt: ms(r.accepted_at), readyIn: r.ready_in, problem: r.problem || null });
+  receivedAt: ms(r.received_at), acceptedAt: ms(r.accepted_at), readyIn: r.ready_in, problem: r.problem || null,
+  courier: r.courier || null, courierStatus: r.courier_status || null, courierRating: r.courier_rating ?? null });
 
 /** Оформить заказ: цены, остатки и доставку база проверяет сама. */
 export async function placeCloud(args) {
@@ -152,4 +153,26 @@ export function startMarket({ render, onSale }) {
   setInterval(() => { if (!document.hidden && recent().some(o => !o.row?.receivedAt && o.row?.status !== 'cancelled')) refreshOrders(); }, 15000);
   addEventListener('online', () => { reload(); refreshOrders(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { soon(); refreshOrders(); } });
+}
+
+// ---------- курьер заказа: код получения и где он сейчас ----------
+const codes = {}, where = {}, asked = {};
+/** Код получения (4 цифры) — покупатель называет его курьеру. Пока не загрузился — null, загрузка идёт сама. */
+export function courierCode(id) {
+  if (codes[id] || asked['c' + id] > Date.now() - 10000) return codes[id] || null;
+  asked['c' + id] = Date.now();
+  auth().then(() => db().rpc('buyer_code', { p_order: id })).then(r => { if (r?.data) { codes[id] = r.data; onChange(); } }).catch(() => {});
+  return null;
+}
+/** Где курьер: { lat, lng, at } или null. Обновляется не чаще раза в 8 секунд, пока экран заказа открыт. */
+export function courierWhere(id) {
+  if (!(asked['w' + id] > Date.now() - 8000)) {
+    asked['w' + id] = Date.now();
+    auth().then(() => db().rpc('order_courier_where', { p_order: id })).then(r => {
+      const p = r?.data, old = where[id];
+      where[id] = p ? { lat: Number(p.lat), lng: Number(p.lng), at: ms(p.at) } : null;
+      if (JSON.stringify(old) !== JSON.stringify(where[id])) onChange();
+    }).catch(() => {});
+  }
+  return where[id] || null;
 }

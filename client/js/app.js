@@ -4,7 +4,8 @@ import { add, bumpSimple, totals } from './model/cart.js';
 import { onSale, productIn, shopById } from './model/catalog.js';
 import { view } from './model/orders.js';
 import { SELLER_KEY } from './services/bridge.js';
-import { startMarket } from './services/market.js';
+import { courierWhere, startMarket } from './services/market.js';
+import { showTrack } from './lib/track.js';
 import { C, save, ui } from './state.js';
 import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } from './ui/dom.js';
 import { addressActions, loginActions, openAddress, openLogin } from './views/account.js';
@@ -42,10 +43,14 @@ export function render() {
   if (!r) { location.replace('#/'); return; }
   const T = totals(), active = C.orders.some(o => { const v = view(o); return v.stage >= 0 && v.stage < 4; });
   const dock = r.dock || (r.cartbar ? cartBar() : ''), tabs = !r.flow && !r.notabs;
+  const keepTrack = $('#track');   // живая карта курьера переживает перерисовку — без мигания
   app.innerHTML = `<main class="page ${tabs ? '' : 'no-tabs'} ${dock ? 'has-bar' : ''}" id="main">${r.html}</main>
     ${dock ? `<div class="dock ${tabs ? 'over-tabs' : ''}">${dock}</div>` : ''}
     ${!tabs ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
   if (enter) { $('#main').classList.add('enter', enter); enter = ''; }
+  const ph = $('#track');
+  if (ph && keepTrack && keepTrack.dataset.id === ph.dataset.id) ph.replaceWith(keepTrack);
+  if ($('#track')) { const o = C.orders.find(x => x.id === $('#track').dataset.id), at = o && courierWhere(o.id); if (at) showTrack($('#track'), { courier: at, home: o.addr?.lat != null ? { lat: o.addr.lat, lng: o.addr.lng } : null }); }
   r.after?.();
   topBtn();
 }

@@ -61,6 +61,10 @@ export function orderCard(o) {
     ${o.receivedAt ? `<span class="pill">Покупатель получил заказ — деньги ваши</span>` : ''}
     ${o.problem ? `<div class="alert bad small"><span><b>Покупатель сообщил о проблеме:</b> ${esc(o.problem.reason)}${o.problem.text ? ' — ' + esc(o.problem.text) : ''}</span></div>` : ''}
     ${o.customer ? `<div class="who" translate="no">${esc(o.customer.name)} · ${esc(o.customer.phone)}${o.delivery === 'courier' ? '<br>' + esc(o.customer.address) : ''}</div>` : ''}
+    ${o.courier && o.courierStatus !== 'delivered' ? `<div class="courier-line"><span class="c-ava" aria-hidden="true">${esc(o.courier.name.charAt(0).toUpperCase())}</span>
+      <span class="grow"><b>${{ going: 'Курьер едет к вам', at_shop: 'Курьер у вас в магазине', picked: 'Курьер забрал заказ', at_client: 'Курьер у покупателя', returned: 'Курьер везёт заказ обратно' }[o.courierStatus] || 'Курьер'}</b>
+        <small translate="no">${esc(o.courier.name)} · ${esc(o.courier.car || '')} · ${esc(o.courier.plate || '')}</small></span>
+      ${o.courier.phone ? `<a class="btn sm" href="tel:${esc(o.courier.phone.replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
   </article>`;
 }

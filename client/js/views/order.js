@@ -1,7 +1,9 @@
 import { REVIEW_BAD, REVIEW_GOOD, PROBLEMS, WEIGHT_UNITS } from '../config.js';
 import { add, clear } from '../model/cart.js';
 import { productIn, shopById } from '../model/catalog.js';
-import { addrLine, answerSub, cancel, received, reportProblem, sendReview, STAGES, view } from '../model/orders.js';
+import { addrLine, answerSub, cancel, rateCourier, received, reportProblem, sendReview, STAGES, view } from '../model/orders.js';
+import { kmText, straightKm } from '../model/delivery.js';
+import { courierCode, courierWhere } from '../services/market.js';
 import { esc, hhmm, money, qtyLabel, whenText } from '../lib/format.js';
 import { C } from '../state.js';
 import { $, closeSheet, ico, openSheet, starFill, toast, twice } from '../ui/dom.js';
@@ -11,6 +13,26 @@ import { backBar, logo } from './parts.js';
 const TITLES = ['Магазин получил заказ', 'Собираем ваш заказ', 'Передаём курьеру', 'Курьер в пути', 'Заказ доставлен'];
 const q = (n, unit) => WEIGHT_UNITS.includes(unit) ? qtyLabel(n, unit) : `${n} ${unit || 'шт'}`;
 const find = id => C.orders.find(o => o.id === id);
+// что делает курьер — заголовок вместо общего этапа
+const COURIER_TITLES = { going: 'Курьер едет в магазин', at_shop: 'Курьер забирает заказ', picked: 'Курьер в пути', at_client: 'Курьер у вашей двери' };
+const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+/** Кто везёт, код получения и курьер на карте. */
+function courierBlock(o, v) {
+  const c = v.courier; if (!c || v.stage < 2 || v.stage > 3) return '';
+  const code = courierCode(o.id), at = courierWhere(o.id), home = o.addr?.lat != null ? { lat: o.addr.lat, lng: o.addr.lng } : null;
+  const far = at && home ? Math.max(0.1, Math.round(straightKm(at, home) * 1.3 * 10) / 10) : null;
+  return `<section class="courier-card">
+      <span class="ava" aria-hidden="true">${esc(initials(c.name))}</span>
+      <span class="grow"><b translate="no">${esc(c.name)}</b><small><span translate="no">${esc(c.car || '')}</span>${c.plate ? ` · <b class="plate" translate="no">${esc(c.plate)}</b>` : ''}</small>
+        ${c.rating_count ? `<small>${ico('starFill', 'xs')} ${Number(c.rating).toLocaleString('ru-RU', { minimumFractionDigits: 1 })}</small>` : ''}</span>
+      ${c.phone ? `<a class="round call" href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}" aria-label="Позвонить курьеру">${ico('phone')}</a>` : ''}
+    </section>
+    ${at ? `<div class="track" id="track" data-id="${o.id}" role="img" aria-label="Курьер на карте"></div>
+      <span class="small muted track-note">${ico('bike', 'xs')} ${far != null ? `Курьер в ${kmText(far)} от вас` : 'Курьер на карте'} · обновляется само</span>` : ''}
+    <section class="code-card"><small>Код для курьера</small><b class="code num" translate="no">${code || '····'}</b>
+      <small>Назовите его курьеру, когда он отдаст заказ. Без кода курьер не сможет закрыть заказ — так никто не отметит доставку за вас</small></section>`;
+}
 
 export function vOrder(id) {
   const o = find(id);
@@ -20,11 +42,13 @@ export function vOrder(id) {
     : o.when && o.when.at > Date.now() + 15 * 60000 && v.stage < 2 ? `Привезём ${o.when.label.toLowerCase()}` : `Привезём примерно к ${hhmm(v.eta)}`;
   return `${backBar(`Заказ № ${o.no}`, v.stage >= 3 ? `<button class="round" data-a="problem" data-id="${o.id}" aria-label="Сообщить о проблеме">${ico('help')}</button>` : '', '#/orders')}
     <section class="status-hero">
-      <div class="col" style="gap:6px"><h1>${v.stage < 0 ? 'Заказ отменён' : TITLES[v.stage]}</h1><span class="muted">${esc(sub)}</span></div>
+      <div class="col" style="gap:6px"><h1>${v.stage < 0 ? 'Заказ отменён' : v.stage < 4 && COURIER_TITLES[v.cstep] || TITLES[v.stage]}</h1><span class="muted">${esc(sub)}</span></div>
       ${v.stage >= 0 ? `<div class="steps" aria-label="Этап ${v.stage + 1} из 5: ${STAGES[v.stage]}">${STAGES.map((_, i) => `<i class="${i < v.stage || v.stage === 4 ? 'on' : i === v.stage ? 'now' : ''}"></i>`).join('')}</div>` : ''}
       ${v.stage === 3 ? `<button class="btn primary block" data-a="received" data-id="${o.id}">${ico('check')} Заказ получил</button><span class="tiny muted">После этого деньги уйдут магазину. Если что-то не так — нажмите «?» вверху.</span>` : ''}
       ${v.stage === 0 ? `<button class="btn block" data-a="cancelOrder" data-id="${o.id}">Отменить заказ</button>` : ''}
     </section>
+    ${courierBlock(o, v)}
+    ${v.stage === 4 && v.courier && !o.row?.courierRating && !o.courierRated ? `<section class="status-hero"><h3>Оцените курьера <span translate="no">${esc(v.courier.name)}</span></h3><div class="stars-pick">${[1, 2, 3, 4, 5].map(s => `<button data-a="rateCourier" data-id="${o.id}" data-v="${s}" aria-label="${s} из 5">${starFill}</button>`).join('')}</div></section>` : ''}
     ${v.subs.filter(x => x.i.sub.status === 'wait').map(({ i, n }) => `<section class="sub-ask"><b>В магазине нет «${esc(i.name)}»</b>
       <span>Предлагают замену: <b>${esc(i.sub.name)}</b> × ${q(i.sub.qty, i.sub.unit)} — ${money(i.sub.qty * i.sub.price)}${i.sub.price > i.price ? ' (дороже)' : ''}</span>
       <div class="grid2"><button class="btn" data-a="subNo" data-id="${o.id}" data-n="${n}">Не надо</button><button class="btn dark" data-a="subYes" data-id="${o.id}" data-n="${n}">Согласен</button></div></section>`).join('')}
@@ -81,6 +105,7 @@ export const orderActions = {
   cancelOrder: el => { if (!twice(el, 'Нажмите ещё раз, чтобы отменить')) return false; return done(el, cancel(find(el.dataset.id)), 'Заказ отменён'); },
   subYes: el => done(el, answerSub(find(el.dataset.id), +el.dataset.n, true), 'Замену согласовали'),
   subNo: el => done(el, answerSub(find(el.dataset.id), +el.dataset.n, false), 'Позицию уберут из заказа'),
+  rateCourier: el => done(el, rateCourier(find(el.dataset.id), +el.dataset.v), 'Спасибо! Курьер увидит оценку'),
   rate: el => { R = { id: el.dataset.id, rating: +el.dataset.v, tags: [], likes: {}, text: '' }; drawRate(); return false; },
   rateSet: el => { keepText(); R.rating = +el.dataset.v; R.tags = []; drawRate(); return false; },
   rateTag: el => { keepText(); const t = el.dataset.v; R.tags = R.tags.includes(t) ? R.tags.filter(x => x !== t) : [...R.tags, t]; drawRate(); return false; },

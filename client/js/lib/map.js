@@ -4,7 +4,7 @@
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet';
 let loading = null;
 
-function loadLeaflet() {
+export function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
   if (loading) return loading;
   loading = new Promise((resolve, reject) => {

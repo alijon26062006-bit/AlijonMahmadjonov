@@ -683,3 +683,9 @@ body { font-weight: 500; }
 .sync-bar.error { background: var(--bad-soft); color: var(--bad); }
 .sync-bar.connecting { background: var(--surface); color: var(--muted); }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+
+/* курьер на карточке заказа */
+.courier-line { display: flex; gap: 10px; align-items: center; background: var(--accent-soft, #fff7cc); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+.courier-line .c-ava { width: 36px; height: 36px; border-radius: 50%; background: var(--accent, #fce000); color: #1f1e1c; display: grid; place-items: center; font-weight: 800; flex: none; }
+.courier-line b { display: block; font-size: 14.5px; }
+.courier-line small { display: block; color: var(--muted); font-size: 13px; }
