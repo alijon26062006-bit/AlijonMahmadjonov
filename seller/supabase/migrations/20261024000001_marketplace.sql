@@ -8,12 +8,15 @@
 -- Покупатель не может сам вписать цену: заказ создаёт функция place_order, она берёт цены из базы,
 -- считает доставку и списывает остаток. Свои действия покупатель делает тоже только через функции.
 
--- ---------- убираем первую схему ----------
-drop table if exists public.order_items, public.orders, public.product_variants, public.products,
-  public.categories, public.expenses, public.shops cascade;
-drop function if exists private.owns_shop(uuid) cascade;
-drop function if exists public.owns_shop(uuid) cascade;
-drop function if exists public.touch_updated_at() cascade;
+-- ---------- первая схема: таблицы пустые, переименовываем в old_*, ничего не удаляя ----------
+alter table if exists public.shops            rename to old_shops;
+alter table if exists public.categories       rename to old_categories;
+alter table if exists public.products         rename to old_products;
+alter table if exists public.product_variants rename to old_product_variants;
+alter table if exists public.orders           rename to old_orders;
+alter table if exists public.order_items      rename to old_order_items;
+alter table if exists public.expenses         rename to old_expenses;
+alter index if exists public.products_shop_idx rename to old_products_shop_idx;
 
 create schema if not exists private;
 revoke all on schema private from public, anon;
@@ -60,9 +63,10 @@ create table public.shop_private (
 );
 
 -- владелец ли текущий пользователь этого магазина — для политик доступа
-create function private.owns_shop(p_shop uuid)
+-- имя параметра как в первой схеме, чтобы функцию можно было заменить, не удаляя
+create or replace function private.owns_shop(p_shop_id uuid)
 returns boolean language sql stable security definer set search_path = ''
-as $$ select exists (select 1 from public.shops s where s.id = p_shop and s.owner_id = (select auth.uid())); $$;
+as $$ select exists (select 1 from public.shops s where s.id = p_shop_id and s.owner_id = (select auth.uid())); $$;
 revoke execute on function private.owns_shop(uuid) from public, anon;
 grant execute on function private.owns_shop(uuid) to authenticated;
 
@@ -281,9 +285,10 @@ begin
     v_sum := v_sum + round(v_price * v_qty, 2);
     v_items := v_items || jsonb_build_object('pid', v_prod.id, 'sku', v_prod.sku, 'name', v_prod.name, 'unit', v_prod.unit,
       'variant', coalesce(v_var ->> 'name', ''), 'qty', v_qty, 'price', v_price, 'opts', v_opts);
+    v_cost := null;
     select case when v_var is not null then (pp.variant_costs ->> (v_var ->> 'id'))::numeric else pp.cost end into v_cost
       from public.product_private pp where pp.product_id = v_prod.id;
-    v_costs := v_costs || to_jsonb(v_cost);
+    v_costs := v_costs || coalesce(to_jsonb(v_cost), 'null'::jsonb);
     update public.products set stock = stock - v_qty where id = v_prod.id;
   end loop;
 
@@ -312,7 +317,7 @@ declare v public.orders;
 begin
   select * into v from public.orders where id = p_order and buyer_id = auth.uid() for update;
   if not found then raise exception 'Заказ не найден'; end if;
-  if v.items -> p_n -> 'sub' ->> 'status' <> 'wait' then return; end if;
+  if coalesce(v.items -> p_n -> 'sub' ->> 'status', '') <> 'wait' then return; end if;
   update public.orders set items = jsonb_set(jsonb_set(items, array[p_n::text, 'sub', 'status'], to_jsonb(case when p_yes then 'ok' else 'no' end)),
     array[p_n::text, 'picked'], 'false'::jsonb) where id = p_order;
 end;
@@ -399,7 +404,9 @@ create policy shops_delete on public.shops for delete to authenticated using (ow
 create policy shop_private_owner on public.shop_private for all to authenticated
   using ((select private.owns_shop(shop_id))) with check ((select private.owns_shop(shop_id)));
 
-create policy products_read on public.products for select to anon, authenticated using (active or (select private.owns_shop(shop_id)));
+-- гость без входа не имеет доступа к схеме private, поэтому чтение витрины и чтение владельцем — отдельные правила
+create policy products_read on public.products for select to anon, authenticated using (active);
+create policy products_read_owner on public.products for select to authenticated using ((select private.owns_shop(shop_id)));
 create policy products_insert on public.products for insert to authenticated with check ((select private.owns_shop(shop_id)));
 create policy products_update on public.products for update to authenticated using ((select private.owns_shop(shop_id))) with check ((select private.owns_shop(shop_id)));
 create policy products_delete on public.products for delete to authenticated using ((select private.owns_shop(shop_id)));
@@ -419,7 +426,8 @@ create policy order_private_owner on public.order_private for all to authenticat
   using ((select private.owns_shop(shop_id))) with check ((select private.owns_shop(shop_id)));
 
 create policy reviews_read on public.reviews for select to anon, authenticated
-  using (coalesce((complaint ->> 'hidden')::boolean, false) = false or (select private.owns_shop(shop_id)));
+  using (coalesce((complaint ->> 'hidden')::boolean, false) = false);
+create policy reviews_read_owner on public.reviews for select to authenticated using ((select private.owns_shop(shop_id)));
 create policy reviews_update on public.reviews for update to authenticated
   using ((select private.owns_shop(shop_id))) with check ((select private.owns_shop(shop_id)));
 
