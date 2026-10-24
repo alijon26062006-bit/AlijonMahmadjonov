@@ -68,7 +68,9 @@ b, strong { font-weight: 700; }
 .page.no-tabs { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
 .page.no-tabs.has-bar { padding-bottom: calc(108px + env(safe-area-inset-bottom)); }
 .section { display: flex; flex-direction: column; gap: 12px; }
-.sec-head, .section-head { display: flex; align-items: center; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+.sec-head, .section-head { display: flex; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.sec-head h2 { min-width: 0; }
+.section-head { flex-wrap: wrap; }
 .all { border: 0; background: none; min-height: 44px; padding: 0 0 0 12px; font-weight: 600; font-size: 15px; color: var(--muted); display: inline-flex; align-items: center; gap: 2px; flex: none; }
 .link { border: 0; background: none; padding: 6px 0; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--surface-2); }
 .li .link { text-decoration: none; background: var(--bg); border-radius: 99px; padding: 6px 12px; font-size: 14px; flex: none; }
@@ -227,44 +229,46 @@ b, strong { font-weight: 700; }
 .notice.bad { background: var(--bad-soft); }
 .notice.info { background: var(--surface); }
 
-/* ---------- товары ---------- */
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
-@media (min-width: 640px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 980px) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* ---------- товары ----------
+   На телефоне три карточки в ряд, как в маркетплейсах: фото ~110 px, цена, две строки названия.
+   Кнопки на фото визуально 34 px, но зона нажатия расширена до 46 px. */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 8px; }
+@media (min-width: 640px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px 12px; } }
+@media (min-width: 980px) { .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 8px; }
-.card { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .pic-wrap { position: relative; }
-.card .pic { position: relative; display: block; aspect-ratio: 1; border-radius: var(--r); overflow: hidden; background: var(--pic); border: 0; padding: 0; width: 100%; }
+.card .pic { position: relative; display: block; aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden; background: var(--pic); border: 0; padding: 0; width: 100%; }
 .card .pic > img { width: 100%; height: 100%; object-fit: cover; }
 .art { width: 100%; height: 100%; display: grid; place-items: center; background: var(--pic); }
 .art svg { width: 30%; height: 30%; fill: none; stroke: var(--faint); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.off { position: absolute; left: 8px; top: 8px; background: var(--bad); color: #fff; font-weight: 700; font-size: 13px; padding: 2px 8px; border-radius: 8px; line-height: 1.4; }
-.off.static { position: static; display: inline-block; }
-.lbl-tag { position: absolute; left: 8px; top: 8px; background: var(--bg); color: var(--ink); font-weight: 700; font-size: 12.5px; padding: 2px 8px; border-radius: 8px; box-shadow: var(--shadow-1); }
-.fab { position: absolute; right: 6px; bottom: 6px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--bg); color: var(--ink); display: grid; place-items: center; box-shadow: var(--shadow-1); }
-.fab .ico { width: 22px; height: 22px; stroke-width: 2.4; }
-.fab.on { background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 14px; }
-.fab-step { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 44px; border-radius: 22px; background: var(--accent); color: var(--accent-ink); display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; text-align: center; font-weight: 800; font-size: 15px; box-shadow: var(--shadow-1); }
-.fab-step button { border: 0; background: none; height: 44px; display: grid; place-items: center; color: inherit; }
+.off { position: absolute; left: 5px; top: 5px; background: var(--bad); color: #fff; font-weight: 700; font-size: 11.5px; padding: 1px 6px; border-radius: 6px; line-height: 1.45; }
+.off.static { position: static; display: inline-block; font-size: 13px; padding: 2px 8px; }
+.lbl-tag { position: absolute; left: 5px; top: 5px; background: var(--bg); color: var(--ink); font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 6px; box-shadow: var(--shadow-1); }
+.fab { position: absolute; right: 5px; bottom: 5px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--bg); color: var(--ink); display: grid; place-items: center; box-shadow: var(--shadow-1); }
+.fab::after { content: ""; position: absolute; inset: -6px; }
+.fab .ico { width: 18px; height: 18px; stroke-width: 2.4; }
+.fab.on { background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 12.5px; }
+.fab-step { position: absolute; left: 4px; right: 4px; bottom: 4px; height: 34px; border-radius: 17px; background: var(--accent); color: var(--accent-ink); display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; text-align: center; font-weight: 800; font-size: 12.5px; box-shadow: var(--shadow-1); }
+.fab-step button { border: 0; background: none; height: 34px; display: grid; place-items: center; color: inherit; position: relative; }
+.fab-step button::after { content: ""; position: absolute; inset: -6px -2px; }
+.fab-step button .ico { width: 16px; height: 16px; }
 .fab-step button:disabled { opacity: .35; }
-.card .price { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-top: 8px; }
-.card .price b { font-size: 17px; font-weight: 800; }
+.card .price { display: flex; gap: 0 5px; align-items: baseline; flex-wrap: wrap; margin-top: 6px; }
+.card .price b { font-size: 15px; font-weight: 800; }
 .card .price b.sale { color: var(--bad); }
-.card .price s { color: var(--muted); font-size: 13.5px; }
-.card .price .from { font-size: 13.5px; color: var(--muted); }
-.card .name { font-size: 14.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; border: 0; background: none; padding: 0; text-align: left; color: var(--ink); }
-.card .meta { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.likes { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.likes .ico { width: 14px; height: 14px; color: var(--ok); }
+.card .price s { color: var(--muted); font-size: 12px; }
+.card .price .from { font-size: 12px; color: var(--muted); }
+.card .name { font-size: 13px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; border: 0; background: none; padding: 0; text-align: left; color: var(--ink); }
+.card .meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.likes { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.likes .ico { width: 13px; height: 13px; color: var(--ok); }
 .card .add, .card .stepper { display: none; }
-.card.small .pic { border-radius: var(--r-sm); }
-.card.small .fab { width: 36px; height: 36px; right: 4px; bottom: 4px; }
-.card.small .fab .ico { width: 18px; height: 18px; }
-.card.small .fab-step { height: 36px; grid-template-columns: 32px 1fr 32px; left: 4px; right: 4px; bottom: 4px; font-size: 13px; }
-.card.small .fab-step button { height: 36px; }
-.card.small .price b { font-size: 15px; }
-.card.small .name { font-size: 13px; }
-.card.small .off, .card.small .lbl-tag { font-size: 11.5px; left: 4px; top: 4px; }
+@media (min-width: 640px) {
+  .card .pic { border-radius: var(--r); }
+  .fab { width: 40px; height: 40px; right: 6px; bottom: 6px; } .fab-step { height: 40px; grid-template-columns: 36px 1fr 36px; left: 6px; right: 6px; bottom: 6px; border-radius: 20px; font-size: 14px; } .fab-step button { height: 40px; }
+  .card .price b { font-size: 17px; } .card .name { font-size: 14px; }
+}
 .add { border: 0; background: var(--surface); border-radius: var(--r-sm); min-height: 44px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
 .stepper { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; background: var(--accent); border-radius: var(--r-sm); min-height: 44px; color: var(--accent-ink); font-weight: 800; text-align: center; }
 .stepper button { border: 0; background: none; height: 44px; display: grid; place-items: center; color: inherit; }
@@ -518,3 +522,8 @@ body:has(.page.no-tabs.has-bar) .to-top { bottom: calc(96px + env(safe-area-inse
 :root[data-theme="dark"] .mark { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
 .sheet-x { background: var(--bg); box-shadow: var(--shadow-1); }
 .p-gallery.no-photo { aspect-ratio: auto; height: 26dvh; }
+
+/* доставка по расстоянию */
+.route { display: flex; align-items: flex-start; gap: 6px; }
+.route .ico { margin-top: 3px; }
+.meta-line .far { color: var(--bad); font-weight: 600; }

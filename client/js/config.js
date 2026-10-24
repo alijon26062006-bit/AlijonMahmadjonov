@@ -2,10 +2,8 @@
 
 export const BRAND = 'Зуд';
 export const CUR = 'смн';
-// доставка: одна цена по городу, от суммы — бесплатно
-export const DELIVERY_FEE = 10;
+// доставка считается по расстоянию — тариф в model/delivery.js; здесь только порог бесплатной доставки
 export const FREE_FROM = 200;
-export const COURIER_MIN = 15;     // сколько минут курьер в пути, добавляем ко времени сборки магазина
 
 export const KINDS = [
   { id: 'grocery', name: 'Продукты', hint: 'Овощи, молочное, хлеб' },

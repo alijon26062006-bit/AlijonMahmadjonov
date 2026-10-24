@@ -1,9 +1,9 @@
-import { COURIER_MIN } from '../config.js';
 import { fmtPhone, r2, uid } from '../lib/format.js';
 import { readSeller, updateSeller } from '../services/bridge.js';
 import { C, save } from '../state.js';
 import { clear, totals } from './cart.js';
 import { shopById } from './catalog.js';
+import { route } from './delivery.js';
 
 // Заказы покупателя. Заказ в магазин из кабинета на этом устройстве уходит прямо в кабинет продавца,
 // статус и сборку (вес, замены) берём оттуда. Заказы в магазины-примеры проходят этапы сами.
@@ -12,11 +12,12 @@ export const STAGES = ['Магазин получил заказ', 'Собира
 export const addrLine = a => a ? [a.city, a.street, a.house && 'д. ' + a.house, a.apt && 'кв. ' + a.apt].filter(Boolean).join(', ') : '';
 
 export function placeOrder({ pay, when }) {
-  const { shop, rows, sum, fee, total } = totals();
+  const { shop, rows, sum, fee, total, way } = totals();
+  if (!way.ok) throw new Error(`Магазин не возит так далеко: ${way.km} км`);
   const a = C.addr, u = C.user;
   const items = rows.map(r => ({ pid: r.p.id, name: r.p.name, unit: r.p.unit, variant: r.variant, qty: r.qty, price: r.price, cost: null, opts: r.optNames.map(o => ({ name: o.name, price: o.price })) }));
   const comment = [C.cart.comment.trim(), shop.kind === 'food' && C.cart.cutlery ? 'Положите приборы' : ''].filter(Boolean).join('. ');
-  const order = { id: uid(), shopId: shop.id, shopName: shop.name, kind: shop.kind, ts: Date.now(), items, sum, fee, total, pay, when, addr: { ...a }, ifMissing: C.cart.ifMissing, comment, phone: shop.phone || '' };
+  const order = { id: uid(), shopId: shop.id, shopName: shop.name, kind: shop.kind, ts: Date.now(), items, sum, fee, total, km: way.km, pay, when, addr: { ...a }, ifMissing: C.cart.ifMissing, comment, phone: shop.phone || '' };
   if (shop.local) {
     const r = updateSeller(S => {
       const no = S.nextNo++;
@@ -25,7 +26,7 @@ export function placeOrder({ pay, when }) {
         id: order.id, no, ts: order.ts, source: 'app', status: 'new', items: sellerItems, delivery: 'courier', pay: pay === 'cash' ? 'Наличные курьеру' : 'Онлайн',
         customer: { name: u.name || 'Покупатель', phone: '+992 ' + fmtPhone(u.phone), address: [addrLine(a), a.entrance && 'подъезд ' + a.entrance, a.floor && 'этаж ' + a.floor, a.intercom && 'домофон ' + a.intercom, a.landmark && 'ориентир: ' + a.landmark].filter(Boolean).join(', ') },
         comment: [comment, { call: 'Если чего-то нет — позвонить', replace: 'Если чего-то нет — заменить похожим', remove: 'Если чего-то нет — убрать' }[C.cart.ifMissing]].filter(Boolean).join('. '),
-        cancelReason: '', client: true, ifMissing: C.cart.ifMissing, fee,
+        cancelReason: '', client: true, ifMissing: C.cart.ifMissing, fee, km: way.km,
       });
       for (const i of items) { const p = S.products.find(x => x.id === i.pid); if (p) p.stock = Math.max(0, r2(p.stock - i.qty)); }
       return no;
@@ -61,7 +62,7 @@ export function view(o) {
   return {
     o, status, stage, rows, subs, sum, fee, total: r2(sum + fee), diff: r2(o.sum - sum), shop,
     waiting: subs.some(x => x.i.sub.status === 'wait'), reason: sel?.cancelReason || o.cancelReason || '',
-    eta: o.ts + ((shop?.prep || 30) + COURIER_MIN) * 60000,
+    eta: o.ts + ((shop?.prep || 30) + (shop ? route(shop, o.addr).min : 15)) * 60000,
   };
 }
 

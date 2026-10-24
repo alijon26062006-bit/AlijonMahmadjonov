@@ -1,7 +1,8 @@
 import { WEIGHT_UNITS } from '../config.js';
 import { r2 } from '../lib/format.js';
 import { C, save } from '../state.js';
-import { deliveryFee, productIn, shopById } from './catalog.js';
+import { productIn, shopById } from './catalog.js';
+import { feeFor, route } from './delivery.js';
 
 // Корзина: товары одного магазина. Строка = товар + вариант + добавки.
 export const stepOf = p => WEIGHT_UNITS.includes(p.unit) ? (p.minStep || 0.5) : 1;
@@ -52,7 +53,7 @@ export function lines() {
 }
 export function totals() {
   const { shop, rows } = lines();
-  const sum = r2(rows.reduce((s, r) => s + r.sum, 0)), fee = rows.length ? deliveryFee(sum) : 0;
+  const sum = r2(rows.reduce((s, r) => s + r.sum, 0)), fee = rows.length ? feeFor(shop, sum) : 0, way = shop ? route(shop) : null;
   const count = rows.reduce((s, r) => s + (r.p.unit === 'кг' || r.p.unit === 'л' ? 1 : r.qty), 0);
-  return { shop, rows, sum, fee, total: r2(sum + fee), count, left: shop ? Math.max(0, r2(shop.minOrder - sum)) : 0 };
+  return { shop, rows, sum, fee, way, total: r2(sum + fee), count, left: shop ? Math.max(0, r2(shop.minOrder - sum)) : 0 };
 }

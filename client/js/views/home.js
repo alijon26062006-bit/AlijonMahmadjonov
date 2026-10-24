@@ -1,4 +1,5 @@
-import { DELIVERY_FEE, FREE_FROM, KINDS, kindSrc } from '../config.js';
+import { FREE_FROM, KINDS, kindSrc } from '../config.js';
+import { feeFor, kmText, route } from '../model/delivery.js';
 import { eta, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
 import { esc, money } from '../lib/format.js';
@@ -23,8 +24,11 @@ export const shopMark = (s, cls = '') => `<span class="mark ${cls}" style="backg
 // магазин в ленте «рядом»: круглый знак, название, время
 export const shopTile = s => `<button class="near" data-go="#/shop/${s.id}">${shopMark(s)}<b translate="no">${esc(s.name)}</b><small>${eta(s)}</small></button>`;
 
-/** Строка «★ 4,8 · 35–45 мин · доставка 10 смн» — всё, по чему выбирают магазин. */
-export const shopMeta = s => `<span class="meta-line"><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span><span>${eta(s)}</span><span>${ico('bike', 'xs')}${money(DELIVERY_FEE)}</span></span>`;
+/** Строка «★ 4,8 · 35–45 мин · 2,1 км · 9 смн» — всё, по чему выбирают магазин. Цена доставки — по расстоянию до вашего адреса. */
+export function shopMeta(s) {
+  const r = route(s);
+  return `<span class="meta-line"><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span>${r.ok ? `<span>${eta(s)}</span><span>${kmText(r.km)}</span><span>${ico('bike', 'xs')}${money(feeFor(s))}</span>` : `<span class="far">Не доставляет на ваш адрес</span>`}</span>`;
+}
 
 // большая карточка магазина: обложка магазина или фирменный цвет с картинкой раздела
 export function bigCard(s) {

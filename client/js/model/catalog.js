@@ -1,4 +1,5 @@
-import { COURIER_MIN, DELIVERY_FEE, FREE_FROM, KINDS } from '../config.js';
+import { KINDS } from '../config.js';
+import { route } from './delivery.js';
 import { today } from '../lib/format.js';
 import { readSeller } from '../services/bridge.js';
 import { DEMO_SHOPS } from './demo.js';
@@ -27,7 +28,7 @@ function localShop() {
   const R = rating(S.reviews || []);
   return {
     id: 'local', local: true, name: sh.name, kind, about: sh.about || '', logo: sh.logo || '', cover: sh.cover || '', banner: sh.banner || '', rating: R.value, count: R.count, isNew: R.count < 10,
-    prep: sh.prep || 30, minOrder: sh.minOrder || 0, address: sh.address || '', schedule: sh.schedule || [], paused: !!sh.paused, delivery: sh.delivery !== false,
+    prep: sh.prep || 30, city: sh.city || '', lat: sh.lat ?? null, lng: sh.lng ?? null, minOrder: sh.minOrder || 0, address: sh.address || '', schedule: sh.schedule || [], paused: !!sh.paused, delivery: sh.delivery !== false,
     phone: sh.phone || '', color: '#fff6c2', tile: { bg: '#fce000', fg: '#21201f' }, cats: (S.cats || []).filter(c => products.some(p => p.cat === c)).concat([...new Set(products.map(p => p.cat))].filter(c => !(S.cats || []).includes(c))), products,
   };
 }
@@ -61,6 +62,6 @@ export function openState(shop, at = new Date()) {
   for (let i = 1; i <= 7; i++) { const n = shop.schedule[(day + i) % 7]; if (n?.open) return { open: false, text: i === 1 ? `Откроется завтра в ${n.from}` : 'Сегодня не работает' }; }
   return { open: false, text: 'Закрыто' };
 }
-export const eta = shop => `${shop.prep + COURIER_MIN}–${shop.prep + COURIER_MIN + 10} мин`;
-export const deliveryFee = sum => sum >= FREE_FROM ? 0 : DELIVERY_FEE;
+/** Время до двери: сборка в магазине + дорога курьера по расстоянию. */
+export const eta = shop => { const t = shop.prep + route(shop).min; return `${t}–${t + 10} мин`; };
 export const ratingText = s => s.isNew || !s.count ? 'Новый' : s.rating.toLocaleString('ru-RU', { minimumFractionDigits: 1 });
