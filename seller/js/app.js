@@ -24,6 +24,7 @@ import { unansweredBad } from './domain/reviews.js';
 import { can, me, role } from './domain/staff.js';
 import { deleteStaff, saveStaff, sheetStaff, vStaff } from './views/staff.js';
 import { ROLES } from './config.js';
+import { cloud, connect, deleteShop, disconnect, hooks } from './services/sync.js';
 import { setLang, startTranslating, tr } from './i18n.js';
 import { applyTheme, isDark, setTheme } from './services/prefs.js';
 
@@ -48,7 +49,8 @@ export function render() {
     <main class="main"><div class="content" id="page"></div></main>
     <nav class="tabs" aria-label="Разделы">${TABS.filter(([k]) => can(k)).map(btn).join('')}</nav>
   </div>`;
-  const banner = S.demo ? `<div class="alert"><span>Это <b>пример магазина</b> с выдуманными заказами, чтобы посмотреть, как всё работает.</span><button class="btn sm" data-act="reset">Удалить пример и завести свой магазин</button></div>` : '';
+  const sync = !S.demo && cloud.status !== 'ok' && cloud.status !== 'off' ? `<div class="sync-bar ${cloud.status}"><span class="sync-dot"></span>${cloud.status === 'connecting' ? 'Подключаемся к базе…' : cloud.status === 'offline' ? 'Нет связи с сервером. Всё сохраняется на телефоне и уйдёт в базу, когда появится интернет' : esc('Не удалось сохранить в базу: ' + cloud.error)}</div>` : '';
+  const banner = sync + (S.demo ? `<div class="alert"><span>Это <b>пример магазина</b> с выдуманными заказами, чтобы посмотреть, как всё работает.</span><button class="btn sm" data-act="reset">Удалить пример и завести свой магазин</button></div>` : '');
   const V = { finance: vFinance, home: vHome, orders: vOrders, catalog: vCatalog, stats: vStats, expenses: vExpenses, preview: vPreview, shop: vShop, more: vMore, reviews: vReviews, staff: vStaff };
   $('#page').innerHTML = banner + V[view]();
   if (view === 'catalog' && ui.q) { const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
@@ -107,13 +109,13 @@ document.addEventListener('click', async e => {
     return render();
   }
   switch (ds.act) {
-    case 'logout': if (confirmTwice(t, 'Нажмите ещё раз, чтобы выйти')) { auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; view = 'home'; render(); } return;
+    case 'logout': if (confirmTwice(t, 'Нажмите ещё раз, чтобы выйти')) { await disconnect(); setS(null); store.fresh(); auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; view = 'home'; render(); } return;
     case 'alifedit': S.shop.alif.status = 'none'; save(); return render();
     case 'alifok': S.shop.alif.status = 'connected'; save(); render(); return toast('Магазин подключён к Alif');
     case 'demo': setS(demo()); S.shop.owner = auth.phone; save(); return go('home');
     case 'place': return sheetPlace();
     case 'reset': if (confirmTwice(t, 'Нажмите ещё раз — пример удалится')) { store.fresh(); setS(null); render(); } return;
-    case 'wipe': if (confirmTwice(t, 'Точно удалить всё? Нажмите ещё раз')) { store.fresh(); setS(null); render(); } return;
+    case 'wipe': if (confirmTwice(t, 'Точно удалить всё? Нажмите ещё раз')) { try { await deleteShop(); } catch (err) { return toast('Не удалось удалить в базе: ' + err.message); } store.fresh(); setS(null); render(); } return;
     case 'add': return openProduct(null);
     case 'dup': { syncDraft(); const src = editing.draft; closeSheet(); openProduct(null, src); return toast('Это копия. Измените и сохраните'); }
     case 'close': return closeSheet();
@@ -131,7 +133,7 @@ document.addEventListener('click', async e => {
     case 'install': return install();
     case 'addstaff': return sheetStaff();
     case 'savestaff': return saveStaff();
-    case 'logoutnow': auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; return render();
+    case 'logoutnow': await disconnect(); setS(null); store.fresh(); auth.phone = ''; saveAuth(); flow.step = 'phone'; flow.phone = ''; return render();
     case 'docancel': { const o = S.orders.find(x => x.id === ds.id); o.status = 'cancelled'; o.cancelReason = document.querySelector('input[name="reason"]:checked')?.value || ''; changeStockForOrder(o, 1); save(); closeSheet(); render(); return toast(`Заказ № ${o.no} отменён`); }
     case 'pause': S.shop.paused = false; save(); render(); return toast('Снова принимаем заказы');
     case 'import': return sheetImport();
@@ -212,6 +214,7 @@ document.addEventListener('submit', e => {
   if (id === 'codeForm') {
     if ($('#codeIn').value !== flow.code) { $('#codeErr').textContent = 'Неверный код. Проверьте и введите ещё раз'; $('#codeIn').value = ''; return $('#codeIn').focus(); }
     auth.phone = flow.phone; auth.loginAt = Date.now(); saveAuth(); flow.err = ''; render(); toast('Вы вошли');
+    connect(auth.phone);
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
@@ -225,6 +228,13 @@ window.addEventListener('storage', e => {
   setS(next);
   if ($('#sheet').hidden) render(); else refreshSheet?.();
 });
+
+// база: перерисовать экран, когда пришли изменения; о новом заказе — сигнал (звонок крутит alerts.js)
+hooks({
+  render: () => { if (!auth.phone) return; if ($('#sheet').hidden) render(); else refreshSheet?.(); },
+  newOrder: n => toast(n === 1 ? 'Пришёл новый заказ' : `Пришло новых заказов: ${n}`),
+});
+if (auth.phone) connect(auth.phone);
 
 applyTheme();
 startTranslating();

@@ -3,6 +3,7 @@ import { inZone } from '../model/delivery.js';
 import { esc, fmtPhone } from '../lib/format.js';
 import { addressAt, locate, mountPicker } from '../lib/map.js';
 import { C, save } from '../state.js';
+import { login } from '../services/market.js';
 import { $, closeSheet, ico, openSheet, toast } from '../ui/dom.js';
 
 // Адрес доставки и вход по номеру телефона — обе формы в шторке
@@ -101,6 +102,6 @@ export const loginActions = {
   checkCode: () => {
     const v = $('#lgCode').value;
     if (v !== L.code) { $('#lgErr').textContent = 'Неверный код. Проверьте и введите ещё раз'; $('#lgCode').value = ''; $('#lgCode').focus(); return false; }
-    C.user = { phone: L.phone, name: L.name }; save(); const then = L.then; closeSheet(); toast('Вы вошли'); then?.();
+    C.user = { phone: L.phone, name: L.name }; save(); const then = L.then; closeSheet(); toast('Вы вошли'); login(); then?.();
   },
 };

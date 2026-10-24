@@ -25,7 +25,7 @@ export function openProduct(id, copyFrom) {
   const base = { id: uid(), name: '', cat: S.cats[0] || '', price: null, oldPrice: null, cost: null, stock: 10, unit: kindOf(S.shop).units[0], minStep: 0.5, desc: '', imgs: [], active: true, labels: [], prep: null, variants: [], attrs: {}, expiry: '', created: Date.now() };
   const draft = src ? JSON.parse(JSON.stringify(src)) : base;
   draft.attrs ||= {};
-  if (copyFrom) { draft.id = uid(); draft.name = src.name + ' (копия)'; draft.created = Date.now(); draft.variants.forEach(v => { v.id = uid(); }); }
+  if (copyFrom) { delete draft.sku; draft.id = uid(); draft.name = src.name + ' (копия)'; draft.created = Date.now(); draft.variants.forEach(v => { v.id = uid(); }); }
   const isNew = !id || !!copyFrom;
   editing = { isNew, draft, step: 0, reached: isNew ? 0 : LAST, err: {}, bad: new Set(), ok: false, newcat: '' };
   drawProduct();
@@ -118,7 +118,7 @@ export function drawProduct() {
   const back = step ? '<button class="btn" data-pnav="-1">Назад</button>' : '<button class="btn" data-act="close">Отмена</button>';
   const fwd = step < LAST ? `<button class="btn ${isNew ? 'primary' : ''}" data-pnav="1">Далее</button>` : '';
   const saveBtn = step === LAST || !isNew ? `<button class="btn primary" data-act="saveP">${isNew ? 'Добавить товар' : 'Сохранить'}</button>` : '';
-  openSheet(isNew ? 'Новый товар' : 'Изменить товар', `${tabs}<form id="pForm" class="col" novalidate style="gap:16px">${body}<button type="submit" hidden></button></form>`,
+  openSheet(isNew ? 'Новый товар' : 'Изменить товар', `${d.sku ? `<div class="sku-line small muted">Артикул <b class="num">${d.sku}</b> — по нему товар не потеряется в заказах</div>` : isNew ? '<div class="sku-line small muted">Артикул из цифр появится сам, когда сохраните товар</div>' : ''}${tabs}<form id="pForm" class="col" novalidate style="gap:16px">${body}<button type="submit" hidden></button></form>`,
     `<div class="row">${isNew ? '' : `<button class="btn danger" data-act="delete">Удалить</button><button class="btn" data-act="dup">Копия</button>`}</div><div class="row">${back}${fwd}${saveBtn}</div>`);
   markErrors(editing.err);
   if (step === 2) updateMargin();

@@ -24,7 +24,7 @@ export function results() {
   }
   const all = shops();
   const sh = all.filter(s => norm(s.name).includes(q) || norm(s.about).includes(q));
-  const found = all.flatMap(s => s.products.filter(p => norm(`${p.name} ${p.cat} ${p.attrs?.brand || ''}`).includes(q)).map(p => ({ s, p })));
+  const found = all.flatMap(s => s.products.filter(p => norm(`${p.name} ${p.cat} ${p.attrs?.brand || ''} ${p.sku || ''}`).includes(q)).map(p => ({ s, p })));
   found.sort((a, b) => a.p.price - b.p.price);
   if (!sh.length && !found.length) return `<div class="empty"><p>По запросу «${esc(ui.q)}» ничего не нашлось. Проверьте написание или поищите похожее.</p></div>`;
   const cheapest = found.length > 1 ? found[0] : null;

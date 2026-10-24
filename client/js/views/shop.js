@@ -69,7 +69,7 @@ function drawProduct(keep) {
   const imgs = p.imgs?.length ? p.imgs.map(src => `<img src="${src}" alt="${esc(p.name)}">`).join('') : art(p);
   const specs = [['Бренд', a.brand], ['Для устройств', a.compat], ['Для кого', a.gender], ['Тип', a.ptype], ['Объём', a.volume && a.volume + ' мл'], ['Мощность, ёмкость', a.power], ['Цвет', a.color],
     [s.kind === 'tech' ? 'Оригинальность' : 'Состояние', a.origin], ['Гарантия', a.warranty && (a.warranty === '0' ? 'без гарантии' : a.warranty + ' мес.')], ['Упаковка', a.pack], ['Вес порции', a.portion && a.portion + ' г'],
-    ['Острота', a.spicy], ['Страна', a.country], ['Годен до', p.expiry && new Date(p.expiry).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })]].filter(x => x[1]);
+    ['Острота', a.spicy], ['Страна', a.country], ['Годен до', p.expiry && new Date(p.expiry).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })], ['Артикул', p.sku]].filter(x => x[1]);
   const base = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
   const more = s.products.filter(x => x.id !== p.id).sort((x, y) => (y.cat === p.cat) - (x.cat === p.cat)).slice(0, 6);
   const fav = C.favProducts.includes(s.id + '::' + p.id);

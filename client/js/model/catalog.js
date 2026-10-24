@@ -2,13 +2,17 @@ import { KINDS } from '../config.js';
 import { inZone, route } from './delivery.js';
 import { today } from '../lib/format.js';
 import { readSeller } from '../services/bridge.js';
+import { live, market } from '../services/market.js';
 import { DEMO_SHOPS } from './demo.js';
 
-// Каталог: магазины-примеры и магазин из кабинета продавца на этом устройстве
+// Каталог: магазины из общей базы. Пока база ни разу не ответила (нет интернета) —
+// магазины-примеры и магазин из кабинета продавца на этом же устройстве.
 const FRESH = ['Овощи и зелень', 'Фрукты и ягоды'];
 
 /** Магазины, которые видит покупатель: только внутри зоны работы (Шахритусский район). */
 export function shops() {
+  if (live()) return market.shops.filter(inZone);
+  if (market.status === 'loading') return [];
   const local = localShop();
   return (local ? [local, ...DEMO_SHOPS] : DEMO_SHOPS).filter(inZone);
 }
@@ -33,9 +37,11 @@ function localShop() {
     phone: sh.phone || '', color: '#fff6c2', tile: { bg: '#fce000', fg: '#21201f' }, cats: (S.cats || []).filter(c => products.some(p => p.cat === c)).concat([...new Set(products.map(p => p.cat))].filter(c => !(S.cats || []).includes(c))), products,
   };
 }
+/** Первая загрузка витрин из базы ещё идёт. */
+export const loadingShops = () => !live() && market.status === 'loading';
 // те же правила, что в кабинете: товар на стопе, без остатка или с истёкшим сроком покупатель не видит
-function onSale(p, kind) {
-  if (!p.active || p.stock <= 0 || (p.stopUntil && p.stopUntil > Date.now())) return false;
+export function onSale(p, kind) {
+  if (p.active === false || p.stock <= 0 || (p.stopUntil && p.stopUntil > Date.now())) return false;
   if (p.expiry) return p.expiry >= today();
   return !(kind === 'grocery' && !FRESH.includes(p.cat));
 }

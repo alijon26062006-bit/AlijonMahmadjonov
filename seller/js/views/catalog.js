@@ -11,7 +11,7 @@ export function filtered(sales) {
   const q = ui.q.trim().toLowerCase();
   const by = { sales: (a, b) => (sales[b.id] || ZERO).qty - (sales[a.id] || ZERO).qty, new: (a, b) => b.created - a.created, cheap: (a, b) => a.price - b.price, stock: (a, b) => a.stock - b.stock }[ui.psort];
   return S.products.filter(p =>
-    (ui.cat === 'Все' || p.cat === ui.cat) && (!q || p.name.toLowerCase().includes(q)) &&
+    (ui.cat === 'Все' || p.cat === ui.cat) && (!q || p.name.toLowerCase().includes(q) || String(p.sku || '').includes(q)) &&
     (ui.stock === 'all' || (ui.stock === 'low' && p.active && p.stock <= LOW) || (ui.stock === 'hidden' && !p.active) || (ui.stock === 'nophoto' && !p.imgs.length) || (ui.stock === 'sale' && p.oldPrice) || (ui.stock === 'stopped' && isStopped(p)) || (ui.stock === 'expiry' && expiringOrBlocked(p)))
   ).sort(by);
 }
@@ -25,7 +25,7 @@ export function vCatalog() {
   const rows = list.map(p => {
     const from = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
     return `<div class="prow">
-      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname" translate="no">${esc(p.name)}</div><div class="pmeta"><span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${likePill(likes[p.id])}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
+      <button class="open" data-edit="${p.id}">${thumb(p)}<div style="min-width:0"><div class="pname" translate="no">${esc(p.name)}</div><div class="pmeta">${p.sku ? `<span class="sku num">арт. ${p.sku}</span>` : ''}<span>${esc(p.cat || 'Без категории')}</span><span class="pill ${(sales[p.id] || ZERO).qty ? 'info' : 'off'}">Продано за 30 дн: ${(sales[p.id] || ZERO).qty}</span>${stockPill(p)}${expiryPill(p)}${likePill(likes[p.id])}${p.oldPrice ? '<span class="pill bad">Скидка</span>' : ''}${p.labels.map(l => `<span class="pill off">${esc(l)}</span>`).join('')}${p.variants.length ? `<span class="pill off">${p.variants.length} вар.</span>` : ''}${p.imgs.length ? '' : '<span class="pill warn">Нет фото</span>'}</div></div></button>
       <div class="stepper" title="Остаток"><button class="iconbtn" data-stock="${p.id}" data-d="-1" aria-label="Уменьшить остаток">−</button><b class="num">${fmtQty(p.stock)}</b><button class="iconbtn" data-stock="${p.id}" data-d="1" aria-label="Увеличить остаток">+</button><button class="tgl" role="switch" aria-checked="${!isStopped(p)}" data-stop="${p.id}" aria-label="${esc(p.name)}: в наличии сегодня" title="${isStopped(p) ? 'Закончилось на сегодня. Включите, чтобы вернуть в продажу' : 'В продаже. Выключите, если закончилось на сегодня'}"></button></div>
       <div class="price num">${p.variants.length ? 'от ' : ''}${money(from)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : `<small>за ${esc(p.unit)}</small>`}</div>
     </div>`;
@@ -38,7 +38,7 @@ export function vCatalog() {
       <div class="row"><button class="btn" data-act="import">${ICON.import} Из Excel</button><button class="btn" data-act="export">Копировать список</button><button class="btn primary hide-m" data-act="add">${plusI} Добавить товар</button></div></div>
     <button class="btn primary fab" data-act="add">${plusI} Добавить товар</button>
     <div class="toolbar">
-      <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="q" type="search" placeholder="Поиск по названию" value="${esc(ui.q)}" aria-label="Поиск"></div>
+      <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="input" id="q" type="search" placeholder="Название или артикул" value="${esc(ui.q)}" aria-label="Поиск"></div>
       <select class="input" id="stockFilter" style="width:auto" aria-label="Фильтр">
         <option value="all">Все товары</option>
         <option value="low" ${ui.stock === 'low' ? 'selected' : ''}>Заканчиваются (${cnt(p => p.active && p.stock <= LOW)})</option>

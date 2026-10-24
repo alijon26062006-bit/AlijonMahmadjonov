@@ -53,15 +53,17 @@ export function checkoutDock() {
 export const checkoutActions = {
   when: el => { chk.when = el.dataset.v; },
   pay: el => { chk.pay = el.value; },
-  placeOrder: (el, go) => {
+  placeOrder: async (el, go) => {
     if (!C.addr) return openAddress(() => checkoutActions.placeOrder(el, go)), false;
     if (!C.user) return openLogin(() => checkoutActions.placeOrder(el, go)), false;
     const T = totals(); if (T.left) return toast(`Минимальный заказ — ${money(T.shop.minOrder)}`), false;
+    if (el.classList.contains('busy')) return false;   // второе нажатие, пока база думает, не создаст второй заказ
+    el.classList.add('busy'); el.disabled = true;
     try {
       const [label, at] = chk.when.split('|');
-      const o = placeOrder({ pay: chk.pay, when: chk.when === 'asap' ? null : { label, at: +at } });
-      toast(o.local ? 'Заказ отправлен в магазин' : 'Заказ оформлен'); go(`#/order/${o.id}`);
-    } catch (e) { toast(e.message); }
+      const o = await placeOrder({ pay: chk.pay, when: chk.when === 'asap' ? null : { label, at: +at } });
+      toast(o.local || o.cloud ? 'Заказ отправлен в магазин' : 'Заказ оформлен'); go(`#/order/${o.id}`);
+    } catch (e) { toast(e.message); el.classList.remove('busy'); el.disabled = false; }
     return false;
   },
 };

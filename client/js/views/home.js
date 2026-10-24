@@ -1,6 +1,6 @@
-import { KINDS, kindSrc } from '../config.js';
+import { BRAND, KINDS, kindSrc } from '../config.js';
 import { feeFor, route } from '../model/delivery.js';
-import { eta, openState, ratingText, shopById, shops } from '../model/catalog.js';
+import { eta, loadingShops, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
 import { esc, money } from '../lib/format.js';
 import { C, ui } from '../state.js';
@@ -72,8 +72,10 @@ export function vHome() {
     <button class="search-pill" data-go="#/search">${ico('search')}<span>Найти товар или магазин</span></button>
     ${live ? `<button class="live" data-go="#/order/${live.o.id}"><span class="pulse"></span><span class="grow"><b>${STAGES[live.stage]}</b><small>Заказ № ${live.o.no} · ${esc(live.o.shopName)}${live.waiting ? ' · нужен ваш ответ' : ''}</small></span>${ico('right', 'sm')}</button>` : ''}
     ${kindTiles()}
-    <div class="banners">${[...all.filter(s => s.banner).map(s => ({ id: s.id, src: s.banner, t: s.name })), ...BANNERS].map(banner).join('')}</div>
+    <div class="banners">${[...all.filter(s => s.banner).map(s => ({ id: s.id, src: s.banner, t: s.name })), ...BANNERS.filter(b => !b.go.startsWith('#/shop/') || shopById(b.go.slice(7)))].map(banner).join('')}</div>
     ${past.length ? `<section class="section">${head('Вы заказывали', '#/orders')}<div class="hscroll">${past.map(bigCard).join('')}</div></section>` : ''}
+    ${loadingShops() ? '<section class="section" aria-busy="true"><span class="sk card"></span><span class="sk line w60"></span><span class="sk card"></span></section>'
+      : !all.length ? `<section class="section"><div class="empty"><p><b>Магазины скоро появятся</b></p><p class="muted">Продавцы Шахритуса подключаются к ${BRAND}. Загляните чуть позже.</p></div></section>` : `
     <section class="section">${head('Магазины рядом')}<div class="near-row">${all.map(shopTile).join('')}</div></section>
     <section class="section">${head('Все магазины')}
       <div class="filters">
@@ -81,7 +83,7 @@ export function vHome() {
         ${FILTERS.map(([k, t]) => `<button class="fbtn ${ui.f?.[k] ? 'on' : ''}" data-a="filterToggle" data-v="${k}" aria-pressed="${!!ui.f?.[k]}">${t}</button>`).join('')}
       </div>
       <div class="cards">${list.map(bigCard).join('') || '<div class="empty"><p>Под эти фильтры ничего не нашлось.</p></div>'}</div>
-    </section>
+    </section>`}
     ${food.length ? `<section class="section">${head('Рестораны и кафе', '#/kind/food')}<div class="cards">${food.map(bigCard).join('')}</div></section>` : ''}`;
 }
 

@@ -71,23 +71,28 @@ function drawRate() {
 }
 const keepText = () => { if (R && $('#rText')) R.text = $('#rText').value; };
 
+// действие уходит в базу: кнопка ждёт ответа, ошибку показываем словами магазина/базы
+async function done(el, job, ok) {
+  el.disabled = true;
+  try { await job; toast(ok); } catch (e) { toast(e.message); return false; } finally { el.disabled = false; }
+}
 export const orderActions = {
-  received: el => { received(find(el.dataset.id)); toast('Спасибо! Деньги ушли магазину'); },
-  cancelOrder: el => { if (!twice(el, 'Нажмите ещё раз, чтобы отменить')) return false; cancel(find(el.dataset.id)); toast('Заказ отменён'); },
-  subYes: el => { answerSub(find(el.dataset.id), +el.dataset.n, true); toast('Замену согласовали'); },
-  subNo: el => { answerSub(find(el.dataset.id), +el.dataset.n, false); toast('Позицию уберут из заказа'); },
+  received: el => done(el, received(find(el.dataset.id)), 'Спасибо! Деньги ушли магазину'),
+  cancelOrder: el => { if (!twice(el, 'Нажмите ещё раз, чтобы отменить')) return false; return done(el, cancel(find(el.dataset.id)), 'Заказ отменён'); },
+  subYes: el => done(el, answerSub(find(el.dataset.id), +el.dataset.n, true), 'Замену согласовали'),
+  subNo: el => done(el, answerSub(find(el.dataset.id), +el.dataset.n, false), 'Позицию уберут из заказа'),
   rate: el => { R = { id: el.dataset.id, rating: +el.dataset.v, tags: [], likes: {}, text: '' }; drawRate(); return false; },
   rateSet: el => { keepText(); R.rating = +el.dataset.v; R.tags = []; drawRate(); return false; },
   rateTag: el => { keepText(); const t = el.dataset.v; R.tags = R.tags.includes(t) ? R.tags.filter(x => x !== t) : [...R.tags, t]; drawRate(); return false; },
   like: el => { keepText(); const v = el.dataset.v === '1'; R.likes[el.dataset.pid] = R.likes[el.dataset.pid] === v ? undefined : v; drawRate(); return false; },
-  rateSend: () => { keepText(); sendReview(find(R.id), { rating: R.rating, tags: R.tags, text: R.text.trim(), likes: R.likes }); closeSheet(); toast('Спасибо за отзыв!'); },
+  rateSend: async el => { keepText(); if (await done(el, sendReview(find(R.id), { rating: R.rating, tags: R.tags, text: R.text.trim(), likes: R.likes }), 'Спасибо за отзыв!') !== false) closeSheet(); },
   problem: el => {
     openSheet(`<h2>Что случилось?</h2><div class="col" style="gap:8px">${PROBLEMS.map((t, i) => `<label class="opt"><input type="radio" name="prob" value="${t}" ${i ? '' : 'checked'}><span class="grow">${t}</span></label>`).join('')}</div>
       <div class="field"><label for="pText">Подробнее</label><textarea class="input" id="pText" maxlength="500" placeholder="Например: не положили хлеб"></textarea></div>`,
     { label: 'Проблема с заказом', foot: `<button class="btn primary" data-a="problemSend" data-id="${el.dataset.id}">Отправить в поддержку</button>` });
     return false;
   },
-  problemSend: el => { reportProblem(find(el.dataset.id), document.querySelector('input[name="prob"]:checked').value, $('#pText').value.trim()); closeSheet(); toast('Отправили. Поддержка свяжется с вами'); },
+  problemSend: async el => { if (await done(el, reportProblem(find(el.dataset.id), document.querySelector('input[name="prob"]:checked').value, $('#pText').value.trim()), 'Отправили. Поддержка свяжется с вами') !== false) closeSheet(); },
   repeat: (el, go) => {
     const o = find(el.dataset.id), s = shopById(o.shopId); if (!s) return toast('Магазин больше не работает'), false;
     if (C.cart.items.length && C.cart.shopId !== s.id) clear();

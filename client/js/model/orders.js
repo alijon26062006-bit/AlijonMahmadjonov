@@ -1,24 +1,36 @@
 import { fmtPhone, r2, uid } from '../lib/format.js';
 import { readSeller, updateSeller } from '../services/bridge.js';
+import { act, placeCloud, rowOf } from '../services/market.js';
 import { C, save } from '../state.js';
 import { clear, totals } from './cart.js';
 import { shopById } from './catalog.js';
 import { route } from './delivery.js';
 
-// Заказы покупателя. Заказ в магазин из кабинета на этом устройстве уходит прямо в кабинет продавца,
-// статус и сборку (вес, замены) берём оттуда. Заказы в магазины-примеры проходят этапы сами.
+// Заказы покупателя. Заказ в магазин из базы уходит прямо в кабинет этого продавца (place_order),
+// статус и сборку (вес, замены) магазин меняет в базе, а мы показываем. Без интернета: заказ в кабинет
+// на этом же устройстве идёт через память браузера, а заказы в магазины-примеры проходят этапы сами.
 
 export const STAGES = ['Магазин получил заказ', 'Собирают заказ', 'Передают курьеру', 'Курьер в пути', 'Доставлен'];
 export const addrLine = a => a ? [a.city, a.street, a.house && 'д. ' + a.house, a.apt && 'кв. ' + a.apt].filter(Boolean).join(', ') : '';
 
-export function placeOrder({ pay, when }) {
+export async function placeOrder({ pay, when }) {
   const { shop, rows, sum, fee, total, way } = totals();
   if (!way.ok) throw new Error(`Магазин не возит так далеко: ${way.km} км`);
   const a = C.addr, u = C.user;
   const items = rows.map(r => ({ pid: r.p.id, name: r.p.name, unit: r.p.unit, variant: r.variant, qty: r.qty, price: r.price, cost: null, opts: r.optNames.map(o => ({ name: o.name, price: o.price })) }));
   const comment = [C.cart.comment.trim(), shop.kind === 'food' && C.cart.cutlery ? 'Положите приборы' : ''].filter(Boolean).join('. ');
   const order = { id: uid(), shopId: shop.id, shopName: shop.name, kind: shop.kind, ts: Date.now(), items, sum, fee, total, km: way.km, pay, when, addr: { ...a }, ifMissing: C.cart.ifMissing, comment, phone: shop.phone || '' };
-  if (shop.local) {
+  if (shop.cloud) {
+    const r = await placeCloud({
+      p_shop: shop.id, p_items: rows.map(x => ({ pid: x.p.id, vid: x.vid || '', opts: x.opts || [], qty: x.qty })),
+      p_addr: { city: a.city, street: a.street, house: a.house, entrance: a.entrance, floor: a.floor, apt: a.apt, intercom: a.intercom, landmark: a.landmark, lat: a.lat ?? null, lng: a.lng ?? null },
+      p_name: u.name || '', p_phone: '+992 ' + fmtPhone(u.phone), p_pay: pay, p_comment: comment, p_if_missing: C.cart.ifMissing,
+      p_when_at: when ? new Date(when.at).toISOString() : null, p_when_label: when?.label || null,
+    });
+    // цены, доставку и номер заказа считает база — берём её цифры
+    const row = rowOf(r);
+    Object.assign(order, { id: r.id, no: Number(r.no), cloud: true, ts: Date.parse(r.created_at) || order.ts, items: row.items, sum: Number(r.sum), fee: Number(r.fee), total: Number(r.total), km: Number(r.km), row });
+  } else if (shop.local) {
     const r = updateSeller(S => {
       const no = S.nextNo++;
       const sellerItems = items.map(i => ({ ...i, cost: S.products.find(p => p.id === i.pid)?.cost ?? null }));
@@ -41,7 +53,9 @@ export function placeOrder({ pay, when }) {
 /** Заказ с текущим состоянием: этап, строки после сборки, суммы. */
 export function view(o) {
   let status = 'new', items = o.items, sel = null;
-  if (o.local) {
+  if (o.cloud) {
+    sel = o.row; if (sel) { status = sel.status; items = sel.items; }
+  } else if (o.local) {
     sel = readSeller()?.orders.find(x => x.id === o.id);
     if (sel) { status = sel.status; items = sel.items; }
   } else {
@@ -49,7 +63,7 @@ export function view(o) {
     status = o.cancelled ? 'cancelled' : s < 12 ? 'new' : s < 35 ? 'accepted' : s < 50 ? 'ready' : 'done';
   }
   if (o.cancelled) status = 'cancelled';
-  const stage = status === 'cancelled' ? -1 : o.receivedAt ? 4 : { new: 0, accepted: 1, ready: 2, done: 3 }[status];
+  const stage = status === 'cancelled' ? -1 : o.receivedAt || o.row?.receivedAt ? 4 : { new: 0, accepted: 1, ready: 2, done: 3 }[status];
   const shop = shopById(o.shopId);
   const rows = [];
   for (const i of items) {
@@ -66,23 +80,27 @@ export function view(o) {
   };
 }
 
-export function answerSub(o, n, yes) {
+export async function answerSub(o, n, yes) {
+  if (o.cloud) return act('buyer_answer_sub', { p_order: o.id, p_n: n, p_yes: yes });
   updateSeller(S => { const x = S.orders.find(q => q.id === o.id); const i = x?.items[n]; if (i?.sub?.status === 'wait') { i.sub.status = yes ? 'ok' : 'no'; i.picked = false; } });
 }
-export function cancel(o) {
-  if (o.local) updateSeller(S => {
+export async function cancel(o) {
+  if (o.cloud) await act('buyer_cancel', { p_order: o.id });
+  else if (o.local) updateSeller(S => {
     const x = S.orders.find(q => q.id === o.id); if (!x || x.status !== 'new') return;
     x.status = 'cancelled'; x.cancelReason = 'Клиент попросил отменить';
     for (const i of x.items) { const p = S.products.find(q => q.id === i.pid); if (p) p.stock = r2(p.stock + i.qty); }
   });
   o.cancelled = true; o.cancelReason = 'Вы отменили заказ'; save();
 }
-export function received(o) {
+export async function received(o) {
+  if (o.cloud) await act('buyer_received', { p_order: o.id });
   o.receivedAt = Date.now();
   if (o.local) updateSeller(S => { const x = S.orders.find(q => q.id === o.id); if (x) x.receivedAt = o.receivedAt; });
   save();
 }
-export function sendReview(o, { rating, tags, text, likes }) {
+export async function sendReview(o, { rating, tags, text, likes }) {
+  if (o.cloud) await act('buyer_review', { p_order: o.id, p_rating: rating, p_tags: tags, p_text: text, p_likes: likes, p_name: C.user?.name || '' });
   o.review = { rating, tags, text, ts: Date.now() };
   if (o.local) updateSeller(S => {
     const x = S.orders.find(q => q.id === o.id); if (!x) return;
@@ -91,7 +109,8 @@ export function sendReview(o, { rating, tags, text, likes }) {
   });
   save();
 }
-export function reportProblem(o, reason, text) {
+export async function reportProblem(o, reason, text) {
+  if (o.cloud) await act('buyer_problem', { p_order: o.id, p_reason: reason, p_text: text });
   o.problem = { reason, text, ts: Date.now() };
   if (o.local) updateSeller(S => { const x = S.orders.find(q => q.id === o.id); if (x) x.problem = o.problem; });
   save();

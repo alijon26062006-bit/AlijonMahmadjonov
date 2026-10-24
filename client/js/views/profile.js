@@ -3,6 +3,7 @@ import { BRAND } from '../config.js';
 import { productIn, shopById } from '../model/catalog.js';
 import { esc, fmtPhone } from '../lib/format.js';
 import { C, save } from '../state.js';
+import { logout } from '../services/market.js';
 import { ico, toast, twice } from '../ui/dom.js';
 import { backBar, productCard } from './parts.js';
 import { bigCard } from './home.js';
@@ -47,7 +48,7 @@ export const profileActions = {
   theme: el => { C.theme = el.dataset.v; save(); applyTheme(); },
   themeToggle: () => { C.theme = isDark() ? 'light' : 'dark'; save(); applyTheme(); },
   lang: el => { setLang(el.dataset.v); },
-  logout: el => { if (!twice(el, 'Нажмите ещё раз, чтобы выйти')) return false; C.user = null; save(); toast('Вы вышли'); },
+  logout: el => { if (!twice(el, 'Нажмите ещё раз, чтобы выйти')) return false; C.user = null; save(); logout(); toast('Вы вышли'); },
   fav: el => {
     const list = el.dataset.kind === 'shop' ? C.favShops : C.favProducts, id = el.dataset.id, has = list.includes(id);
     if (has) list.splice(list.indexOf(id), 1); else list.push(id);

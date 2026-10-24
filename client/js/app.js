@@ -1,9 +1,10 @@
 import { startTranslating, tr } from './i18n.js';
 import { BRAND } from './config.js';
 import { add, bumpSimple, totals } from './model/cart.js';
-import { productIn, shopById } from './model/catalog.js';
+import { onSale, productIn, shopById } from './model/catalog.js';
 import { view } from './model/orders.js';
 import { SELLER_KEY } from './services/bridge.js';
+import { startMarket } from './services/market.js';
 import { C, save, ui } from './state.js';
 import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } from './ui/dom.js';
 import { addressActions, loginActions, openAddress, openLogin } from './views/account.js';
@@ -127,6 +128,8 @@ function topBtn() {
 }
 addEventListener('scroll', () => { const b = $('#toTop'); if (b) b.hidden = window.scrollY < 1400; }, { passive: true });
 
+// витрины и заказы из общей базы: что-то поменялось — перерисовываем, если покупатель сейчас ничего не вводит
+startMarket({ onSale, render: () => { if (C.onboarded && !sheetOpen() && !document.activeElement?.matches('input,textarea')) render(); } });
 document.title = tr(BRAND + ' — доставка из магазинов рядом');
 startTranslating();
 // первый экран: скелет, пока не загрузился шрифт, чтобы текст не прыгал

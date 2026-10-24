@@ -37,7 +37,7 @@ export function vOrders() {
     </section>`;
 }
 const itemLine = i => {
-  const name = `<span translate="no">${esc(i.name)}</span>${i.variant ? ', ' + esc(i.variant) : ''}`;
+  const name = `<span translate="no">${esc(i.name)}</span>${i.variant ? ', ' + esc(i.variant) : ''}${i.sku ? ` <small class="muted num">арт. ${i.sku}</small>` : ''}`;
   const opts = i.opts?.length ? `<br><small class="muted">${i.opts.map(x => esc(x.name) + (x.price ? ` +${money(x.price)}` : '')).join(', ')}</small>` : '';
   const sub = i.sub ? `<li class="subline"><span>→ замена: <span translate="no">${esc(i.sub.name)}</span> × ${fmtQty(i.sub.qty)} <small class="pill ${i.sub.status === 'ok' ? '' : i.sub.status === 'no' ? 'bad' : 'warn'}">${{ wait: 'ждём ответа', ok: 'согласен', no: 'отказался' }[i.sub.status]}</small></span><span class="num">${i.sub.status === 'ok' ? money(i.sub.qty * i.sub.price) : ''}</span></li>` : '';
   if (i.missing) return `<li class="missing"><span><s>${name} × ${fmtQty(i.qty)}</s> <small class="pill bad">нет в наличии</small>${opts}</span><span class="num"><s>${money(i.qty * i.price)}</s></span></li>${sub}`;

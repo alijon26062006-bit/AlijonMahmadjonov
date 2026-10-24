@@ -674,3 +674,12 @@ h2 { font-weight: 800; letter-spacing: -.015em; }
 /* шрифт плотнее: на телефоне тонкие 400 читаются плохо */
 body { font-weight: 500; }
 .morelist small, .price s, .price small, .set-row small { font-weight: 500; }
+
+/* артикул и связь с базой */
+.pmeta .sku { font-weight: 600; color: var(--muted); }
+.sku-line { margin: -4px 0 4px; }
+.sync-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 600; margin-bottom: 12px; }
+.sync-bar.offline { background: var(--warn-soft); color: var(--warn); }
+.sync-bar.error { background: var(--bad-soft); color: var(--bad); }
+.sync-bar.connecting { background: var(--surface); color: var(--muted); }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }

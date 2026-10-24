@@ -75,7 +75,9 @@ server {
     location ~ ^/(supabase|README\.md|package\.json|deploy\.sh) { return 404; }
     location / { try_files \$uri \$uri/ =404; }
 
-    location ~* \.(css|js|svg|png|jpg|webp|woff2)$ {
+    # код браузер сверяет с сервером при каждом открытии: после обновления у всех сразу новая версия
+    location ~* \.(css|js)$ { expires -1; add_header Cache-Control "no-cache"; }
+    location ~* \.(svg|png|jpg|webp|woff2)$ {
         expires 1h;
         add_header Cache-Control "public";
     }
@@ -89,6 +91,8 @@ server {
 }
 NGINX
 fi
+# сервер, настроенный раньше: код кэшировался на час — теперь сверяется каждый раз (остальное в конфиге не трогаем)
+perl -0pi -e 's/location ~\* \\\.\(css\|js\|svg\|png\|jpg\|webp\|woff2\)\$ \{/location ~* \\.(css|js)\$ { expires -1; add_header Cache-Control "no-cache"; }\n    location ~* \\.(svg|png|jpg|webp|woff2)\$ {/' "$CONF"
 ln -sf "$CONF" /etc/nginx/sites-enabled/seller-panel
 rm -f /etc/nginx/sites-enabled/default
 nginx -t -q
