@@ -1,4 +1,5 @@
-import { FREE_FROM, WEIGHT_UNITS } from '../config.js';
+import { WEIGHT_UNITS } from '../config.js';
+import { kmText } from '../model/delivery.js';
 import { qtyInCart, stepOf, totals } from '../model/cart.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
 import { C } from '../state.js';
@@ -37,12 +38,11 @@ export function productCard(shop, p, small = false) {
   </article>`;
 }
 
-/** Одна полоса корзины внизу: сумма, сколько осталось до бесплатной доставки и полоска прогресса. */
+/** Одна полоса корзины внизу: сколько товаров, сумма с доставкой и сколько ехать. */
 export function cartBar() {
   const T = totals(); if (!T.rows.length) return '';
-  const left = Math.max(0, FREE_FROM - T.sum), n = T.rows.reduce((s, r) => s + (WEIGHT_UNITS.includes(r.p.unit) ? 1 : r.qty), 0);
-  return `<button class="cartbar" data-go="#/cart"><span class="cb-n num">${n}</span><span class="grow"><b>Корзина</b><small>${left ? `Ещё ${money(left)} до бесплатной доставки` : 'Доставка бесплатная'}</small></span><b class="num">${money(T.total)}</b>
-    <span class="cb-track" aria-hidden="true"><i style="width:${Math.min(100, T.sum / FREE_FROM * 100)}%"></i></span></button>`;
+  const n = T.rows.reduce((s, r) => s + (WEIGHT_UNITS.includes(r.p.unit) ? 1 : r.qty), 0);
+  return `<button class="cartbar" data-go="#/cart"><span class="cb-n num">${n}</span><span class="grow"><b>Корзина</b><small>Доставка ${money(T.fee)} · ${kmText(T.way.km)}</small></span><b class="num">${money(T.total)}</b></button>`;
 }
 
 export const backBar = (title, right = '', to = '') => `<div class="back"><button class="round" data-a="back" ${to ? `data-to="${to}"` : ''} aria-label="Назад">${ico('back')}</button><h3 class="grow">${esc(title)}</h3>${right}</div>`;

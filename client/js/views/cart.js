@@ -1,4 +1,5 @@
-import { FREE_FROM, IF_MISSING, WEIGHT_UNITS } from '../config.js';
+import { IF_MISSING, WEIGHT_UNITS } from '../config.js';
+import { kmText, TARIFF } from '../model/delivery.js';
 import { bump, clear, totals } from '../model/cart.js';
 import { eta, openState } from '../model/catalog.js';
 import { esc, money, qtyLabel } from '../lib/format.js';
@@ -12,7 +13,6 @@ export function vCart() {
   const T = totals(), { shop, rows } = T;
   if (!rows.length) return `${backBar('Корзина')}
     <div class="empty"><img src="img/kind-grocery.webp" alt="" width="120" height="120"><h2>Корзина пустая</h2><p>Загляните в магазины рядом — добавьте то, что нужно, и мы привезём.</p><button class="btn primary" data-go="#/">Выбрать магазин</button></div>`;
-  const toFree = Math.max(0, FREE_FROM - T.sum);
   const st = openState(shop);
   return `${backBar('Корзина', `<button class="round" data-a="clearCart" aria-label="Очистить корзину">${ico('trash')}</button>`)}
     <button class="li list" data-go="#/shop/${shop.id}" style="border-radius:var(--r)">${logo(shop)}<span class="grow"><b>${esc(shop.name)}</b><small>${st.open ? 'Доставка ' + eta(shop) : esc(st.text)}</small></span>${ico('right', 'chev')}</button>
@@ -26,8 +26,7 @@ export function vCart() {
         <div class="stepper light"><button data-a="bump" data-key="${esc(r.key)}" data-d="-1" aria-label="Меньше">${ico('minus', 'sm')}</button><span class="num small">${w ? qtyLabel(r.qty, r.p.unit) : r.qty}</span><button data-a="bump" data-key="${esc(r.key)}" data-d="1" aria-label="Больше" ${r.qty >= r.p.stock ? 'disabled' : ''}>${ico('plus', 'sm')}</button></div></div>`;
     }).join('')}</div>
     ${T.left ? `<div class="col" style="gap:8px"><span class="small">До минимального заказа <b>${money(T.left)}</b></span><div class="progress"><i style="width:${T.sum / shop.minOrder * 100}%"></i></div></div>`
-      : toFree ? `<div class="col" style="gap:8px"><span class="small">До бесплатной доставки <b>${money(toFree)}</b></span><div class="progress"><i style="width:${T.sum / FREE_FROM * 100}%"></i></div></div>`
-      : `<div class="notice ok">${ico('check', 'sm')}<span>Доставка бесплатная</span></div>`}
+      : `<div class="notice info">${ico('bike', 'sm')}<span>До вас ${kmText(T.way.km)} — доставка ${money(T.fee)}. Возит такси, ${money(TARIFF.perKm)} за км.</span></div>`}
     <section class="section"><h3>Если товара не окажется</h3>
       <div class="col" style="gap:8px">${IF_MISSING.map(([k, t]) => `<label class="opt"><input type="radio" name="miss" value="${k}" ${C.cart.ifMissing === k ? 'checked' : ''} data-a="ifMissing"><span class="grow">${t}</span></label>`).join('')}</div>
       ${shop.kind === 'grocery' ? '<span class="small muted">Весовой товар взвешивают при сборке: сумма может немного измениться, разницу вернём.</span>' : ''}</section>

@@ -1,16 +1,15 @@
-import { CITIES, FREE_FROM } from '../config.js';
+import { CITIES } from '../config.js';
 import { C } from '../state.js';
 
 // Доставка по расстоянию: от метки магазина до метки покупателя.
-// Цифры тарифа — временные: владелец сервиса назовёт цену за километр, и её меняют только здесь.
+// Возят таксисты: как в такси, 10 смн за километр. Бесплатной доставки нет — деньги за дорогу получает водитель.
 export const TARIFF = {
-  base: 5,          // смн — подача курьера, платится всегда
-  perKm: 1.5,       // смн за каждый километр пути
-  freeFrom: FREE_FROM,  // смн — заказ от этой суммы везём бесплатно
+  perKm: 10,        // смн за километр — как у такси
+  minFee: 10,       // смн — минимум, даже если ехать меньше километра
   maxKm: 15,        // дальше магазин не возит
   roadFactor: 1.3,  // дорога длиннее прямой линии: по городу примерно на треть
-  minPerKm: 3,      // минут курьера на километр
-  pickupMin: 5,     // минут, чтобы курьер забрал заказ
+  minPerKm: 3,      // минут в пути на километр
+  pickupMin: 5,     // минут, чтобы водитель забрал заказ
 };
 
 const R = 6371;
@@ -31,9 +30,8 @@ export function route(shop, addr = C.addr) {
   const km = Math.max(0.3, Math.round(straightKm(from, to) * TARIFF.roadFactor * 10) / 10);
   return { km, min: Math.round(TARIFF.pickupMin + km * TARIFF.minPerKm), exact: from.exact && to.exact && !!addr, ok: km <= TARIFF.maxKm };
 }
-/** Цена доставки для суммы заказа: подача + км × цена километра, от порога — бесплатно. Округляем до целого сомони вверх. */
-export function feeFor(shop, sum = 0, addr = C.addr) {
-  if (sum >= TARIFF.freeFrom) return 0;
-  return Math.ceil(TARIFF.base + route(shop, addr).km * TARIFF.perKm);
+/** Цена доставки: километры × цена километра, не меньше минимума. Округляем до целого сомони вверх. */
+export function feeFor(shop, addr = C.addr) {
+  return Math.max(TARIFF.minFee, Math.ceil(route(shop, addr).km * TARIFF.perKm));
 }
 export const kmText = km => `${km.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`;

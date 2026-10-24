@@ -348,8 +348,6 @@ label.chip:has(input:focus-visible) { outline: 2px solid var(--ink); outline-off
 .cartbar .grow b { display: block; font-size: 16px; font-weight: 800; }
 .cartbar small { display: block; font-size: 13px; font-weight: 600; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cartbar > b { font-size: 17px; font-weight: 800; white-space: nowrap; }
-.cb-track { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0,0,0,.08); }
-.cb-track i { display: block; height: 100%; background: #1f1e1c; transition: width .3s var(--ease); }
 @keyframes up { from { transform: translateY(16px); opacity: 0; } }
 
 /* ---------- заказ ---------- */

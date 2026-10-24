@@ -53,7 +53,7 @@ export function lines() {
 }
 export function totals() {
   const { shop, rows } = lines();
-  const sum = r2(rows.reduce((s, r) => s + r.sum, 0)), fee = rows.length ? feeFor(shop, sum) : 0, way = shop ? route(shop) : null;
+  const sum = r2(rows.reduce((s, r) => s + r.sum, 0)), fee = rows.length ? feeFor(shop) : 0, way = shop ? route(shop) : null;
   const count = rows.reduce((s, r) => s + (r.p.unit === 'кг' || r.p.unit === 'л' ? 1 : r.qty), 0);
   return { shop, rows, sum, fee, way, total: r2(sum + fee), count, left: shop ? Math.max(0, r2(shop.minOrder - sum)) : 0 };
 }

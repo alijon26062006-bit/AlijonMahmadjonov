@@ -2,8 +2,7 @@
 
 export const BRAND = 'Зуд';
 export const CUR = 'смн';
-// доставка считается по расстоянию — тариф в model/delivery.js; здесь только порог бесплатной доставки
-export const FREE_FROM = 200;
+// доставка считается по расстоянию — тариф в model/delivery.js
 
 export const KINDS = [
   { id: 'grocery', name: 'Продукты', hint: 'Овощи, молочное, хлеб' },

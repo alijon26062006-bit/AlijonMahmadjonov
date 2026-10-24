@@ -1,4 +1,4 @@
-import { FREE_FROM, KINDS, kindSrc } from '../config.js';
+import { KINDS, kindSrc } from '../config.js';
 import { feeFor, kmText, route } from '../model/delivery.js';
 import { eta, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
@@ -46,7 +46,7 @@ export function bigCard(s) {
 // акции: без выдуманных промокодов — только то, что правда работает
 const BANNERS = [
   { go: '#/shop/sabz', t: 'Скидки до 18% на фрукты', s: 'Дехкон Маркет', img: 'img/kind-grocery.webp', bg: '#fdf1dc' },
-  { go: '#/kind/food', t: `Доставка бесплатно от ${FREE_FROM} смн`, s: 'Во всех магазинах', img: 'img/intro-bag.webp', bg: '#e6f4ea' },
+  { go: '#/kind/food', t: 'Привезёт такси — 10 смн за км', s: 'Цена по расстоянию до вас', img: 'img/intro-bag.webp', bg: '#e6f4ea' },
   { go: '#/shop/atir', t: 'Ароматы — только оригиналы', s: 'Парфюм-хаус Атир', img: 'img/kind-perfume.webp', bg: '#f2ece4' },
 ];
 const FILTERS = [['open', 'Открыто сейчас'], ['sale', 'Со скидкой'], ['fast', 'До 40 минут']];

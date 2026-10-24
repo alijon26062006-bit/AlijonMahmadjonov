@@ -1,4 +1,4 @@
-import { FREE_FROM, WEIGHT_UNITS } from '../config.js';
+import { WEIGHT_UNITS } from '../config.js';
 import { feeFor, kmText, route, TARIFF } from '../model/delivery.js';
 import { add, stepOf, unitPrice } from '../model/cart.js';
 import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
@@ -51,7 +51,7 @@ export function shopInfo(id) {
     <div class="list">
       <div class="li">${ico('starFill')}<span class="grow"><b>Рейтинг ${ratingText(s)}</b><small>${s.count ? `${s.count} оценок за 3 месяца` : 'Пока мало оценок'}</small></span></div>
       <div class="li">${ico('clock')}<span class="grow"><b>${esc(st.text)}</b><small>Сборка заказа ~${s.prep} мин</small></span></div>
-      <div class="li">${ico('bike')}<span class="grow"><b>Доставка ${money(feeFor(s))} · ${kmText(route(s).km)}</b><small>${money(TARIFF.base)} + ${money(TARIFF.perKm)} за км${route(s).exact ? '' : ' (примерно: нет метки на карте)'} · бесплатно от ${money(FREE_FROM)}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</small></span></div>
+      <div class="li">${ico('bike')}<span class="grow"><b>Доставка ${money(feeFor(s))} · ${kmText(route(s).km)}</b><small>Такси: ${money(TARIFF.perKm)} за км, минимум ${money(TARIFF.minFee)}${route(s).exact ? '' : ' (примерно: нет метки на карте)'}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</small></span></div>
       <div class="li">${ico('pin')}<span class="grow"><b>Адрес магазина</b><small>${esc(s.address || '—')}</small></span></div>
     </div>`, { label: s.name });
 }
