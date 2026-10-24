@@ -33,8 +33,8 @@ create table public.couriers (
 );
 create trigger couriers_touch before update on public.couriers for each row execute function private.touch();
 alter table public.couriers enable row level security;
+-- писать в анкету напрямую нельзя: правило есть только на чтение своей строки, всё остальное — через функции ниже
 create policy couriers_self on public.couriers for select to authenticated using (id = (select auth.uid()));
-revoke insert, update, delete on public.couriers from anon, authenticated;
 
 -- ---------- курьер в заказе ----------
 alter table public.orders
@@ -249,7 +249,7 @@ begin
   update public.orders set courier_id = null, courier = null, courier_status = null, courier_at = null, courier_fee = null
   where id = p_order and courier_id = me.id and courier_status in ('going', 'at_shop');
   if not found then raise exception 'Заказ уже забран — отказаться нельзя. Если не получается доставить, нажмите «Не могу передать»'; end if;
-  delete from private.order_codes where order_id = p_order;
+  -- старый код не трогаем: следующий курьер при «Беру» получит новый (courier_take перезаписывает)
 end;
 $$;
 
