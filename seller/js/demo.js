@@ -19,7 +19,7 @@ export function demo() {
     P('Яйца деревенские', 'Молочное и яйца', 13, 9, 3, 'упак', 'Упаковка 10 шт.', { expiry: addDays(today(), 14), variants: [{ id: uid(), name: '10 шт', price: 13, cost: 9 }, { id: uid(), name: '30 шт', price: 36, cost: 26 }] }),
   ];
   const names = ['Фарзона', 'Шерали', 'Мадина', 'Рустам', 'Нигина', 'Бахром', 'Зарина', 'Далер', 'Манижа', 'Сухроб'];
-  const streets = ['ул. Айни 12', 'пр. Рудаки 98', 'ул. Шотемур 5', 'ул. Бохтар 31', 'мкр. Сино, д. 14', 'ул. Карамова 7'];
+  const streets = ['ул. Айни 12', 'ул. Рудаки 98', 'ул. Сомони 5', 'ул. Гагарина 31', 'ул. Ленина 14', 'ул. Мира 7'];
   const pickItems = () => {
     const n = 1 + Math.floor(R() * 2), items = [];
     for (let i = 0; i < n; i++) {
@@ -39,11 +39,11 @@ export function demo() {
       const ts = new Date(day); ts.setHours(9 + Math.floor(R() * 12), Math.floor(R() * 60));
       if (ts.getTime() > Date.now() - 60 * 60000) continue; // сегодня — только уже прошедшие часы
       const app = R() < .6, cancel = R() < .06;
-      orders.push({ id: uid(), no: ++no, ts: ts.getTime(), source: app ? 'app' : 'shop', status: cancel ? 'cancelled' : 'done', items: pickItems(), customer: app ? { name: names[Math.floor(R() * names.length)], phone: '+992 9' + Math.floor(R() * 1e8).toString().padStart(8, '0'), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] } : null, delivery: app ? (R() < .8 ? 'courier' : 'pickup') : 'shop', comment: '', cancelReason: cancel ? 'Нет товара' : '', pay: R() < .5 ? 'Наличные' : 'Карта' });
+      orders.push({ id: uid(), no: ++no, ts: ts.getTime(), source: app ? 'app' : 'shop', status: cancel ? 'cancelled' : 'done', items: pickItems(), customer: app ? { name: names[Math.floor(R() * names.length)], phone: '+992 9' + Math.floor(R() * 1e8).toString().padStart(8, '0'), address: 'Шахритус, ' + streets[Math.floor(R() * streets.length)] } : null, delivery: app ? (R() < .8 ? 'courier' : 'pickup') : 'shop', comment: '', cancelReason: cancel ? 'Нет товара' : '', pay: R() < .5 ? 'Наличные' : 'Карта' });
     }
   }
   const now = Date.now();
-  const live = (st, ago, comment) => ({ id: uid(), no: ++no, ts: now - ago * 60000, source: 'app', status: st, items: pickItems(), customer: { name: names[Math.floor(R() * names.length)], phone: '+992 93 555 12 ' + pad(Math.floor(R() * 99)), address: 'Душанбе, ' + streets[Math.floor(R() * streets.length)] }, delivery: 'courier', comment, cancelReason: '', pay: 'Наличные', readyIn: st === 'accepted' ? 25 : null });
+  const live = (st, ago, comment) => ({ id: uid(), no: ++no, ts: now - ago * 60000, source: 'app', status: st, items: pickItems(), customer: { name: names[Math.floor(R() * names.length)], phone: '+992 93 555 12 ' + pad(Math.floor(R() * 99)), address: 'Шахритус, ' + streets[Math.floor(R() * streets.length)] }, delivery: 'courier', comment, cancelReason: '', pay: 'Наличные', readyIn: st === 'accepted' ? 25 : null });
   orders.push(live('ready', 41, ''), live('accepted', 18, 'Позвоните за 10 минут'), live('new', 3, 'Помидоры выберите покрепче, пожалуйста'), live('new', 1, ''));
   // отзывы примерно к каждому третьему заказу из приложения
   const texts = { 5: ['Всё свежее, спасибо!', 'Помидоры как с грядки, буду заказывать ещё', '', 'Быстро и аккуратно'], 4: ['Хорошо, но пакет порвался', '', 'Всё пришло, спасибо'], 3: ['Яблоки были мелковаты'], 2: ['Не положили курагу, пришлось звонить'], 1: ['Молоко оказалось кислым'] };
