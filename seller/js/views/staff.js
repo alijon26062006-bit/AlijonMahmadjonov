@@ -33,7 +33,7 @@ export function sheetStaff(id) {
 }
 export function saveStaff() {
   const f = document.querySelector('#staffForm'), fd = new FormData(f), id = f.dataset.id;
-  const name = fd.get('name').trim(), phone = fd.get('phone').replace(/\D/g, '').replace(/^992(?=\d{9})/, ''), errs = {};
+  const name = String(fd.get('name') ?? '').trim(), phone = String(fd.get('phone') ?? '').replace(/\D/g, '').replace(/^992(?=\d{9})/, ''), errs = {};
   if (!name) errs.name = 'Введите имя';
   if (phone.length !== 9) errs.phone = 'Нужно 9 цифр после +992';
   else if (phone === S.shop.owner) errs.phone = 'Это номер владельца';

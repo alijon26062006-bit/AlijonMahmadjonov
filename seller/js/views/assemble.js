@@ -23,7 +23,7 @@ export function refreshSheet() { if (curId && subFor == null) draw(); }
 
 function draw(keep = true) {
   const o = order(); if (!o) return;
-  if (subFor != null) return drawSubs(keep);
+  if (subFor != null) return drawSubs();
   const done = o.items.filter(handled).length, wait = o.items.some(i => i.sub?.status === 'wait');
   const rows = o.items.map((i, n) => {
     const p = S.products.find(x => x.id === i.pid) || { imgs: [] };

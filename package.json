@@ -1,0 +1,16 @@
+{
+  "name": "zud-marketplace",
+  "private": true,
+  "type": "module",
+  "description": "Зуд: кабинет продавца (seller/), приложения покупателя (client/) и курьера (courier/)",
+  "scripts": {
+    "check": "tsc -p tsconfig.json && eslint .",
+    "test": "node e2e/offline.cjs && node e2e/delivery.cjs ru && node e2e/delivery.cjs tg",
+    "test:sql": "bash e2e/sql/run.sh"
+  },
+  "devDependencies": {
+    "eslint": "^10.1.0",
+    "playwright": "1.56.1",
+    "typescript": "^6.0.2"
+  }
+}

@@ -27,6 +27,7 @@ export function vProfile() {
       <button class="btn sm" data-go="#/register">Изменить</button></section>
     <section class="section"><h3>Работа</h3><div class="list">
       <button class="li" data-a="chooseNav">${ico('nav')}<span class="grow"><b>Навигатор</b><small>${esc(NAVS.find(n => n[0] === K.nav)?.[1] || '')}</small></span>${ico('right', 'chev')}</button>
+      ${sw('toggleAutoRoute', K.autoRoute, 'Маршрут сам', 'Взяли заказ — навигатор ведёт в магазин, забрали — к покупателю')}
       ${sw('toggleSound', K.sound, 'Звук нового заказа', 'Громкая мелодия и вибрация')}
       <button class="li" data-a="testSound">${ico('bike')}<span class="grow"><b>Проверить звук</b></span></button>
       ${sw('toggleAwake', K.awake, 'Не гасить экран на линии', 'Заказы видно сразу, даже если телефон лежит на панели')}
@@ -47,6 +48,7 @@ export const profileActions = {
   },
   setNav: el => { K.nav = el.dataset.v; save(); closeSheet(); toast('Навигатор выбран'); },
   toggleSound: () => { K.sound = !K.sound; save(); },
+  toggleAutoRoute: () => { K.autoRoute = !K.autoRoute; save(); },
   testSound: () => { if (!play('offer')) toast('Звук недоступен в этом браузере'); vibrate([300, 120, 300]); toast('Если не слышно — уберите беззвучный режим и прибавьте громкость'); return false; },
   toggleAwake: () => { K.awake = !K.awake; save(); },
   lang: el => { setLang(el.dataset.v); location.reload(); return false; },

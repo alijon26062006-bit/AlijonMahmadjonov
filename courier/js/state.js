@@ -6,7 +6,8 @@ const fresh = () => ({
   phone: '',            // номер, по которому вошли (9 цифр)
   me: null,             // анкета из базы: имя, машина, номер, рейтинг
   online: false,        // курьер на линии
-  nav: 'yandexmaps',    // навигатор для маршрута
+  nav: '2gis',          // навигатор для маршрута
+  autoRoute: true,      // открывать маршрут сам: взял заказ — путь до магазина, забрал — до покупателя
   sound: true,          // звук нового заказа
   awake: true,          // не гасить экран на линии
   theme: 'auto',
@@ -16,8 +17,10 @@ const fresh = () => ({
   jobs: [],             // последние заказы — чтобы экран открылся без сети
 });
 export const K = (() => { try { return { ...fresh(), ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return fresh(); } })();
+// версия 2: 2GIS стал навигатором по умолчанию — переключаем тех, кто ещё не выбирал сам
+if (!K.navV) { K.nav = '2gis'; K.navV = 2; }
 export const save = () => { try { localStorage.setItem(KEY, JSON.stringify(K)); } catch { /* память переполнена */ } };
-export const reset = () => { const keep = { nav: K.nav, sound: K.sound, awake: K.awake, theme: K.theme }; Object.assign(K, fresh(), keep); save(); };
+export const reset = () => { const keep = { nav: K.nav, navV: K.navV, autoRoute: K.autoRoute, sound: K.sound, awake: K.awake, theme: K.theme }; Object.assign(K, fresh(), keep); save(); };
 
 // живое состояние (не сохраняется): лента, место, связь, что сейчас на экране
 export const rt = {

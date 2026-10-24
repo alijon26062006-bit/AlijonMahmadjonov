@@ -10,3 +10,7 @@ data/
 *.db-shm
 .venv/
 .pytest_cache/
+
+# Маркетплейс: зависимости проверок и отчёты тестов
+node_modules/
+e2e/report/

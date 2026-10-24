@@ -1,0 +1,48 @@
+# Проверка маркетплейса «Зуд» при каждом изменении: код, приложения в браузере, база данных.
+# Если что-то сломалось — на GitHub у коммита будет красный крестик и понятная причина в логе.
+name: Маркетплейс — проверка
+
+on:
+  push:
+    paths: ['seller/**', 'client/**', 'courier/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
+  pull_request:
+    paths: ['seller/**', 'client/**', 'courier/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
+
+jobs:
+  code:
+    name: Код (TypeScript + ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run check
+
+  browser:
+    name: Три телефона в браузере
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: screenshots, path: e2e/report }
+
+  database:
+    name: База (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash e2e/sql/run.sh
+        env: { DATABASE_URL: 'postgres://postgres:postgres@127.0.0.1:5432/postgres' }

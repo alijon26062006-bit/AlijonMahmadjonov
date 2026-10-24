@@ -39,7 +39,7 @@ export const TABS = [['home', 'Главная'], ['orders', 'Заказы'], ['c
 // товар на стопе до конца дня: «Закончилось на сегодня»
 export const isStopped = p => !!p.stopUntil && p.stopUntil > Date.now();
 /** Сколько дней осталось до конца срока годности; null — срок не указан. */
-export const daysLeft = p => p.expiry ? Math.round((new Date(p.expiry) - new Date(today())) / 864e5) : null;
+export const daysLeft = p => p.expiry ? Math.round((+new Date(p.expiry) - +new Date(today())) / 864e5) : null;
 /** Продукт без срока (кроме свежих овощей и фруктов) или с истёкшим сроком продавать нельзя. */
 export function expiryBlock(p) {
   const d = daysLeft(p);

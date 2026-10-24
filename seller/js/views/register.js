@@ -22,8 +22,8 @@ const fresh = () => ({
   delivery: true, pickup: true, prep: 30,
 });
 let R = (() => { try { return { ...fresh(), ...JSON.parse(localStorage.getItem(DRAFT_KEY)) }; } catch { return fresh(); } })();
-const keep = () => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(R)); } catch {} };
-const forget = () => { try { localStorage.removeItem(DRAFT_KEY); } catch {} };
+const keep = () => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(R)); } catch { /* черновик не сохранится — анкета всё равно работает */ } };
+const forget = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* нечего убирать */ } };
 
 let picker = null;
 const dropPicker = () => { picker?.destroy(); picker = null; };

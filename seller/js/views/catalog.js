@@ -68,7 +68,7 @@ export function readImage(file, size) {
       const k = Math.min(1, size / Math.max(img.width, img.height));
       const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.8));
-    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = r.result; };
+    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = String(r.result); };
     r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
   });
 }
@@ -92,7 +92,7 @@ export function readProductImage(file) {
         g.drawImage(img, (N - dw) / 2, (N - dh) / 2, dw, dh);
       }
       res(c.toDataURL('image/jpeg', 0.82));
-    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = r.result; };
+    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = String(r.result); };
     r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
   });
 }
@@ -107,7 +107,7 @@ export function readImageExact(file, W, H) {
       c.getContext('2d').drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, W, H);
       const off = Math.abs(img.width / img.height - W / H) > 0.08;
       res({ src: c.toDataURL('image/jpeg', 0.82), cropped: off, small: img.width < W * 0.8 });
-    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = r.result; };
+    }; img.onerror = () => rej(new Error('Не удалось открыть картинку')); img.src = String(r.result); };
     r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(file);
   });
 }

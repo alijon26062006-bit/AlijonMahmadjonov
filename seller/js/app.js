@@ -1,5 +1,5 @@
 import { DAYS } from './config.js';
-import { blankShop, demo, migrate } from './demo.js';
+import { demo, migrate } from './demo.js';
 import { changeStockForOrder } from './domain/orders.js';
 import { esc, fmtPhone, num, today, uid } from './lib/format.js';
 import { auth, KEY, saveAuth, store } from './services/storage.js';
@@ -27,10 +27,13 @@ import { ROLES } from './config.js';
 import { cloud, connect, deleteShop, disconnect, hooks } from './services/sync.js';
 import { setLang, startTranslating, tr } from './i18n.js';
 import { applyTheme, isDark, setTheme } from './services/prefs.js';
+import { crashScreen, guardGlobal } from './lib/guard.js';
 
 let view = 'home';
 // рендер
-export function render() {
+/** Нарисовать экран. Если в каком-то экране ошибка — вместо белого экрана «Что-то пошло не так» и «Обновить». */
+export function render() { try { draw(); } catch (e) { crashScreen(app, e); } }
+function draw() {
   if (!auth.phone) return renderAuth();
   if (!S) return renderRegister();
   if (!S.shop.owner) { S.shop.owner = auth.phone; save(); }
@@ -187,17 +190,17 @@ document.addEventListener('change', async e => {
 });
 document.addEventListener('submit', e => {
   e.preventDefault();
-  const f = e.target, id = f.id;
+  const f = /** @type {HTMLFormElement} */ (e.target), id = f.id;
   if (id === 'shopEdit') { const d = validateShop(f); if (!d) return; Object.assign(S.shop, d); save(); render(); toast('Профиль сохранён'); }
   if (id === 'opsForm') {
-    const fd = new FormData(f), prep = num(fd.get('prep')), min = fd.get('minOrder').trim() === '' ? 0 : num(fd.get('minOrder'));
+    const fd = new FormData(f), prep = num(fd.get('prep')), min = String(fd.get('minOrder') ?? '').trim() === '' ? 0 : num(fd.get('minOrder'));
     if (!showErrors(f, { ...(prep == null || prep <= 0 ? { prep: 'Больше нуля' } : {}), ...(min == null || min < 0 ? { minOrder: 'Число от нуля' } : {}) })) return;
     if (!fd.get('delivery') && !fd.get('pickup')) return toast('Оставьте хотя бы доставку или самовывоз');
     Object.assign(S.shop, { prep: Math.round(prep), minOrder: min, delivery: !!fd.get('delivery'), pickup: !!fd.get('pickup'), schedule: DAYS.map((_, i) => ({ open: !!fd.get('open' + i), from: fd.get('from' + i) || '09:00', to: fd.get('to' + i) || '21:00' })) });
     save(); render(); toast('Настройки сохранены');
   }
   if (id === 'alifForm') {
-    const fd = new FormData(f), t = fd.get('terminal').trim(), h = fd.get('holder').trim(), n = fd.get('tin').trim();
+    const fd = new FormData(f), t = String(fd.get('terminal') ?? '').trim(), h = String(fd.get('holder') ?? '').trim(), n = String(fd.get('tin') ?? '').trim();
     if (!showErrors(f, { ...(!/^\d{6,}$/.test(t) ? { terminal: 'Только цифры, не меньше 6' } : {}), ...(!h ? { holder: 'Укажите получателя' } : {}) })) return;
     S.shop.alif = { terminal: t, holder: h, tin: n, status: 'pending' }; save(); render(); toast('Отправили на проверку');
   }
@@ -237,6 +240,7 @@ hooks({
 if (auth.phone) connect(auth.phone);
 
 applyTheme();
+guardGlobal(toast);   // ошибки в фоне — подсказка, а не зависший экран
 startTranslating();
 document.title = tr('Кабинет продавца');
 render();

@@ -3,7 +3,7 @@ import { feeFor, route } from '../model/delivery.js';
 import { add, stepOf, unitPrice } from '../model/cart.js';
 import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
 import { esc, money, qtyLabel, r2 } from '../lib/format.js';
-import { C, save, ui } from '../state.js';
+import { C, save } from '../state.js';
 import { art } from '../ui/art.js';
 import { closeSheet, ico, openSheet, toast } from '../ui/dom.js';
 import { backBar, likesLine, productCard, unitLine } from './parts.js';
@@ -71,7 +71,7 @@ function drawProduct(keep) {
     [s.kind === 'tech' ? 'Оригинальность' : 'Состояние', a.origin], ['Гарантия', a.warranty && (a.warranty === '0' ? 'без гарантии' : a.warranty + ' мес.')], ['Упаковка', a.pack], ['Вес порции', a.portion && a.portion + ' г'],
     ['Острота', a.spicy], ['Страна', a.country], ['Годен до', p.expiry && new Date(p.expiry).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })], ['Артикул', p.sku]].filter(x => x[1]);
   const base = p.variants.length ? Math.min(...p.variants.map(v => v.price)) : p.price;
-  const more = s.products.filter(x => x.id !== p.id).sort((x, y) => (y.cat === p.cat) - (x.cat === p.cat)).slice(0, 6);
+  const more = s.products.filter(x => x.id !== p.id).sort((x, y) => Number(y.cat === p.cat) - Number(x.cat === p.cat)).slice(0, 6);
   const fav = C.favProducts.includes(s.id + '::' + p.id);
   openSheet(`
     <div class="p-gallery ${p.imgs?.length ? "" : "no-photo"}" translate="no">${imgs}</div>

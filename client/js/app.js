@@ -17,8 +17,10 @@ import { applyTheme, introActions, profileActions, vFavorites, vIntro, vProfile 
 import { refreshResults, remember, vSearch } from './views/search.js';
 import { askReplace, openProduct, productActions, refreshProduct, shopInfo, spyTabs, vShop } from './views/shop.js';
 import { cartBar } from './views/parts.js';
+import { crashScreen, guardGlobal } from './lib/guard.js';
 
 // Экраны: адрес → функция, вкладка снизу, нужна ли полоска корзины, закреплённая кнопка
+/** @type {Array<[RegExp, (arg?: string) => { html: string, tab?: string, cartbar?: boolean, notabs?: boolean, flow?: boolean, dock?: string, after?: () => void }]>} */
 const ROUTES = [
   [/^#\/?$/, () => ({ html: vHome(), tab: 'home', cartbar: true })],
   [/^#\/search$/, () => ({ html: vSearch(), tab: 'home', cartbar: true, after: () => { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })],
@@ -34,7 +36,9 @@ const ROUTES = [
 // три вкладки, как в больших приложениях доставки: поиск — сверху на главной, заказы — в профиле
 const TABS = [['home', '#/', 'Главная', 'homeFill'], ['cart', '#/cart', 'Корзина', 'basket'], ['profile', '#/profile', 'Профиль', 'userFill']];
 
-export function render() {
+/** Нарисовать экран. Если в каком-то экране ошибка — вместо белого экрана «Что-то пошло не так» и «Обновить». */
+export function render() { try { draw(); } catch (e) { crashScreen(app, e); } }
+function draw() {
   applyTheme();
   if (!C.onboarded) { app.innerHTML = vIntro(); return; }
   const h = location.hash || '#/';
@@ -136,6 +140,7 @@ addEventListener('scroll', () => { const b = $('#toTop'); if (b) b.hidden = wind
 // витрины и заказы из общей базы: что-то поменялось — перерисовываем, если покупатель сейчас ничего не вводит
 startMarket({ onSale, render: () => { if (C.onboarded && !sheetOpen() && !document.activeElement?.matches('input,textarea')) render(); } });
 document.title = tr(BRAND + ' — доставка из магазинов рядом');
+guardGlobal(toast);   // ошибки в фоне — подсказка, а не зависший экран
 startTranslating();
 // первый экран: скелет, пока не загрузился шрифт, чтобы текст не прыгал
 if (C.onboarded && (!location.hash || location.hash === '#/')) {

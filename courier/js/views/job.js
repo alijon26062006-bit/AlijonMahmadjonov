@@ -71,11 +71,12 @@ export function vJob(j) {
       ${t.note ? `<p class="muted small" translate="no">${esc(t.note)}</p>` : ''}
       ${dist != null ? `<span class="dist num">${ico('nav', 'xs')} ${kmText(dist)} от вас</span>` : ''}
       <div class="acts">
-        <button class="btn primary grow" data-a="route">${ico('nav')} Маршрут</button>
+        <button class="btn primary grow" data-a="route">${ico('nav')} ${toShop(j) ? 'Маршрут до магазина' : 'Маршрут до покупателя'}</button>
         ${t.phone ? `<button class="btn sq" data-a="callTarget" aria-label="Позвонить: ${esc(t.kind)}">${ico('phone')}</button>` : ''}
         ${!toShop(j) && t.phone ? `<button class="btn sq" data-a="waTarget" aria-label="Написать в WhatsApp">${ico('chat')}</button>` : ''}
         <button class="btn sq" data-a="copyAddr" aria-label="Скопировать адрес">${ico('copy')}</button>
       </div>
+      ${toShop(j) ? `<button class="link-btn" data-a="routeFull">${ico('route', 'sm')} Весь путь: магазин → покупатель${j.km ? ` · ${kmText(j.km)}` : ''}</button>` : ''}
     </section>
     ${toShop(j) ? `
       <section class="say"><small>Назовите в магазине номер заказа</small><b class="huge num">${j.no}</b>${readyLine(j)}</section>
@@ -128,21 +129,31 @@ export async function doStep(el, sure = false) {
   try {
     const r = await api.step(j.id, to, to === 'delivered' ? rt.code : null);
     replace(r);
+    // забрал заказ — навигатор сам строит путь до покупателя
+    if (to === 'picked' && K.autoRoute) openRoute(r);
     if (to === 'delivered') { rt.code = ''; delete K.waitFrom[j.id]; delete K.checked[j.id]; K.seenDone.push(j.id); save(); rt.done = r; if (K.sound) play('done'); vibrate([80, 60, 160]); }
     else vibrate(30);
   } catch (e) { toast(e.message); if (K.sound) play('bad'); }
   finally { rt.busy = false; }
 }
 
-function openRoute(j) {
-  const t = target(j), { url, fallback } = routeUrl(K.nav, t);
+/**
+ * Открыть маршрут в навигаторе (по умолчанию 2GIS).
+ * leg: 'now' — от курьера до текущей цели (магазин или покупатель); 'full' — весь путь магазин → покупатель.
+ * @param {any} j заказ
+ * @param {'now'|'full'} [leg]
+ */
+export function openRoute(j, leg = 'now') {
+  const full = leg === 'full', t = full ? target({ ...j, step: 'picked' }) : target(j);
+  const { url, fallback } = routeUrl(K.nav, t, full ? { lat: j.shop.lat, lng: j.shop.lng } : null);
   openExternal(url);
-  // навигатора нет на телефоне — через секунду открываем карты в браузере
+  // навигатора нет на телефоне — через полторы секунды открываем его сайт
   if (fallback) setTimeout(() => { if (document.visibilityState === 'visible') openExternal(fallback); }, 1500);
 }
 
 export const jobActions = {
   route: () => { const j = cur(); if (j) openRoute(j); return false; },
+  routeFull: () => { const j = cur(); if (j) openRoute(j, 'full'); return false; },
   callTarget: () => { const j = cur(); if (j) call(target(j).phone); return false; },
   waTarget: () => { const j = cur(); if (j) openExternal(waUrl(target(j).phone)); return false; },
   copyAddr: async () => { const j = cur(); if (j) toast(await copy(target(j).address || '') ? 'Адрес скопирован' : 'Не удалось скопировать'); return false; },

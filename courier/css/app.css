@@ -348,3 +348,4 @@ body:has(.page.no-tabs.has-bar) .toast { bottom: calc(100px + env(safe-area-inse
 /* подсказки — сверху: внизу палец и ползунок, а за рулём взгляд сначала падает на верх экрана */
 .toast, body:has(.dock) .toast { top: calc(12px + env(safe-area-inset-top)); bottom: auto; animation-name: toastDown; }
 @keyframes toastDown { from { transform: translate(-50%, -12px); opacity: 0; } }
+.link-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 10px 0 0; min-height: 44px; font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--faint); width: fit-content; }

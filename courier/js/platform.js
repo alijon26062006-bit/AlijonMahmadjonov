@@ -29,7 +29,12 @@ export async function where() {
     { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }));
 }
 
-/** Следить за местом: cb({ lat, lng, acc }) при каждом движении. Возвращает функцию «перестать». */
+/**
+ * Следить за местом: cb({ lat, lng, acc }) при каждом движении. Возвращает функцию «перестать».
+ * @param {(p: { lat: number, lng: number, acc: number }) => void} cb
+ * @param {(e: Error) => void} [onError]
+ * @returns {() => void}
+ */
 export function watch(cb, onError = () => {}) {
   const BG = plugin('BackgroundGeolocation');
   if (BG) {   // в APK: место идёт и с выключенным экраном, в шторке висит «Вы на линии»
@@ -50,7 +55,10 @@ export function watch(cb, onError = () => {}) {
   return () => navigator.geolocation.clearWatch(id);
 }
 
-/** Вибрация: число — мс, массив — узор. */
+/**
+ * Вибрация: число — мс, массив — узор.
+ * @param {number | number[]} [pattern]
+ */
 export function vibrate(pattern = 200) {
   const H = plugin('Haptics');
   if (H) { const total = [].concat(pattern).filter((_, i) => i % 2 === 0).reduce((s, x) => s + x, 0); H.vibrate({ duration: total }).catch(() => {}); return; }
@@ -70,6 +78,7 @@ export async function keepAwake(on) {
 
 /** Открыть внешнее: навигатор, звонок, WhatsApp. В APK — системным способом, в браузере — ссылкой. */
 export async function openExternal(url) {
+  dispatchEvent(new CustomEvent('zud:open', { detail: url }));   // для тестов и будущей аналитики: что открыли
   const L = plugin('AppLauncher');
   if (L) { try { await L.openUrl({ url }); return true; } catch { return false; } }
   if (/^(tel|sms|yandexnavi|yandexmaps|dgis|geo|intent):/i.test(url)) { location.href = url; return true; }

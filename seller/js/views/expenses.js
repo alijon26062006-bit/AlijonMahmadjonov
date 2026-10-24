@@ -37,6 +37,6 @@ export function saveExpense() {
   const f = $('#expForm'), fd = new FormData(f), amount = num(fd.get('amount'));
   if (!showErrors(f, amount == null || amount <= 0 ? { amount: 'Введите сумму' } : {})) return;
   const cat = fd.get('cat');
-  S.expenses.push({ id: uid(), date: fd.get('date') || today(), cat, amount, note: fd.get('note').trim(), stockPurchase: cat === 'Закупка товара' && !!fd.get('stockPurchase') });
-  ui.expMonth = (fd.get('date') || today()).slice(0, 7); save(); closeSheet(); render(); toast('Расход добавлен');
+  S.expenses.push({ id: uid(), date: fd.get('date') || today(), cat, amount, note: String(fd.get('note') ?? '').trim(), stockPurchase: cat === 'Закупка товара' && !!fd.get('stockPurchase') });
+  ui.expMonth = String(fd.get('date') || today()).slice(0, 7); save(); closeSheet(); render(); toast('Расход добавлен');
 }

@@ -11,7 +11,12 @@ export const unitPrice = (p, vid, opts = []) => (p.variants.find(v => v.id === v
 
 export function qtyInCart(pid) { return C.cart.items.filter(i => i.pid === pid).reduce((s, i) => s + i.qty, 0); }
 
-/** Добавить товар. Если в корзине другой магазин — вернёт 'other', чтобы спросить покупателя. */
+/**
+ * Добавить товар. Если в корзине другой магазин — вернёт 'other', чтобы спросить покупателя.
+ * @param {any} shop @param {any} p
+ * @param {{ vid?: string, opts?: string[], qty?: number }} [pick]
+ * @param {boolean} [force]
+ */
 export function add(shop, p, { vid = '', opts = [], qty } = {}, force = false) {
   if (C.cart.items.length && C.cart.shopId !== shop.id) { if (!force) return 'other'; clear(); }
   C.cart.shopId = shop.id;

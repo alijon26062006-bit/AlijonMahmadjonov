@@ -10,6 +10,7 @@ export const slider = (label, act, data = {}, tone = '') => `<div class="slide $
   <span class="slide-fill"></span><span class="slide-label">${esc(label)}</span>
   <button class="slide-knob" type="button" aria-label="${esc(label)}: потяните вправо или нажмите Enter">${ico('arrowR')}</button></div>`;
 
+/** @type {(act: string, el: HTMLElement) => void} */
 let onDone = () => {};
 /** Что делать, когда ползунок дотянули: fn(имя действия, элемент). */
 export const onSlide = fn => { onDone = fn; };

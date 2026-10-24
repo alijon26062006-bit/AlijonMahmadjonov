@@ -15,16 +15,24 @@ export const roadKm = (a, b) => hasPin(a) && hasPin(b) ? Math.max(0.1, Math.roun
 export const kmText = km => km == null ? '' : km < 1 ? `${Math.round(km * 1000 / 10) * 10} м` : `${km.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`;
 
 /**
- * Ссылка на маршрут до точки. Если метки нет — поиск по адресу.
+ * Ссылка на маршрут до точки target. origin — откуда (по умолчанию — где курьер сейчас). Если метки нет — поиск по адресу.
  * Возвращает { url, fallback }: fallback — веб-версия, если приложения навигатора на телефоне нет.
+ * @param {string} app
+ * @param {{ lat?: number|null, lng?: number|null, address?: string }} target
+ * @param {{ lat: number, lng: number }|null} [origin]
+ * @returns {{ url: string, fallback?: string }}
  */
-export function routeUrl(app, { lat, lng, address = '' }) {
-  const pin = lat != null && lng != null, q = encodeURIComponent(address);
-  const yandexWeb = pin ? `https://yandex.ru/maps/?rtext=~${lat},${lng}&rtt=auto` : `https://yandex.ru/maps/?text=${q}`;
+export function routeUrl(app, { lat, lng, address = '' }, origin = null) {
+  const pin = lat != null && lng != null, q = encodeURIComponent(address), from = origin && hasPin(origin) ? origin : null;
+  const yandexWeb = pin ? `https://yandex.ru/maps/?rtext=${from ? `${from.lat},${from.lng}` : ''}~${lat},${lng}&rtt=auto` : `https://yandex.ru/maps/?text=${q}`;
   switch (app) {
-    case 'yandexnavi': return pin ? { url: `yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lng}`, fallback: yandexWeb } : { url: yandexWeb };
-    case '2gis': return { url: pin ? `https://2gis.ru/routeSearch/rsType/car/to/${lng},${lat}` : `https://2gis.ru/search/${q}` };
-    case 'google': return { url: pin ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving` : `https://www.google.com/maps/search/?api=1&query=${q}` };
+    case '2gis': {
+      // официальная ссылка приложения 2GIS (сначала долгота, потом широта); без «from» 2GIS ведёт от места, где курьер сейчас
+      const path = `routeSearch/rsType/car${from ? `/from/${from.lng},${from.lat}` : ''}/to/${lng},${lat}`;
+      return pin ? { url: `dgis://2gis.ru/${path}`, fallback: `https://2gis.ru/${path}` } : { url: `https://2gis.ru/search/${q}` };
+    }
+    case 'yandexnavi': return pin ? { url: `yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lng}${from ? `&lat_from=${from.lat}&lon_from=${from.lng}` : ''}`, fallback: yandexWeb } : { url: yandexWeb };
+    case 'google': return { url: pin ? `https://www.google.com/maps/dir/?api=1${from ? `&origin=${from.lat},${from.lng}` : ''}&destination=${lat},${lng}&travelmode=driving` : `https://www.google.com/maps/search/?api=1&query=${q}` };
     default: return { url: yandexWeb };
   }
 }

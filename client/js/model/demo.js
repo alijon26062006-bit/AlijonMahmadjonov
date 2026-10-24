@@ -3,7 +3,7 @@
 const week = (from, to) => Array.from({ length: 7 }, () => ({ open: true, from, to }));
 const inDays = n => { const d = new Date(Date.now() + n * 864e5); return d.toISOString().slice(0, 10); };
 let n = 0;
-const P = (cat, name, price, unit, extra = {}) => ({ id: 'p' + ++n, cat, name, price, unit, stock: 50, minStep: unit === 'кг' ? 0.5 : 1, oldPrice: null, imgs: [], desc: '', attrs: {}, variants: [], options: [], labels: [], expiry: '', likes: null, ...extra });
+const P = (cat, name, price, unit, extra = {}) => ({ id: 'p' + ++n, cat, name, price, unit, stock: 50, minStep: unit === 'кг' ? 0.5 : 1, oldPrice: null, imgs: [], desc: '', attrs: {}, variants: [], options: [], labels: [], expiry: '', likes: null, likesN: 0, ...extra });
 
 export const DEMO_SHOPS = [
   {

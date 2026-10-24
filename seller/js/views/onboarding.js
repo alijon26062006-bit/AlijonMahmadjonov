@@ -112,7 +112,8 @@ export function shopFields(s) {
     <div class="field"><label for="s_about">Коротко о магазине</label><textarea class="input" id="s_about" name="about" maxlength="200" placeholder="Чем вы отличаетесь от других">${esc(s.about)}</textarea></div>`;
 }
 export function validateShop(form) {
-  const d = Object.fromEntries(new FormData(form)); const errs = {};
+  /** @type {Record<string, string>} */
+  const d = Object.fromEntries([...new FormData(form)].map(([k, v]) => [k, String(v)])); const errs = {};
   if (!d.name?.trim()) errs.name = 'Введите название';
   if (!d.type) errs.type = 'Выберите, что продаёте';
   if ((d.phone || '').replace(/\D/g, '').length < 9) errs.phone = 'Введите номер полностью';

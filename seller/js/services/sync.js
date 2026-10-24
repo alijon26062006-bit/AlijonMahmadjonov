@@ -15,7 +15,11 @@ let snap = (() => { try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || {
 const keepSnap = () => { try { localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch { /* память переполнена — отправим всё заново */ } };
 
 export const cloud = { user: null, status: 'off', error: '' };   // off | connecting | ok | offline
-let onChange = () => {}, onNewOrder = () => {}, timer = null, busy = false, again = false, channel = null, poll = null, lastPoll = 0;
+/** @type {() => void} */
+let onChange = () => {};
+/** @type {(n: number) => void} */
+let onNewOrder = () => {};
+let timer = null, busy = false, again = false, channel = null, poll = null, lastPoll = 0;
 /** Кабинет передаёт, как перерисовать экран и что делать с новым заказом. */
 export function hooks(h) { onChange = h.render || onChange; onNewOrder = h.newOrder || onNewOrder; }
 

@@ -1,12 +1,12 @@
 import { calc, prodSales, range, trend, ZERO } from '../domain/analytics.js';
 import { lines } from '../domain/orders.js';
-import { addDays, ddmm, dkey, esc, money, parseKey, plural, r2 } from '../lib/format.js';
+import { addDays, ddmm, dkey, esc, money, parseKey, plural, r2, today } from '../lib/format.js';
 import { S, ui } from '../state.js';
 import { copyText } from './catalog.js';
 
 // Статистика
 export function vStats() {
-  const [a, b] = range(), { list, T, top } = calc(a, b);
+  const [a, b] = range(), { list, T } = calc(a, b);
   const avg = T.orders ? T.rev / T.orders : 0, margin = T.rev ? Math.round(T.profit / T.rev * 100) : 0;
   const per = (k, l) => `<button class="chip" data-period="${k}" aria-pressed="${ui.period === k}">${l}</button>`;
   const max = Math.max(1, ...list.map(d => d.rev));
@@ -58,7 +58,7 @@ export function vStats() {
     </section>`;
 }
 export function productTable(a, b) {
-  const n = Math.round((parseKey(b) - parseKey(a)) / 864e5) + 1;
+  const n = Math.round((+parseKey(b) - +parseKey(a)) / 864e5) + 1;
   const cur = prodSales(a, b), prev = prodSales(addDays(a, -n), addDays(a, -1));
   const rows = S.products.map(p => ({ p, ...(cur[p.id] || ZERO), prevQty: (prev[p.id] || ZERO).qty })).sort((x, y) => y.rev - x.rev || y.qty - x.qty);
   const total = rows.reduce((t, r) => t + r.rev, 0) || 1;

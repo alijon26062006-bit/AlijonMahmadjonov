@@ -11,7 +11,7 @@ export function range() {
   if (ui.period === '30') return [addDays(t, -29), t];
   if (ui.period === 'month') return [t.slice(0, 8) + '01', t];
   let a = ui.from, b = ui.to; if (a > b) [a, b] = [b, a];
-  if ((parseKey(b) - parseKey(a)) / 864e5 > 366) a = addDays(b, -366);
+  if ((+parseKey(b) - +parseKey(a)) / 864e5 > 366) a = addDays(b, -366);
   return [a, b];
 }
 export function calc(a, b) {

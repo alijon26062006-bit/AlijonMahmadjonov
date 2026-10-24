@@ -1,0 +1,20 @@
+{
+  // Проверка всего проекта без сборки: npx tsc  (код остаётся JavaScript, ошибки типов видны до запуска)
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "es2023"],
+    "strict": false,
+    "noImplicitThis": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["types/**/*.d.ts", "seller/js/**/*.js", "client/js/**/*.js", "courier/js/**/*.js"],
+  "exclude": ["**/vendor/**"]
+}

@@ -30,6 +30,7 @@ const ICONS = {
   burger: '<path d="M4 10a8 5 0 0 1 16 0zM3 13h18M5 16h14a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3z"/>',
   bag: '<path d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2"/>',
 };
+/** @type {Array<[RegExp, string]>} */
 const RULES = [
   [/наушник|buds|airpods/i, 'headphones'], [/чехол|чехл|стекл|плёнк|пленк/i, 'phonecase'], [/зарядк|зарядн|кабел|переходник|держател|автомоб/i, 'charger'], [/пауэрбанк|power/i, 'battery'], [/колонк|jbl flip/i, 'speaker'],
   [/орех|сухофрукт|курага|миндал/i, 'nut'], [/овощ|зелен|помидор|огур|картоф|лук/i, 'veg'], [/фрукт|ягод|яблок|гранат|виноград/i, 'fruit'], [/молоч|молоко|кефир|чакка|яйц/i, 'milk'],
@@ -42,7 +43,7 @@ const RULES = [
 
 export function art(p) {
   const text = `${p.cat} ${p.name}`;
-  const key = (RULES.find(([re]) => re.test(text)) || [, 'bag'])[1];
+  const key = RULES.find(([re]) => re.test(text))?.[1] || 'bag';
   return `<span class="art" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[key]}</svg></span>`;
 }
 export const pic = (p, cls = '') => p.imgs?.[0] ? `<img class="${cls}" src="${p.imgs[0]}" alt="${esc(p.name)}" loading="lazy">` : art(p);

@@ -7,17 +7,20 @@ import { activeJob, cancelledJob, K, reset, rt, save } from './state.js';
 import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } from './ui/dom.js';
 import { onSlide } from './ui/slide.js';
 import { authActions, vRegister, vWelcome } from './views/auth.js';
-import { doStep, jobActions, mmss, setCurrent, vCancelled, vDone, vJob } from './views/job.js';
+import { doStep, jobActions, mmss, openRoute, setCurrent, vCancelled, vDone, vJob } from './views/job.js';
 import { moneyActions, vMoney } from './views/money.js';
 import { applyTheme, profileActions, vProfile } from './views/profile.js';
 import { vShift } from './views/shift.js';
+import { crashScreen, guardGlobal } from './lib/guard.js';
 
 // Приложение курьера: экраны, смена на линии, лента заказов, живые обновления, место курьера.
 
 const TABS = [['shift', '#/', 'Смена', 'bike'], ['money', '#/money', 'Доход', 'wallet'], ['profile', '#/profile', 'Профиль', 'user']];
 setCurrent(activeJob);
 
-export function render() {
+/** Нарисовать экран. Если в каком-то экране ошибка — вместо белого экрана «Что-то пошло не так» и «Обновить». */
+export function render() { try { draw(); } catch (e) { crashScreen(app, e); } }
+function draw() {
   applyTheme();
   if (!K.phone) { app.innerHTML = vWelcome(); return; }
   if (!K.me || location.hash === '#/register') { app.innerHTML = vRegister(); return; }
@@ -29,7 +32,7 @@ export function render() {
   else if (c) html = vCancelled(c);
   else if (j) { html = vJob(j); dock = true; }
   else html = vShift();
-  const typing = document.activeElement?.id === 'code', caret = typing ? document.activeElement.selectionStart : 0, y = window.scrollY;
+  const active = /** @type {HTMLInputElement|null} */ (document.activeElement), typing = active?.id === 'code', caret = typing ? active.selectionStart : 0, y = window.scrollY;
   app.innerHTML = `<main class="page ${dock ? 'has-dock' : ''}" id="main">${html}</main>
     <nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'shift' && j && tab !== 'shift' ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`;
   window.scrollTo(0, y);
@@ -137,6 +140,7 @@ on('take', async el => {
     const j = await api.take(el.dataset.id);
     K.jobs = [j, ...K.jobs.filter(x => x.id !== j.id)]; rt.feed = rt.feed.filter(o => o.id !== j.id); save();
     vibrate([40, 40, 40]); toast('Заказ ваш! Едем в магазин'); window.scrollTo(0, 0);
+    if (K.autoRoute) openRoute(j);   // навигатор сам строит путь до магазина
   } catch (e) { toast(e.message); refreshFeed(); }
   finally { rt.busy = false; }
 });
@@ -180,5 +184,6 @@ async function install() {
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 document.title = tr(BRAND + ' Курьер');
+guardGlobal(toast);   // ошибки в фоне — подсказка, а не зависший экран
 startTranslating();
 boot();
