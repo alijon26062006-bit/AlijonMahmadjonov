@@ -57,6 +57,10 @@ fs.mkdirSync(OUT, { recursive: true });
   await scan(kp, 'courier'); await kp.screenshot({ path: OUT + '/k1-offer.png', fullPage: true });
   await kp.evaluate(() => { window.__opened = []; addEventListener('zud:open', e => window.__opened.push(e.detail)); });
   await kp.click('[data-a="take"]'); await kp.waitForTimeout(700);
+  // карта никогда не пустая молча: либо улицы загрузились, либо видна понятная надпись (источники перебираются сами)
+  await kp.waitForTimeout(2500);
+  const mapOk = await kp.evaluate(() => !!document.querySelector('#map-layer .leaflet-tile-loaded') || !!document.querySelector('#map-layer.nomap .nomap-note'));
+  if (!mapOk) errs.push('courier: map is blank without explanation');
   // взял заказ — 2GIS сам строит путь до магазина
   const opened1 = await kp.evaluate(() => window.__opened); if (!opened1.includes('dgis://2gis.ru/routeSearch/rsType/car/to/76.8897,43.2389')) errs.push('courier: 2GIS route to shop not opened: ' + opened1);
   await scan(kp, 'courier'); await kp.screenshot({ path: OUT + '/k2-to-shop.png', fullPage: true });

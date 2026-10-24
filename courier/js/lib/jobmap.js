@@ -41,19 +41,38 @@ const GLYPH = {
   client: '<path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>',
 };
 
-function useTiles() {
+// Источники улиц по очереди: если один не отдаёт плитки (сеть, блокировка, правила), берём следующий сам.
+// Все без ключа; MapTiler — первым, если в config.js вписан ключ.
+const sources = () => [
+  ...(MAP.maptilerKey ? [{ name: 'MapTiler', dark: true, url: d => `https://api.maptiler.com/maps/${d ? 'streets-v2-dark' : 'streets-v2'}/256/{z}/{x}/{y}.png?key=${MAP.maptilerKey}`, attribution: '&copy; MapTiler &copy; OpenStreetMap' }] : []),
+  { name: 'OpenStreetMap', url: () => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap' },
+  { name: 'OpenStreetMap France', url: () => 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', subdomains: 'abc', attribution: '&copy; OpenStreetMap France' },
+  { name: 'Esri', url: () => 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: 'Tiles &copy; Esri' },
+];
+let srcIdx = 0, loaded = 0, failed = 0;
+
+function useTiles(force = false) {
   const want = dark();
-  if (tiles && tileDark === want) return;
+  if (tiles && tileDark === want && !force) return;
   tiles?.remove();
-  const key = MAP.maptilerKey;
-  tiles = key
-    ? L.tileLayer(`https://api.maptiler.com/maps/${want ? 'streets-v2-dark' : 'streets-v2'}/256/{z}/{x}/{y}.png?key=${key}`,
-      { maxZoom: 19, attribution: '&copy; MapTiler &copy; OpenStreetMap' })
-    : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+  const list = sources(), src = list[srcIdx];
+  if (!src) { showNoMap(); return; }
+  loaded = 0; failed = 0;
+  tiles = L.tileLayer(src.url(want), { maxZoom: 19, attribution: src.attribution, subdomains: src.subdomains || 'abc' });
+  // плитки не грузятся, а ни одна ещё не пришла — переходим к следующему источнику
+  tiles.on('tileload', () => { loaded++; layer().classList.remove('nomap'); });
+  tiles.on('tileerror', () => {
+    failed++;
+    if (!loaded && failed >= 4) { console.warn('map tiles failed:', src.name); srcIdx++; useTiles(true); }
+  });
   tiles.addTo(map);
-  // у OpenStreetMap нет тёмной подложки — перекрашиваем плитки фильтром (у MapTiler тёмная своя)
-  layer().classList.toggle('dark-tiles', want && !key);
+  // у кого нет тёмной подложки — перекрашиваем плитки фильтром
+  layer().classList.toggle('dark-tiles', want && !src.dark);
   tileDark = want;
+}
+function showNoMap() {
+  const el = layer(); el.classList.add('nomap');
+  if (!el.querySelector('.nomap-note')) el.insertAdjacentHTML('beforeend', '<div class="nomap-note">Улицы на карте не загрузились. Маршрут и кнопки работают — нажмите «Маршрут»</div>');
 }
 
 function setMark(key, p, html, size, anchor, z = 0) {
@@ -103,7 +122,7 @@ export async function showJobMap(s) {
 async function update(s) {
   const el = layer(); if (!el || !wanted) return;
   el.hidden = false; document.body.classList.add('has-map');
-  try { L = await loadLeaflet(); } catch { el.classList.add('nomap'); return; }
+  try { L = await loadLeaflet(); } catch { showNoMap(); return; }
   if (!wanted) return;   // пока грузилась библиотека, заказ закрыли
   if (!map) {
     map = L.map(el, { zoomControl: false, attributionControl: true, tap: true });
