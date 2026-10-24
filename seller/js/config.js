@@ -29,11 +29,13 @@ export const WEIGHT_STEPS = [0.1, 0.25, 0.5, 1];
 
 // Работаем только в Шахритусском районе: центр — посёлок Тус (бывш. Шахритус). Зона — круг 15 км вокруг посёлка.
 // То же значение стоит в приложении покупателя (client/js/config.js) — меняются вместе.
-export const SERVICE_AREA = { name: 'Шахритус', lat: 37.267, lng: 68.133, radiusKm: 15 };
+// ТЕСТ: open: true — зона открыта, карта и доставка работают в любом городе и стране.
+// Перед запуском для людей поставить open: false здесь, в другом приложении и в базе (private.zone_open).
+export const SERVICE_AREA = { name: 'Шахритус', lat: 37.267, lng: 68.133, radiusKm: 15, open: true };
 export const CITIES = [{ name: 'Шахритус', lat: 37.267, lng: 68.133 }];
 /** Точка в зоне работы? Без метки считаем, что магазин в посёлке. */
 export function inZone(p) {
-  if (p?.lat == null || p?.lng == null) return true;
+  if (SERVICE_AREA.open || p?.lat == null || p?.lng == null) return true;
   const r = d => d * Math.PI / 180, dLat = r(p.lat - SERVICE_AREA.lat), dLng = r(p.lng - SERVICE_AREA.lng);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(SERVICE_AREA.lat)) * Math.cos(r(p.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(h)) <= SERVICE_AREA.radiusKm;

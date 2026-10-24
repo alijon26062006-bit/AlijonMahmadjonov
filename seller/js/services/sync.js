@@ -28,7 +28,7 @@ const IF_MISSING = { call: 'Если чего-то нет — позвонить
 const shopId = () => S?.shop?.cloudId;
 const shopRow = () => {
   const sh = S.shop;
-  return { name: sh.name, kind: sh.kind || kindOf(sh).id, phone: sh.phone || '', city: sh.city || 'Шахритус', address: sh.address || '', landmark: sh.landmark || '',
+  return { name: sh.name, kind: sh.kind || kindOf(sh).id, phone: sh.phone || '', city: sh.city || '', address: sh.address || '', landmark: sh.landmark || '',
     lat: sh.lat ?? null, lng: sh.lng ?? null, about: (sh.about || '').slice(0, 300), logo: sh.logo || '', cover: sh.cover || '', banner: sh.banner || '',
     paused: !!sh.paused, min_order: sh.minOrder || 0, prep_min: sh.prep || 30, delivery: sh.delivery !== false, pickup: sh.pickup !== false,
     schedule: sh.schedule || [], cats: S.cats || [] };

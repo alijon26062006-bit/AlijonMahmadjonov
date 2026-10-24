@@ -23,13 +23,15 @@ export function straightKm(a, b) {
 }
 const hasPin = x => x?.lat != null && x?.lng != null;
 /** Точка в зоне работы сервиса? Без метки на карте считаем, что адрес в посёлке. */
-export const inZone = x => !hasPin(x) || straightKm(SERVICE_AREA, x) <= SERVICE_AREA.radiusKm;
+export const inZone = x => SERVICE_AREA.open || !hasPin(x) || straightKm(SERVICE_AREA, x) <= SERVICE_AREA.radiusKm;
 // без метки на карте берём центр посёлка и честно помечаем расчёт как примерный
 const point = (x, city) => hasPin(x) ? { lat: x.lat, lng: x.lng, exact: true } : { ...(CITIES.find(c => c.name === city) || CITIES[0]), exact: false };
 
 /** Путь от магазина до адреса: км по дороге, минуты, точный ли расчёт, можно ли доставить. */
 export function route(shop, addr = C.addr) {
-  const from = point(shop, shop.city), to = point(addr, addr?.city || shop.city);
+  let from = point(shop, shop.city), to = point(addr, addr?.city || shop.city);
+  // тест в любом городе: у кого нет метки, того считаем рядом с другим, а не в Шахритусе
+  if (SERVICE_AREA.open && from.exact !== to.exact) { if (from.exact) to = { ...from, exact: false }; else from = { ...to, exact: false }; }
   const km = Math.max(0.3, Math.round(straightKm(from, to) * TARIFF.roadFactor * 10) / 10);
   return { km, min: Math.round(TARIFF.pickupMin + km * TARIFF.minPerKm), exact: from.exact && to.exact && !!addr, ok: km <= TARIFF.maxKm && inZone(addr) };
 }

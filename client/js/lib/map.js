@@ -64,15 +64,28 @@ export function locate() {
   });
 }
 
-/** Адрес по координатам: «улица, дом». Пустая строка, если сервис не ответил. */
-export async function addressAt({ lat, lng }) {
+/** Место по координатам: улица с домом и город. Пустые строки, если сервис не ответил. */
+export async function placeAt({ lat, lng }) {
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&accept-language=ru`);
-    if (!r.ok) return '';
+    if (!r.ok) return { street: '', city: '' };
     const a = (await r.json()).address || {};
     const street = a.road || a.pedestrian || a.neighbourhood || a.suburb || '';
-    return [street, a.house_number].filter(Boolean).join(', ');
+    return { street: [street, a.house_number].filter(Boolean).join(', '), city: a.city || a.town || a.village || a.municipality || a.county || '' };
   } catch {
-    return '';
+    return { street: '', city: '' };
+  }
+}
+/** Адрес по координатам: «улица, дом». Пустая строка, если сервис не ответил. */
+export const addressAt = async pt => (await placeAt(pt)).street;
+
+/** Найти город или адрес по названию: { lat, lng } или null. */
+export async function findPlace(q) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
+    const [f] = r.ok ? await r.json() : [];
+    return f ? { lat: +(+f.lat).toFixed(6), lng: +(+f.lon).toFixed(6) } : null;
+  } catch {
+    return null;
   }
 }

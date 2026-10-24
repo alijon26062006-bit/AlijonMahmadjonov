@@ -2,7 +2,7 @@ import { go, render } from '../app.js';
 import { CITIES, DAYS, inZone, kindOf, SERVICE_AREA, SHOP_KINDS } from '../config.js';
 import { blankShop } from '../demo.js';
 import { esc, fmtPhone } from '../lib/format.js';
-import { addressAt, locate, mountPicker } from '../lib/map.js';
+import { findPlace, locate, mountPicker, placeAt } from '../lib/map.js';
 import { auth } from '../services/storage.js';
 import { S, save, setS } from '../state.js';
 import { $, app, closeSheet, ICON, onSheetClose, openSheet, toast } from '../ui/dom.js';
@@ -17,7 +17,7 @@ const PRESETS = { daily: 'Каждый день', weekdays: 'Будни', custom
 
 const fresh = () => ({
   step: 0, kind: '', name: '', phone: auth.phone || '', logo: '', about: '',
-  city: CITIES[0].name, lat: null, lng: null, address: '', addrAuto: true, landmark: '',
+  city: SERVICE_AREA.open ? '' : CITIES[0].name, lat: null, lng: null, address: '', addrAuto: true, landmark: '',
   preset: 'daily', from: '09:00', to: '21:00', days: DAYS.map(() => true),
   delivery: true, pickup: true, prep: 30,
 });
@@ -28,6 +28,10 @@ const forget = () => { try { localStorage.removeItem(DRAFT_KEY); } catch {} };
 let picker = null;
 const dropPicker = () => { picker?.destroy(); picker = null; };
 const cityOf = name => CITIES.find(c => c.name === name) || CITIES[0];
+// город: в тестовом режиме — любой, вписывают сами (карта переходит туда); потом — выбор из городов сервиса
+const cityField = st => SERVICE_AREA.open
+  ? `<div class="field"><label for="r_city">Город</label><input class="input" id="r_city" value="${esc(st.city)}" maxlength="60" placeholder="Например, Алматы" autocomplete="address-level2"><span class="tiny muted">Тестовый режим: работаем в любом городе. Впишите город — карта перейдёт туда</span></div>`
+  : `<div class="field"><label for="r_city">Город</label><select class="input" id="r_city">${CITIES.map(c => `<option ${c.name === st.city ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>`;
 
 // ---------- экраны ----------
 
@@ -75,7 +79,7 @@ function stepShop() {
 
 function stepPlace() {
   return `<h1>Где находится магазин</h1>
-    <div class="field"><label for="r_city">Город</label><select class="input" id="r_city">${CITIES.map(c => `<option ${c.name === R.city ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>
+    ${cityField(R)}
     <div class="map-box"><div id="r_map" class="map" role="application" aria-label="Карта: перетащите метку на место магазина"></div>
       <button class="btn sm gps" data-reg="locate"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Определить моё место</button></div>
     <span class="small muted" id="r_maphint">Нажмите на карту или перетащите метку туда, где вход в магазин.</span>
@@ -107,7 +111,7 @@ function stepReview() {
     <div class="panel col" style="gap:0;padding:4px 16px">
       ${row(`Тип: ${k.name}. Единицы: ${k.units.join(', ')}`, 0)}
       ${row(`+992 ${fmtPhone(R.phone)}`, 1)}
-      ${row(`${esc(R.city)}, ${esc(R.address)}${R.landmark ? `<br><span class="small muted">${esc(R.landmark)}</span>` : ''}${R.lat ? '' : '<br><span class="small" style="color:var(--warn)">Метка на карте не поставлена</span>'}`, 2)}
+      ${row(`${esc([R.city, R.address].filter(Boolean).join(', '))}${R.landmark ? `<br><span class="small muted">${esc(R.landmark)}</span>` : ''}${R.lat ? '' : '<br><span class="small" style="color:var(--warn)">Метка на карте не поставлена</span>'}`, 2)}
       ${row(`${scheduleText()} · ${[R.delivery && 'доставка', R.pickup && 'самовывоз'].filter(Boolean).join(' и ')} · сборка ${R.prep} мин`, 3)}
     </div>
     <p class="small muted" style="margin:0">Создадим ${k.cats.length} готовых категорий: ${k.cats.slice(0, 4).join(', ')} и другие. Лишние можно не использовать, свои — добавить.</p>`;
@@ -127,10 +131,16 @@ async function startMap(el, state = R, onChange = () => keep()) {
     picker = await mountPicker(el, { lat: state.lat ?? c.lat, lng: state.lng ?? c.lng, zoom: state.lat ? 17 : 13 }, async p => {
       Object.assign(state, p);
       onChange();
-      if (!state.addrAuto && state.address) return;
-      const a = await addressAt(p);
-      if (a) { state.address = a; state.addrAuto = true; const inp = $('#r_address'); if (inp) inp.value = a; onChange(); }
+      if (!state.addrAuto && state.address && (state.city || !SERVICE_AREA.open)) return;
+      const { street: a, city } = await placeAt(p);
+      if (SERVICE_AREA.open && city && !state.city) { state.city = city; const ci = $('#r_city'); if (ci) ci.value = city; onChange(); }
+      if (a && (state.addrAuto || !state.address)) { state.address = a; state.addrAuto = true; const inp = $('#r_address'); if (inp) inp.value = a; onChange(); }
     });
+    // тест в любом городе: метки ещё нет — показываем карту там, где продавец, или вписанный город
+    if (SERVICE_AREA.open && state.lat == null) {
+      const p = await locate().catch(() => null) || (state.city ? await findPlace(state.city) : null);
+      if (p && state.lat == null) picker?.moveTo(p.lat, p.lng, 16);
+    }
   } catch (err) {
     el.innerHTML = `<div class="map-fail">${esc(err.message)}<br>Адрес можно ввести вручную.</div>`;
     if (hint) hint.hidden = true;
@@ -174,7 +184,7 @@ function schedule() {
 function create() {
   const k = kindOf({ kind: R.kind });
   const shop = {
-    ...blankShop({ name: R.name.trim(), type: k.name, phone: '+992 ' + fmtPhone(R.phone), address: `${R.city}, ${R.address.trim()}`, about: R.about.trim() }),
+    ...blankShop({ name: R.name.trim(), type: k.name, phone: '+992 ' + fmtPhone(R.phone), address: [R.city, R.address.trim()].filter(Boolean).join(', '), about: R.about.trim() }),
     kind: k.id, city: R.city, lat: R.lat, lng: R.lng, landmark: R.landmark.trim(), logo: R.logo,
     schedule: schedule(), delivery: R.delivery, pickup: R.pickup, prep: R.prep,
   };
@@ -225,7 +235,8 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (!t.closest('.wizard, .place-sheet')) return;
   const state = t.closest('.place-sheet') ? P : R;
-  if (t.id === 'r_city') { state.city = t.value; const c = cityOf(t.value); picker?.moveTo(c.lat, c.lng, 13); }
+  if (t.id === 'r_city' && SERVICE_AREA.open) { state.city = t.value.trim(); const p = state.city && await findPlace(state.city); if (p) picker?.moveTo(p.lat, p.lng, 13); }
+  else if (t.id === 'r_city') { state.city = t.value; const c = cityOf(t.value); picker?.moveTo(c.lat, c.lng, 13); }
   if (/^r_day\d$/.test(t.id)) R.days[+t.id.slice(5)] = t.checked;
   if (t.id === 'r_delivery') R.delivery = t.checked;
   if (t.id === 'r_pickup') R.pickup = t.checked;
@@ -243,11 +254,11 @@ onSheetClose(() => { if (P) { dropPicker(); P = null; } });
 
 export function sheetPlace() {
   const sh = S.shop;
-  P = { city: sh.city || CITIES[0].name, lat: sh.lat ?? null, lng: sh.lng ?? null,
+  P = { city: sh.city || (SERVICE_AREA.open ? '' : CITIES[0].name), lat: sh.lat ?? null, lng: sh.lng ?? null,
         address: sh.city && sh.address.startsWith(sh.city + ', ') ? sh.address.slice(sh.city.length + 2) : sh.address,
         addrAuto: false, landmark: sh.landmark || '' };
   openSheet('Адрес магазина', `<div class="place-sheet col">
-    <div class="field"><label for="r_city">Город</label><select class="input" id="r_city">${CITIES.map(c => `<option ${c.name === P.city ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>
+    ${cityField(P)}
     <div class="map-box"><div id="r_map" class="map" role="application" aria-label="Карта: перетащите метку на место магазина"></div>
       <button class="btn sm gps" data-reg="locate"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Определить моё место</button></div>
     <span class="small muted" id="r_maphint">Нажмите на карту или перетащите метку туда, где вход в магазин.</span>
@@ -261,6 +272,6 @@ export function sheetPlace() {
 function savePlace() {
   if (!P.address.trim()) { toast('Укажите улицу и дом'); return $('#r_address').focus(); }
   if (!inZone(P)) return toast('Пока работаем только в Шахритусском районе. Поставьте метку там, где магазин');
-  Object.assign(S.shop, { city: P.city, lat: P.lat, lng: P.lng, landmark: P.landmark.trim(), address: `${P.city}, ${P.address.trim()}` });
+  Object.assign(S.shop, { city: P.city, lat: P.lat, lng: P.lng, landmark: P.landmark.trim(), address: [P.city, P.address.trim()].filter(Boolean).join(', ') });
   save(); closeSheet(); render(); toast('Адрес сохранён');
 }
