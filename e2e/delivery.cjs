@@ -6,7 +6,7 @@ fs.mkdirSync(OUT, { recursive: true });
 (async () => {
   const srv = await server.start(), R = srv.url;
   const b = await chromium.launch(); const errs = [];
-  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, geolocation: { latitude: 43.2395, longitude: 76.8905 }, permissions: ['geolocation'] });
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: process.env.DARK ? 'dark' : 'light', geolocation: { latitude: 43.2395, longitude: 76.8905 }, permissions: ['geolocation'] });
   await ctx.route(/supabase\.co|fonts\.g|unpkg|openstreetmap/, r => r.abort());
   await ctx.addInitScript(MOCK); await ctx.addInitScript(l => { if (!localStorage.getItem('zud-lang')) localStorage.setItem('zud-lang', l); }, LANG);
   const sp = await ctx.newPage(), cp = await ctx.newPage(), kp = await ctx.newPage();
@@ -60,7 +60,7 @@ fs.mkdirSync(OUT, { recursive: true });
   // взял заказ — 2GIS сам строит путь до магазина
   const opened1 = await kp.evaluate(() => window.__opened); if (!opened1.includes('dgis://2gis.ru/routeSearch/rsType/car/to/76.8897,43.2389')) errs.push('courier: 2GIS route to shop not opened: ' + opened1);
   await scan(kp, 'courier'); await kp.screenshot({ path: OUT + '/k2-to-shop.png', fullPage: true });
-  if (!(await kp.textContent('.say')).includes(String((await DB()).t.orders[0].no))) errs.push('courier: order number not shown');
+  if (!(await kp.textContent('.order-no')).includes(String((await DB()).t.orders[0].no))) errs.push('courier: order number not shown');
   // ---- покупатель и продавец видят курьера ----
   await cp.waitForTimeout(5500);
   const ctext = await cp.textContent('main'); if (!ctext.includes('Алишер') || !ctext.includes('01 123 AA')) errs.push('client: no courier card');
@@ -77,7 +77,7 @@ fs.mkdirSync(OUT, { recursive: true });
   await kp.waitForTimeout(700); await scan(kp, 'courier'); await kp.screenshot({ path: OUT + '/k4-to-client.png', fullPage: true });
   // забрал — 2GIS сам строит путь до покупателя
   const opened2 = await kp.evaluate(() => window.__opened || []); console.log('2GIS:', opened2.join('  |  ')); if (opened2.length < 2) errs.push('courier: 2GIS route to client not opened: ' + opened2);
-  if (!(await kp.textContent('.paybox')).includes('смн')) errs.push('courier: no cash box');
+  if (!(await kp.textContent('.ir-v.cash')).includes('смн')) errs.push('courier: no cash box');
   await cp.waitForTimeout(5500); if (LANG === 'ru' && !(await cp.textContent('h1')).includes('Курьер в пути')) errs.push('client: not in transit: ' + await cp.textContent('h1'));
   // ---- у двери: неверный код, потом верный ----
   await slide(kp, 'Я у покупателя');

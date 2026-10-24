@@ -7,7 +7,8 @@ import { activeJob, cancelledJob, K, reset, rt, save } from './state.js';
 import { $, actions, app, closeSheet, ico, on, openSheet, sheetOpen, toast } from './ui/dom.js';
 import { onSlide } from './ui/slide.js';
 import { authActions, vRegister, vWelcome } from './views/auth.js';
-import { doStep, jobActions, mmss, openRoute, setCurrent, vCancelled, vDone, vJob } from './views/job.js';
+import { doStep, jobActions, mapState, mmss, openRoute, setCurrent, vCancelled, vDone, vJob } from './views/job.js';
+import { hideJobMap, onRouteReady, recenter, showJobMap } from './lib/jobmap.js';
 import { moneyActions, vMoney } from './views/money.js';
 import { applyTheme, profileActions, vProfile } from './views/profile.js';
 import { vShift } from './views/shift.js';
@@ -33,9 +34,12 @@ function draw() {
   else if (j) { html = vJob(j); dock = true; }
   else html = vShift();
   const active = /** @type {HTMLInputElement|null} */ (document.activeElement), typing = active?.id === 'code', caret = typing ? active.selectionStart : 0, y = window.scrollY;
-  app.innerHTML = `<main class="page ${dock ? 'has-dock' : ''}" id="main">${html}</main>
-    <nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'shift' && j && tab !== 'shift' ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`;
+  const sheetY = $('.job-sheet')?.scrollTop || 0;   // карточку доставки курьер мог прокрутить — не сбрасываем
+  // во время доставки вкладок нет: экран целиком — карта и карточка заказа (как в приложениях такси)
+  app.innerHTML = `<main class="page ${dock ? 'job-page' : ''}" id="main">${html}</main>
+    ${dock ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'shift' && j && tab !== 'shift' ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
   window.scrollTo(0, y);
+  if (dock) { const sh = $('.job-sheet'); if (sh) sh.scrollTop = sheetY; showJobMap(mapState(j)); } else hideJobMap();
   if (typing) { const i = $('#code'); i?.focus(); i?.setSelectionRange(caret, caret); }
 }
 // перерисовать само, если курьер сейчас ничего не трогает: не открыта шторка, не тянет ползунок
@@ -145,6 +149,8 @@ on('take', async el => {
   finally { rt.busy = false; }
 });
 on('install', () => { install(); return false; });
+on('recenter', () => { const j = activeJob(); if (j) recenter(mapState(j)); return false; });
+onRouteReady(() => soft());   // посчитали путь — показать «7 мин · 2,1 км»
 onSlide((act, el) => { if (act === 'step') doStep(el).then(render); });
 
 document.addEventListener('submit', e => e.preventDefault());

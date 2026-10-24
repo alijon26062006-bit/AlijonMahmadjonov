@@ -7,6 +7,7 @@ import * as api from '../services/api.js';
 import { K, rt, save } from '../state.js';
 import { $, closeSheet, ico, openSheet, toast, twice } from '../ui/dom.js';
 import { slider } from '../ui/slide.js';
+import { route } from '../lib/jobmap.js';
 import { dayStats } from './shift.js';
 
 // Доставка по шагам. На экране только то, что нужно сейчас: куда ехать, кому звонить, что сказать, что взять.
@@ -28,70 +29,83 @@ const target = j => toShop(j)
 const waitLeft = j => K.waitFrom[j.id] ? Math.max(0, WAIT_CLIENT_MIN * 60000 - (Date.now() - K.waitFrom[j.id])) : null;
 export const mmss = ms => `${pad(Math.floor(ms / 60000))}:${pad(Math.floor(ms / 1000) % 60)}`;
 
-function readyLine(j) {
-  if (j.status === 'ready' || j.status === 'done') return `<span class="pill ok">${ico('check', 'xs')} Заказ собран — можно забирать</span>`;
+function readyRow(j) {
+  if (j.status === 'ready' || j.status === 'done') return `<div class="ir"><span class="ir-l">Готовность</span><b class="ir-v ok">${ico('check', 'xs')} Собран</b></div>`;
   const min = j.readyAt ? Math.round((j.readyAt - Date.now()) / 60000) : null;
-  return `<span class="pill">${ico('clock', 'xs')} ${min > 0 ? `Магазин собирает · готов через ${min} мин` : 'Магазин собирает, скоро будет готов'}</span>`;
+  return `<div class="ir"><span class="ir-l">Готовность</span><b class="ir-v num">${min > 0 ? `через ${min} мин` : 'скоро'}</b></div>`;
 }
 
 function itemsList(j) {
   const ticked = K.checked[j.id] || [];
-  const rows = j.items.map((i, n) => {
-    const q = i.missing ? 0 : i.actual ?? i.qty, on = ticked.includes(n);
-    return `<button class="check-row ${on ? 'on' : ''} ${i.missing ? 'gone' : ''}" data-a="tick" data-n="${n}" aria-pressed="${on}">
-      <span class="box">${on ? ico('check', 'sm') : ''}</span>
-      <span class="grow"><b translate="no">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</b>${i.missing ? '<small>нет в наличии — убрали</small>' : ''}
-        ${i.sub?.status === 'ok' ? `<small>замена: <span translate="no">${esc(i.sub.name)}</span> × ${qtyLabel(+i.sub.qty, i.sub.unit || i.unit)}</small>` : ''}</span>
-      <span class="q num">${i.missing ? '—' : qtyLabel(q, i.unit)}</span></button>`;
-  }).join('');
   const left = j.items.filter((i, n) => !i.missing && !ticked.includes(n)).length;
-  return `<section class="section"><div class="sec-head"><h3>Проверьте пакет</h3><span class="muted small">${left ? `осталось ${left}` : 'всё на месте'}</span></div>
-    <div class="checklist">${rows}</div></section>`;
+  return `<div class="group-t"><span>Проверьте пакет</span><span class="muted">${left ? `осталось ${left}` : 'всё на месте'}</span></div>
+    <div class="group">${j.items.map((i, n) => {
+      const q = i.missing ? 0 : i.actual ?? i.qty, on = ticked.includes(n);
+      return `<button class="check-row ${on ? 'on' : ''} ${i.missing ? 'gone' : ''}" data-a="tick" data-n="${n}" aria-pressed="${on}">
+        <span class="box">${on ? ico('check', 'sm') : ''}</span>
+        <span class="grow"><b translate="no">${esc(i.name)}${i.variant ? ', ' + esc(i.variant) : ''}</b>${i.missing ? '<small>нет в наличии — убрали</small>' : ''}
+          ${i.sub?.status === 'ok' ? `<small>замена: <span translate="no">${esc(i.sub.name)}</span> × ${qtyLabel(+i.sub.qty, i.sub.unit || i.unit)}</small>` : ''}</span>
+        <span class="qty num">${i.missing ? '—' : qtyLabel(q, i.unit)}</span></button>`;
+    }).join('')}</div>`;
 }
 
-function payBox(j) {
-  if (j.pay === 'cash') return `<section class="paybox cash"><small>Возьмите у покупателя наличными</small><b class="huge num">${money(j.total)}</b>
-    <small>товары ${money(j.sum)} + доставка ${money(j.fee)}</small></section>`;
-  return `<section class="paybox paid">${ico('card')}<span><b>Оплачен онлайн</b><small>Деньги с покупателя не берите</small></span></section>`;
+function payRow(j) {
+  return j.pay === 'cash'
+    ? `<div class="ir"><span class="ir-l">Возьмите наличными</span><b class="ir-v cash num">${money(j.total)}</b></div>
+       <div class="ir sub"><span class="ir-l">товары ${money(j.sum)} + доставка ${money(j.fee)}</span></div>`
+    : `<div class="ir"><span class="ir-l">Оплата</span><b class="ir-v ok">${ico('check', 'xs')} Онлайн, деньги не брать</b></div>`;
 }
 
+/** Экран доставки: карта на весь экран (слой #map-layer), снизу карточка с одним главным действием — ползунком. */
 export function vJob(j) {
-  const t = target(j), dist = roadKm(rt.pos, t), idx = STEPS.findIndex(s => s[1].includes(j.step)), [next, label] = NEXT[j.step], left = waitLeft(j);
+  const t = target(j), shop = toShop(j), idx = STEPS.findIndex(s => s[1].includes(j.step)), [next, label] = NEXT[j.step], left = waitLeft(j);
+  const km = route.km ?? roadKm(rt.pos, t);
   return `
-    <header class="job-head">
-      <span class="grow"><small class="num">Заказ № ${j.no}</small><b>${TITLE[j.step]}</b></span>
-      <span class="earn-chip num">+${money(j.earn)}</span>
-      <button class="round" data-a="jobMenu" aria-label="Ещё действия">${ico('dots')}</button>
-    </header>
-    <ol class="steps" aria-label="Этапы доставки">${STEPS.map(([s], i) => `<li class="${i < idx ? 'done' : i === idx ? 'now' : ''}" ${i === idx ? 'aria-current="step"' : ''}><span class="pt">${i < idx ? ico('check', 'xs') : i + 1}</span><span>${s}</span></li>`).join('')}</ol>
-    <section class="target ${toShop(j) ? 'shop' : 'client'}">
-      <span class="tag">${ico(toShop(j) ? 'store' : 'user', 'xs')} ${t.kind}</span>
-      <h2 translate="no">${esc(t.name || '')}</h2>
-      <p class="addr" translate="no">${esc(t.address || 'Адрес не указан')}</p>
-      ${t.note ? `<p class="muted small" translate="no">${esc(t.note)}</p>` : ''}
-      ${dist != null ? `<span class="dist num">${ico('nav', 'xs')} ${kmText(dist)} от вас</span>` : ''}
-      <div class="acts">
-        <button class="btn primary grow" data-a="route">${ico('nav')} ${toShop(j) ? 'Маршрут до магазина' : 'Маршрут до покупателя'}</button>
-        ${t.phone ? `<button class="btn sq" data-a="callTarget" aria-label="Позвонить: ${esc(t.kind)}">${ico('phone')}</button>` : ''}
-        ${!toShop(j) && t.phone ? `<button class="btn sq" data-a="waTarget" aria-label="Написать в WhatsApp">${ico('chat')}</button>` : ''}
-        <button class="btn sq" data-a="copyAddr" aria-label="Скопировать адрес">${ico('copy')}</button>
+    <div class="map-top">
+      <button class="fab" data-a="jobMenu" aria-label="Действия с заказом">${ico('dots')}</button>
+      <span class="map-pill"><b class="num">№ ${j.no}</b><i aria-hidden="true"></i><b class="num plus">+${money(j.earn)}</b></span>
+      <button class="fab" data-a="recenter" aria-label="Показать маршрут целиком">${ico('locate')}</button>
+    </div>
+    <section class="job-sheet ${j.step === 'at_client' ? 'door' : ''}" aria-label="Заказ № ${j.no}">
+      <span class="grab" aria-hidden="true"></span>
+      <div class="prog" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${idx + 1}" aria-label="Этап ${idx + 1} из 4">${STEPS.map((_, i) => `<i class="${i < idx ? 'done' : i === idx ? 'now' : ''}"></i>`).join('')}</div>
+      <div class="lead"><small class="eyebrow">${TITLE[j.step]}</small>
+        <span class="eta-line"><b class="eta num">${route.min != null ? `${route.min} мин` : km != null ? kmText(km) : STEPS[idx][0]}</b>${route.min != null && km != null ? `<span class="eta-km num">${kmText(km)}</span>` : ''}</span></div>
+      <div class="who">
+        <span class="who-ico ${shop ? 'shop' : 'client'}">${ico(shop ? 'store' : 'home')}</span>
+        <span class="grow"><small>${t.kind}</small><b translate="no">${esc(t.name || '')}</b><span class="addr" translate="no">${esc(t.address || 'Адрес не указан')}</span>${t.note ? `<span class="note-l" translate="no">${esc(t.note)}</span>` : ''}</span>
       </div>
-      ${toShop(j) ? `<button class="link-btn" data-a="routeFull">${ico('route', 'sm')} Весь путь: магазин → покупатель${j.km ? ` · ${kmText(j.km)}` : ''}</button>` : ''}
-    </section>
-    ${toShop(j) ? `
-      <section class="say"><small>Назовите в магазине номер заказа</small><b class="huge num">${j.no}</b>${readyLine(j)}</section>
-      ${itemsList(j)}`
-    : `${payBox(j)}
-      ${j.step === 'at_client' ? `<section class="code-box">
-        <label for="code">Код от покупателя</label>
-        <input id="code" class="code-in num" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" value="${esc(rt.code)}" placeholder="····">
-        <small class="muted">Покупатель видит 4 цифры в своём приложении. Без кода заказ не закрыть — это защита и вас, и покупателя</small></section>` : ''}
-      ${left != null ? `<section class="wait ${left ? '' : 'over'}">${ico('timer')}<span class="grow"><b>${left ? 'Ждём покупателя' : 'Покупатель так и не ответил'}</b>
-          <small>${left ? 'Звоните и пишите ему. Через 10 минут можно вернуть заказ в магазин' : 'Можно вернуть заказ в магазин'}</small></span>
-          ${left ? `<b class="num" id="waitT">${mmss(left)}</b>` : `<button class="btn sm" data-a="giveBack">Вернуть</button>`}</section>` : ''}`}
-    ${j.comment ? `<section class="note">${ico('chat', 'sm')}<span translate="no">${esc(j.comment)}</span></section>` : ''}
-    <div class="dock over-tabs">${slider(label, 'step', { id: j.id, to: next }, next === 'delivered' ? 'go' : '')}</div>`;
+      <div class="quick">
+        <button class="q primary" data-a="route"><span class="qi">${ico('nav')}</span><span>Маршрут</span></button>
+        ${t.phone ? `<button class="q" data-a="callTarget"><span class="qi">${ico('phone')}</span><span>Позвонить</span></button>` : ''}
+        ${!shop && t.phone ? `<button class="q" data-a="waTarget"><span class="qi">${ico('chat')}</span><span>WhatsApp</span></button>` : ''}
+        <button class="q" data-a="copyAddr"><span class="qi">${ico('copy')}</span><span>Адрес</span></button>
+      </div>
+      ${shop ? `
+        <div class="group">
+          <div class="ir"><span class="ir-l">Назовите в магазине</span><b class="ir-v order-no num">№ ${j.no}</b></div>
+          ${readyRow(j)}
+        </div>
+        ${itemsList(j)}
+        <button class="link-btn" data-a="routeFull">${ico('route', 'sm')} Весь путь до покупателя${j.km ? ` · ${kmText(j.km)}` : ''}</button>`
+      : `${j.step === 'at_client' ? `<div class="code-box"><label for="code">Код от покупателя</label>
+          <input id="code" class="code-in num" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" value="${esc(rt.code)}" placeholder="····">
+          <small class="muted">4 цифры в приложении покупателя. Без кода заказ не закрыть</small></div>` : ''}
+        <div class="group">${payRow(j)}</div>
+        ${left != null ? `<div class="wait ${left ? '' : 'over'}">${ico('timer')}<span class="grow"><b>${left ? 'Ждём покупателя' : 'Покупатель не ответил'}</b>
+            <small>${left ? 'Звоните ему. Через 10 минут можно вернуть заказ' : 'Можно вернуть заказ в магазин'}</small></span>
+            ${left ? `<b class="num" id="waitT">${mmss(left)}</b>` : `<button class="btn sm" data-a="giveBack">Вернуть</button>`}</div>` : ''}`}
+      ${j.comment ? `<div class="note">${ico('chat', 'sm')}<span translate="no">${esc(j.comment)}</span></div>` : ''}
+      <div class="sheet-cta">${slider(label, 'step', { id: j.id, to: next }, next === 'delivered' ? 'go' : '')}</div>
+    </section>`;
 }
+
+/** Точки для карты доставки. */
+export const mapState = j => ({
+  me: rt.pos, kind: /** @type {'shop'|'client'} */ (toShop(j) ? 'shop' : 'client'), target: target(j),
+  shop: j.shop?.lat != null ? { lat: j.shop.lat, lng: j.shop.lng } : null,
+  client: j.client?.lat != null ? { lat: j.client.lat, lng: j.client.lng } : null,
+});
 
 /** Экран «Доставлено»: сколько заработал сейчас и за день. */
 export function vDone(j, list) {

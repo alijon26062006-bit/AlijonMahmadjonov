@@ -1,5 +1,5 @@
 // Приложение курьера открывается и без интернета: сначала берём свежую версию из сети, если сети нет — из кэша
-const CACHE = 'courier-v3';
+const CACHE = 'courier-v4';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'manifest.json', 'img/icons/icon-192.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
