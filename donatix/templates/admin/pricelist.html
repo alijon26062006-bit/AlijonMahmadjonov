@@ -2,6 +2,8 @@
 {% from "_icons.html" import icon %}
 {% block title %}Прайс-лист картинкой — админка{% endblock %}
 {% block content %}
+{# Моноширинный шрифт нужен только здесь — для цифр на картинке прайса #}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap">
 <section class="page-hero">
   <h1>Прайс-лист картинкой</h1>
   <p>Цены продажи в сомони — прямо из каталога: наценка сайта {{ data.markup }}%, курс {{ data.rate }} с. за $1.</p>

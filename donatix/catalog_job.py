@@ -107,8 +107,9 @@ def bind_base(base: str) -> None:
 def own_media(url: str | None) -> str | None:
     """Ссылка на картинку НА НАШЕМ сайте — её и отдаём в API. Скачанной копии нет — None:
     ссылку поставщика наружу не отдаём никогда."""
-    if url and url.startswith("/static/"):   # своя обложка (например, FF)
-        return _base + url
+    if url and url.startswith("/static/"):   # своя обложка (например, FF) — с хешем версии, кэш на год
+        from .deps import static_url
+        return _base + static_url(url)
     local = local_url(url)
     if not local or not local.startswith("/media/"):
         return None

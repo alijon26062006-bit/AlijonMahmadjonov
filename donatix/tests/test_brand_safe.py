@@ -44,5 +44,5 @@ def test_ff_cover_everywhere(client, conn, shop, supplier, monkeypatch):
     ff = [i for i in popular.compute(conn) if i["title"].startswith("FF")]
     assert ff and all(i["image_url"] == FF_COVER for i in ff)
     items = client.get("/api/v1/products?category_id=free_fire", headers=shop["h"]).json()["items"]
-    assert items and all(i["image_url"] == "https://donatix.tj" + FF_COVER for i in items)
+    assert items and all(i["image_url"].startswith("https://donatix.tj" + FF_COVER + "?v=") for i in items)
     assert client.get(FF_COVER).status_code == 200

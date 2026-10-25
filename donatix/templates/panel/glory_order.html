@@ -6,7 +6,7 @@
 <div class="od gl">
   <section class="od-card">
     <div class="gl-top">
-      <img src="/static/glory.svg" alt="" width="46" height="46">
+      <img src="{{ static_url('/static/glory.svg') }}" alt="" width="46" height="46">
       <div><h1 class="od-id" id="gl-name">{{ g.clan.name or ('Клан ' ~ g.clan_id) }}</h1>
         <p class="od-sub">Заказ № GL-{{ g.id }} <span aria-hidden="true">•</span> ID {{ g.clan_id }} <span aria-hidden="true">•</span> {{ g.flag }} {{ g.region | upper }}</p></div>
     </div>

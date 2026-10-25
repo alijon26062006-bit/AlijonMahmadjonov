@@ -6,9 +6,7 @@
 <meta name="format-detection" content="telephone=no">
 <title>{{ site_name }} — Stars · Premium · Тӯҳфа</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
+{% include "_fonts.html" %}
 <style>
 /* Цвета и шрифт — как на donatix.tj (static/donatix.css); тема — как у Telegram (светлая / тёмная) */
 :root {
@@ -21,7 +19,7 @@
   --shadow-2: 0 2px 4px rgb(18 21 33 / .04), 0 12px 28px -12px rgb(18 21 33 / .16);
   --shadow-accent: 0 8px 20px -8px color-mix(in srgb, var(--accent) 55%, transparent);
   --r-lg: 20px; --r: 16px; --r-sm: 12px;
-  --font: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font: "Onest", "Onest Fallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --ease: cubic-bezier(.2, .7, .2, 1);
   color-scheme: light;
 }
@@ -204,7 +202,7 @@ nav.tabs button.on svg { transform: translateY(-1px); }
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><img src="/static/logo.svg" alt="" width="32" height="32">Donatix</div>
+<header class="top"><div class="brand"><img src="{{ static_url('/static/logo.svg') }}" alt="" width="32" height="32">Donatix</div>
   <button aria-label="Профиль" data-tab="profile"><div class="ava" id="hava">D</div></button></header>
 <p class="greet"><span data-t="hi"></span> <b id="hname">…</b></p>
 <div id="friday" class="friday hidden"></div>
@@ -307,7 +305,7 @@ function ago(at) {
   if (s < 86400) return t("ago_h", {n: Math.floor(s / 3600)}); return t("ago_d", {n: Math.floor(s / 86400)});
 }
 function ava(name, photo, cls) {
-  if (photo) return `<img class="ava ${cls || ""}" src="${esc(photo)}" alt="">`;
+  if (photo) return `<img class="ava ${cls || ""}" src="${esc(photo)}" alt="" width="40" height="40" loading="lazy" decoding="async">`;
   return `<div class="ava ${cls || ""}">${esc((name || "?").trim().charAt(0).toUpperCase() || "?")}</div>`;
 }
 const IC = {
@@ -428,7 +426,7 @@ function giftSheet(id) {
   const st = {to: "self", friend: ""};
   const draw = () => {
     const sh = sheet(`<div style="text-align:center"><div class="gift" style="border:0;background:none"><div class="pic" style="width:120px;height:120px;font-size:84px"${g.anim ? ` data-anim="${esc(g.anim)}"` : ""}>
-        ${g.img ? `<img src="${g.img}" alt="">` : esc(g.emoji)}</div></div>
+        ${g.img ? `<img src="${g.img}" alt="" width="96" height="96" loading="lazy" decoding="async">` : esc(g.emoji)}</div></div>
       <h3>${g.stars} ★ · ${microTjs(g.price_micro)} ${t("som")}</h3><p class="mut" style="margin:0">${t("from_bot")}</p></div>
       ${toBlock("g", st.to, st.friend)}
       <textarea class="field" id="gtext" maxlength="128" placeholder="${t("gift_msg")}"></textarea>
@@ -475,7 +473,7 @@ function topupView() {
   if (P.pay) return payView();
   const m = curM(), cr = isCrypto(m);
   const methods = D.pay.methods.map(x => `<button class="${x.code === P.method ? "on" : ""}" data-act="pm" data-v="${esc(x.code)}">
-      ${x.icon ? `<img src="${esc(x.icon)}" alt="">` : `<span class="ic" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)">${IC.card}</span>`}
+      ${x.icon ? `<img src="${esc(x.icon)}" alt="" width="36" height="36" loading="lazy" decoding="async">` : `<span class="ic" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)">${IC.card}</span>`}
       <span><b>${esc(x.title)}</b><small>${x.net ? esc(x.net) + " · " : ""}${x.auto ? "⚡ авто" : (LANG === "ru" ? "чек" : "чек")}</small></span></button>`).join("");
   const chips = cr ? [5, 10, 25, 50] : [20, 50, 100, 200];
   const min = cr ? (m.min_usd || D.pay.min_usd) : D.pay.min_tjs;
@@ -641,7 +639,7 @@ refresh();
 
 // ── Анимация подарков как в Telegram: Lottie (из .tgs) или видео-стикер. Пока не загрузилась — картинка.
 // Играют только те, что видно на экране; ушли за край — пауза (батарея и плавность).
-const LOTTIE = "/static/vendor/lottie_light-5.12.2.min.js";   // lottie-web 5.12.2, MIT
+const LOTTIE = "{{ static_url('/static/vendor/lottie_light-5.12.2.min.js') }}";   // lottie-web 5.12.2, MIT
 let lottieP = null;
 const loadLottie = () => lottieP || (lottieP = new Promise((ok, no) => {
   const s = document.createElement("script"); s.src = LOTTIE; s.async = true;

@@ -20,13 +20,33 @@ from .suppliers import KIND_TITLES
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
 
+_static_v: dict[str, str] = {}
+
+
+def static_url(path: str) -> str:
+    """/static/файл → /static/файл?v=<хеш содержимого>. Такой адрес браузер кэширует на год (immutable):
+    поменяли файл — поменялся хеш, и все сразу получают новый. Не /static/ или файла нет — как есть."""
+    if not path or not path.startswith("/static/") or "?" in path:
+        return path
+    if path not in _static_v:
+        import hashlib
+        file = ROOT / path.lstrip("/")
+        try:
+            _static_v[path] = f"{path}?v={hashlib.sha1(file.read_bytes()).hexdigest()[:8]}"
+        except OSError:
+            return path
+    return _static_v[path]
+
+
+templates.env.globals["static_url"] = static_url
+
 # Обложки разделов, если у поставщика своей картинки нет (Telegram, Steam) — лежат у нас, грузятся мгновенно
 KIND_COVERS = {"telegram_stars": "/static/img/tg-stars.svg", "telegram_premium": "/static/img/tg-premium.svg",
                "steam_topup": "/static/img/steam.svg", "steam_gift": "/static/img/steam.svg"}
 
 
 def kind_cover(kind: str, url: str | None = None) -> str | None:
-    return url or KIND_COVERS.get(kind)
+    return url or static_url(KIND_COVERS.get(kind) or "") or None
 
 
 templates.env.globals["kind_cover"] = kind_cover
@@ -47,7 +67,7 @@ templates.env.filters["faq_item"] = lambda qa: {
 
 def _img(url):
     from .catalog_job import local_url
-    return local_url(url)
+    return static_url(local_url(url) or "") or url
 
 
 templates.env.filters["img"] = _img

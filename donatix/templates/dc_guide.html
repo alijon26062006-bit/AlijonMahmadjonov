@@ -5,13 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Пардохт бо «Душанбе Сити» — {{ site_name }}</title>
 <meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+{% include "_fonts.html" %}
 <style>
 :root { --ink: #121521; --muted: #5e6577; --accent: #4f46e5; --soft: #eef0ff; --ok: #12a26a; --line: #e7e9f0; }
 * { box-sizing: border-box; margin: 0; }
 html, body { height: 100%; }
-body { font-family: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink);
+body { font-family: "Onest", "Onest Fallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink);
   background: radial-gradient(120% 80% at 50% 0%, #6d5dfc 0%, #4338ca 45%, #1e1b4b 100%); overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh; padding: 2vh 0; }
 .cap { width: min(92vw, 560px); text-align: center; color: #fff; height: 17vh; display: flex; flex-direction: column; justify-content: flex-end; }

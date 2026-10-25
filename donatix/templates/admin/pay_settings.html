@@ -110,9 +110,9 @@
       <a href="/dc-guide" target="_blank" rel="noopener">Открыть</a> · <a href="/static/app/dc-guide.mp4" download>Скачать MP4</a></div>{% endif %}
     <div class="dcv-frame" style="max-width:260px">
       {% if v.builtin %}{% if kind == 'site' %}<iframe class="dcv-anim" src="/dc-guide" title="Анимация" loading="lazy"></iframe>
-      {% else %}<video src="/static/app/dc-guide.mp4" controls preload="metadata"></video>{% endif %}
+      {% else %}<video src="/static/app/dc-guide.mp4" poster="{{ static_url('/static/app/dc-guide-poster.webp') }}" controls preload="none"></video>{% endif %}
       {% elif v.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ v.youtube }}" title="Видео" allowfullscreen loading="lazy"></iframe>
-      {% elif v.file or v.src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ v.src }}" controls preload="metadata"></video>
+      {% elif v.file or v.src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ v.src }}" controls preload="none"></video>
       {% else %}<a class="btn block" href="{{ v.src }}" target="_blank" rel="noopener">Открыть ссылку</a>{% endif %}
     </div>
     <div class="hint">Посмотрели и согласились: <b>{{ v.seen }}</b> клиент(ов)</div>

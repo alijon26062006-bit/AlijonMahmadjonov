@@ -20,13 +20,13 @@
   <meta property="og:title" content="{{ self.title() | trim }}">
   <meta property="og:description" content="{{ self.description() | trim }}">
   <meta property="og:url" content="{{ canonical }}">
-  <meta property="og:image" content="{{ base_url }}/static/og.png?v={{ asset_v }}">
+  <meta property="og:image" content="{{ base_url }}/static/og.jpg?v={{ asset_v }}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{ self.title() | trim }}">
   <meta name="twitter:description" content="{{ self.description() | trim }}">
-  <meta name="twitter:image" content="{{ base_url }}/static/og.png?v={{ asset_v }}">
+  <meta name="twitter:image" content="{{ base_url }}/static/og.jpg?v={{ asset_v }}">
   {% block jsonld %}{% endblock %}
   <script>
     (function () {
@@ -64,10 +64,7 @@
       return (Math.round(t * k + 1e-9) / k).toFixed(d) + " с.";
     };
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Шрифты не держат показ страницы: пока грузятся (медленный мобильный интернет), текст — системным шрифтом -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+  {% include "_fonts.html" %}
   <link rel="stylesheet" href="/static/donatix.css?v={{ asset_v }}">
   <link rel="icon" href="/static/logo.svg?v={{ asset_v }}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/app/icon-192.png?v={{ asset_v }}">
