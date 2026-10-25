@@ -1,0 +1,6 @@
+{#- Цифры баннера: просмотры, нажатия, доля нажавших. Каждый человек — раз в день, роботы не считаются. -#}
+<div class="ads-nums">
+  <div><span>Просмотры</span><b>{{ b.views }}</b></div>
+  <div><span>Нажатия</span><b>{{ b.clicks }}</b></div>
+  <div><span>Нажали</span><b>{{ ad_ctr(b.views, b.clicks) }}</b></div>
+</div>

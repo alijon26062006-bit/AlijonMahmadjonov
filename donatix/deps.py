@@ -166,6 +166,14 @@ def _money(ctx, value, digits: int | None = None):
 templates.env.globals["money"] = _money
 
 
+def _ad_ctr(views: int, clicks: int) -> str:
+    from .banners import ctr
+    return ctr(views or 0, clicks or 0)
+
+
+templates.env.globals["ad_ctr"] = _ad_ctr
+
+
 @pass_context
 def _dprice(ctx, usd: float) -> str:
     """Цена D-коина (доли цента) в валюте клиента: 3 значащие цифры — коротко и видно каждое движение."""

@@ -279,11 +279,25 @@ def push_test(request: Request, user=Depends(panel_user), conn=Depends(get_conn)
 
 
 @router.get("/bn-go/{bid}")
-def banner_go(bid: int, conn=Depends(get_conn)):
+def banner_go(bid: int, request: Request, conn=Depends(get_conn)):
     """Нажатие на рекламный баннер: считаем клик и уводим на его ссылку."""
     from . import banners
-    link = banners.click(conn, bid)
+    link = banners.click(conn, bid, banners.visitor_key(request))
     return RedirectResponse(link or "/", status_code=302, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/api/bn-view")
+async def banner_view(request: Request, conn=Depends(get_conn)):
+    """Просмотр баннера: страница сообщает, что он реально был на экране. Путь под /api/ — его не проверяет
+    Cloudflare «я не робот», иначе из мини-приложения Telegram просмотры бы не доходили."""
+    from . import banners
+    try:
+        bid = int(json.loads((await request.body())[:200] or b"{}").get("id", 0))
+    except (ValueError, TypeError, AttributeError):
+        return Response(status_code=204)
+    if bid > 0:
+        banners.view(conn, bid, banners.visitor_key(request))
+    return Response(status_code=204)
 
 
 @router.get("/robots.txt")

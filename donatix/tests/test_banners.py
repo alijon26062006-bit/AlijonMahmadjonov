@@ -191,3 +191,26 @@ def test_house_banner_always_last_and_kept(admin, conn):
     assert len(shown) == banners.MAX_ACTIVE
     assert shown[-1]["title"] == "Здесь может быть ваша реклама"
     assert all(b["title"].startswith("Платный") for b in shown[:-1])
+
+
+UA = {"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148 Safari/604.1"}
+
+
+def test_views_and_clicks_counted_honestly(admin, app, conn):
+    c, token = admin
+    _add(c, token, link="t.me/x")
+    bid = banners.all_rows(conn)[0]["id"]
+    one, two, robot = TestClient(app), TestClient(app), TestClient(app)
+    one.cookies.set("dx_vid", "a" * 16)
+    two.cookies.set("dx_vid", "b" * 16)
+    for _ in range(5):                                  # обновлял страницу — всё равно один просмотр
+        assert one.post("/api/bn-view", content='{"id": %d}' % bid, headers=UA).status_code == 204
+        one.get(f"/bn-go/{bid}", headers=UA, follow_redirects=False)
+    two.post("/api/bn-view", content='{"id": %d}' % bid, headers=UA)
+    robot.post("/api/bn-view", content='{"id": %d}' % bid, headers={"user-agent": "Googlebot/2.1"})
+    robot.get(f"/bn-go/{bid}", headers={"user-agent": "TelegramBot (like TwitterBot)"}, follow_redirects=False)
+    one.post("/api/bn-view", content="мусор", headers=UA)
+    row = banners.all_rows(conn)[0]
+    assert (row["views"], row["clicks"]) == (2, 1)
+    assert banners.ctr(2, 1) == "50%" and banners.ctr(0, 0) == "—"
+    assert "Просмотры" in c.get("/admin/banners").text

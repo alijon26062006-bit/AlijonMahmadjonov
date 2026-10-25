@@ -43,6 +43,8 @@
 
 {% if mine %}
 <h2 class="adf-h">Мои заявки</h2>
+<p class="hint">Счёт честный: просмотр — когда баннер реально был на экране (видно хотя бы половину, не меньше секунды).
+  Один человек засчитывается один раз в день — и в просмотрах, и в нажатиях. Поисковые роботы не считаются.</p>
 <div class="adl">
 {% for b in mine %}
   <div class="card adl-item">
@@ -51,7 +53,8 @@
       <div class="adl-top"><b>{{ b.title }}</b>
         <span class="badge {{ {'approved': 'ok', 'rejected': 'bad'}.get(b.status, 'warn') }}">{{ statuses.get(b.status, b.status) }}</span></div>
       <div class="muted small">{{ b.days or '—' }} дн. · {{ b.link }}</div>
-      {% if b.status == 'approved' %}<div class="small">Показ: {{ b.starts_at }} — {{ b.ends_at }} · нажатий: <b>{{ b.clicks }}</b></div>{% endif %}
+      {% if b.status == 'approved' %}<div class="small">Показ: {{ b.starts_at }} — {{ b.ends_at }}</div>
+      {% include "_ad_stats.html" %}{% endif %}
       {% if b.status == 'rejected' and b.note %}<div class="small adl-note">Причина: {{ b.note }}</div>{% endif %}
     </div>
   </div>

@@ -55,11 +55,24 @@ FORBIDDEN = (
 )
 
 
+SEEN_SCHEMA = """
+CREATE TABLE IF NOT EXISTS banner_seen (
+    banner_id   INTEGER NOT NULL,
+    day         TEXT NOT NULL,      -- YYYY-MM-DD
+    visitor     TEXT NOT NULL,      -- хеш: cookie посетителя, а без неё — адрес + браузер
+    kind        TEXT NOT NULL,      -- v — просмотр, c — нажатие
+    PRIMARY KEY (banner_id, day, visitor, kind)
+) WITHOUT ROWID
+"""
+
+
 def ensure(conn: sqlite3.Connection) -> None:
     conn.execute(SCHEMA)
+    conn.execute(SEEN_SCHEMA)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(banners)")}
     for col, kind in (("user_id", "INTEGER"), ("status", "TEXT NOT NULL DEFAULT 'approved'"), ("days", "INTEGER"),
-                      ("note", "TEXT NOT NULL DEFAULT ''"), ("paid_micro", "INTEGER NOT NULL DEFAULT 0")):
+                      ("note", "TEXT NOT NULL DEFAULT ''"), ("paid_micro", "INTEGER NOT NULL DEFAULT 0"),
+                      ("views", "INTEGER NOT NULL DEFAULT 0")):
         if col not in cols:   # заявки пользователей: чьё, статус проверки, срок, причина отказа
             conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
@@ -189,15 +202,63 @@ def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str,
     return cache.get_or_set(CACHE_KEY, 30, load)
 
 
-def click(conn: sqlite3.Connection, bid: int) -> str | None:
-    """Засчитать нажатие и вернуть ссылку (None — баннера нет или ссылки нет)."""
+# ── Честный счёт: один человек — один просмотр и одно нажатие в день на баннер, роботы не считаются ──
+
+
+def visitor_key(request: Any) -> str | None:
+    """Кто смотрит. None — робот (поисковик, превью ссылок, скрипт): такого не считаем."""
+    import hashlib
+
+    from .traffic import VISITOR_COOKIE, is_bot
+    ua = request.headers.get("user-agent", "")
+    if not ua or is_bot(ua):
+        return None
+    cookie = request.cookies.get(VISITOR_COOKIE, "")
+    ip = request.client.host if request.client else ""
+    import re
+    raw = ("c:" + cookie) if re.fullmatch(r"[0-9a-f]{16}", cookie) else f"a:{ip}|{ua}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:20]
+
+
+def _count(conn: sqlite3.Connection, bid: int, visitor: str, kind: str) -> bool:
+    """Засчитать, если этот человек сегодня ещё не засчитан. True — засчитали."""
+    from datetime import date, timedelta
+    day = date.today().isoformat()
+    with db.tx(conn):
+        fresh = conn.execute("INSERT OR IGNORE INTO banner_seen (banner_id, day, visitor, kind) VALUES (?, ?, ?, ?)",
+                             (bid, day, visitor, kind)).rowcount == 1
+        if fresh:
+            col = "views" if kind == "v" else "clicks"
+            conn.execute(f"UPDATE banners SET {col} = {col} + 1 WHERE id = ?", (bid,))
+    if fresh and secrets.randbelow(200) == 0:   # вчерашние отметки больше не нужны
+        conn.execute("DELETE FROM banner_seen WHERE day < ?", ((date.today() - timedelta(days=2)).isoformat(),))
+    return fresh
+
+
+def view(conn: sqlite3.Connection, bid: int, visitor: str | None) -> bool:
+    """Баннер побыл на экране (видно хотя бы половину, не меньше секунды) — засчитать просмотр."""
+    ensure(conn)
+    if not visitor or conn.execute("SELECT 1 FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
+                                   (bid,)).fetchone() is None:
+        return False
+    return _count(conn, bid, visitor, "v")
+
+
+def click(conn: sqlite3.Connection, bid: int, visitor: str | None = None) -> str | None:
+    """Засчитать нажатие (раз в день от человека, роботов — нет) и вернуть ссылку. None — баннера/ссылки нет."""
     ensure(conn)
     row = conn.execute("SELECT link FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
                        (bid,)).fetchone()
     if row is None or not row["link"]:
         return None
-    conn.execute("UPDATE banners SET clicks = clicks + 1 WHERE id = ?", (bid,))
+    if visitor:
+        _count(conn, bid, visitor, "c")
     return row["link"]
+
+
+def ctr(views: int, clicks: int) -> str:
+    """Доля нажавших от увидевших, %."""
+    return f"{clicks * 100 / views:.1f}".rstrip("0").rstrip(".") + "%" if views else "—"
 
 
 # ── Заявки пользователей ─────────────────────────────────────

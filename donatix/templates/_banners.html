@@ -5,8 +5,8 @@
   <div class="bnr-track">
     {% for b in banners %}
     {% set alt = b.title or 'Рекламный баннер' %}
-    {% if b.link %}<a class="bnr-slide" href="/bn-go/{{ b.id }}"{% if not b.link.startswith('/') %} target="_blank" rel="noopener sponsored"{% endif %}
-       aria-label="{{ alt }} — {{ loop.index }} из {{ banners | length }}">{% else %}<div class="bnr-slide" role="group" aria-label="{{ loop.index }} из {{ banners | length }}">{% endif %}
+    {% if b.link %}<a class="bnr-slide" data-bid="{{ b.id }}" href="/bn-go/{{ b.id }}"{% if not b.link.startswith('/') %} target="_blank" rel="noopener sponsored"{% endif %}
+       aria-label="{{ alt }} — {{ loop.index }} из {{ banners | length }}">{% else %}<div class="bnr-slide" data-bid="{{ b.id }}" role="group" aria-label="{{ loop.index }} из {{ banners | length }}">{% endif %}
       <img src="{{ b.src_small }}" srcset="{{ b.src_small }} 750w, {{ b.src }} 1500w"
            sizes="(min-width: 1180px) 1100px, calc(100vw - 32px)" width="1500" height="600" alt="{{ alt }}"
            {% if loop.first %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async">
@@ -36,6 +36,27 @@
   ["pointerdown", "mouseenter", "focusin"].forEach(function (e) { root.addEventListener(e, function () { paused = true; }); });
   ["mouseleave", "focusout"].forEach(function (e) { root.addEventListener(e, function () { paused = false; }); });
   root.addEventListener("pointerup", function () { setTimeout(function () { paused = false; }, 4000); });
+  // Честный просмотр: баннер виден хотя бы наполовину не меньше секунды (сервер считает раз в день на человека)
+  if ("IntersectionObserver" in window) {
+    var sent = {}, wait = {};
+    var io = new IntersectionObserver(function (items) {
+      items.forEach(function (it) {
+        var id = it.target.dataset.bid;
+        if (!id || sent[id]) return;
+        if (it.intersectionRatio >= 0.5 && !document.hidden) {
+          if (!wait[id]) wait[id] = setTimeout(function () {
+            wait[id] = 0;
+            if (document.hidden) return;              // вкладку свернули — не считаем
+            sent[id] = true; io.unobserve(it.target);
+            var body = JSON.stringify({id: +id});
+            if (navigator.sendBeacon) navigator.sendBeacon("/api/bn-view", body);
+            else fetch("/api/bn-view", {method: "POST", body: body, keepalive: true});
+          }, 1000);
+        } else { clearTimeout(wait[id]); wait[id] = 0; }
+      });
+    }, {threshold: [0, 0.5]});
+    Array.prototype.forEach.call(track.children, function (s) { io.observe(s); });
+  }
   if (n > 1 && !reduce) window.dxBnrTimer = setInterval(function () {
     if (paused || document.hidden || !document.body.contains(track)) return;
     var i = at() + 1; go(i >= n ? 0 : i);

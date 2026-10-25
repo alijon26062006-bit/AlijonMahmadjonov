@@ -2592,3 +2592,7 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .adf-price { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); font-size: .85rem; font-weight: 700; }
 .adf-login { display: grid; gap: 12px; }
 .adf-login p { margin: 0; }
+.ads-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 420px; }
+.ads-nums div { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; display: grid; gap: 2px; }
+.ads-nums span { font-size: .75rem; color: var(--muted); }
+.ads-nums b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
