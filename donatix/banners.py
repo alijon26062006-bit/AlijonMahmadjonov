@@ -2,7 +2,7 @@
 
 Баннеры ставит админ: картинка, ссылка, порядок, даты показа. Картинку сайт сам обрезает до 5:2 и
 сохраняет в WebP двумя размерами (телефон / компьютер) — лёгкая и чёткая на любом экране.
-Нажатие идёт через /bn/go/<id>: считаем клики и только потом уводим на ссылку.
+Нажатие идёт через /bn-go/<id>: считаем клики и только потом уводим на ссылку.
 """
 
 from __future__ import annotations
@@ -173,7 +173,7 @@ def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str,
             "AND (starts_at IS NULL OR starts_at <= ?) AND (ends_at IS NULL OR ends_at >= ?) "
             "ORDER BY sort, id DESC LIMIT ?", (day, day, MAX_ACTIVE)).fetchall()
         return [{"id": r["id"], "title": r["title"], "link": r["link"],
-                 "src": f"/bn/{r['image']}-{SIZES[0]}.webp", "src_small": f"/bn/{r['image']}-{SIZES[1]}.webp"}
+                 "src": f"/static/bn/{r['image']}-{SIZES[0]}.webp", "src_small": f"/static/bn/{r['image']}-{SIZES[1]}.webp"}
                 for r in rows]
     if today is not None:
         return load()

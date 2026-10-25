@@ -167,3 +167,15 @@ def test_banners_in_telegram_mini_app(admin, app):
     cache.clear()
     page = TestClient(app).get("/tg").text
     assert "data-bnr" in page and "Здесь может быть ваша реклама" in page
+
+
+def test_banner_image_served_under_static(admin, app, conn):
+    """Картинки — под /static/bn/: Cloudflare не проверяет этот путь, и в мини-приложении картинка грузится."""
+    c, token = admin
+    _add(c, token)
+    cache.clear()
+    src = banners.active(conn)[0]["src"]
+    assert src.startswith("/static/bn/")
+    r = TestClient(app).get(src)
+    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert "immutable" in r.headers["cache-control"]

@@ -180,11 +180,11 @@ def cache_policy(path: str, query: str, status: int) -> str:
     """Как долго браузер и прокси держат ответ у себя."""
     if status >= 400:
         return "no-store"
+    if path.startswith(("/bn/", "/static/bn/")):   # имя файла новое при каждой загрузке баннера — можно хранить год
+        return "public, max-age=31536000, immutable"
     if path.startswith("/static/"):
         # Файлы с ?v=хеш меняют адрес при каждом изменении — можно хранить год
         return "public, max-age=31536000, immutable" if "v=" in query else "public, max-age=86400"
-    if path.startswith("/bn/"):   # имя файла новое при каждой загрузке баннера — можно хранить год
-        return "public, max-age=31536000, immutable"
     if path.startswith("/media/"):
         return "public, max-age=2592000, stale-while-revalidate=86400"
     if path in ("/robots.txt", "/sitemap.xml"):
@@ -308,6 +308,11 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     )
     app.add_middleware(_CacheAndTiming, https=config.base_url.startswith("https://"))
     app.add_middleware(_SelectiveGZip, minimum_size=800, compresslevel=5)
+    from . import banners   # рекламные баннеры вверху страниц: картинки — у нас, имя меняется с каждой загрузкой
+    banners.folder(config).mkdir(parents=True, exist_ok=True)
+    # Под /static/ — путь, который Cloudflare не проверяет «я не робот»: иначе в мини-приложении Telegram
+    # вместо картинки приходит страница проверки. Монтируем раньше /static, чтобы этот путь сработал первым.
+    app.mount("/static/bn", StaticFiles(directory=str(banners.folder(config))), name="banners")
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)
     from . import catalog_job
@@ -315,9 +320,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     catalog_job.bind_base(config.base_url)
     catalog_job.forget(ff_images)   # картинки FF — убрать с сервера
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
-    from . import banners   # рекламные баннеры вверху страниц: картинки — у нас, имя меняется с каждой загрузкой
-    banners.folder(config).mkdir(parents=True, exist_ok=True)
-    app.mount("/bn", StaticFiles(directory=str(banners.folder(config))), name="banners")
+    app.mount("/bn", StaticFiles(directory=str(banners.folder(config))), name="banners_old")   # старые ссылки
     app.include_router(api.router)
     from . import api_extra   # виртуальные номера и подарки Telegram для партнёров
     app.include_router(api_extra.router)

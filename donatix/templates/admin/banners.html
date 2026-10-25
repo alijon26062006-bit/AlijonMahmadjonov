@@ -12,7 +12,7 @@
 <div class="adl">
 {% for b in pending %}
   <div class="card adl-item">
-    <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+    <img src="/static/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
     <div class="adl-body">
       <div class="adl-top"><b>{{ b.title }}</b><span class="muted small">#{{ b.id }} · {{ b.login or ('клиент ' ~ b.user_id) }} · {{ b.days }} дн. · оплачено {{ money(b.paid_micro) }}</span></div>
       <div class="small">Ссылка: <a href="{{ b.link }}" target="_blank" rel="noopener nofollow">{{ b.link }}</a> — откройте и проверьте, что там.</div>
@@ -53,7 +53,7 @@
 <h2 class="adf-h">Все баннеры</h2>
 {% for b in rows %}
 <div class="card adl-item wide{% if not b.active %} off{% endif %}">
-  <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+  <img src="/static/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
   <div class="adl-body">
     <div class="adl-top">
       <span class="badge {{ 'ok' if b.active else '' }}">{{ 'Показывается' if b.active else 'Выключен' }}</span>

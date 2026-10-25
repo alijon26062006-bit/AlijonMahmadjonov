@@ -46,7 +46,7 @@
 <div class="adl">
 {% for b in mine %}
   <div class="card adl-item">
-    <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+    <img src="/static/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
     <div class="adl-body">
       <div class="adl-top"><b>{{ b.title }}</b>
         <span class="badge {{ {'approved': 'ok', 'rejected': 'bad'}.get(b.status, 'warn') }}">{{ statuses.get(b.status, b.status) }}</span></div>
