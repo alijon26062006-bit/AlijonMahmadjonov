@@ -153,3 +153,17 @@ def test_client_request_needs_balance(app, conn, config):
     assert "Не хватает денег" in r.text
     assert conn.execute("SELECT COUNT(*) FROM banners").fetchone()[0] == 0
     assert list(banners.folder(config).glob("*.webp")) == []  # картинку не оставили
+
+
+def test_ads_page_open_without_login(app):
+    r = TestClient(app).get("/panel/ads", follow_redirects=False)
+    assert r.status_code == 200
+    assert "7 сомони за день" in r.text and "Азартные игры" in r.text and "/register?next=/panel/ads" in r.text
+
+
+def test_banners_in_telegram_mini_app(admin, app):
+    c, token = admin
+    _add(c, token, title="Здесь может быть ваша реклама", link="/panel/ads")
+    cache.clear()
+    page = TestClient(app).get("/tg").text
+    assert "data-bnr" in page and "Здесь может быть ваша реклама" in page

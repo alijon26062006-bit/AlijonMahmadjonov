@@ -199,12 +199,28 @@ nav.tabs button.on svg { transform: translateY(-1px); }
 .file input { display: none; }
 .note { font-size: 14px; color: var(--muted); margin: 10px 2px 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+/* Лента рекламы — как на сайте */
+.bnr-wrap { padding: 0; }
+.bnr { position: relative; margin: 4px 0 10px; }
+.bnr-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain;
+  border-radius: var(--r); background: var(--surface-2); -webkit-overflow-scrolling: touch; }
+.bnr-track::-webkit-scrollbar { display: none; }
+.bnr-slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; aspect-ratio: 5 / 2; display: block; overflow: hidden; }
+.bnr-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bnr-tag { position: absolute; top: 8px; right: 10px; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  color: #fff; background: rgb(0 0 0 / .45); pointer-events: none; }
+.bnr-dots { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; justify-content: center; gap: 8px; pointer-events: none; }
+.bnr-dots button { position: relative; width: 6px; height: 6px; padding: 0; border: 0; border-radius: 3px; background: rgb(255 255 255 / .55);
+  pointer-events: auto; transition: transform .2s var(--ease), background-color .2s var(--ease); }
+.bnr-dots button::before { content: ""; position: absolute; inset: -9px; }
+.bnr-dots button.on { background: #fff; transform: scaleX(2.4); }
 </style>
 </head>
 <body>
 <header class="top"><div class="brand"><img src="{{ static_url('/static/logo.svg') }}" alt="" width="32" height="32">Donatix</div>
   <button aria-label="Профиль" data-tab="profile"><div class="ava" id="hava">D</div></button></header>
 <p class="greet"><span data-t="hi"></span> <b id="hname">…</b></p>
+{% if banners %}<div class="bnr-wrap">{% include "_banners.html" %}</div>{% endif %}
 <div id="friday" class="friday hidden"></div>
 <main id="view"><div class="skel"></div><div class="skel"></div></main>
 <p class="foot" data-t="indep"></p>
@@ -220,6 +236,13 @@ nav.tabs button.on svg { transform: translateY(-1px); }
 <script>
 (function () {
 const tg = window.Telegram && Telegram.WebApp;
+// Баннер рекламы: открываем через Telegram (в браузере / в самом Telegram), клик засчитывается на /bn-go
+document.addEventListener("click", function (e) {
+  const a = e.target.closest && e.target.closest("a.bnr-slide");
+  if (!a || !tg || !tg.openLink) return;
+  e.preventDefault();
+  tg.openLink(new URL(a.getAttribute("href"), location.origin).href);
+});
 const DARK = tg ? tg.colorScheme !== "light" : matchMedia("(prefers-color-scheme: dark)").matches;
 document.documentElement.dataset.theme = DARK ? "dark" : "light";   // тема — как у Telegram
 if (tg) { tg.ready(); tg.expand(); try { const c = DARK ? "#0e1016" : "#f5f6fa"; tg.setHeaderColor(c); tg.setBackgroundColor(c); } catch (e) {} }

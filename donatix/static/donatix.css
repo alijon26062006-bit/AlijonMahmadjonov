@@ -2590,3 +2590,5 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .adl-actions input { flex: 1 1 200px; min-width: 0; }
 @media (max-width: 640px) { .adl-item { grid-template-columns: 1fr; } }
 .adf-price { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); font-size: .85rem; font-weight: 700; }
+.adf-login { display: grid; gap: 12px; }
+.adf-login p { margin: 0; }

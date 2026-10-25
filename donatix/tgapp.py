@@ -119,8 +119,15 @@ def _stats(conn, user_id: int) -> dict[str, int]:
 
 @router.get("")
 def page(request: Request, config: Config = Depends(get_config)):
+    from . import banners, db
+    pool = db.pool(config.db_path)
+    conn = pool.acquire()
+    try:
+        ads = banners.active(conn)    # та же лента рекламы, что на сайте
+    finally:
+        pool.release(conn)
     return templates.TemplateResponse(request, "tg_app.html", {"site_name": config.site_name,
-                                                               "support": config.support_contact})
+                                                               "support": config.support_contact, "banners": ads})
 
 
 @router.get("/gift/{name}")

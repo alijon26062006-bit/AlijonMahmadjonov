@@ -530,8 +530,14 @@ def panel_password(request: Request, old: str = Form(""), new: str = Form(""), n
 
 
 @router.get("/panel/ads")
-def panel_ads(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_ads(request: Request, user=Depends(viewer), conn=Depends(get_conn)):
+    """Открывается и без входа (ссылка с рекламного баннера): цена и правила видны сразу, вход — для заявки."""
     from . import banners, quickbuy
+    if user.get("guest") if isinstance(user, dict) else False:
+        request.session["next"] = "/panel/ads"      # после входа или регистрации — обратно сюда
+        return render(request, "panel/ads.html", {"user": user, "mine": [], "days": banners.DAYS,
+                                                  "statuses": banners.STATUS_TITLES, "price_day": banners.PRICE_TJS_DAY,
+                                                  "ad_forbidden": banners.FORBIDDEN, "anon": True})
     return render(request, "panel/ads.html", {"user": user, "mine": banners.of_user(conn, user["id"]),
                                               "days": banners.DAYS, "statuses": banners.STATUS_TITLES,
                                               "price_day": banners.PRICE_TJS_DAY,

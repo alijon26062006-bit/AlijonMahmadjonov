@@ -11,7 +11,12 @@
 <form class="card adf" method="post" action="/panel/ads" enctype="multipart/form-data">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2 class="adf-title">{{ icon('image', 22) }} Подать заявку</h2>
-  {% if guest %}
+  {% if anon %}
+  <div class="adf-login">
+    <p>Чтобы подать заявку, войдите или зарегистрируйтесь — это минута. После входа вернём вас сюда.</p>
+    <div class="adl-actions"><a class="btn primary lg" href="/register?next=/panel/ads">Зарегистрироваться</a><a class="btn lg" href="/login?next=/panel/ads">Войти</a></div>
+  </div>
+  {% elif guest %}
   <div class="flash warn" role="status">Сначала сохраните аккаунт — <a href="/panel/save">укажите email или логин</a>, тогда сможете подать рекламу.</div>
   {% else %}
   <label for="a-img">Картинка <span class="adg-pill sm">1500 × 600 px</span></label>
