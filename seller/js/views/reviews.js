@@ -5,6 +5,10 @@ import { esc, plural, uid, whenText } from '../lib/format.js';
 import { S, save, ui } from '../state.js';
 import { closeSheet, openSheet, toast } from '../ui/dom.js';
 
+// решение админа по жалобе: на проверке → принята (отзыв скрыт) или отклонена
+const complaintPill = c => c.status === 'accepted' ? `<span class="pill info">Жалоба принята: отзыв скрыт</span>`
+  : c.status === 'rejected' ? `<span class="pill off">Жалоба отклонена${c.note ? ': ' + esc(c.note) : ''}</span>` : `<span class="pill warn">Жалоба на проверке: ${esc(c.reason)}</span>`;
+
 // Отзывы
 const FILTERS = [['all', 'Все'], ['bad', 'Плохие'], ['noreply', 'Без ответа'], ['text', 'С текстом']];
 const pass = { all: () => true, bad: isBad, noreply: needsReply, text: r => !!r.text };
@@ -40,7 +44,7 @@ function card(r) {
     ${r.text ? `<p><span translate="no">${esc(r.text)}</span></p>` : ''}
     ${r.items?.length ? `<div class="small muted">${r.items.map(i => `${i.like === true ? '👍' : i.like === false ? '👎' : '·'} <span translate="no">${esc(i.name)}</span>`).join('&nbsp;&nbsp; ')}</div>` : ''}
     ${r.reply ? `<div class="reply"><b>Ваш ответ</b><span>${esc(r.reply)}</span></div>` : ''}
-    <div class="row">${r.complaint ? `<span class="pill warn">Жалоба на проверке: ${esc(r.complaint.reason)}</span>` : ''}
+    <div class="row">${r.complaint ? complaintPill(r.complaint) : ''}
       <button class="btn sm ${needsReply(r) ? 'primary' : ''}" data-reply="${r.id}">${r.reply ? 'Изменить ответ' : 'Ответить'}</button>
       ${r.complaint ? '' : `<button class="btn sm" data-complain="${r.id}">Пожаловаться</button>`}</div>
   </article>`;

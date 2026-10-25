@@ -17,7 +17,7 @@ export default [
   { ignores: ['**/vendor/**', 'node_modules/**', 'e2e/report/**'] },
   { linterOptions: { reportUnusedDisableDirectives: 'error' } },
   // приложения — модули в браузере
-  { files: ['seller/js/**/*.js', 'client/js/**/*.js', 'courier/js/**/*.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'module' }, rules },
+  { files: ['seller/js/**/*.js', 'client/js/**/*.js', 'courier/js/**/*.js', 'admin/js/**/*.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'module' }, rules },
   // service worker и подмена базы в тестах — обычные скрипты
   { files: ['*/sw.js', 'e2e/**/*.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'script' }, rules },
   // тесты — Node.js

@@ -43,15 +43,17 @@ apt_install() {
 log "Проверяю nginx и git"
 apt_install nginx git ca-certificates
 
-log "Скачиваю кабинет продавца, приложения покупателя и курьера"
-# только папки seller/, client/ и courier/, без остального репозитория; прерванный запуск ничего не ломает
+log "Скачиваю кабинет продавца, приложения покупателя и курьера, админ-панель"
+# только папки seller/, client/, courier/ и admin/, без остального репозитория; прерванный запуск ничего не ломает
 rm -rf "$APP_DIR.new"
 git clone -q --depth 1 --filter=blob:none --sparse --branch "$BRANCH" "$REPO" "$APP_DIR.new"
-git -C "$APP_DIR.new" sparse-checkout set seller client courier
+git -C "$APP_DIR.new" sparse-checkout set seller client courier admin
 # приложение покупателя открывается по адресу /app/ того же сайта
 cp -a "$APP_DIR.new/client" "$APP_DIR.new/seller/app"
 # приложение курьера — по адресу /courier/
 cp -a "$APP_DIR.new/courier" "$APP_DIR.new/seller/courier"
+# админ-панель — по адресу /admin/ (вход только по почте и паролю админа; поисковики её не индексируют)
+cp -a "$APP_DIR.new/admin" "$APP_DIR.new/seller/admin"
 rm -rf "$APP_DIR.old"
 [ -d "$APP_DIR" ] && mv "$APP_DIR" "$APP_DIR.old"
 mv "$APP_DIR.new" "$APP_DIR"
@@ -130,3 +132,4 @@ log "Готово за $(( $(date +%s) - STARTED )) с"
 note "кабинет продавца:     $URL"
 note "приложение покупателя: ${URL%/}/app/"
 note "приложение курьера:   ${URL%/}/courier/"
+note "админ-панель:         ${URL%/}/admin/"

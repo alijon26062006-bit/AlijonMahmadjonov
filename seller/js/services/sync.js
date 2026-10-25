@@ -64,6 +64,8 @@ const fromProduct = (r, pp) => ({
   desc: r.data?.desc || '', imgs: r.data?.imgs || [], active: r.active, labels: r.data?.labels || [], prep: r.data?.prep ?? null, attrs: r.data?.attrs || {},
   variants: (r.data?.variants || []).map(v => ({ ...v, cost: pp?.variant_costs?.[v.id] ?? null })), options: r.data?.options || [],
   expiry: r.expiry || '', minStep: r.data?.minStep ?? undefined, stopUntil: ms(r.stop_until), created: r.data?.created || ms(r.created_at),
+  // скрыт администратором: только показываем, в базу магазин это поле не пишет
+  blocked: !!r.blocked, blockReason: r.block_reason || '',
 });
 const fromOrder = (r, op) => {
   const app = r.source === 'app', c = r.customer || {};
@@ -143,7 +145,8 @@ async function pull(phone) {
     shop: { cloudId: id, name: shop.name, kind: shop.kind, type: d.type || kindOf({ kind: shop.kind }).name, phone: shop.phone, city: shop.city, address: shop.address,
       landmark: shop.landmark, lat: shop.lat, lng: shop.lng, about: shop.about, logo: shop.logo, cover: shop.cover, banner: shop.banner, paused: shop.paused,
       minOrder: n(shop.min_order), prep: shop.prep_min, delivery: shop.delivery, pickup: shop.pickup, schedule: shop.schedule,
-      alif: d.alif || { terminal: '', status: 'none', holder: '', tin: '' }, melody: d.melody, sound: d.sound, awake: d.awake, autoAccept: d.autoAccept, owner: d.owner || phone },
+      alif: d.alif || { terminal: '', status: 'none', holder: '', tin: '' }, melody: d.melody, sound: d.sound, awake: d.awake, autoAccept: d.autoAccept, owner: d.owner || phone,
+      blocked: !!shop.blocked, blockReason: shop.block_reason || '' },
     products: (prods.data || []).map(r => fromProduct(r, pp[r.id])).sort((a, b) => (b.created || 0) - (a.created || 0)),
     orders: [...orders, ...localOnly],
     reviews: (revs.data || []).map(fromReview),
@@ -253,6 +256,12 @@ async function fetchOrders(ids) {
 }
 function applied(fresh) { keepSnap(); store.save(S); onChange(); if (fresh) onNewOrder(fresh); }
 
+// блокировку магазина ставит и снимает администратор — показываем её сразу, без перезахода
+function shopBlock(row) {
+  if (!S?.shop || (!!row.blocked === !!S.shop.blocked && (row.block_reason || '') === (S.shop.blockReason || ''))) return;
+  S.shop.blocked = !!row.blocked; S.shop.blockReason = row.block_reason || ''; store.save(S); onChange();
+}
+
 function listen() {
   const c = db(); if (!c || !shopId() || channel) return;
   const id = shopId();
@@ -263,10 +272,11 @@ function listen() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `shop_id=eq.${id}` }, ev => {
       const p = S.products.find(x => x.id === ev.new.id); if (!p) return;
       const pending = snap['p:' + p.id] !== J(productRow(p));
-      p.stock = n(ev.new.stock);
+      p.stock = n(ev.new.stock); p.blocked = !!ev.new.blocked; p.blockReason = ev.new.block_reason || '';
       if (!pending) snap['p:' + p.id] = J(productRow(p));
       applied(0);
     })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shops', filter: `id=eq.${id}` }, ev => { shopBlock(ev.new); })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reviews', filter: `shop_id=eq.${id}` }, ev => {
       if (S.reviews.some(r => r.id === ev.new.id)) return;
       const r = fromReview(ev.new); S.reviews.push(r); snap['r:' + r.id] = J(reviewPatch(r)); applied(0);
@@ -281,6 +291,8 @@ function listen() {
       const { data, error } = await c.from('orders').select('id').eq('shop_id', shopId()).gte('updated_at', since);
       if (error) throw error;
       if (data?.length) applied(await fetchOrders(data.map(x => x.id)));
+      const sh = await c.from('shops').select('blocked,block_reason').eq('id', shopId()).maybeSingle();
+      if (sh.data) shopBlock(sh.data);
       if (cloud.status !== 'ok') { cloud.status = 'ok'; cloud.error = ''; schedule(); onChange(); }
     } catch (e) { if (cloud.status === 'ok') { cloud.status = isNetErr(e) ? 'offline' : 'error'; cloud.error = explain(e); onChange(); } }
   }, 20000);

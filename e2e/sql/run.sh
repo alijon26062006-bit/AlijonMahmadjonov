@@ -9,4 +9,6 @@ psql "$ADMIN" -qX -c "drop database if exists zud_test" -c "create database zud_
 psql "$DB" -qX -v ON_ERROR_STOP=1 -f e2e/sql/stubs.sql 2>&1 | grep -v "wal_level\|HINT" || true
 for f in seller/supabase/migrations/*.sql; do PGOPTIONS="-c client_min_messages=warning" psql "$DB" -qX -v ON_ERROR_STOP=1 -f "$f" > /dev/null; done
 # -tA: без таблиц, только сообщения проверок; set -o pipefail вернёт ошибку psql, если сценарий упал
-psql "$DB" -qXtA -v ON_ERROR_STOP=1 -f e2e/sql/marketplace.sql 2>&1 | sed -e 's/^psql:[^ ]* NOTICE:  /  /' -e '/^$/d'
+for f in marketplace admin; do
+  psql "$DB" -qXtA -v ON_ERROR_STOP=1 -f "e2e/sql/$f.sql" 2>&1 | sed -e 's/^psql:[^ ]* NOTICE:  /  /' -e '/^$/d'
+done

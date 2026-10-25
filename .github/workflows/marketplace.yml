@@ -4,9 +4,9 @@ name: Маркетплейс — проверка
 
 on:
   push:
-    paths: ['seller/**', 'client/**', 'courier/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
+    paths: ['seller/**', 'client/**', 'courier/**', 'admin/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
   pull_request:
-    paths: ['seller/**', 'client/**', 'courier/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
+    paths: ['seller/**', 'client/**', 'courier/**', 'admin/**', 'e2e/**', 'types/**', 'tsconfig.json', 'eslint.config.js', 'package*.json', '.github/workflows/marketplace.yml']
 
 jobs:
   code:

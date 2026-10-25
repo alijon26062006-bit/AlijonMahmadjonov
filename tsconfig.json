@@ -15,6 +15,6 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["types/**/*.d.ts", "seller/js/**/*.js", "client/js/**/*.js", "courier/js/**/*.js"],
+  "include": ["types/**/*.d.ts", "seller/js/**/*.js", "client/js/**/*.js", "courier/js/**/*.js", "admin/js/**/*.js"],
   "exclude": ["**/vendor/**"]
 }

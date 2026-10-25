@@ -16,6 +16,7 @@ export function vHome() {
   return `
     <div class="head"><div><div class="eyebrow">${new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1><span translate="no">${esc(S.shop.name)}</span></h1></div>
       <div class="row"><button class="btn" data-act="sale">${plusI} Продажа в магазине</button><button class="btn primary" data-act="add">${plusI} Товар</button></div></div>
+    ${S.shop.blocked ? `<div class="alert bad" role="alert"><span><b>Магазин заблокирован администратором.</b> Покупатели его не видят, новые заказы не приходят.${S.shop.blockReason ? ` Причина: ${esc(S.shop.blockReason)}.` : ''} Напишите в поддержку, когда исправите.</span></div>` : ''}
     ${S.shop.paused ? `<div class="alert bad"><span><b>Приём заказов на паузе.</b> Покупатели видят магазин закрытым.</span><button class="btn sm" data-act="pause">Снова принимать заказы</button></div>` : ''}
     ${nc ? `<div class="alert bad"><span><b>${nc} ${plural(nc, 'новый заказ', 'новых заказа', 'новых заказов')}</b> ждёт ответа. Покупатель ждёт: примите или отклоните заказ как можно быстрее.</span><button class="btn sm primary" data-nav="orders">Открыть заказы</button></div>` : ''}
     ${rb ? `<div class="alert"><span><b>${rb} ${plural(rb, 'плохой отзыв', 'плохих отзыва', 'плохих отзывов')} без ответа.</b> Ответьте покупателю — другие видят, как магазин решает проблемы.</span><button class="btn sm" data-nav="reviews">Ответить</button></div>` : ''}
