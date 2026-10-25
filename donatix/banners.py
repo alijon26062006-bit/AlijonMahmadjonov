@@ -41,7 +41,8 @@ class BannerError(ValueError):
     pass
 
 
-DAYS = (1, 3, 7, 14, 30)       # срок показа в заявке пользователя
+DAYS = (1, 2, 3)               # срок показа в заявке пользователя (дольше — подаёт заново)
+PRICE_TJS_DAY = 7              # цена показа клиентского баннера, сомони за день
 STATUS_TITLES = {"pending": "На проверке", "approved": "Одобрен", "rejected": "Отклонён"}
 #: Что нельзя рекламировать — показываем людям в разделе «Реклама» и в админке
 FORBIDDEN = (
@@ -58,7 +59,7 @@ def ensure(conn: sqlite3.Connection) -> None:
     conn.execute(SCHEMA)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(banners)")}
     for col, kind in (("user_id", "INTEGER"), ("status", "TEXT NOT NULL DEFAULT 'approved'"), ("days", "INTEGER"),
-                      ("note", "TEXT NOT NULL DEFAULT ''")):
+                      ("note", "TEXT NOT NULL DEFAULT ''"), ("paid_micro", "INTEGER NOT NULL DEFAULT 0")):
         if col not in cols:   # заявки пользователей: чьё, статус проверки, срок, причина отказа
             conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
@@ -193,6 +194,16 @@ def click(conn: sqlite3.Connection, bid: int) -> str | None:
 # ── Заявки пользователей ─────────────────────────────────────
 
 
+def price_micro(conn: sqlite3.Connection, config: Config, days: int) -> int:
+    """Цена показа в микро-долларах баланса: сомони по курсу сайта, округление вверх."""
+    from decimal import Decimal
+
+    from .money import to_micro_ceil
+    from .payments import settings
+    rate = Decimal(str(settings(conn, config)["tjs_rate"] or config.tjs_rate))
+    return to_micro_ceil(Decimal(PRICE_TJS_DAY * days) / rate)
+
+
 def submit(conn: sqlite3.Connection, config: Config, user_id: int, *, data: bytes, title: str, link: str,
            days: int) -> int:
     """Заявка на рекламу: баннер сохраняется, но не показывается, пока админ не одобрит."""
@@ -207,12 +218,20 @@ def submit(conn: sqlite3.Connection, config: Config, user_id: int, *, data: byte
     open_n = conn.execute("SELECT COUNT(*) FROM banners WHERE user_id = ? AND status = 'pending'", (user_id,)).fetchone()[0]
     if open_n >= 3:
         raise BannerError("У вас уже 3 заявки на проверке — дождитесь ответа.")
+    from .accounts import InsufficientBalance, post_ledger
+    price = price_micro(conn, config, days)
     name = save_image(config, data)
-    with db.tx(conn):
-        bid = int(conn.execute(
-            "INSERT INTO banners (title, image, link, active, sort, user_id, status, days, created_at) "
-            "VALUES (?, ?, ?, 0, 100, ?, 'pending', ?, ?)",
-            (title.strip()[:120], name, link, user_id, days, db.now())).lastrowid)
+    try:
+        with db.tx(conn):
+            bid = int(conn.execute(
+                "INSERT INTO banners (title, image, link, active, sort, user_id, status, days, paid_micro, created_at) "
+                "VALUES (?, ?, ?, 0, 100, ?, 'pending', ?, ?, ?)",
+                (title.strip()[:120], name, link, user_id, days, price, db.now())).lastrowid)
+            post_ledger(conn, user_id, -price, f"Реклама на сайте: заявка #{bid}, {days} дн.")
+    except InsufficientBalance:
+        remove_files(config, name)
+        raise BannerError(f"Не хватает денег на балансе: показ на {days} дн. стоит {PRICE_TJS_DAY * days} сомони. "
+                          "Пополните баланс и отправьте заявку снова.") from None
     return bid
 
 
@@ -229,8 +248,12 @@ def decide(conn: sqlite3.Connection, bid: int, approve: bool, note: str = "") ->
         conn.execute("UPDATE banners SET status = 'approved', active = 1, starts_at = ?, ends_at = ?, note = '' "
                      "WHERE id = ?", (start.isoformat(), end.isoformat(), bid))
     else:
-        conn.execute("UPDATE banners SET status = 'rejected', active = 0, note = ? WHERE id = ?",
-                     ((note or "").strip()[:300], bid))
+        from .accounts import post_ledger
+        with db.tx(conn):   # отказ — деньги назад на баланс
+            conn.execute("UPDATE banners SET status = 'rejected', active = 0, note = ? WHERE id = ?",
+                         ((note or "").strip()[:300], bid))
+            if row["paid_micro"] and row["user_id"]:
+                post_ledger(conn, row["user_id"], row["paid_micro"], f"Возврат: реклама #{bid} отклонена")
     cache.clear(CACHE_KEY)
     return conn.execute("SELECT * FROM banners WHERE id = ?", (bid,)).fetchone()
 

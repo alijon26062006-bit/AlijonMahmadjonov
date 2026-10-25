@@ -92,8 +92,8 @@ def test_no_banners_no_markup(client):
     assert "data-bnr" not in client.get("/").text
 
 
-def _buyer(app, conn):
-    make_client(conn, login="buyer")
+def _buyer(app, conn, balance="100"):
+    make_client(conn, login="buyer", balance=balance)
     c = TestClient(app)
     web_login(c, "buyer@example.com", "password123")
     return c, csrf_of(c.get("/panel/ads").text)
@@ -108,6 +108,9 @@ def test_client_request_waits_for_approval(admin, app, conn):
     assert r.status_code == 303
     row = banners.pending(conn)[0]
     assert row["status"] == "pending" and row["login"] == "buyer"
+    assert row["paid_micro"] > 0 and row["paid_micro"] == banners.price_micro(conn, app.state.config, 3)
+    bal = conn.execute("SELECT balance_micro FROM users WHERE login = 'buyer'").fetchone()[0]
+    assert bal == 100 * 10_000 - row["paid_micro"]        # 21 сомони списаны сразу
     cache.clear()
     assert banners.active(conn) == []                       # без одобрения не показывается
     assert "На проверке" in c.get("/panel/ads").text
@@ -123,7 +126,7 @@ def test_client_request_waits_for_approval(admin, app, conn):
 
 def test_client_request_rejected_with_reason(admin, app, conn):
     c, token = _buyer(app, conn)
-    c.post("/panel/ads", data={"csrf": token, "title": "Ставки", "link": "https://example.com", "days": "7"},
+    c.post("/panel/ads", data={"csrf": token, "title": "Ставки", "link": "https://example.com", "days": "2"},
            files={"image": ("b.png", _png(), "image/png")})
     bid = banners.pending(conn)[0]["id"]
     a, atoken = admin
@@ -131,11 +134,22 @@ def test_client_request_rejected_with_reason(admin, app, conn):
     cache.clear()
     assert banners.active(conn) == [] and banners.pending(conn) == []
     assert "Причина: Азартные игры" in c.get("/panel/ads").text
+    bal = conn.execute("SELECT balance_micro FROM users WHERE login = 'buyer'").fetchone()[0]
+    assert bal == 100 * 10_000                               # отказ — деньги вернулись
 
 
 def test_client_request_needs_link_and_valid_days(app, conn):
     c, token = _buyer(app, conn)
-    for data in ({"title": "Канал", "link": "", "days": "7"}, {"title": "Канал", "link": "t.me/x", "days": "5"},
+    for data in ({"title": "Канал", "link": "", "days": "7"}, {"title": "Канал", "link": "t.me/x", "days": "7"},
                  {"title": "Канал", "link": "javascript:alert(1)", "days": "7"}):
         c.post("/panel/ads", data={"csrf": token, **data}, files={"image": ("b.png", _png(), "image/png")})
     assert banners.pending(conn) == []
+
+
+def test_client_request_needs_balance(app, conn, config):
+    c, token = _buyer(app, conn, balance="0.5")              # меньше 7 сомони
+    r = c.post("/panel/ads", data={"csrf": token, "title": "Канал", "link": "t.me/x", "days": "1"},
+               files={"image": ("b.png", _png(), "image/png")})
+    assert "Не хватает денег" in r.text
+    assert conn.execute("SELECT COUNT(*) FROM banners").fetchone()[0] == 0
+    assert list(banners.folder(config).glob("*.webp")) == []  # картинку не оставили

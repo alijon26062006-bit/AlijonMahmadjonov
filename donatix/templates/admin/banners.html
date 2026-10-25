@@ -14,7 +14,7 @@
   <div class="card adl-item">
     <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
     <div class="adl-body">
-      <div class="adl-top"><b>{{ b.title }}</b><span class="muted small">#{{ b.id }} · {{ b.login or ('клиент ' ~ b.user_id) }} · {{ b.days }} дн.</span></div>
+      <div class="adl-top"><b>{{ b.title }}</b><span class="muted small">#{{ b.id }} · {{ b.login or ('клиент ' ~ b.user_id) }} · {{ b.days }} дн. · оплачено {{ money(b.paid_micro) }}</span></div>
       <div class="small">Ссылка: <a href="{{ b.link }}" target="_blank" rel="noopener nofollow">{{ b.link }}</a> — откройте и проверьте, что там.</div>
       <form method="post" action="/admin/banners/{{ b.id }}/decide" class="adl-actions">
         <input type="hidden" name="csrf" value="{{ csrf }}">

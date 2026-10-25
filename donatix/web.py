@@ -534,12 +534,13 @@ def panel_ads(request: Request, user=Depends(panel_user), conn=Depends(get_conn)
     from . import banners, quickbuy
     return render(request, "panel/ads.html", {"user": user, "mine": banners.of_user(conn, user["id"]),
                                               "days": banners.DAYS, "statuses": banners.STATUS_TITLES,
+                                              "price_day": banners.PRICE_TJS_DAY,
                                               "ad_forbidden": banners.FORBIDDEN, "guest": quickbuy.is_guest(user)})
 
 
 @router.post("/panel/ads", dependencies=[Depends(check_csrf)])
 async def panel_ads_submit(request: Request, image: UploadFile | None = File(None), title: str = Form(""),
-                           link: str = Form(""), days: str = Form("7"), user=Depends(panel_user),
+                           link: str = Form(""), days: str = Form("1"), user=Depends(panel_user),
                            conn=Depends(get_conn), config: Config = Depends(get_config)):
     import threading
 

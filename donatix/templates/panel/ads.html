@@ -3,7 +3,8 @@
 {% block title %}Реклама на сайте — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Реклама на сайте</h1>
-  <p>Ваш баннер — в ленте вверху всех страниц {{ site_name }}: на сайте и в кабинете. Её видит каждый покупатель.</p></section>
+  <p>Ваш баннер — в ленте вверху всех страниц {{ site_name }}: на сайте и в кабинете. Её видит каждый покупатель.
+    Всего <b>{{ price_day }} сомони за день</b>, до {{ days | last }} дней подряд.</p></section>
 
 {% include "_ad_guide.html" %}
 
@@ -24,12 +25,13 @@
   <label for="a-link">Куда ведёт баннер</label>
   <input id="a-link" name="link" required placeholder="https://t.me/ваш_канал" inputmode="url">
   <p class="hint">Ссылка на ваш Telegram-канал (t.me/…) или сайт (https://…).</p>
-  <fieldset class="adf-days"><legend>Сколько дней показывать</legend>
-    {% for d in days %}<label class="chip-radio"><input type="radio" name="days" value="{{ d }}" {{ 'checked' if d == 7 }}>
-      <span>{{ d }} {{ 'день' if d == 1 else ('дня' if d == 3 else 'дней') }}</span></label>{% endfor %}
+  <fieldset class="adf-days"><legend>Сколько дней показывать <span class="adf-price">{{ price_day }} сомони за день</span></legend>
+    {% for d in days %}<label class="chip-radio"><input type="radio" name="days" value="{{ d }}" {{ 'checked' if loop.first }}>
+      <span>{{ d }} {{ 'день' if d == 1 else 'дня' }} · <b>{{ price_day * d }} с.</b></span></label>{% endfor %}
   </fieldset>
+  <p class="hint">Оплата с баланса сразу при отправке. Если заявку отклоним — деньги вернутся на баланс.</p>
   <label class="adf-agree"><input type="checkbox" required> Мой баннер не нарушает правила выше</label>
-  <button class="btn primary lg block">{{ icon('zap-send', 18) }} Отправить на проверку</button>
+  <button class="btn primary lg block">{{ icon('zap-send', 18) }} Оплатить и отправить на проверку</button>
   <p class="hint center">Ответим в течение дня. Показ начнётся сразу после одобрения.</p>
   {% endif %}
 </form>
