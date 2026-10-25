@@ -910,7 +910,20 @@ def reviews_hide(rid: int, request: Request, hidden: int = Form(1), admin=Depend
 def banners_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import banners
     return render(request, "admin/banners.html", {"user": admin, "rows": banners.all_rows(conn),
-                                                  "ratio": banners.RATIO, "max_active": banners.MAX_ACTIVE})
+                                                  "pending": banners.pending(conn), "ad_forbidden": banners.FORBIDDEN,
+                                                  "statuses": banners.STATUS_TITLES, "max_active": banners.MAX_ACTIVE})
+
+
+@router.post("/banners/{bid}/decide", dependencies=[Depends(check_csrf)])
+def banners_decide(bid: int, request: Request, action: str = Form(""), note: str = Form(""),
+                   admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import banners
+    row = banners.decide(conn, bid, action == "approve", note)
+    if row is None:
+        flash(request, "Заявка уже обработана.", "error")
+    else:
+        flash(request, f"Баннер #{bid} {'одобрен — уже показывается' if row['status'] == 'approved' else 'отклонён'}.")
+    return _back("/admin/banners")
 
 
 @router.post("/banners", dependencies=[Depends(check_csrf)])

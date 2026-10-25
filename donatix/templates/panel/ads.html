@@ -1,0 +1,54 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Реклама на сайте — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Реклама на сайте</h1>
+  <p>Ваш баннер — в ленте вверху всех страниц {{ site_name }}: на сайте и в кабинете. Её видит каждый покупатель.</p></section>
+
+{% include "_ad_guide.html" %}
+
+<form class="card adf" method="post" action="/panel/ads" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2 class="adf-title">{{ icon('image', 22) }} Подать заявку</h2>
+  {% if guest %}
+  <div class="flash warn" role="status">Сначала сохраните аккаунт — <a href="/panel/save">укажите email или логин</a>, тогда сможете подать рекламу.</div>
+  {% else %}
+  <label for="a-img">Картинка <span class="adg-pill sm">1500 × 600 px</span></label>
+  <input id="a-img" type="file" name="image" accept="image/jpeg,image/png,image/webp" required data-bn-file="a-prev">
+  <div class="adp" id="a-prev" hidden>
+    <div class="adp-frame"><img alt="Так баннер будет выглядеть на сайте"><span class="bnr-tag">Реклама</span></div>
+    <p class="adp-msg" role="status"></p>
+  </div>
+  <label for="a-title">Что рекламируете</label>
+  <input id="a-title" name="title" maxlength="120" required placeholder="Например: канал о кулинарии «Вкусно дома»">
+  <label for="a-link">Куда ведёт баннер</label>
+  <input id="a-link" name="link" required placeholder="https://t.me/ваш_канал" inputmode="url">
+  <p class="hint">Ссылка на ваш Telegram-канал (t.me/…) или сайт (https://…).</p>
+  <fieldset class="adf-days"><legend>Сколько дней показывать</legend>
+    {% for d in days %}<label class="chip-radio"><input type="radio" name="days" value="{{ d }}" {{ 'checked' if d == 7 }}>
+      <span>{{ d }} {{ 'день' if d == 1 else ('дня' if d == 3 else 'дней') }}</span></label>{% endfor %}
+  </fieldset>
+  <label class="adf-agree"><input type="checkbox" required> Мой баннер не нарушает правила выше</label>
+  <button class="btn primary lg block">{{ icon('zap-send', 18) }} Отправить на проверку</button>
+  <p class="hint center">Ответим в течение дня. Показ начнётся сразу после одобрения.</p>
+  {% endif %}
+</form>
+
+{% if mine %}
+<h2 class="adf-h">Мои заявки</h2>
+<div class="adl">
+{% for b in mine %}
+  <div class="card adl-item">
+    <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+    <div class="adl-body">
+      <div class="adl-top"><b>{{ b.title }}</b>
+        <span class="badge {{ {'approved': 'ok', 'rejected': 'bad'}.get(b.status, 'warn') }}">{{ statuses.get(b.status, b.status) }}</span></div>
+      <div class="muted small">{{ b.days or '—' }} дн. · {{ b.link }}</div>
+      {% if b.status == 'approved' %}<div class="small">Показ: {{ b.starts_at }} — {{ b.ends_at }} · нажатий: <b>{{ b.clicks }}</b></div>{% endif %}
+      {% if b.status == 'rejected' and b.note %}<div class="small adl-note">Причина: {{ b.note }}</div>{% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -529,6 +529,37 @@ def panel_password(request: Request, old: str = Form(""), new: str = Form(""), n
     return _redirect("/panel")
 
 
+@router.get("/panel/ads")
+def panel_ads(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import banners, quickbuy
+    return render(request, "panel/ads.html", {"user": user, "mine": banners.of_user(conn, user["id"]),
+                                              "days": banners.DAYS, "statuses": banners.STATUS_TITLES,
+                                              "ad_forbidden": banners.FORBIDDEN, "guest": quickbuy.is_guest(user)})
+
+
+@router.post("/panel/ads", dependencies=[Depends(check_csrf)])
+async def panel_ads_submit(request: Request, image: UploadFile | None = File(None), title: str = Form(""),
+                           link: str = Form(""), days: str = Form("7"), user=Depends(panel_user),
+                           conn=Depends(get_conn), config: Config = Depends(get_config)):
+    import threading
+
+    from . import banners, quickbuy
+    from .worker import notify_admin
+    if quickbuy.is_guest(user):
+        return _redirect("/panel/save")
+    data = await image.read(banners.MAX_BYTES + 1) if image is not None else b""
+    try:
+        bid = banners.submit(conn, config, user["id"], data=data, title=title, link=link,
+                             days=int(days) if days.isdigit() else 0)
+    except banners.BannerError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/ads")
+    text = f"📣 Новая заявка на рекламу #{bid} от {user['login'] or user['id']}: «{title.strip()[:80]}», {days} дн. Проверьте: /admin/banners"
+    threading.Thread(target=notify_admin, args=(config, text), daemon=True).start()
+    flash(request, "✅ Заявка отправлена. Проверим и ответим в течение дня.")
+    return _redirect("/panel/ads")
+
+
 @router.get("/panel/save")
 def panel_save_form(request: Request, user=Depends(panel_user), config: Config = Depends(get_config)):
     from . import google_auth, quickbuy

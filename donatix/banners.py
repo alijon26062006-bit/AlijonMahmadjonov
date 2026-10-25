@@ -41,8 +41,26 @@ class BannerError(ValueError):
     pass
 
 
+DAYS = (1, 3, 7, 14, 30)       # срок показа в заявке пользователя
+STATUS_TITLES = {"pending": "На проверке", "approved": "Одобрен", "rejected": "Отклонён"}
+#: Что нельзя рекламировать — показываем людям в разделе «Реклама» и в админке
+FORBIDDEN = (
+    ("🎰", "Азартные игры", "казино, ставки, букмекеры, рулетки, «кейсы», лотереи на деньги"),
+    ("🛒", "Конкуренты", "другие магазины доната, пополнений игр, Stars и Premium"),
+    ("©️", "Чужие бренды", "логотипы и картинки игр, банков, Telegram, Garena и т. д."),
+    ("💸", "«Лёгкий заработок»", "пирамиды, «заработок на SMS», инвестиции с гарантией дохода"),
+    ("🔞", "18+", "интим, насилие, оружие, наркотики, алкоголь и табак"),
+    ("🎣", "Обман", "фишинг, продажа аккаунтов, накрутки, взломы, фейковые раздачи"),
+)
+
+
 def ensure(conn: sqlite3.Connection) -> None:
     conn.execute(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(banners)")}
+    for col, kind in (("user_id", "INTEGER"), ("status", "TEXT NOT NULL DEFAULT 'approved'"), ("days", "INTEGER"),
+                      ("note", "TEXT NOT NULL DEFAULT ''")):
+        if col not in cols:   # заявки пользователей: чьё, статус проверки, срок, причина отказа
+            conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
 
 def folder(config: Config) -> Path:
@@ -140,7 +158,7 @@ def _date(value: str) -> str | None:
 
 def all_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ensure(conn)
-    return conn.execute("SELECT * FROM banners ORDER BY active DESC, sort, id DESC").fetchall()
+    return conn.execute("SELECT * FROM banners WHERE status != 'pending' ORDER BY active DESC, sort, id DESC").fetchall()
 
 
 def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str, Any]]:
@@ -150,7 +168,7 @@ def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str,
         from datetime import date
         day = today or date.today().isoformat()
         rows = conn.execute(
-            "SELECT id, title, image, link FROM banners WHERE active = 1 "
+            "SELECT id, title, image, link FROM banners WHERE active = 1 AND status = 'approved' "
             "AND (starts_at IS NULL OR starts_at <= ?) AND (ends_at IS NULL OR ends_at >= ?) "
             "ORDER BY sort, id DESC LIMIT ?", (day, day, MAX_ACTIVE)).fetchall()
         return [{"id": r["id"], "title": r["title"], "link": r["link"],
@@ -164,8 +182,65 @@ def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str,
 def click(conn: sqlite3.Connection, bid: int) -> str | None:
     """Засчитать нажатие и вернуть ссылку (None — баннера нет или ссылки нет)."""
     ensure(conn)
-    row = conn.execute("SELECT link FROM banners WHERE id = ? AND active = 1", (bid,)).fetchone()
+    row = conn.execute("SELECT link FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
+                       (bid,)).fetchone()
     if row is None or not row["link"]:
         return None
     conn.execute("UPDATE banners SET clicks = clicks + 1 WHERE id = ?", (bid,))
     return row["link"]
+
+
+# ── Заявки пользователей ─────────────────────────────────────
+
+
+def submit(conn: sqlite3.Connection, config: Config, user_id: int, *, data: bytes, title: str, link: str,
+           days: int) -> int:
+    """Заявка на рекламу: баннер сохраняется, но не показывается, пока админ не одобрит."""
+    ensure(conn)
+    if days not in DAYS:
+        raise BannerError("Выберите срок показа.")
+    if not (title or "").strip():
+        raise BannerError("Напишите, что рекламируете.")
+    link = clean_link(link)
+    if not link:
+        raise BannerError("Укажите ссылку: https://… или t.me/…")
+    open_n = conn.execute("SELECT COUNT(*) FROM banners WHERE user_id = ? AND status = 'pending'", (user_id,)).fetchone()[0]
+    if open_n >= 3:
+        raise BannerError("У вас уже 3 заявки на проверке — дождитесь ответа.")
+    name = save_image(config, data)
+    with db.tx(conn):
+        bid = int(conn.execute(
+            "INSERT INTO banners (title, image, link, active, sort, user_id, status, days, created_at) "
+            "VALUES (?, ?, ?, 0, 100, ?, 'pending', ?, ?)",
+            (title.strip()[:120], name, link, user_id, days, db.now())).lastrowid)
+    return bid
+
+
+def decide(conn: sqlite3.Connection, bid: int, approve: bool, note: str = "") -> sqlite3.Row | None:
+    """Одобрить (показ с сегодня на выбранный срок) или отклонить с причиной."""
+    ensure(conn)
+    from datetime import date, timedelta
+    row = conn.execute("SELECT * FROM banners WHERE id = ? AND status = 'pending'", (bid,)).fetchone()
+    if row is None:
+        return None
+    if approve:
+        start = date.today()
+        end = start + timedelta(days=max(int(row["days"] or 1), 1) - 1)
+        conn.execute("UPDATE banners SET status = 'approved', active = 1, starts_at = ?, ends_at = ?, note = '' "
+                     "WHERE id = ?", (start.isoformat(), end.isoformat(), bid))
+    else:
+        conn.execute("UPDATE banners SET status = 'rejected', active = 0, note = ? WHERE id = ?",
+                     ((note or "").strip()[:300], bid))
+    cache.clear(CACHE_KEY)
+    return conn.execute("SELECT * FROM banners WHERE id = ?", (bid,)).fetchone()
+
+
+def of_user(conn: sqlite3.Connection, user_id: int) -> list[sqlite3.Row]:
+    ensure(conn)
+    return conn.execute("SELECT * FROM banners WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user_id,)).fetchall()
+
+
+def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    ensure(conn)
+    return conn.execute("SELECT b.*, u.login FROM banners b LEFT JOIN users u ON u.id = b.user_id "
+                        "WHERE b.status = 'pending' ORDER BY b.id").fetchall()

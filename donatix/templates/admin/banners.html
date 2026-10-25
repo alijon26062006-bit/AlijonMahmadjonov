@@ -4,46 +4,79 @@
 {% block content %}
 <section class="page-hero"><h1>Баннеры рекламы</h1>
   <p>Лента вверху всех страниц сайта и кабинета (в админке её нет). Листается пальцем и сама переключается каждые 5 секунд.
-    Показываются включённые баннеры в своём сроке, до {{ max_active }} штук, по порядку (меньше число — раньше).</p></section>
+    Показываются включённые баннеры в своём сроке, до {{ max_active }} штук, по порядку (меньше число — раньше).
+    Клиенты подают свои заявки в кабинете — раздел <a href="/panel/ads">«Реклама на сайте»</a>.</p></section>
 
-<form class="card" method="post" action="/admin/banners" enctype="multipart/form-data">
+{% if pending %}
+<h2 class="adf-h">{{ icon('bell', 20) }} Заявки на проверку <span class="badge warn">{{ pending | length }}</span></h2>
+<div class="adl">
+{% for b in pending %}
+  <div class="card adl-item">
+    <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+    <div class="adl-body">
+      <div class="adl-top"><b>{{ b.title }}</b><span class="muted small">#{{ b.id }} · {{ b.login or ('клиент ' ~ b.user_id) }} · {{ b.days }} дн.</span></div>
+      <div class="small">Ссылка: <a href="{{ b.link }}" target="_blank" rel="noopener nofollow">{{ b.link }}</a> — откройте и проверьте, что там.</div>
+      <form method="post" action="/admin/banners/{{ b.id }}/decide" class="adl-actions">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn sm primary" name="action" value="approve">{{ icon('check', 16) }} Одобрить</button>
+        <input name="note" maxlength="300" placeholder="Причина отказа (увидит клиент)" aria-label="Причина отказа"
+               onkeydown="if (event.key === 'Enter') event.preventDefault()">
+        <button class="btn sm danger" name="action" value="reject">{{ icon('x', 16) }} Отклонить</button>
+      </form>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% include "_ad_guide.html" %}
+
+<form class="card adf" method="post" action="/admin/banners" enctype="multipart/form-data">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h3 style="margin:0 0 6px">Новый баннер</h3>
-  <p class="muted small" style="margin:0 0 12px">Картинка {{ ratio[0] }}:{{ ratio[1] }}, лучше <b>1500×600</b> (JPG, PNG или WebP, до 8 МБ).
-    Другой формат сайт обрежет по центру — важный текст держите ближе к середине. Чужие бренды и логотипы
-    (игр, банков) на баннерах не размещайте: из-за них приходят жалобы на сервер.</p>
+  <h2 class="adf-title">{{ icon('plus', 22) }} Свой баннер</h2>
+  <label for="b-img">Картинка <span class="adg-pill sm">1500 × 600 px</span></label>
+  <input id="b-img" type="file" name="image" accept="image/jpeg,image/png,image/webp" required data-bn-file="b-prev">
+  <div class="adp" id="b-prev" hidden>
+    <div class="adp-frame"><img alt="Так баннер будет выглядеть на сайте"><span class="bnr-tag">Реклама</span></div>
+    <p class="adp-msg" role="status"></p>
+  </div>
   <div class="grid two" style="gap:12px">
-    <div><label for="b-img">Картинка</label><input id="b-img" type="file" name="image" accept="image/jpeg,image/png,image/webp" required></div>
     <div><label for="b-title">Подпись <small class="muted">для незрячих и для вас</small></label><input id="b-title" name="title" maxlength="120" placeholder="Скидка на алмазы до пятницы"></div>
     <div><label for="b-link">Ссылка <small class="muted">/страница, https://… или t.me/…</small></label><input id="b-link" name="link" placeholder="/panel/catalog"></div>
     <div><label for="b-sort">Порядок</label><input id="b-sort" name="sort" inputmode="numeric" value="0"></div>
-    <div><label for="b-from">Показывать с <small class="muted">необязательно</small></label><input id="b-from" type="date" name="starts_at"></div>
-    <div><label for="b-to">Показывать по <small class="muted">включительно, необязательно</small></label><input id="b-to" type="date" name="ends_at"></div>
+    <div style="display:flex;gap:8px"><div style="flex:1"><label for="b-from">С <small class="muted">необяз.</small></label><input id="b-from" type="date" name="starts_at"></div>
+      <div style="flex:1"><label for="b-to">По <small class="muted">включительно</small></label><input id="b-to" type="date" name="ends_at"></div></div>
   </div>
   <button class="btn primary" style="margin-top:12px">{{ icon('plus', 16) }} Добавить</button>
 </form>
 
+<h2 class="adf-h">Все баннеры</h2>
 {% for b in rows %}
-<div class="card" style="margin-top:14px{% if not b.active %};opacity:.6{% endif %}">
-  <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async"
-       style="width:100%;max-width:520px;height:auto;aspect-ratio:5/2;object-fit:cover;border-radius:12px;display:block">
-  <div class="muted small" style="margin:8px 0">{{ '🟢 Показывается' if b.active else '⚪ Выключен' }} · кликов: <b>{{ b.clicks }}</b>
-    {% if b.starts_at or b.ends_at %} · срок: {{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}{% endif %}</div>
-  <form method="post" action="/admin/banners/{{ b.id }}" class="grid two" style="gap:10px">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div><label>Подпись</label><input name="title" maxlength="120" value="{{ b.title }}"></div>
-    <div><label>Ссылка</label><input name="link" value="{{ b.link }}"></div>
-    <div><label>Порядок</label><input name="sort" inputmode="numeric" value="{{ b.sort }}"></div>
-    <div style="display:flex;gap:8px"><div style="flex:1"><label>С</label><input type="date" name="starts_at" value="{{ b.starts_at or '' }}"></div>
-      <div style="flex:1"><label>По</label><input type="date" name="ends_at" value="{{ b.ends_at or '' }}"></div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-      <button class="btn sm primary">Сохранить</button>
-      <button class="btn sm" formaction="/admin/banners/{{ b.id }}/toggle">{{ 'Выключить' if b.active else 'Включить' }}</button>
-      <button class="btn sm" formaction="/admin/banners/{{ b.id }}/delete" onclick="return confirm('Удалить баннер?')">Удалить</button>
+<div class="card adl-item wide{% if not b.active %} off{% endif %}">
+  <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
+  <div class="adl-body">
+    <div class="adl-top">
+      <span class="badge {{ 'ok' if b.active else '' }}">{{ 'Показывается' if b.active else 'Выключен' }}</span>
+      {% if b.status == 'rejected' %}<span class="badge bad">Отклонён</span>{% endif %}
+      {% if b.user_id %}<span class="badge">от клиента</span>{% endif %}
+      <span class="muted small">нажатий: <b>{{ b.clicks }}</b>{% if b.starts_at or b.ends_at %} · {{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}{% endif %}</span>
     </div>
-  </form>
+    <form method="post" action="/admin/banners/{{ b.id }}" class="grid two" style="gap:10px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label>Подпись</label><input name="title" maxlength="120" value="{{ b.title }}"></div>
+      <div><label>Ссылка</label><input name="link" value="{{ b.link }}"></div>
+      <div><label>Порядок</label><input name="sort" inputmode="numeric" value="{{ b.sort }}"></div>
+      <div style="display:flex;gap:8px"><div style="flex:1"><label>С</label><input type="date" name="starts_at" value="{{ b.starts_at or '' }}"></div>
+        <div style="flex:1"><label>По</label><input type="date" name="ends_at" value="{{ b.ends_at or '' }}"></div></div>
+      <div class="adl-actions">
+        <button class="btn sm primary">Сохранить</button>
+        <button class="btn sm" formaction="/admin/banners/{{ b.id }}/toggle">{{ 'Выключить' if b.active else 'Включить' }}</button>
+        <button class="btn sm danger" formaction="/admin/banners/{{ b.id }}/delete" onclick="return confirm('Удалить баннер?')">Удалить</button>
+      </div>
+    </form>
+  </div>
 </div>
 {% else %}
-<div class="card empty" style="margin-top:14px">Баннеров пока нет — добавьте первый выше.</div>
+<div class="card empty">Баннеров пока нет — добавьте первый выше.</div>
 {% endfor %}
 {% endblock %}

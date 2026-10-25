@@ -1,0 +1,74 @@
+{#- Памятка для рекламы: размер картинки, что запрещено, промпт для ChatGPT. Общая для кабинета и админки. -#}
+{% set ad_prompt = "Сделай рекламный баннер для сайта. Размер строго 1500×600 пикселей (горизонтальный, соотношение 5:2).\n"
+  ~ "Что рекламирую: [опишите — например, мой Telegram-канал о кулинарии / мой магазин одежды].\n"
+  ~ "Крупный короткий заголовок на русском (до 5 слов): «[ваш текст]».\n"
+  ~ "Весь текст и главное — в центре, по краям 150 пикселей оставь только фон.\n"
+  ~ "Стиль: яркий, современный, чистый фон, без мелкого текста.\n"
+  ~ "Не используй логотипы и названия чужих брендов, игр, банков и Telegram, а также реальных людей." %}
+<section class="adg" aria-label="Требования к рекламе">
+  <div class="adg-size">
+    <div class="adg-size-head">
+      <span class="adg-pill">Размер картинки</span>
+      <b class="adg-big">1500 × 600 px</b>
+      <span class="adg-ratio">соотношение 5 : 2 · JPG, PNG или WebP · до 8 МБ</span>
+    </div>
+    <div class="adg-frame" aria-hidden="true">
+      <span class="adg-w">1500 px</span><span class="adg-h">600 px</span>
+      <div class="adg-safe"><b>Текст и главное — здесь</b><small>безопасная зона</small></div>
+    </div>
+    <p class="adg-warn">{{ icon('alert', 16) }}<span>Другой размер сайт <b>обрежет по краям</b> — края на телефоне тоже не видно. Текст не ставьте у краёв.</span></p>
+  </div>
+
+  <div class="adg-rules">
+    <div class="adg-col bad">
+      <h3>{{ icon('x', 18) }} Не принимаем</h3>
+      <ul>{% for em, name, what in ad_forbidden %}<li><span class="adg-em" aria-hidden="true">{{ em }}</span><span><b>{{ name }}</b> — {{ what }}</span></li>{% endfor %}</ul>
+    </div>
+    <div class="adg-col good">
+      <h3>{{ icon('check', 18) }} Можно</h3>
+      <ul>
+        <li><span class="adg-em" aria-hidden="true">📣</span><span><b>Свой Telegram-канал</b> или группу (не про донат и не про ставки)</span></li>
+        <li><span class="adg-em" aria-hidden="true">🛍️</span><span><b>Свой магазин или услугу</b> — одежда, еда, ремонт, обучение</span></li>
+        <li><span class="adg-em" aria-hidden="true">🎨</span><span><b>Своё творчество</b> — музыка, видео, блог, YouTube</span></li>
+        <li><span class="adg-em" aria-hidden="true">🎉</span><span><b>Мероприятие</b> — турнир, концерт, открытие</span></li>
+      </ul>
+      <p class="adg-note">Каждую заявку проверяем вручную. Нарушение — отказ, а повторное — блокировка рекламы.</p>
+    </div>
+  </div>
+
+  <details class="adg-ai" open>
+    <summary>{{ icon('bolt', 18) }} <b>Нет картинки? Сделайте за 1 минуту в ChatGPT</b></summary>
+    <ol class="adg-steps">
+      <li>Нажмите <b>«Скопировать промпт»</b> и замените текст в [квадратных скобках] на свой.</li>
+      <li>Вставьте его в <b>ChatGPT</b> (или другой генератор картинок) и отправьте.</li>
+      <li>Скачайте картинку и загрузите сюда — ниже сразу увидите, как она будет выглядеть.</li>
+    </ol>
+    <pre class="adg-prompt">{{ ad_prompt }}</pre>
+    <button type="button" class="btn primary" data-copy="{{ ad_prompt }}">{{ icon('copy', 16) }} Скопировать промпт</button>
+  </details>
+</section>
+<script>
+// Живой предпросмотр: выбранная картинка сразу в рамке 5:2 — как на сайте, плюс подсказка про размер.
+// Слушаем на document: форма стоит ниже памятки, а страница может обновиться «вживую».
+if (!window.dxAdPreview) {
+  window.dxAdPreview = true;
+  document.addEventListener("change", function (e) {
+    var input = e.target.closest && e.target.closest("[data-bn-file]");
+    if (!input) return;
+    var box = document.getElementById(input.dataset.bnFile);
+    if (!box) return;
+    var img = box.querySelector("img"), msg = box.querySelector(".adp-msg"), f = input.files && input.files[0];
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    if (!f) { box.hidden = true; return; }
+    img.onload = function () {
+      var w = img.naturalWidth, h = img.naturalHeight, off = Math.abs(w / h - 2.5) > 0.08, text, cls;
+      if (off) { cls = "bad"; text = "⚠️ " + w + " × " + h + " — не 5:2. Края обрежутся, как на превью. Лучше сделать 1500 × 600."; }
+      else if (w < 1200) { cls = "warn"; text = "⚠️ " + w + " × " + h + " — маловато, на компьютере будет мутно. Лучше 1500 × 600."; }
+      else { cls = "ok"; text = "✅ " + w + " × " + h + " — размер подходит."; }
+      msg.className = "adp-msg " + cls; msg.textContent = text;
+    };
+    img.src = img.dataset.url = URL.createObjectURL(f);
+    box.hidden = false;
+  });
+}
+</script>

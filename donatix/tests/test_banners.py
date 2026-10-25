@@ -90,3 +90,52 @@ def test_delete_removes_files(admin, config, conn):
 def test_no_banners_no_markup(client):
     cache.clear()
     assert "data-bnr" not in client.get("/").text
+
+
+def _buyer(app, conn):
+    make_client(conn, login="buyer")
+    c = TestClient(app)
+    web_login(c, "buyer@example.com", "password123")
+    return c, csrf_of(c.get("/panel/ads").text)
+
+
+def test_client_request_waits_for_approval(admin, app, conn):
+    c, token = _buyer(app, conn)
+    page = c.get("/panel/ads").text
+    assert "1500 × 600 px" in page and "Азартные игры" in page and "Скопировать промпт" in page
+    r = c.post("/panel/ads", data={"csrf": token, "title": "Мой канал", "link": "t.me/mychan", "days": "3"},
+               files={"image": ("b.png", _png(1500, 600), "image/png")}, follow_redirects=False)
+    assert r.status_code == 303
+    row = banners.pending(conn)[0]
+    assert row["status"] == "pending" and row["login"] == "buyer"
+    cache.clear()
+    assert banners.active(conn) == []                       # без одобрения не показывается
+    assert "На проверке" in c.get("/panel/ads").text
+    a, atoken = admin
+    assert "Заявки на проверку" in a.get("/admin/banners").text
+    a.post(f"/admin/banners/{row['id']}/decide", data={"csrf": atoken, "action": "approve"})
+    shown = banners.active(conn)
+    assert [b["id"] for b in shown] == [row["id"]]
+    got = conn.execute("SELECT starts_at, ends_at FROM banners WHERE id = ?", (row["id"],)).fetchone()
+    from datetime import date, timedelta
+    assert got["ends_at"] == (date.fromisoformat(got["starts_at"]) + timedelta(days=2)).isoformat()
+
+
+def test_client_request_rejected_with_reason(admin, app, conn):
+    c, token = _buyer(app, conn)
+    c.post("/panel/ads", data={"csrf": token, "title": "Ставки", "link": "https://example.com", "days": "7"},
+           files={"image": ("b.png", _png(), "image/png")})
+    bid = banners.pending(conn)[0]["id"]
+    a, atoken = admin
+    a.post(f"/admin/banners/{bid}/decide", data={"csrf": atoken, "action": "reject", "note": "Азартные игры"})
+    cache.clear()
+    assert banners.active(conn) == [] and banners.pending(conn) == []
+    assert "Причина: Азартные игры" in c.get("/panel/ads").text
+
+
+def test_client_request_needs_link_and_valid_days(app, conn):
+    c, token = _buyer(app, conn)
+    for data in ({"title": "Канал", "link": "", "days": "7"}, {"title": "Канал", "link": "t.me/x", "days": "5"},
+                 {"title": "Канал", "link": "javascript:alert(1)", "days": "7"}):
+        c.post("/panel/ads", data={"csrf": token, **data}, files={"image": ("b.png", _png(), "image/png")})
+    assert banners.pending(conn) == []
