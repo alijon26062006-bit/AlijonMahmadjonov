@@ -16,7 +16,7 @@ from . import packs, popular
 from .config import Config
 from .money import apply_markup, to_decimal
 
-SECTIONS = (("ff_cis", "FF", "CIS"), ("ff_id", "FF", "Indonesia"), ("pubg", "PUBG Mobile", "UC"))
+SECTIONS = (("ff_cis", "FF", "СНГ"), ("ff_id", "FF", "Инд"), ("pubg", "PUBG Mobile", "UC"))
 
 
 def _categories(conn: sqlite3.Connection) -> dict[str, tuple[str, str | None, str | None]]:

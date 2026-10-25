@@ -161,13 +161,15 @@ FF_COVER = "/static/img/ff-cover.webp"   # своя обложка для все
 
 
 def brand_safe(text: str | None) -> str | None:
-    """Название без бренда правообладателя: «Free Fire (CIS)», «Free Fire — СНГ» → «FF CIS»."""
-    if not text or not _FF.search(text):
+    """Название без бренда правообладателя: «Free Fire (CIS)», «Free Fire — СНГ» → «FF СНГ»,
+    «Free Fire Indonesia» → «FF Инд» — коротко и понятно покупателям."""
+    if not text or not (_FF.search(text) or re.match(r"FF\b", text)):
         return text
     t = _FF.sub("FF", text)
     t = re.sub(r"FF\s*[-—–:]?\s*[\(\[]\s*([^\)\]]+?)\s*[\)\]]", r"FF \1", t)   # FF (CIS) → FF CIS
     t = re.sub(r"FF\s*[-—–:|]\s*", "FF ", t)                                        # FF — Global → FF Global
-    t = re.sub(r"FF\s+СНГ", "FF CIS", t, flags=re.I)
+    t = re.sub(r"FF\s+(CIS|СНГ)\b", "FF СНГ", t, flags=re.I)
+    t = re.sub(r"FF\s+(Indonesia|Индонезия|IDN?|Инд)\b", "FF Инд", t, flags=re.I)
     return re.sub(r"\s{2,}", " ", t).strip()
 
 

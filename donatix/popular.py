@@ -20,7 +20,7 @@ LIMIT = 7
 TTL = 600
 
 _CIS = {"cis", "снг", "ru", "russia", "россия"}
-_ID = {"id", "idn", "indonesia", "индонезия"}
+_ID = {"id", "idn", "indonesia", "индонезия", "инд"}
 
 
 def _words(text: str) -> set[str]:
@@ -69,9 +69,9 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         elif game == "coc":
             key, title, reg = "coc", "Clash of Clans", None
         elif region in ("CIS", "RU") or words & _CIS:
-            key, title, reg = "ff_cis", "FF CIS", r["region"] if region in ("CIS", "RU") else None
+            key, title, reg = "ff_cis", "FF СНГ", r["region"] if region in ("CIS", "RU") else None
         elif region == "ID" or words & _ID:
-            key, title, reg = "ff_id", "FF Indonesia", r["region"] if region == "ID" else None
+            key, title, reg = "ff_id", "FF Инд", r["region"] if region == "ID" else None
         else:
             continue
         entry = {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",

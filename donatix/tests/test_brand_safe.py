@@ -4,10 +4,12 @@ from donatix.suppliers.base import FF_COVER, brand_safe, is_ff
 
 
 def test_names():
-    assert brand_safe("Free Fire (CIS)") == "FF CIS"
-    assert brand_safe("Free Fire — СНГ") == "FF CIS"
+    assert brand_safe("Free Fire (CIS)") == "FF СНГ"
+    assert brand_safe("Free Fire — СНГ") == "FF СНГ"
+    assert brand_safe("FF CIS") == "FF СНГ" and brand_safe("FF Indonesia") == "FF Инд"
+    assert brand_safe("Free Fire [ID]") == "FF Инд"
     assert brand_safe("FREE FIRE - Global") == "FF Global"
-    assert brand_safe("Free Fire Indonesia") == "FF Indonesia"
+    assert brand_safe("Free Fire Indonesia") == "FF Инд"
     assert brand_safe("PUBG Mobile") == "PUBG Mobile"
     assert is_ff("FF CIS") and not is_ff("BUFF") and not is_ff("Offer")
 
@@ -28,7 +30,7 @@ def test_old_rows_renamed_on_start(conn):
                      "'{}', 1, ?, 'https://cdn.example/ff.png', 'CIS')", (db.now(),))
     urls = catalog.rename_brands(conn)
     r = conn.execute("SELECT category_name, image_url FROM products WHERE id = 'x1'").fetchone()
-    assert r["category_name"] == "FF CIS" and r["image_url"] == FF_COVER and urls == ["https://cdn.example/ff.png"]
+    assert r["category_name"] == "FF СНГ" and r["image_url"] == FF_COVER and urls == ["https://cdn.example/ff.png"]
     assert catalog.rename_brands(conn) == []   # второй запуск — уже ничего не меняет
 
 

@@ -255,9 +255,11 @@ def delivery_note(category_name: str | None) -> str:
 def rename_brands(conn: sqlite3.Connection) -> list[str]:
     """Уже загруженные товары FF: новое имя и своя обложка (до следующей загрузки каталога ждать не надо).
     Вернёт ссылки снятых картинок поставщика — их файлы удаляет catalog_job.forget."""
-    rows = conn.execute("SELECT id, category_name, name, image_url FROM products WHERE category_name LIKE '%free%fire%' "
-                        "OR name LIKE '%free%fire%' OR (category_name LIKE 'FF%' AND image_url IS NOT ?)",
-                        (FF_COVER,)).fetchall()
+    rows = [r for r in conn.execute("SELECT id, category_name, name, image_url FROM products "
+                                    "WHERE category_name LIKE '%free%fire%' OR name LIKE '%free%fire%' "
+                                    "OR category_name LIKE 'FF%'").fetchall()
+            if r["image_url"] != FF_COVER or brand_safe(r["category_name"]) != r["category_name"]
+            or brand_safe(r["name"]) != r["name"]]
     with db.tx(conn):
         for r in rows:
             conn.execute("UPDATE products SET category_name = ?, name = ?, image_url = ? WHERE id = ?",

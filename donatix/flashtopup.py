@@ -28,7 +28,7 @@ PREFIX = "/api/reseller/v2"
 TIMEOUT = 12
 GAMES_TTL = 6 * 3600
 
-_REGION_WORDS = re.compile(r"\b(global|indonesia|india|brazil|cis|снг|russia|turkey|ph|my|sg|th|vn|id|br|tr|ru|"
+_REGION_WORDS = re.compile(r"\b(global|indonesia|india|brazil|cis|снг|инд|russia|turkey|ph|my|sg|th|vn|id|br|tr|ru|"
                            r"me|mena|latam|eu|us|asia|sea|top ?up|topup|direct|login|id)\b", re.I)
 
 
@@ -37,7 +37,7 @@ def norm(name: str) -> str:
     text = re.sub(r"[\(\[].*?[\)\]]", " ", (name or "").lower())
     text = _REGION_WORDS.sub(" ", text)
     text = re.sub(r"[^a-zа-я0-9]", "", text)
-    return "freefire" if text == "ff" else text   # у нас игра называется «FF CIS» — у сервиса проверки «Free Fire»
+    return "freefire" if text == "ff" else text   # у нас игра называется «FF СНГ» — у сервиса проверки «Free Fire»
 
 
 class FlashError(Exception):
