@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("bank-listen")
     relink = sub.add_parser("glory-relink")
     relink.add_argument("order_id", nargs="?", type=int, default=None)
+    sub.add_parser("bots-drain")   # перед обновлением: мягко остановить ботов партнёров, пока сайт работает
     sub.add_parser("geo-update")   # скачать базу «IP → страна» и курсы СНГ сейчас, не дожидаясь воркера
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
@@ -81,6 +82,14 @@ def main(argv: list[str] | None = None) -> int:
             asyncio.run(bankbot.run(config))
         except KeyboardInterrupt:
             pass
+        return 0
+
+    if args.cmd == "bots-drain":
+        from . import bots
+        db.init(config.db_path)
+        stopped, killed = bots.drain(config)
+        print(f"боты партнёров: остановлено {stopped}" + (f", не успели доделать и остановлены силой: {killed}"
+                                                          if killed else ", все доделали начатое"))
         return 0
 
     db.init(config.db_path)

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 import aiosqlite
 from aiogram import Bot
@@ -135,9 +136,17 @@ async def purchase(
     return refreshed or order
 
 
+def order_key(order_id: int) -> str:
+    """Ключ повтора заказа у поставщика: один и тот же при любой повторной отправке этого заказа."""
+    return f"{os.environ.get('BOT_USERNAME') or 'bot'}-order-{order_id}"
+
+
 async def _run_delivery(
     bot: Bot, conn: aiosqlite.Connection, provider: DeliveryProvider, order: db.Order
 ) -> None:
+    from app.services.fazer import ORDER_KEY
+
+    token = ORDER_KEY.set(order_key(order.id))
     try:
         if order.product_type == "stars":
             result = await provider.deliver_stars(order.recipient, order.quantity)
@@ -198,6 +207,8 @@ async def _run_delivery(
         )
         log.info("Заказ %s выдан, fragment_id=%s", order.id, result.order_id)
         await _ask_review(bot, conn, order)
+    finally:
+        ORDER_KEY.reset(token)
 
 
 async def _give_back(conn: aiosqlite.Connection, order: db.Order) -> None:
@@ -246,6 +257,42 @@ async def _refund(
         ),
     )
     log.warning("Заказ %s: возвращено %s — %s", order.id, fmt(order.price), reason)
+
+
+async def resume_interrupted(bot: Bot, conn: aiosqlite.Connection, provider: DeliveryProvider,
+                             stuck: list[db.Order] | None = None) -> int:
+    """При запуске: довести заказы, выдачу которых оборвала остановка бота (обновление, сбой сервера).
+
+    Такой заказ остаётся «в выдаче»: деньги списаны, а чем кончилось — неизвестно. Через Donatix
+    отправляем его снова с тем же ключом повтора: если заказ уже создан, Donatix вернёт его же (второй
+    покупки не будет), если не успел — создаст. С другим поставщиком повтор небезопасен — тогда как при
+    таймауте: заказ ждёт проверки, клиенту «проверяется», админу — /done или /refund.
+    Игровые заказы сюда не входят: за ними и так следит games.watch_loop.
+    """
+    if stuck is None:   # список берём до приёма новых нажатий — иначе сюда попал бы и свежий заказ
+        stuck = await db.interrupted_orders(conn)
+    if not stuck:
+        return 0
+    safe = bool(os.environ.get("DONATIX_URL"))
+    log.warning("Запуск: %s заказ(ов) прервано остановкой — %s", len(stuck),
+                "довожу с тем же ключом" if safe else "отдаю на проверку админу")
+    for order in stuck:
+        try:
+            if safe:
+                await _run_delivery(bot, conn, provider, order)
+                continue
+            await db.transition_order(conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
+                                      error="Прервано остановкой бота во время выдачи")
+            await tell_buyer(bot, conn, order, f"⏳ <b>Заказ №{order.id} проверяется.</b>\n\n"
+                                               "Бот перезапускался во время выдачи. Проверяю — напишу в течение "
+                                               "нескольких минут. Деньги в безопасности.")
+            await notify_admins(bot, f"⚠️ Заказ №{order.id} ({order.title} → {order.recipient}) прерван "
+                                     "перезапуском бота во время выдачи.\n\n❗️ Проверьте у поставщика:\n"
+                                     f"• дошёл → <code>/done {order.id}</code>\n"
+                                     f"• не дошёл → <code>/refund {order.id}</code>")
+        except Exception:  # noqa: BLE001 — один заказ не должен остановить остальные
+            log.exception("Запуск: заказ %s не довёлся", order.id)
+    return len(stuck)
 
 
 async def retry_failed(

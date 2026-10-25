@@ -16,6 +16,7 @@ immediately; fulfillment is asynchronous». То есть успешный от�
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -163,6 +164,11 @@ def _decimal(value, field: str) -> Decimal:
         return Decimal(str(value))
     except (InvalidOperation, TypeError) as exc:
         raise DeliveryError(f"FazerCards вернул нечисловое поле {field}: {value!r}") from exc
+
+
+#: Ключ повтора текущего заказа (ставит delivery._run_delivery). С ним повторная отправка того же заказа —
+#: после обрыва связи или перезапуска бота посреди выдачи — вернёт уже созданный заказ, а не купит второй раз.
+ORDER_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("fazer_order_key", default=None)
 
 
 class FazerProvider(DeliveryProvider):
@@ -533,7 +539,9 @@ class FazerProvider(DeliveryProvider):
         })
 
     async def _buy(self, path: str, payload: dict) -> DeliveryResult:
-        data = await self._request("POST", path, payload, urgent=True)
+        key = ORDER_KEY.get()
+        data = await self._request("POST", path, payload, urgent=True,
+                                   headers={"Idempotency-Key": key} if key else None)
         order = data.get("order")
         if not isinstance(order, dict):
             raise DeliveryUncertain(

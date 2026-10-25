@@ -270,3 +270,37 @@ def test_daily_backup_of_bot_databases(config, conn):
     copy.unlink()
     bots.backup_all(config)
     assert len(list(dest.glob("u5-*.sqlite3"))) == bots.BACKUP_KEEP
+
+
+def test_drain_stops_bots_gently_and_holds_until_site_restart(config, conn, tmp_path):
+    """Перед обновлением: бот получает сигнал, доделывает начатое и выходит; сайт не запускает его снова,
+    пока сам не перезапустится (новый запуск снимает паузу)."""
+    import subprocess
+    import sys as _sys
+
+    from donatix import bots, db
+    folder = bots.bots_dir(config) / "1"
+    folder.mkdir(parents=True, exist_ok=True)
+    code = ("import signal, sys, time\n"
+            "def bye(*_):\n    time.sleep(0.3)\n    open(sys.argv[1], 'w').write('done')\n    sys.exit(0)\n"
+            "signal.signal(signal.SIGTERM, bye)\nprint('ready', flush=True)\n"
+            "while True:\n    time.sleep(0.1)\n")
+    mark = tmp_path / "finished"
+    p = subprocess.Popen([_sys.executable, "-c", code, str(mark), "app.main"], stdout=subprocess.PIPE)
+    assert p.stdout.readline().strip() == b"ready"
+    (folder / "bot.pid").write_text(str(p.pid))
+    stopped, killed = bots.drain(config, wait=10)
+    p.wait(timeout=5)
+    assert (stopped, killed) == (1, 0) and mark.read_text() == "done"   # доделал начатое, не убит
+    assert bots.held(config)
+    conn = db.connect(config.db_path)
+    uid = accounts.create_user(conn, email="pbot@example.com", login="pbot", password="password123")
+    conn.execute("INSERT INTO bots (user_id, token_enc, username, admin_ids, enabled, created_at, updated_at) "
+                 "VALUES (?, 'x', 'pbot', '1', 1, '2026-01-01', '2026-01-01')", (uid,))
+    conn.close()
+    runner = bots.BotRunner(config, "http://x", python=_sys.executable, check_every=999)
+    runner._sync()                                                    # включённый бот, но пауза — не запускаем
+    assert runner.procs == {}
+    runner.start()
+    runner.stop()
+    assert not bots.held(config)                                      # новый сайт — пауза снята

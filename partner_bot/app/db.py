@@ -1869,6 +1869,17 @@ async def last_game_orders(
         return [_from_row(Order, row) for row in await cur.fetchall()]
 
 
+async def interrupted_orders(conn: aiosqlite.Connection) -> list[Order]:
+    """Stars, Premium и Steam, оставшиеся «в выдаче»: так бывает, только если бота остановили посреди выдачи."""
+    async with conn.execute(
+        """SELECT * FROM orders
+           WHERE status = ? AND product_type IN ('stars', 'premium', 'steam')
+           ORDER BY id""",
+        (ORDER_DELIVERING,),
+    ) as cur:
+        return [_from_row(Order, row) for row in await cur.fetchall()]
+
+
 async def unfinished_game_orders(
     conn: aiosqlite.Connection, limit: int = 100,
 ) -> list[Order]:

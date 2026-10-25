@@ -153,6 +153,10 @@ async def main() -> None:
     dp = Dispatcher(storage=storage, conn=conn, provider=provider)
     # Внешняя мидлварь — до фильтров: команда должна пробиваться
     # сквозь любой незакрытый шаг диалога.
+    # Самым первым: отмечает каждое нажатие, чтобы при остановке доделать начатое (services/inflight)
+    from app.services.inflight import InFlight
+
+    dp.update.outer_middleware(InFlight())
     dp.message.outer_middleware(CommandEscapeMiddleware())
     dp.message.middleware(UserGuardMiddleware())
     dp.callback_query.middleware(UserGuardMiddleware())
@@ -306,10 +310,20 @@ async def main() -> None:
 
     digest_task = asyncio.create_task(api_digest.loop(bot))
 
+    # Заказы, выдачу которых оборвала прошлая остановка (обновление, сбой), — довести до конца
+    from app.services import delivery, inflight
+
+    interrupted = await db.interrupted_orders(conn)   # до приёма нажатий: свежие заказы сюда не попадут
+    resume_task = asyncio.create_task(delivery.resume_interrupted(bot, conn, provider, interrupted))
+
     try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        # Сессию закрываем сами, после того как доделаются начатые действия: им ещё отвечать клиентам
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types(), close_bot_session=False)
     finally:
-        for task in (pricing_task, games_task, api_task, digest_task):
+        # Новые нажатия уже не принимаются — доделываем начатые (покупки!), потом выходим
+        await inflight.drain()
+        await asyncio.wait({resume_task}, timeout=inflight.DRAIN)   # дожимание прерванных — тоже начатое
+        for task in (pricing_task, games_task, api_task, digest_task, resume_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

@@ -6,11 +6,12 @@ APP_DIR=/home/donatix/app
 START=$(date +%s)
 step() { echo "• $1 ($(( $(date +%s) - START )) с)"; }
 
-# Остановка не дольше 10 с: по умолчанию systemd ждёт 90 с, пока старый процесс (и боты партнёров) выключится
+# Остановка не дольше 45 с: боты партнёров доделывают начатые заказы (обычно хватает пары секунд)
 DROP=/etc/systemd/system/donatix.service.d/fast-stop.conf
-if [ ! -f "$DROP" ]; then
+WANT=$'[Service]\nTimeoutStopSec=45\nKillMode=mixed'
+if [ "$(cat "$DROP" 2>/dev/null)" != "$WANT" ]; then
   mkdir -p "$(dirname "$DROP")"
-  printf '[Service]\nTimeoutStopSec=10\nKillMode=mixed\n' > "$DROP"
+  printf '%s\n' "$WANT" > "$DROP"
   systemctl daemon-reload
 fi
 
@@ -22,8 +23,11 @@ if [ "$OLD" != "$NEW" ] && sudo -u donatix git -C "$APP_DIR" diff --name-only "$
   step "новые библиотеки — устанавливаю"
   sudo -u donatix "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/donatix/requirements.txt"
 fi
+# Боты партнёров — мягко и ДО перезапуска сайта: доделывают начатые заказы, пока сайт отвечает им
+step "останавливаю ботов партнёров (доделывают начатые заказы)"
+(cd "$APP_DIR" && sudo -u donatix .venv/bin/python -m donatix bots-drain) || echo "  (не получилось — боты остановятся вместе с сайтом)"
 systemctl restart donatix
-step "перезапущен"
+step "перезапущен — боты партнёров запускаются с новым кодом"
 for _ in $(seq 1 60); do
   if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/robots.txt | grep -q 200; then
     echo "✅ Готово за $(( $(date +%s) - START )) с — версия $(sudo -u donatix git -C "$APP_DIR" log --oneline -1)"

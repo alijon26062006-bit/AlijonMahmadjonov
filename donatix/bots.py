@@ -492,6 +492,12 @@ class BotRunner:
         return str(py)
 
     def start(self) -> None:
+        # Новый процесс сайта — обновление закончено: пауза после «bots-drain» больше не нужна
+        conn = db.connect(self.config.db_path)
+        try:
+            db.set_setting(conn, HOLD_KEY, "")
+        finally:
+            conn.close()
         self._thread = threading.Thread(target=self._run, name="donatix-bots", daemon=True)
         self._thread.start()
 
@@ -559,6 +565,8 @@ class BotRunner:
             rows = {r["id"]: r for r in conn.execute("SELECT * FROM bots")}
         finally:
             conn.close()
+        if held(self.config):
+            return   # идёт обновление: боты остановлены мягко, новые запустит уже обновлённый сайт
         with self._lock:
             # выключенные и удалённые — остановить
             for bot_id in list(self.procs):
@@ -647,7 +655,68 @@ class BotRunner:
             p.kill()
 
 
-STOP_WAIT = 5   # секунд на остановку всех ботов вместе
+STOP_WAIT = 30  # секунд на остановку всех ботов вместе: бот доделывает начатые заказы (сам ждёт до 25 с)
+HOLD_KEY = "bots.hold_until"
+HOLD_SECONDS = 300
+
+
+def held(config: Config) -> bool:
+    """Боты на паузе (обновление): не запускать их заново, пока сайт не перезапустится."""
+    try:
+        c = sqlite3.connect(str(config.db_path), timeout=5)
+        try:
+            row = c.execute("SELECT value FROM settings WHERE key = ?", (HOLD_KEY,)).fetchone()
+        finally:
+            c.close()
+        return bool(row and row[0]) and float(row[0]) > time.time()
+    except (sqlite3.Error, ValueError):
+        return False
+
+
+def drain(config: Config, wait: float = 60) -> tuple[int, int]:
+    """Перед обновлением: мягко остановить всех ботов, пока сайт ещё работает.
+
+    Бот по сигналу перестаёт брать новые нажатия и доделывает начатые заказы — а для этого ему нужен
+    живой сайт (заказы идут через Donatix API). Поэтому ботов останавливаем ДО перезапуска сайта.
+    Пауза HOLD_SECONDS не даёт старому сайту запустить их снова. Вернёт (остановлено, пришлось убить).
+    """
+    import signal
+    conn = db.connect(config.db_path)
+    try:
+        db.set_setting(conn, HOLD_KEY, str(time.time() + HOLD_SECONDS))
+    finally:
+        conn.close()
+    pids = []
+    for pidfile in bots_dir(config).glob("*/bot.pid"):
+        try:
+            pid = int(pidfile.read_text().strip())
+            if b"app.main" in Path(f"/proc/{pid}/cmdline").read_bytes():
+                os.kill(pid, signal.SIGTERM)
+                pids.append(pid)
+        except (OSError, ValueError):
+            continue
+    deadline = time.monotonic() + wait
+    alive = list(pids)
+    while alive and time.monotonic() < deadline:
+        time.sleep(0.2)
+        alive = [p for p in alive if _alive(p)]
+    for pid in alive:   # не уложился — убираем; прерванный заказ бот доведёт после запуска (ключ повтора)
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return len(pids), len(alive)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    try:   # зомби (уже завершился, но родитель не забрал) — считаем остановленным
+        return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z"
+    except OSError:
+        return False
 
 
 def _kill_stale(pidfile: Path) -> None:
