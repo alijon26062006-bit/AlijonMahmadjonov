@@ -213,4 +213,78 @@ def test_views_and_clicks_counted_honestly(admin, app, conn):
     row = banners.all_rows(conn)[0]
     assert (row["views"], row["clicks"]) == (2, 1)
     assert banners.ctr(2, 1) == "50%" and banners.ctr(0, 0) == "—"
-    assert "Просмотры" in c.get("/admin/banners").text
+    assert "На сайте" in c.get("/admin/banners").text and "В ботах" in c.get("/admin/banners").text
+
+
+# ── Реклама в ботах ─────────────────────────────────────────
+
+DAY = 86400
+
+
+def _paid_and_house(admin):
+    c, token = admin
+    _add(c, token, title="Здесь может быть ваша реклама", link="/panel/ads")
+    _add(c, token, title="Канал А", link="t.me/a")
+    _add(c, token, title="Канал Б", link="t.me/b")
+    cache.clear()
+
+
+def test_bot_ads_two_per_day_spaced_and_not_for_newbies(admin, conn, config):
+    _paid_and_house(admin)
+    t0 = 1_800_000_000.0
+    nxt = lambda t: banners.bot_next(conn, config, 555, "shop", now=t, chance=1)  # noqa: E731
+    assert nxt(t0) is None                                   # новичок — не в первые 10 минут
+    first = nxt(t0 + 11 * 60)
+    assert first and first["photo"].endswith("-tg.jpg") and "/bn-go/" in first["url"]
+    assert nxt(t0 + 60 * 60) is None                         # меньше 4 часов — рано
+    second = nxt(t0 + 11 * 60 + 4 * 3600 + 1)
+    assert second and second["id"] != first["id"]            # чередуем: второй — другой платный
+    assert banners.bot_next(conn, config, 555, "shop", now=t0 + 2 * DAY, chance=0) is None   # случайность «не сейчас»
+    titles = {first["title"], second["title"]}
+    assert titles == {"Канал А", "Канал Б"}                  # пока есть платные — приглашение не показываем
+
+
+def test_bot_ads_daily_cap(admin, conn, config):
+    _paid_and_house(admin)
+    t0 = 1_800_000_000.0
+    banners.bot_next(conn, config, 7, "shop", now=t0, chance=1)
+    got = [banners.bot_next(conn, config, 7, "gift", now=t0 + 600 + i * 5 * 3600, chance=1) for i in range(5)]
+    # 5 попыток с шагом 5 часов (25 часов): в одни сутки — не больше двух показов
+    days = {}
+    for i, ad in enumerate(got):
+        if ad:
+            d = int((t0 + 600 + i * 5 * 3600 + banners.BOT_TZ) // DAY)
+            days[d] = days.get(d, 0) + 1
+    assert days and max(days.values()) <= 2
+    assert sum(1 for a in got if a) >= 3
+
+
+def test_bot_message_has_go_and_skip(admin, conn, config):
+    _paid_and_house(admin)
+    ad = banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 3600, chance=1) or \
+        banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 7200, chance=1)
+    msg = banners.bot_message(ad)
+    kb = msg["reply_markup"]["inline_keyboard"]
+    assert kb[0][0]["text"] == "Перейти" and kb[0][0]["url"] == ad["url"]
+    assert kb[1][0] == {"text": "Пропустить", "callback_data": "adskip"}
+    assert msg["caption"].endswith("Реклама")
+    assert (banners.folder(config) / ad["photo"].rsplit("/", 1)[1]).exists()
+
+
+def test_partner_api_never_shows_ad_to_bot_staff(admin, app, conn):
+    _paid_and_house(admin)
+    uid, key = make_client(conn, login="partner")
+    conn.execute("INSERT INTO bots (user_id, token_enc, username, admin_ids, enabled, created_at, updated_at) "
+                 "VALUES (?, 'x', 'pbot', '111,222', 1, '2026-01-01', '2026-01-01')", (uid,))
+    c = TestClient(app)
+    h = {"X-API-Key": key}
+    banners._ensure_bot(conn)                                # оба «давно знакомы» — правило новичка не мешает
+    conn.execute("INSERT OR IGNORE INTO banner_bot_users (tg_id, first_seen) VALUES (111, 0), (333, 0)")
+    import random
+    random.seed(1)
+    for _ in range(20):
+        assert c.post("/api/v2/ads/next", json={"tg_user_id": 111}, headers=h).json()["ad"] is None   # владелец
+    got = [c.post("/api/v2/ads/next", json={"tg_user_id": 333}, headers=h).json()["ad"] for _ in range(20)]
+    assert sum(1 for a in got if a) == 1                     # клиенту — один показ (дальше 4 часа ждать)
+    _, other = make_client(conn, login="nobot")
+    assert c.post("/api/v2/ads/next", json={"tg_user_id": 333}, headers={"X-API-Key": other}).json()["ad"] is None

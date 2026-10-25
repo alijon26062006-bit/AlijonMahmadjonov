@@ -101,7 +101,7 @@ class GiftBot:
             while not self._stop.is_set():
                 try:
                     updates = self.api("getUpdates", offset=offset, timeout=POLL_SECONDS,
-                                       allowed_updates=["message", "pre_checkout_query"]) or []
+                                       allowed_updates=["message", "pre_checkout_query", "callback_query"]) or []
                 except Exception as exc:  # noqa: BLE001
                     log.warning("бот мини-приложения: %s", exc)
                     self._stop.wait(10)
@@ -148,6 +148,15 @@ class GiftBot:
         return False
 
     def handle(self, conn, upd: dict[str, Any]) -> None:
+        cq = upd.get("callback_query")
+        if cq and cq.get("data") == "adskip":   # «Пропустить» под рекламой — убираем её
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            msg = cq.get("message") or {}
+            try:
+                self.api("deleteMessage", chat_id=(msg.get("chat") or {}).get("id"), message_id=msg.get("message_id"))
+            except Exception:  # noqa: BLE001 — уже удалили
+                pass
+            return
         if "pre_checkout_query" in upd:
             q = upd["pre_checkout_query"]
             # Счёт на пополнение бота: платящий отдаёт свои Stars боту — принимаем от кого угодно (себе во вред не сделать)
@@ -186,6 +195,19 @@ class GiftBot:
             elif o:
                 self.api("sendMessage", chat_id=chat["id"], text=T[lang]["claim_old"])
         self.welcome(chat["id"], tg, lang)
+        self.maybe_ad(conn, int(chat["id"]))
+
+    def maybe_ad(self, conn, tg_id: int) -> None:
+        """Реклама после приветствия — по правилам banners.bot_next. Админам — нет; сбой бот не ломает."""
+        if str(tg_id) in admin_ids(self.config):
+            return
+        from . import banners
+        try:
+            ad = banners.bot_next(conn, self.config, tg_id, "gift")
+            if ad:
+                self.api("sendPhoto", chat_id=tg_id, **banners.bot_message(ad))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("реклама в боте Stars: %s", exc)
 
     def welcome(self, chat_id: int, tg: dict[str, Any], lang: str) -> None:
         self.api("sendMessage", chat_id=chat_id, parse_mode="HTML", disable_web_page_preview=True,

@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import html
 import json
 import logging
@@ -805,6 +806,11 @@ class ShopBot:
                 return
             su = ensure_user(conn, tg_id, sender.get("first_name") or "", username=sender.get("username") or "")
             data = str(cq.get("data") or "")
+            if data == "adskip":   # «Пропустить» под рекламой — просто убираем её
+                self.api("answerCallbackQuery", callback_query_id=cq["id"])
+                with contextlib.suppress(Exception):
+                    self.api("deleteMessage", chat_id=tg_id, message_id=msg.get("message_id"))
+                return
             if data.startswith(("lg:", "lgno:")):   # вход на сайт — без проверки подписки на каналы
                 self.api("answerCallbackQuery", callback_query_id=cq["id"])
                 self.login_answer(conn, su, data, msg.get("message_id"))
@@ -1130,6 +1136,20 @@ class ShopBot:
         if self.is_admin(su["tg_id"]):
             rows.append([(tr(lang, "admin"), "adm", "primary")])
         self.show(su["tg_id"], text, rows, edit=edit)
+        self.maybe_ad(conn, su["tg_id"])
+
+    def maybe_ad(self, conn: sqlite3.Connection, tg_id: int) -> None:
+        """Реклама под главным меню — по правилам banners.bot_next (2 раза в день, в разное время). Админам — нет.
+        Сбой рекламы бот не ломает."""
+        if self.is_admin(tg_id):
+            return
+        from . import banners
+        try:
+            ad = banners.bot_next(conn, self.config, tg_id, "shop")
+            if ad:
+                self.api("sendPhoto", chat_id=tg_id, **banners.bot_message(ad))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("реклама в боте-магазине: %s", exc)
 
     def screen_games(self, conn: sqlite3.Connection, su: sqlite3.Row, group: str, page: int,
                      edit: int | None = None, q: str = "") -> None:

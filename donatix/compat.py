@@ -486,3 +486,26 @@ def payment_one(payment_id: int, user=Depends(api_user), conn=Depends(get_conn),
     if not 1 <= payment_id <= 2**62:
         raise ApiError("Заявка не найдена.", "not_found", 404)
     return api.payment_one(payment_id, user, conn, config)
+
+
+# ── Реклама для ботов партнёров ─────────────────────────────
+
+
+class AdAsk(BaseModel):
+    tg_user_id: int = Field(..., description="Telegram ID клиента, который сейчас пользуется ботом")
+
+
+@router.post("/ads/next", include_in_schema=False)
+def ads_next(body: AdAsk, user=Depends(api_user), conn=Depends(get_conn),
+             config: Config = Depends(get_config)) -> dict[str, Any]:
+    """Бот партнёра спрашивает в спокойный момент: показать ли этому клиенту рекламу. Правила (2 раза в день,
+    в разное время) — в banners.bot_next. Только для ключей ботов из конструктора; владельцу и админам бота — никогда."""
+    from . import banners
+    bots = conn.execute("SELECT id, admin_ids FROM bots WHERE user_id = ? AND enabled = 1", (user["id"],)).fetchall()
+    if not bots:
+        return {"ok": True, "ad": None}
+    staff = {int(x) for b in bots for x in str(b["admin_ids"] or "").replace(";", ",").split(",") if x.strip().isdigit()}
+    if body.tg_user_id in staff:
+        return {"ok": True, "ad": None}
+    ad = banners.bot_next(conn, config, body.tg_user_id, f"partner:{bots[0]['id']}")
+    return {"ok": True, "ad": banners.bot_message(ad) if ad else None}

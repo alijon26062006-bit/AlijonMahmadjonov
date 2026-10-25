@@ -500,3 +500,22 @@ def test_id_answer_is_instant_nick_added_later(app, config, conn, supplier, monk
     texts = [p.get("text", "") for m, p in bot.api.calls]
     assert any("Оформляю заказ" in t for t in texts)
     assert texts.index(next(t for t in texts if "Оформляю" in t)) < texts.index(next(t for t in texts if "принят" in t))
+
+
+def test_ad_under_menu_for_clients_not_admins_and_skip_removes_it(app, config, conn, supplier, monkeypatch):
+    from donatix import banners
+    api = FakeApi()
+    bot = _bot(config, supplier, api)
+    ad = {"id": 1, "title": "Канал", "photo": "https://x/static/bn/a-tg.jpg", "url": "https://x/bn-go/1"}
+    asked = []
+    monkeypatch.setattr(banners, "bot_next", lambda c, cfg, tg, src: asked.append((tg, src)) or ad)
+    _start(bot, conn)
+    photos = [p for m, p in api.calls if m == "sendPhoto"]
+    assert photos and photos[-1]["reply_markup"]["inline_keyboard"][1][0]["callback_data"] == "adskip"
+    assert asked[-1] == (TG, "shop")
+    bot.handle(conn, press("adskip", mid=555))
+    assert ("deleteMessage", {"chat_id": TG, "message_id": 555}) in api.calls
+    monkeypatch.setattr(bot, "is_admin", lambda tg: True)
+    api.calls.clear()
+    bot.screen_home(conn, shopbot.shop_user(conn, TG))
+    assert not [m for m, _ in api.calls if m == "sendPhoto"]          # админу — без рекламы

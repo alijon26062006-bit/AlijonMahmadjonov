@@ -72,7 +72,7 @@ def ensure(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(banners)")}
     for col, kind in (("user_id", "INTEGER"), ("status", "TEXT NOT NULL DEFAULT 'approved'"), ("days", "INTEGER"),
                       ("note", "TEXT NOT NULL DEFAULT ''"), ("paid_micro", "INTEGER NOT NULL DEFAULT 0"),
-                      ("views", "INTEGER NOT NULL DEFAULT 0")):
+                      ("views", "INTEGER NOT NULL DEFAULT 0"), ("bot_views", "INTEGER NOT NULL DEFAULT 0")):
         if col not in cols:   # заявки пользователей: чьё, статус проверки, срок, причина отказа
             conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
@@ -337,3 +337,109 @@ def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ensure(conn)
     return conn.execute("SELECT b.*, u.login FROM banners b LEFT JOIN users u ON u.id = b.user_id "
                         "WHERE b.status = 'pending' ORDER BY b.id").fetchall()
+
+
+# ── Реклама в Telegram-ботах (наш магазин, бот Stars, боты партнёров) ────────
+#
+# Правила, чтобы реклама работала и не злила людей:
+#  • не больше BOT_PER_DAY показов в день одному человеку — общий счёт на все боты (по Telegram ID);
+#  • между показами не меньше BOT_GAP — так они попадают на разное время дня;
+#  • только пока человек сам пользуется ботом (бот спрашивает в спокойный момент: меню, после покупки),
+#    и даже тогда — с вероятностью BOT_CHANCE, чтобы время каждый день было разным;
+#  • новичку — не раньше чем через BOT_FRESH после первого появления;
+#  • владельцу и админам бота — никогда (решает сам бот, а для ботов партнёров проверяем и здесь).
+# Какой баннер: платные впереди — тот, что этот человек видел реже всего; «Здесь может быть ваша
+# реклама» — когда платных нет.
+
+BOT_PER_DAY = 2
+BOT_GAP = 4 * 3600
+BOT_FRESH = 10 * 60
+BOT_CHANCE = 0.35
+BOT_TZ = 5 * 3600            # «день» — по Душанбе
+
+BOT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS banner_bot_shows (
+    tg_id       INTEGER NOT NULL,
+    banner_id   INTEGER NOT NULL,
+    source      TEXT NOT NULL,     -- shop / gift / partner:<id бота>
+    shown_at    REAL NOT NULL      -- unix-время
+);
+CREATE INDEX IF NOT EXISTS banner_bot_shows_tg ON banner_bot_shows(tg_id, shown_at);
+CREATE TABLE IF NOT EXISTS banner_bot_users (
+    tg_id       INTEGER PRIMARY KEY,
+    first_seen  REAL NOT NULL
+);
+"""
+
+
+def _ensure_bot(conn: sqlite3.Connection) -> None:
+    ensure(conn)
+    conn.executescript(BOT_SCHEMA)
+
+
+def tg_photo(config: Config, image: str) -> str:
+    """JPEG для Telegram (WebP он как фото не берёт). Делаем из готовой картинки один раз."""
+    path = folder(config) / f"{image}-tg.jpg"
+    if not path.exists():
+        from PIL import Image
+        with Image.open(folder(config) / f"{image}-{SIZES[0]}.webp") as im:
+            im.convert("RGB").save(path, "JPEG", quality=85, optimize=True, progressive=True)
+    return path.name
+
+
+def bot_next(conn: sqlite3.Connection, config: Config, tg_id: int, source: str, *,
+             now: float | None = None, chance: float | None = None) -> dict[str, Any] | None:
+    """Показать ли сейчас рекламу этому человеку и какую. None — не сейчас."""
+    import random
+    import time
+    if not tg_id or tg_id < 0:
+        return None
+    _ensure_bot(conn)
+    now = time.time() if now is None else now
+    conn.execute("INSERT OR IGNORE INTO banner_bot_users (tg_id, first_seen) VALUES (?, ?)", (tg_id, now))
+    first = conn.execute("SELECT first_seen FROM banner_bot_users WHERE tg_id = ?", (tg_id,)).fetchone()[0]
+    if now - first < BOT_FRESH:
+        return None
+    day_start = (now + BOT_TZ) // 86400 * 86400 - BOT_TZ
+    today, last = conn.execute("SELECT SUM(shown_at >= ?), MAX(shown_at) FROM banner_bot_shows WHERE tg_id = ?",
+                               (day_start, tg_id)).fetchone()
+    today = today or 0
+    if today >= BOT_PER_DAY or (last and now - last < BOT_GAP):
+        return None
+    if random.random() >= (BOT_CHANCE if chance is None else chance):
+        return None
+    from datetime import datetime, timezone
+    shown = active(conn, datetime.fromtimestamp(now + BOT_TZ, timezone.utc).date().isoformat())
+    paid = [b for b in shown if not is_house(b["link"])]
+    pool = paid or shown
+    if not pool:
+        return None
+    seen = dict(conn.execute("SELECT banner_id, COUNT(*) FROM banner_bot_shows WHERE tg_id = ? GROUP BY banner_id",
+                             (tg_id,)).fetchall())
+    least = min(seen.get(b["id"], 0) for b in pool)
+    pick = random.choice([b for b in pool if seen.get(b["id"], 0) == least])
+    row = conn.execute("SELECT image FROM banners WHERE id = ?", (pick["id"],)).fetchone()
+    photo = tg_photo(config, row["image"])
+    with db.tx(conn):
+        conn.execute("INSERT INTO banner_bot_shows (tg_id, banner_id, source, shown_at) VALUES (?, ?, ?, ?)",
+                     (tg_id, pick["id"], source[:40], now))
+        conn.execute("UPDATE banners SET bot_views = bot_views + 1 WHERE id = ?", (pick["id"],))
+    if secrets.randbelow(500) == 0:      # старые записи не копим
+        conn.execute("DELETE FROM banner_bot_shows WHERE shown_at < ?", (now - 60 * 86400,))
+    base = config.base_url.rstrip("/")
+    return {"id": pick["id"], "title": pick["title"], "photo": f"{base}/static/bn/{photo}",
+            "url": f"{base}/bn-go/{pick['id']}"}
+
+
+BOT_CAPTION = "Реклама"
+BOT_GO = "Перейти"
+BOT_SKIP = "Пропустить"
+BOT_SKIP_DATA = "adskip"
+
+
+def bot_message(ad: dict[str, Any]) -> dict[str, Any]:
+    """Готовое сообщение для Bot API sendPhoto: картинка, подпись, «Перейти» и «Пропустить»."""
+    title = (ad.get("title") or "").strip()
+    return {"photo": ad["photo"], "caption": f"{title}\n\n{BOT_CAPTION}" if title else BOT_CAPTION,
+            "reply_markup": {"inline_keyboard": [[{"text": BOT_GO, "url": ad["url"]}],
+                                                 [{"text": BOT_SKIP, "callback_data": BOT_SKIP_DATA}]]}}

@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, texts
 from app import runtime
 from app.money import fmt4, affordable_stars, fmt, parse, stars_cost
+from app.services import ads
 from app.states import Calc
 
 router = Router(name="menu")
@@ -38,6 +39,8 @@ async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connectio
     """
     text = await menu_text(conn, target.from_user.id)
     markup = await main_markup(conn)
+    # Спокойный момент — человек в меню: Donatix может прислать рекламу следом (не чаще 2 раз в день)
+    ads.maybe_show(getattr(target, "bot", None), target.from_user.id)
 
     # Различаем по тому, что у объекта есть, а не по его классу: у
     # нажатия кнопки внутри лежит сообщение, у обычного сообщения —
@@ -79,6 +82,16 @@ async def cmd_menu(message: Message, state: FSMContext, conn: aiosqlite.Connecti
 async def cb_main(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
     await state.clear()
     await render_menu(call, conn)
+    await call.answer()
+
+
+@router.callback_query(F.data == ads.SKIP)
+async def cb_ad_skip(call: CallbackQuery) -> None:
+    """«Пропустить» под рекламой — убрать её."""
+    try:
+        await call.message.delete()
+    except (TelegramAPIError, AttributeError):
+        pass
     await call.answer()
 
 
