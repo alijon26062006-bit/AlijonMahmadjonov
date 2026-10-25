@@ -232,14 +232,15 @@ def _paid_and_house(admin):
 def test_bot_ads_two_per_day_spaced_and_not_for_newbies(admin, conn, config):
     _paid_and_house(admin)
     t0 = 1_800_000_000.0
-    nxt = lambda t: banners.bot_next(conn, config, 555, "shop", now=t, chance=1)  # noqa: E731
-    assert nxt(t0) is None                                   # новичок — не в первые 10 минут
+    nxt = lambda t: banners.bot_next(conn, config, 555, "shop", now=t)  # noqa: E731
+    assert nxt(t0) is None                                   # новичок — не на самом первом /start
+    assert nxt(t0 + 30) is None                              # и не раньше минуты
     first = nxt(t0 + 11 * 60)
     assert first and first["photo"].endswith("-tg.jpg") and "/bn-go/" in first["url"]
     assert nxt(t0 + 60 * 60) is None                         # меньше 4 часов — рано
     second = nxt(t0 + 11 * 60 + 4 * 3600 + 1)
     assert second and second["id"] != first["id"]            # чередуем: второй — другой платный
-    assert banners.bot_next(conn, config, 555, "shop", now=t0 + 2 * DAY, chance=0) is None   # случайность «не сейчас»
+    assert nxt(t0 + 2 * DAY) is not None                     # через пару дней пришёл — сразу видит (гарантия)
     titles = {first["title"], second["title"]}
     assert titles == {"Канал А", "Канал Б"}                  # пока есть платные — приглашение не показываем
 
@@ -247,8 +248,8 @@ def test_bot_ads_two_per_day_spaced_and_not_for_newbies(admin, conn, config):
 def test_bot_ads_daily_cap(admin, conn, config):
     _paid_and_house(admin)
     t0 = 1_800_000_000.0
-    banners.bot_next(conn, config, 7, "shop", now=t0, chance=1)
-    got = [banners.bot_next(conn, config, 7, "gift", now=t0 + 600 + i * 5 * 3600, chance=1) for i in range(5)]
+    banners.bot_next(conn, config, 7, "shop", now=t0)
+    got = [banners.bot_next(conn, config, 7, "gift", now=t0 + 600 + i * 5 * 3600) for i in range(5)]
     # 5 попыток с шагом 5 часов (25 часов): в одни сутки — не больше двух показов
     days = {}
     for i, ad in enumerate(got):
@@ -256,13 +257,13 @@ def test_bot_ads_daily_cap(admin, conn, config):
             d = int((t0 + 600 + i * 5 * 3600 + banners.BOT_TZ) // DAY)
             days[d] = days.get(d, 0) + 1
     assert days and max(days.values()) <= 2
-    assert sum(1 for a in got if a) >= 3
+    assert sum(1 for a in got if a) == 4                     # каждые 5 часов: 2 + 2 по суткам, без пропусков
 
 
 def test_bot_message_has_go_and_skip(admin, conn, config):
     _paid_and_house(admin)
-    ad = banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 3600, chance=1) or \
-        banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 7200, chance=1)
+    ad = banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 3600) or \
+        banners.bot_next(conn, config, 9, "shop", now=1_800_000_000.0 + 7200)
     msg = banners.bot_message(ad)
     kb = msg["reply_markup"]["inline_keyboard"]
     assert kb[0][0]["text"] == "Перейти" and kb[0][0]["url"] == ad["url"]

@@ -344,17 +344,17 @@ def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 # Правила, чтобы реклама работала и не злила людей:
 #  • не больше BOT_PER_DAY показов в день одному человеку — общий счёт на все боты (по Telegram ID);
 #  • между показами не меньше BOT_GAP — так они попадают на разное время дня;
-#  • только пока человек сам пользуется ботом (бот спрашивает в спокойный момент: меню, после покупки),
-#    и даже тогда — с вероятностью BOT_CHANCE, чтобы время каждый день было разным;
-#  • новичку — не раньше чем через BOT_FRESH после первого появления;
+#  • только пока человек сам пользуется ботом (бот спрашивает в спокойный момент: меню, баланс, заказы);
+#  • гарантированно: кто в этот день пользовался ботом — увидит рекламу. Первый показ — в первый же
+#    спокойный момент дня, второй — когда человек вернётся не раньше чем через BOT_GAP;
+#  • новичку — не на самом первом /start: со следующего спокойного момента, но не раньше BOT_FRESH;
 #  • владельцу и админам бота — никогда (решает сам бот, а для ботов партнёров проверяем и здесь).
 # Какой баннер: платные впереди — тот, что этот человек видел реже всего; «Здесь может быть ваша
 # реклама» — когда платных нет.
 
 BOT_PER_DAY = 2
 BOT_GAP = 4 * 3600
-BOT_FRESH = 10 * 60
-BOT_CHANCE = 0.35
+BOT_FRESH = 60
 BOT_TZ = 5 * 3600            # «день» — по Душанбе
 
 BOT_SCHEMA = """
@@ -388,7 +388,7 @@ def tg_photo(config: Config, image: str) -> str:
 
 
 def bot_next(conn: sqlite3.Connection, config: Config, tg_id: int, source: str, *,
-             now: float | None = None, chance: float | None = None) -> dict[str, Any] | None:
+             now: float | None = None) -> dict[str, Any] | None:
     """Показать ли сейчас рекламу этому человеку и какую. None — не сейчас."""
     import random
     import time
@@ -405,8 +405,6 @@ def bot_next(conn: sqlite3.Connection, config: Config, tg_id: int, source: str, 
                                (day_start, tg_id)).fetchone()
     today = today or 0
     if today >= BOT_PER_DAY or (last and now - last < BOT_GAP):
-        return None
-    if random.random() >= (BOT_CHANCE if chance is None else chance):
         return None
     from datetime import datetime, timezone
     shown = active(conn, datetime.fromtimestamp(now + BOT_TZ, timezone.utc).date().isoformat())

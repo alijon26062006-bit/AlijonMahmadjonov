@@ -1139,7 +1139,8 @@ class ShopBot:
         self.maybe_ad(conn, su["tg_id"])
 
     def maybe_ad(self, conn: sqlite3.Connection, tg_id: int) -> None:
-        """Реклама под главным меню — по правилам banners.bot_next (2 раза в день, в разное время). Админам — нет.
+        """Реклама в спокойный момент (меню, баланс, заказы) — по правилам banners.bot_next: кто пользовался
+        ботом в этот день, увидит её обязательно, но не больше 2 раз и с перерывом 4 часа. Админам — нет.
         Сбой рекламы бот не ломает."""
         if self.is_admin(tg_id):
             return
@@ -1643,6 +1644,8 @@ class ShopBot:
                                   amount=_e(f"{waiting['pay_amount']} {waiting['pay_currency']}"))
             rows.insert(0, [(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")])
         self.show(su["tg_id"], text, rows, edit=edit)
+        if waiting is None:   # идёт оплата — рекламой не мешаем
+            self.maybe_ad(conn, su["tg_id"])
 
     def screen_history(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang = su["lang"]
@@ -1879,6 +1882,7 @@ class ShopBot:
             rows.append(nav)
         rows.append([(tr(lang, "home"), "h")])
         self.show(su["tg_id"], tr(lang, "orders_title"), rows, edit=edit)
+        self.maybe_ad(conn, su["tg_id"])
 
     def order_text(self, conn: sqlite3.Connection, lang: str, o: sqlite3.Row) -> str:
         rate = tjs_rate(conn, self.config)
