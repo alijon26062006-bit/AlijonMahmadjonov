@@ -133,6 +133,7 @@
 </header>
 {% endblock %}
 {% if friday_break %}<div class="friday-break" role="status">{{ friday_break }}</div>{% endif %}
+{% block banners %}{% if banners %}<div class="wrap">{% include "_banners.html" %}</div>{% endif %}{% endblock %}
 {% block body %}
 <main class="wrap">
   {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}

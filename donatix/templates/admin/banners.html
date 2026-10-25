@@ -1,0 +1,49 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Баннеры рекламы — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Баннеры рекламы</h1>
+  <p>Лента вверху всех страниц сайта и кабинета (в админке её нет). Листается пальцем и сама переключается каждые 5 секунд.
+    Показываются включённые баннеры в своём сроке, до {{ max_active }} штук, по порядку (меньше число — раньше).</p></section>
+
+<form class="card" method="post" action="/admin/banners" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3 style="margin:0 0 6px">Новый баннер</h3>
+  <p class="muted small" style="margin:0 0 12px">Картинка {{ ratio[0] }}:{{ ratio[1] }}, лучше <b>1500×600</b> (JPG, PNG или WebP, до 8 МБ).
+    Другой формат сайт обрежет по центру — важный текст держите ближе к середине. Чужие бренды и логотипы
+    (игр, банков) на баннерах не размещайте: из-за них приходят жалобы на сервер.</p>
+  <div class="grid two" style="gap:12px">
+    <div><label for="b-img">Картинка</label><input id="b-img" type="file" name="image" accept="image/jpeg,image/png,image/webp" required></div>
+    <div><label for="b-title">Подпись <small class="muted">для незрячих и для вас</small></label><input id="b-title" name="title" maxlength="120" placeholder="Скидка на алмазы до пятницы"></div>
+    <div><label for="b-link">Ссылка <small class="muted">/страница, https://… или t.me/…</small></label><input id="b-link" name="link" placeholder="/panel/catalog"></div>
+    <div><label for="b-sort">Порядок</label><input id="b-sort" name="sort" inputmode="numeric" value="0"></div>
+    <div><label for="b-from">Показывать с <small class="muted">необязательно</small></label><input id="b-from" type="date" name="starts_at"></div>
+    <div><label for="b-to">Показывать по <small class="muted">включительно, необязательно</small></label><input id="b-to" type="date" name="ends_at"></div>
+  </div>
+  <button class="btn primary" style="margin-top:12px">{{ icon('plus', 16) }} Добавить</button>
+</form>
+
+{% for b in rows %}
+<div class="card" style="margin-top:14px{% if not b.active %};opacity:.6{% endif %}">
+  <img src="/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async"
+       style="width:100%;max-width:520px;height:auto;aspect-ratio:5/2;object-fit:cover;border-radius:12px;display:block">
+  <div class="muted small" style="margin:8px 0">{{ '🟢 Показывается' if b.active else '⚪ Выключен' }} · кликов: <b>{{ b.clicks }}</b>
+    {% if b.starts_at or b.ends_at %} · срок: {{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}{% endif %}</div>
+  <form method="post" action="/admin/banners/{{ b.id }}" class="grid two" style="gap:10px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div><label>Подпись</label><input name="title" maxlength="120" value="{{ b.title }}"></div>
+    <div><label>Ссылка</label><input name="link" value="{{ b.link }}"></div>
+    <div><label>Порядок</label><input name="sort" inputmode="numeric" value="{{ b.sort }}"></div>
+    <div style="display:flex;gap:8px"><div style="flex:1"><label>С</label><input type="date" name="starts_at" value="{{ b.starts_at or '' }}"></div>
+      <div style="flex:1"><label>По</label><input type="date" name="ends_at" value="{{ b.ends_at or '' }}"></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <button class="btn sm primary">Сохранить</button>
+      <button class="btn sm" formaction="/admin/banners/{{ b.id }}/toggle">{{ 'Выключить' if b.active else 'Включить' }}</button>
+      <button class="btn sm" formaction="/admin/banners/{{ b.id }}/delete" onclick="return confirm('Удалить баннер?')">Удалить</button>
+    </div>
+  </form>
+</div>
+{% else %}
+<div class="card empty" style="margin-top:14px">Баннеров пока нет — добавьте первый выше.</div>
+{% endfor %}
+{% endblock %}

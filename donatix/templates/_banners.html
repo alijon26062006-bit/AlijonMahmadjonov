@@ -1,0 +1,46 @@
+{#- Лента рекламных баннеров вверху страницы (как в приложениях магазинов): листается пальцем,
+    сама переключается каждые 5 с, точки снизу. Место под баннер зарезервировано (5:2) — страница не прыгает. -#}
+{% if banners %}
+<section class="bnr" data-bnr aria-roledescription="carousel" aria-label="Реклама">
+  <div class="bnr-track">
+    {% for b in banners %}
+    {% set alt = b.title or 'Рекламный баннер' %}
+    {% if b.link %}<a class="bnr-slide" href="/bn-go/{{ b.id }}"{% if not b.link.startswith('/') %} target="_blank" rel="noopener sponsored"{% endif %}
+       aria-label="{{ alt }} — {{ loop.index }} из {{ banners | length }}">{% else %}<div class="bnr-slide" role="group" aria-label="{{ loop.index }} из {{ banners | length }}">{% endif %}
+      <img src="{{ b.src_small }}" srcset="{{ b.src_small }} 750w, {{ b.src }} 1500w"
+           sizes="(min-width: 1180px) 1100px, calc(100vw - 32px)" width="1500" height="600" alt="{{ alt }}"
+           {% if loop.first %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async">
+    {% if b.link %}</a>{% else %}</div>{% endif %}
+    {% endfor %}
+  </div>
+  <span class="bnr-tag">Реклама</span>
+  {% if banners | length > 1 %}
+  <div class="bnr-dots">{% for b in banners %}<button type="button" data-i="{{ loop.index0 }}" aria-label="Баннер {{ loop.index }}"></button>{% endfor %}</div>
+  {% endif %}
+</section>
+<script>
+(function () {
+  var root = document.querySelector("[data-bnr]");
+  if (!root) return;
+  var track = root.querySelector(".bnr-track"), n = track.children.length, dots = root.querySelectorAll(".bnr-dots button");
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches, paused = false, raf = 0;
+  if (window.dxBnrTimer) clearInterval(window.dxBnrTimer);   // страницу обновили «вживую» — старый таймер не копим
+  function at() { return Math.round(track.scrollLeft / Math.max(track.clientWidth, 1)); }
+  function mark() {
+    var i = at();
+    dots.forEach(function (d, k) { d.classList.toggle("on", k === i); d.setAttribute("aria-current", k === i ? "true" : "false"); });
+  }
+  function go(i) { track.scrollTo({left: i * track.clientWidth, behavior: reduce ? "auto" : "smooth"}); }
+  track.addEventListener("scroll", function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(mark); }, {passive: true});
+  dots.forEach(function (d) { d.addEventListener("click", function () { go(+d.dataset.i); }); });
+  ["pointerdown", "mouseenter", "focusin"].forEach(function (e) { root.addEventListener(e, function () { paused = true; }); });
+  ["mouseleave", "focusout"].forEach(function (e) { root.addEventListener(e, function () { paused = false; }); });
+  root.addEventListener("pointerup", function () { setTimeout(function () { paused = false; }, 4000); });
+  if (n > 1 && !reduce) window.dxBnrTimer = setInterval(function () {
+    if (paused || document.hidden || !document.body.contains(track)) return;
+    var i = at() + 1; go(i >= n ? 0 : i);
+  }, 5000);
+  mark();
+})();
+</script>
+{% endif %}

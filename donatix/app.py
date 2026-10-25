@@ -183,6 +183,8 @@ def cache_policy(path: str, query: str, status: int) -> str:
     if path.startswith("/static/"):
         # Файлы с ?v=хеш меняют адрес при каждом изменении — можно хранить год
         return "public, max-age=31536000, immutable" if "v=" in query else "public, max-age=86400"
+    if path.startswith("/bn/"):   # имя файла новое при каждой загрузке баннера — можно хранить год
+        return "public, max-age=31536000, immutable"
     if path.startswith("/media/"):
         return "public, max-age=2592000, stale-while-revalidate=86400"
     if path in ("/robots.txt", "/sitemap.xml"):
@@ -313,6 +315,9 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     catalog_job.bind_base(config.base_url)
     catalog_job.forget(ff_images)   # картинки FF — убрать с сервера
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
+    from . import banners   # рекламные баннеры вверху страниц: картинки — у нас, имя меняется с каждой загрузкой
+    banners.folder(config).mkdir(parents=True, exist_ok=True)
+    app.mount("/bn", StaticFiles(directory=str(banners.folder(config))), name="banners")
     app.include_router(api.router)
     from . import api_extra   # виртуальные номера и подарки Telegram для партнёров
     app.include_router(api_extra.router)

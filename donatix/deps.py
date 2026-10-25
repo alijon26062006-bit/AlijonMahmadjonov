@@ -323,6 +323,16 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["vnumbers_on"] = bool(config.fivesim_token)   # виртуальные номера (5sim) подключены
     from . import glory
     ctx["glory_on"] = glory.selling(config)   # Glory клана: показываем, только пока продажа включена
+    # Лента рекламных баннеров вверху страницы — на сайте и в кабинете, не в админке
+    ctx["banners"] = []
+    if not request.url.path.startswith("/admin"):
+        from . import banners
+        _bp = db.pool(config.db_path)
+        _bc = _bp.acquire()
+        try:
+            ctx["banners"] = banners.active(_bc)
+        finally:
+            _bp.release(_bc)
     ctx["csrf"] = csrf_token(request)
     # Живое обновление страницы (X-Live) сообщения не «съедает» — их покажет следующий обычный переход
     ctx["flashes"] = [] if request.headers.get("x-live") else request.session.pop("flash", [])

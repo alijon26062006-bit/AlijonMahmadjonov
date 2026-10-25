@@ -278,6 +278,14 @@ def push_test(request: Request, user=Depends(panel_user), conn=Depends(get_conn)
     return JSONResponse({"ok": bool(n), "devices": n})
 
 
+@router.get("/bn-go/{bid}")
+def banner_go(bid: int, conn=Depends(get_conn)):
+    """Нажатие на рекламный баннер: считаем клик и уводим на его ссылку."""
+    from . import banners
+    link = banners.click(conn, bid)
+    return RedirectResponse(link or "/", status_code=302, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/robots.txt")
 def robots(config: Config = Depends(get_config)):
     body = ("User-agent: *\n"

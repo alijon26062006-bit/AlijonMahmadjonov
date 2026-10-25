@@ -6,7 +6,7 @@ import html
 import json
 import sqlite3
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 
 from . import accounts, cache, catalog, db, orders, payments, shopbot, worker
@@ -901,3 +901,56 @@ def reviews_hide(rid: int, request: Request, hidden: int = Form(1), admin=Depend
     reviews.set_hidden(conn, rid, bool(hidden))
     flash(request, "Отзыв скрыт со страницы «Отзывы»." if hidden else "Отзыв снова виден всем.")
     return _back(f"/admin/reviews?show=all#r{rid}")
+
+
+# ── Рекламные баннеры вверху страниц ──────────────────────
+
+
+@router.get("/banners")
+def banners_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import banners
+    return render(request, "admin/banners.html", {"user": admin, "rows": banners.all_rows(conn),
+                                                  "ratio": banners.RATIO, "max_active": banners.MAX_ACTIVE})
+
+
+@router.post("/banners", dependencies=[Depends(check_csrf)])
+async def banners_add(request: Request, image: UploadFile | None = File(None), title: str = Form(""),
+                      link: str = Form(""), sort: str = Form("0"), starts_at: str = Form(""), ends_at: str = Form(""),
+                      admin=Depends(admin_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import banners
+    data = await image.read(banners.MAX_BYTES + 1) if image is not None else b""
+    try:
+        banners.create(conn, config, data=data, title=title, link=link, sort=int(sort or 0),
+                       starts_at=starts_at, ends_at=ends_at)
+        flash(request, "Баннер добавлен — уже показывается на сайте.")
+    except (banners.BannerError, ValueError) as exc:
+        flash(request, str(exc) if isinstance(exc, banners.BannerError) else "Порядок — числом.", "error")
+    return _back("/admin/banners")
+
+
+@router.post("/banners/{bid}", dependencies=[Depends(check_csrf)])
+def banners_edit(bid: int, request: Request, title: str = Form(""), link: str = Form(""), sort: str = Form("0"),
+                 starts_at: str = Form(""), ends_at: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import banners
+    try:
+        banners.update(conn, bid, title=title, link=link, sort=int(sort or 0), starts_at=starts_at, ends_at=ends_at)
+        flash(request, "Сохранено.")
+    except (banners.BannerError, ValueError) as exc:
+        flash(request, str(exc) if isinstance(exc, banners.BannerError) else "Порядок — числом.", "error")
+    return _back("/admin/banners")
+
+
+@router.post("/banners/{bid}/toggle", dependencies=[Depends(check_csrf)])
+def banners_toggle(bid: int, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import banners
+    banners.toggle(conn, bid)
+    return _back("/admin/banners")
+
+
+@router.post("/banners/{bid}/delete", dependencies=[Depends(check_csrf)])
+def banners_delete(bid: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                   config: Config = Depends(get_config)):
+    from . import banners
+    banners.delete(conn, config, bid)
+    flash(request, "Баннер удалён.")
+    return _back("/admin/banners")
