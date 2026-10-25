@@ -179,3 +179,15 @@ def test_banner_image_served_under_static(admin, app, conn):
     r = TestClient(app).get(src)
     assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
     assert "immutable" in r.headers["cache-control"]
+
+
+def test_house_banner_always_last_and_kept(admin, conn):
+    c, token = admin
+    _add(c, token, title="Здесь может быть ваша реклама", link="https://donatix.tj/panel/ads", sort="0")
+    for i in range(banners.MAX_ACTIVE + 2):
+        _add(c, token, title=f"Платный {i}", link="t.me/x", sort="100")
+    cache.clear()
+    shown = banners.active(conn)
+    assert len(shown) == banners.MAX_ACTIVE
+    assert shown[-1]["title"] == "Здесь может быть ваша реклама"
+    assert all(b["title"].startswith("Платный") for b in shown[:-1])

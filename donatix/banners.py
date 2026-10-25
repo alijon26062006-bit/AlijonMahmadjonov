@@ -64,6 +64,11 @@ def ensure(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
 
+def is_house(link: str) -> bool:
+    """Свой баннер-приглашение: ссылка на страницу подачи рекламы."""
+    return (link or "").rstrip("/").endswith("/panel/ads")
+
+
 def folder(config: Config) -> Path:
     return Path(config.db_path).parent / "banners"
 
@@ -171,7 +176,11 @@ def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str,
         rows = conn.execute(
             "SELECT id, title, image, link FROM banners WHERE active = 1 AND status = 'approved' "
             "AND (starts_at IS NULL OR starts_at <= ?) AND (ends_at IS NULL OR ends_at >= ?) "
-            "ORDER BY sort, id DESC LIMIT ?", (day, day, MAX_ACTIVE)).fetchall()
+            "ORDER BY sort, id DESC", (day, day)).fetchall()
+        # «Здесь может быть ваша реклама» (ведёт на /panel/ads) — всегда последний и всегда в ленте:
+        # платные баннеры клиентов идут впереди и места у него не отнимают
+        house = [r for r in rows if is_house(r["link"])][:1]
+        rows = [r for r in rows if not is_house(r["link"])][:MAX_ACTIVE - len(house)] + house
         return [{"id": r["id"], "title": r["title"], "link": r["link"],
                  "src": f"/static/bn/{r['image']}-{SIZES[0]}.webp", "src_small": f"/static/bn/{r['image']}-{SIZES[1]}.webp"}
                 for r in rows]
