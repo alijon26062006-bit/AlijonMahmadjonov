@@ -35,6 +35,10 @@
 - `POST /accounts/check` — проверка аккаунта игрока (ID) до заказа.
 - `POST /orders` — заказ: `{"product_id": "...", "quantity": 1, "fields": {...}}`. Заголовок `Idempotency-Key` защищает от двойного заказа.
 - `GET /orders?page=&limit=&status=`, `GET /orders/{order_id}` — заказы.
+- **Выдача (карты, ключи):** у выполненного заказа есть `delivery_items` — готовый список того, что надо отдать покупателю:
+  `[{"label": "Код", "value": "XXXX-YYYY", "link": ""}, {"label": "PIN", "value": "1234", "link": ""},
+  {"label": "Ссылка активации", "value": "https://...", "link": "1"}]`. Если `link` = `"1"`, это ссылка: покажите её кнопкой.
+  Сырой ответ остаётся в `delivery`.
 
 Виды товаров (`kind`): `topup` (пополнение игр), `telegram_stars`, `telegram_premium`, `steam_topup`, `steam_gift`, `gift_card`, `game_key`.
 

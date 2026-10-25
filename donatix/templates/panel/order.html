@@ -27,13 +27,15 @@
   </section>
 
   {% if st == 'completed' %}
-  {% set d = view.delivery or {} %}
-  {% set codes = d.get('codes') or d.get('keys') or [] %}
-  {% if codes or d.message or view.delivery %}
+  {% set items = view.delivery_items or [] %}
+  {% if items or view.delivery %}
   <section class="od-card">
-    <h2 class="od-h2">{{ 'Ключи' if view.kind == 'game_key' else 'Коды' if codes else 'Результат' }}</h2>
-    {% if codes %}{% for c in codes %}<pre class="keybox">{{ (c.get('key') or c.get('code') or c) if c is mapping else c }}</pre>{% endfor %}
-    {% elif d.message %}<p>{{ d.message }}</p>
+    <h2 class="od-h2">{{ 'Ключи' if view.kind == 'game_key' else 'Ваша карта' if view.kind == 'gift_card' else 'Результат' }}</h2>
+    {% if items %}{% for it in items %}
+      {% if it.link %}<p><span class="muted small">{{ it.label }}</span><br><a class="btn primary" href="{{ it.value }}" target="_blank" rel="noopener noreferrer">{{ it.label }} ↗</a></p>
+      {% elif it.label in ('Сообщение', 'Как активировать') %}<p>{{ it.value }}</p>
+      {% else %}<p class="muted small" style="margin:8px 0 2px">{{ it.label }}</p><pre class="keybox">{{ it.value }}</pre>{% endif %}
+    {% endfor %}
     {% else %}<pre class="keybox">{{ delivery_pretty }}</pre>{% endif %}
   </section>
   {% endif %}

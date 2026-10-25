@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from typing import Any
@@ -101,7 +102,15 @@ def _text(conn: sqlite3.Connection, config: Config, w: sqlite3.Row) -> str | Non
         if o["status"] not in ORDER_FINAL:
             return None
         key = "order_ok" if o["status"] == "completed" else "order_fail"
-        return t[key].format(id=o["public_id"], product=o["product_name"])
+        text = t[key].format(id=o["public_id"], product=o["product_name"])
+        if o["status"] == "completed" and o["delivery_json"]:
+            from .orders import delivery_items
+            try:
+                items = delivery_items(json.loads(o["delivery_json"]))
+            except ValueError:
+                items = []
+            text += "".join(f"\n{'🔗' if i['link'] else '🔑'} {i['label']}: {i['value']}" for i in items)
+        return text
     g = conn.execute("SELECT * FROM gift_orders WHERE id = ?", (w["obj_id"],)).fetchone()
     if g is None:
         return ""

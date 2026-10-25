@@ -542,20 +542,20 @@ def pack_button(p: dict[str, Any]) -> tuple[str, bool]:
 
 
 def delivery_text(order: sqlite3.Row) -> str:
+    """Код, PIN, ссылка активации — всё, что прислал поставщик, в понятном виде."""
     try:
         d = json.loads(order["delivery_json"] or "{}")
     except ValueError:
         return ""
-    codes = d.get("codes") or d.get("keys") or []
     lines = []
-    for c in codes:
-        value = (c.get("key") or c.get("code") or json.dumps(c, ensure_ascii=False)) if isinstance(c, dict) else c
-        lines.append(f"<code>{_e(value)}</code>")
-    if lines:
-        return "\n🔑 " + "\n🔑 ".join(lines)
-    if d.get("message"):
-        return "\n" + _e(d["message"])
-    return ""
+    for it in orders.delivery_items(d):
+        if it["link"]:
+            lines.append(f"🔗 {_e(it['label'])}: {_e(it['value'])}")
+        elif it["label"] in ("Сообщение", "Как активировать"):
+            lines.append(f"ℹ️ {_e(it['value'])}")
+        else:
+            lines.append(f"🔑 {_e(it['label'])}: <code>{_e(it['value'])}</code>")
+    return ("\n\n" + "\n".join(lines)) if lines else ""
 
 
 # ── Статистика для админки ──

@@ -596,6 +596,55 @@ def client_status(status: str) -> str:
     return "processing" if status == "attention" else status
 
 
+# Что из ответа поставщика показать покупателю: код карты, PIN, серийный номер, ссылка активации…
+# Поставщик называет поля по-разному и кладёт их на разную глубину — ищем по всему ответу.
+_DELIVERY_LABELS = {
+    "code": "Код", "key": "Ключ", "keys": "Ключ", "codes": "Код", "card_code": "Код карты", "voucher": "Ваучер",
+    "voucher_code": "Ваучер", "redeem_code": "Код", "claim_code": "Код", "activation_code": "Код активации",
+    "gift_code": "Код", "pin": "PIN", "pin_code": "PIN", "serial": "Серийный номер", "serial_number": "Серийный номер",
+    "card_number": "Номер карты", "number": "Номер", "password": "Пароль", "login": "Логин", "email": "Email",
+    "cvv": "CVV", "expiry": "Действует до", "expires_at": "Действует до", "expiration": "Действует до",
+    "valid_until": "Действует до", "url": "Ссылка", "link": "Ссылка", "redeem_url": "Ссылка активации",
+    "redeem_link": "Ссылка активации", "activation_url": "Ссылка активации", "activation_link": "Ссылка активации",
+    "claim_url": "Ссылка", "claim_link": "Ссылка", "gift_url": "Ссылка", "gift_link": "Ссылка",
+    "instructions": "Как активировать", "instruction": "Как активировать", "how_to_redeem": "Как активировать",
+}
+_SKIP = {"status", "state", "id", "order_id", "kind", "price", "price_usd", "amount", "currency", "quantity",
+         "created_at", "updated_at", "category_id", "card_id", "offer_id", "product_id"}
+
+
+def delivery_items(delivery: Any) -> list[dict[str, str]]:
+    """[{label, value, link}] — всё, что покупатель должен получить; ссылки отдельно (их можно нажать)."""
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(label: str, value: Any) -> None:
+        text = str(value).strip()
+        if not text or text.lower() in ("none", "null") or (label, text) in seen or len(text) > 2000:
+            return
+        seen.add((label, text))
+        out.append({"label": label, "value": text, "link": "1" if text.startswith(("https://", "http://")) else ""})
+
+    def walk(node: Any, key: str = "") -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, str(k).lower())
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, key)
+        elif isinstance(node, (str, int)) and not isinstance(node, bool):
+            if key in _DELIVERY_LABELS:
+                add(_DELIVERY_LABELS[key], node)
+            elif isinstance(node, str) and node.startswith(("https://", "http://")) and key not in _SKIP:
+                add("Ссылка", node)
+            elif key == "message" and isinstance(node, str):
+                add("Сообщение", node)
+            elif key in ("", "payload") and isinstance(node, str):
+                add("Код", node)
+    walk(delivery)
+    return out
+
+
 def public_view(order: sqlite3.Row) -> dict[str, Any]:
     status = client_status(order["status"])
     return {
@@ -609,6 +658,9 @@ def public_view(order: sqlite3.Row) -> dict[str, Any]:
         "unit_price_usd": order["unit_price"],
         "total_usd": fmt(order["total_micro"]),
         "delivery": json.loads(order["delivery_json"]) if order["delivery_json"] and status == "completed" else None,
+        # Готовый список для показа: код, PIN, ссылка активации… (из delivery)
+        "delivery_items": (delivery_items(json.loads(order["delivery_json"]))
+                           if order["delivery_json"] and status == "completed" else []),
         "error": order["error"] if status == "failed" else None,
         "created_at": order["created_at"],
         "completed_at": order["completed_at"],
