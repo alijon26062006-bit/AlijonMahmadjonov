@@ -185,6 +185,9 @@ async def main() -> None:
     # Последним: ловит нажатия, которые не взял никто, — чаще всего это
     # кнопка из диалога, чьё состояние стёр перезапуск бота. Без него
     # такое нажатие пропадает молча, и клиент видит сломанную кнопку.
+    from app.handlers import glory
+
+    dp.include_router(glory.router)
     dp.include_router(fallback.router)
 
     async def on_error(event) -> bool:
@@ -252,6 +255,8 @@ async def main() -> None:
     # Игровые заказы почти всегда уходят «в обработку»: без присмотра они
     # зависли бы навсегда, а клиент остался бы и без денег, и без товара.
     games_task = asyncio.create_task(games_watch(provider, bot))
+    # Боты для гильдии: закончили работу — сказать клиенту.
+    glory_task = asyncio.create_task(glory.watch_loop(bot))
 
     # Поставщик умеет сам сообщать о выдаче. Это не отменяет присмотра
     # выше — отчёт может не дойти, — но с ним клиент узнаёт за секунду,
@@ -280,7 +285,7 @@ async def main() -> None:
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        for task in (pricing_task, games_task, api_task, digest_task):
+        for task in (pricing_task, games_task, api_task, digest_task, glory_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

@@ -23,8 +23,10 @@ async def menu_text(conn: aiosqlite.Connection, user_id: int) -> str:
 
 async def main_markup(conn: aiosqlite.Connection):
     """Клавиатура меню. Раздел игр показываем, только если игры открыты."""
+    from app.services import donatix
+
     has_games = bool(runtime.get_bool("games_enabled")
-                     and await db.list_games(conn, only_enabled=True))
+                     and await db.list_games(conn, only_enabled=True)) or donatix.ready()
     return keyboards.main_menu(games=has_games)
 
 

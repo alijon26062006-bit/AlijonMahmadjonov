@@ -675,7 +675,18 @@ FIELDS["ff_community_key"] = (
     "ключ снимает ограничения:", "text",
 )
 
+FIELDS["donatix_key"] = (
+    "🔑 Ключ Donatix",
+    "Ключ <code>dx_live_…</code> из кабинета donatix.tj (раздел API). С его "
+    "счёта идут только «Боты для гильдии». Сообщение с ключом бот сразу "
+    "удалит из чата. <code>-</code> — убрать:", "text")
+FIELDS["glory_margin"] = (
+    "📈 Наценка на ботов для гильдии",
+    "На сколько процентов клиент платит больше цены Donatix (по курсу "
+    "доллара из «Цен»). Например <code>25</code>:", "int")
+
 FIELD_PARENT.update({
+    "donatix_key": "pn:glory", "glory_margin": "pn:glory",
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
@@ -696,9 +707,19 @@ FIELD_PARENT.update({
 })
 
 
+def _mask(value: str) -> str:
+    """Ключ на экране: начало и конец, середина скрыта."""
+    value = (value or "").strip()
+    if len(value) <= 12:
+        return "•" * len(value)
+    return f"{value[:8]}…{value[-4:]}"
+
+
 def current_display(key: str) -> str:
     kind = FIELDS[key][2]
     raw = runtime.get(key)
+    if key.endswith("_key") and raw:
+        return _mask(raw)
     if kind == "price4":
         return fmt4(runtime.get_int(key))
     if kind == "money":
@@ -997,7 +1018,13 @@ async def on_field_value(
                     + ", ".join(str(q) for q in skipped))
     else:
         value = "" if raw == "-" else raw
-        shown = value or "убрано"
+        shown = (_mask(value) if field.endswith("_key") else value) or "убрано"
+        if field.endswith("_key"):
+            # Ключ не должен висеть в переписке — убираем сообщение с ним.
+            try:
+                await message.delete()
+            except TelegramAPIError:
+                pass
 
     await runtime.set_value(conn, field, value)
     # Лимит запросов API — простое число с разумными границами.
@@ -1012,6 +1039,11 @@ async def on_field_value(
             reply_markup=back_kb("pn:api", "‹ К API"),
         )
         return
+
+    if field in ("donatix_key", "glory_margin"):
+        from app.services import donatix
+
+        donatix.forget()
 
     if field == "fazer_games_key":
         # Старый клиент держит прежний ключ — выбрасываем его.
@@ -1788,6 +1820,56 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
         kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:glory")
+async def cb_glory(call: CallbackQuery, state: FSMContext,
+                   conn: aiosqlite.Connection) -> None:
+    """Боты для гильдии: ключ Donatix, баланс там, наценка, последние запуски."""
+    from app.services import donatix
+
+    await state.clear()
+    on = runtime.get("glory_on", "1") != "0"
+    lines = ["🏆 <b>Боты для гильдии (Glory клана FF)</b>", f"<code>{texts.LINE}</code>", ""]
+    if not donatix.key():
+        lines.append("🔑 Ключ Donatix: <b>не задан</b> — в меню игр раздела нет.")
+    else:
+        lines.append(f"🔑 Ключ Donatix: <code>{_mask(donatix.key())}</code>")
+        try:
+            lines.append(f"💼 Баланс у Donatix: <b>{await donatix.balance()}</b>")
+        except (donatix.GloryError, donatix.GloryUnknown) as exc:
+            lines.append(f"💼 Баланс у Donatix: ⚠️ <i>{str(exc)[:120]}</i>")
+        try:
+            regions = await donatix.regions(fresh=True)
+            for r in regions[:8]:
+                lines.append(f"├ {r['name']}: у Donatix ${r['price_usd']} → клиенту "
+                             f"<b>{fmt(r['price'])}</b>")
+        except (donatix.GloryError, donatix.GloryUnknown) as exc:
+            lines.append(f"⚠️ Регионы не получены: <i>{str(exc)[:120]}</i>")
+    lines.append(f"\n📈 Наценка: <b>{donatix.margin()}%</b>")
+    lines.append(f"Раздел в меню: <b>{'включён' if on else 'выключен'}</b>")
+    recent = await db.glory_runs_recent(conn, 6)
+    if recent:
+        lines.append("\n<b>Последние запуски</b>")
+        for run in recent:
+            lines.append(f"├ №{run['order_id']} · клан <code>{run['clan_id']}</code> · "
+                         f"{run['status']} · +{run['farmed']}")
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🔑 Ключ Donatix", "pn:set:donatix_key", style=PRIMARY))
+    kb.row(btn(f"📈 Наценка · {donatix.margin()}%", "pn:set:glory_margin"))
+    kb.row(btn("🚫 Убрать из меню" if on else "✅ Показать в меню", "pn:glory_toggle",
+               style=DANGER if on else SUCCESS))
+    kb.row(btn("‹ К играм", "pn:games"))
+    await safe_edit(call, "\n".join(lines), kb.as_markup())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:glory_toggle")
+async def cb_glory_toggle(call: CallbackQuery, state: FSMContext,
+                          conn: aiosqlite.Connection) -> None:
+    await runtime.set_value(conn, "glory_on",
+                            "0" if runtime.get("glory_on", "1") != "0" else "1")
+    await cb_glory(call, state, conn)
 
 
 @router.callback_query(F.data == "pn:fx_toggle")
@@ -4053,6 +4135,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📚 Взять из каталога поставщика",
                                 callback_data="pn:game_pick"))
+    kb.row(btn("🏆 Боты для гильдии (Donatix)", "pn:glory", style=PRIMARY))
     kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))

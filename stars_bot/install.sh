@@ -271,6 +271,38 @@ case "\${1:-help}" in
         fi
         ;;
     logs)    journalctl -u "\$SERVICE" -f ;;
+    donatix)
+        # Ключ Donatix: с его счёта идут только «Боты для гильдии».
+        # Ключ пишем в .env на сервере — в чаты и в код он не попадает.
+        KEY="\${2:-}"
+        if [ "\$KEY" = "off" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set DONATIX_KEY=
+            systemctl restart "\$SERVICE" && echo "✅ Donatix отключён, раздел Glory убран из меню"
+            exit 0
+        fi
+        if [ -z "\$KEY" ]; then
+            echo "Вставьте ключ Donatix (dx_live_…) и нажмите Enter (при вводе не виден):"
+            read -r -s KEY; echo
+        fi
+        KEY="\$(printf '%s' "\$KEY" | tr -d '[:space:]')"
+        case "\$KEY" in
+            dx_*) ;;
+            *) echo "❌ Это не ключ Donatix — он начинается с dx_"; exit 1 ;;
+        esac
+        CODE=\$(curl -s -o /tmp/dx_check.\$\$ -w '%{http_code}' -m 20 \
+            -H "X-API-Key: \$KEY" -H "User-Agent: StarsBot/1.0" \
+            https://donatix.tj/api/v1/balance || echo 000)
+        BODY=\$(cat /tmp/dx_check.\$\$ 2>/dev/null); rm -f /tmp/dx_check.\$\$
+        case "\$CODE" in
+            200) echo "✅ Ключ рабочий: \$BODY" ;;
+            401|403) echo "❌ Donatix не принял ключ (\$CODE). Возьмите новый в кабинете."; exit 1 ;;
+            *) echo "⚠️  Donatix не ответил (\$CODE) — ключ сохраню, проверьте потом в /panel" ;;
+        esac
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set DONATIX_KEY="\$KEY"
+        systemctl restart "\$SERVICE"
+        echo "✅ Бот перезапущен. В меню игр — «🏆 Ботҳо барои гильдия»"
+        echo "   Наценка и баланс: /panel → 🕹 Игры → 🏆 Боты для гильдии"
+        ;;
     onekey)
         # Всё на игровой ключ: звёзды, Premium, игры, Steam и API.
         ( cd "\$APP" && sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" \
@@ -622,6 +654,8 @@ PYBK
   stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
   stars-bot errors    последние ошибки
   stars-bot onekey     всё (звёзды, Premium, игры) — на игровой ключ
+  stars-bot donatix [КЛЮЧ|off]
+                      ключ Donatix для «Ботов для гильдии» (Glory FF)
   stars-bot orders [ИГРА]
                       игровые заказы и их статус у поставщика
   stars-bot setup     изменить настройки и перезапустить

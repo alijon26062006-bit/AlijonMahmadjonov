@@ -16,6 +16,11 @@ class Steam(StatesGroup):
     promo = State()         # ждём промокод
 
 
+class Glory(StatesGroup):
+    clan = State()          # ждём ID клана
+    confirm = State()       # показали цену, ждём «Запустить»
+
+
 class Game(StatesGroup):
     player = State()        # ждём ID игрока
     confirm = State()       # показали ник, ждём подтверждения

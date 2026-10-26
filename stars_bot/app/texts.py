@@ -76,6 +76,92 @@ _RAW["GAMES_ENTRY"] = (
     "<i>Бозиро интихоб кунед</i> [[point]]"
 )
 
+_RAW["GLORY_ENTRY"] = (
+    "🏆 <b>Ботҳо барои гильдия (Glory)</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Гурӯҳи ботҳо ба клани шумо дар Free Fire холҳои шӯҳрат "
+    "(Glory) ҷамъ мекунад. Танҳо <b>ID-и клан</b> лозим аст — паролро "
+    "намепурсем.</blockquote>\n\n"
+    "<i>Минтақаи серверро интихоб кунед</i> [[point]]"
+)
+
+_RAW["GLORY_ASK_CLAN"] = (
+    "🏆 <b>ID-и кланро фиристед</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Минтақа: <b>{region}</b>\n"
+    "└ Нарх: <b>{price}</b>\n\n"
+    "<blockquote>ID-и клан — танҳо рақам (5–15 рақам). Онро дар бозӣ "
+    "мебинед: Клан → маълумот.</blockquote>"
+)
+
+_RAW["GLORY_BAD_CLAN"] = (
+    "[[fail]] <b>Ин ба ID-и клан монанд нест</b>\n\n"
+    "<blockquote>Танҳо рақам, аз 5 то 15 аломат.</blockquote>"
+)
+
+_RAW["GLORY_BUSY"] = (
+    "[[warn]] <b>Барои ин клан ботҳо аллакай кор мекунанд</b>\n\n"
+    "<blockquote>Як клан — як гурӯҳ. Интизор шавед, то гурӯҳи ҳозира "
+    "кори худро тамом кунад.</blockquote>"
+)
+
+_RAW["GLORY_CONFIRM"] = (
+    "🏆 <b>Санҷед ва оғоз кунед</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Минтақа: <b>{region}</b>\n"
+    "├ ID-и клан: <code>{clan}</code>\n"
+    "├ Барои пардохт: <b>{price}</b>\n"
+    "└ Мемонад: <b>{rest}</b>\n\n"
+    "<blockquote>[[warn]] Пас аз оғоз пул баргардонида намешавад — гурӯҳро "
+    "танҳо қатъ кардан мумкин аст. Агар оғоз нашавад, пул худ ба худ "
+    "бармегардад.</blockquote>"
+)
+
+_RAW["GLORY_STARTING"] = "[[wait]] <i>Ботҳоро барои клан</i> <code>{clan}</code> <i>оғоз мекунам…</i>"
+
+_RAW["GLORY_CARD"] = (
+    "🏆 <b>Glory · клан {clan}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Ҳолат: <b>{status}</b>\n"
+    "├ Минтақа: {region}\n"
+    "{clan_line}"
+    "├ Холҳои клан ҳозир: <b>{glory}</b>\n"
+    "├ Ба даст омад: <b>+{farmed}</b>\n"
+    "{extra}"
+    "└ Фармоиш: <code>№{order_id}</code>\n\n"
+    "<i>Навсозӣ кунед, то рақамҳои навро бинед.</i>"
+)
+
+_RAW["GLORY_FAILED"] = (
+    "[[fail]] <b>Ботҳо оғоз нашуданд</b>\n\n"
+    "├ Фармоиш: <code>№{order_id}</code>\n"
+    "└ Ба баланс баргашт: <b>{price}</b>\n\n"
+    "<blockquote>{reason}</blockquote>"
+)
+
+_RAW["GLORY_CHECKING"] = (
+    "[[wait]] <b>Фармоиши №{order_id} санҷида мешавад</b>\n\n"
+    "<blockquote>Хидмат ҷавоб надод. Мо дастӣ месанҷем ва менависем — "
+    "пули шумо дар амон аст.</blockquote>"
+)
+
+_RAW["GLORY_STOP_ASK"] = (
+    "[[warn]] <b>Гурӯҳро қатъ кунем?</b>\n\n"
+    "<blockquote>Пас аз қатъ пул барнамегардад ва дубора оғоз кардан "
+    "фармоиши нав аст.</blockquote>"
+)
+
+_RAW["GLORY_FINISHED"] = (
+    "🏆 <b>Ботҳо кори худро тамом карданд</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Клан: <code>{clan}</code>\n"
+    "├ Ба даст омад: <b>+{farmed}</b> Glory\n"
+    "└ Холҳои клан: <b>{glory}</b>\n\n"
+    "<blockquote>Боз лозим шавад — менюи бозиҳо → 🏆 Glory.</blockquote>"
+)
+
+_RAW["GLORY_MY_EMPTY"] = "Шумо ҳоло ботҳо барои гильдия нагирифтаед."
+
 _RAW["GAME_REGION"] = (
     "[[game]] <b>{title}</b>\n"
     f"<code>{LINE}</code>\n\n"

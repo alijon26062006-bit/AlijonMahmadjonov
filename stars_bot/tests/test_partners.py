@@ -164,7 +164,7 @@ async def run(conn) -> None:
     check("экран товаров открывается", "Товары: Алиджон" in call.last)
     check("все товары перечислены",
           all(t in call.last for t in ("⭐ Звёзды", "👑 Telegram Premium", "🎮 Steam")))
-    check("пока все ничьи", call.last.count("ничей") == 3, call.last)
+    check("пока все ничьи", call.last.count("ничей") == len(db.PRODUCT_TITLES), call.last)
 
     await panel.cb_partner_take(call_of(f"pn:pt_take:{first.id}:stars"), conn)
     check("товар закреплён", (await db.product_owners(conn)).get("stars") == first.id)

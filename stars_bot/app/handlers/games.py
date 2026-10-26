@@ -80,7 +80,9 @@ async def cb_games(
     games = await db.list_games(conn, only_enabled=True)
     if not runtime.get_bool("games_enabled"):
         games = []
-    if not games and not runtime.steam_on():
+    from app.services import donatix
+
+    if not games and not runtime.steam_on() and not donatix.ready():
         await call.answer("Бахш муваққатан баста аст.", show_alert=True)
         return
     await call.message.edit_text(

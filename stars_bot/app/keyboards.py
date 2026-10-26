@@ -192,7 +192,11 @@ def stars_entry() -> InlineKeyboardMarkup:
 
 
 def games_menu(games: list) -> InlineKeyboardMarkup:
+    from app.services import donatix
+
     kb = InlineKeyboardBuilder()
+    if donatix.ready():
+        kb.row(btn("🏆 Ботҳо барои гильдия (Glory)", "gl:menu", style=PRIMARY))
     if runtime.steam_on():
         kb.row(btn(labeled("steam", "Steam"), "m:steam",
                    style=PRIMARY, icon="steam"))

@@ -139,6 +139,25 @@ CREATE TABLE IF NOT EXISTS promo_uses (
     PRIMARY KEY (code, user_id)
 );
 
+-- «Боты для гильдии» (Glory клана FF через Donatix). Деньги и статус
+-- заказа — в orders (product_type 'glory'); здесь — живые данные запуска.
+CREATE TABLE IF NOT EXISTS glory_runs (
+    order_id     INTEGER PRIMARY KEY,
+    ext_id       TEXT NOT NULL DEFAULT '',   -- номер у Donatix (gl-…)
+    user_id      INTEGER NOT NULL,
+    region       TEXT NOT NULL,
+    region_title TEXT NOT NULL DEFAULT '',
+    clan_id      TEXT NOT NULL,
+    status       TEXT NOT NULL,              -- starting|running|stopped|failed
+    glory        INTEGER NOT NULL DEFAULT 0, -- очки клана сейчас
+    farmed       INTEGER NOT NULL DEFAULT 0, -- набрано с запуска
+    clan         TEXT NOT NULL DEFAULT '',   -- название клана
+    uptime       TEXT NOT NULL DEFAULT '',
+    bots         INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
 -- Копии заявки, разосланные админам с кнопками. Когда один решил,
 -- кнопки снимаются у всех остальных — иначе второй нажмёт следом.
 CREATE TABLE IF NOT EXISTS admin_notices (
@@ -529,6 +548,7 @@ PRODUCT_TITLES = {
     "stars": "⭐ Звёзды",
     "premium": "👑 Telegram Premium",
     "steam": "🎮 Steam",
+    "glory": "🏆 Боты для гильдии",
 }
 
 
@@ -674,6 +694,8 @@ class Order:
             return f"🎮 Steam {self.quantity} {runtime.steam_currency()}"
         if self.product_type.startswith("game:"):
             return f"{product_title(self.product_type)} × {self.quantity}"
+        if self.product_type == "glory":
+            return f"🏆 Glory · клан {self.recipient}"
         return f"👑 Premium {self.quantity} моҳ"
 
     @property
@@ -2097,6 +2119,69 @@ async def save_notice(
         "VALUES (?, ?, ?, ?)", (kind, ref_id, chat_id, message_id),
     )
     await conn.commit()
+
+
+GLORY_FIELDS = ("ext_id", "status", "glory", "farmed", "clan", "uptime", "bots")
+
+
+async def save_glory_run(
+    conn: aiosqlite.Connection, *, order_id: int, user_id: int, region: str,
+    region_title: str, clan_id: str, status: str, ext_id: str = "",
+) -> None:
+    now = _now()
+    await conn.execute(
+        """INSERT OR REPLACE INTO glory_runs (order_id, ext_id, user_id, region,
+               region_title, clan_id, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (order_id, ext_id, user_id, region, region_title, clan_id, status, now, now),
+    )
+    await conn.commit()
+
+
+async def update_glory_run(conn: aiosqlite.Connection, order_id: int, **fields) -> None:
+    fields = {k: v for k, v in fields.items() if k in GLORY_FIELDS}
+    if not fields:
+        return
+    fields["updated_at"] = _now()
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    await conn.execute(f"UPDATE glory_runs SET {sets} WHERE order_id = ?",
+                       (*fields.values(), order_id))
+    await conn.commit()
+
+
+async def get_glory_run(conn: aiosqlite.Connection, order_id: int):
+    async with conn.execute("SELECT * FROM glory_runs WHERE order_id = ?", (order_id,)) as cur:
+        return await cur.fetchone()
+
+
+async def glory_runs_of(conn: aiosqlite.Connection, user_id: int, limit: int = 10) -> list:
+    async with conn.execute(
+        "SELECT * FROM glory_runs WHERE user_id = ? ORDER BY order_id DESC LIMIT ?",
+        (user_id, limit),
+    ) as cur:
+        return list(await cur.fetchall())
+
+
+async def glory_runs_recent(conn: aiosqlite.Connection, limit: int = 10) -> list:
+    async with conn.execute(
+        "SELECT * FROM glory_runs ORDER BY order_id DESC LIMIT ?", (limit,)) as cur:
+        return list(await cur.fetchall())
+
+
+async def open_glory_runs(conn: aiosqlite.Connection, limit: int = 50) -> list:
+    async with conn.execute(
+        "SELECT * FROM glory_runs WHERE status IN ('starting', 'running') "
+        "AND ext_id != '' ORDER BY order_id LIMIT ?", (limit,),
+    ) as cur:
+        return list(await cur.fetchall())
+
+
+async def glory_clan_busy(conn: aiosqlite.Connection, clan_id: str) -> bool:
+    async with conn.execute(
+        "SELECT 1 FROM glory_runs WHERE clan_id = ? AND status IN ('starting', 'running') LIMIT 1",
+        (clan_id,),
+    ) as cur:
+        return await cur.fetchone() is not None
 
 
 async def remember_loose_receipt(
