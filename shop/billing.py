@@ -80,6 +80,30 @@ def migrate(db: Database) -> None:
     db.set_setting(MIGRATED_KEY, "1")
 
 
+TRIAL_KEY = "constructor_trial_days"
+DEFAULT_TRIAL_DAYS = 3
+
+
+def trial_days(db: Database) -> int:
+    try:
+        return max(0, min(int(db.setting(TRIAL_KEY) or DEFAULT_TRIAL_DAYS), 365))
+    except ValueError:
+        return DEFAULT_TRIAL_DAYS
+
+
+def trial_available(db: Database, user_id: int) -> bool:
+    """Озмоиши ройгон — як бор барои ҳар шарик (нест кардан ва аз нав пайваст кардан намедиҳад)."""
+    return trial_days(db) > 0 and db.setting(f"trial_used:{user_id}") != "1"
+
+
+def start_trial(db: Database, row) -> str:
+    """Рӯзҳои ройгон барои боти нав. Огоҳии «3 рӯз монд» фавран намеояд — танҳо 1 рӯз пеш."""
+    until = db.pay_subscription(row["id"], 0, trial_days(db), reason="trial")
+    db.set_setting(f"trial_used:{row['owner_id']}", "1")
+    db.set_tenant(row["id"], sub_notice=f"{until}:{max(WARN_DAYS)}")
+    return until
+
+
 def charge(db: Database, row) -> str:
     """Як моҳ аз ҳисоби шарик. Пул нарасад — ``NotEnoughMoney``."""
     return db.pay_subscription(row["id"], price(db), PERIOD_DAYS)

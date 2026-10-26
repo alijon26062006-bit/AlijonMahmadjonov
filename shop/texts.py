@@ -1228,6 +1228,11 @@ def sub_reminder(name: str, until, cost: int, auto: bool, balance: int,
     )
 
 
+ADMIN_ASK_TRIAL = (
+    "🎁 <b>Рӯзҳои ройгон барои боти нав</b>\n\n"
+    "Шарик боти аввалашро ин қадар рӯз бепул истифода мебарад (як бор).\n"
+    "<code>0</code> — бе озмоиш. Намуна: <code>3</code>"
+)
 SUB_NOT_ENOUGH = "Маблағ кофӣ нест — аввал ҳисобро пур кунед."
 ADMIN_ASK_SUB_PRICE = (
     "💳 <b>Нархи обунаи моҳонаи конструктор</b>\n\n"
@@ -1314,10 +1319,12 @@ def partner_empty_balance(balance: int, currency: str = CURRENCY) -> str:
 # ── соҳиби платформа ──
 def admin_constructor(is_open: bool, tenants: int, active: int, partners: int,
                       markup: float, max_bots: int, *, sub_price: int = 0,
-                      income: tuple[int, int] = (0, 0), expired: int = 0) -> str:
+                      income: tuple[int, int] = (0, 0), expired: int = 0,
+                      trial: int = 0) -> str:
     return (
         admin_constructor_head(is_open, tenants, active, partners, markup, max_bots)
         + f"\n\n💳 Обуна: <b>{money(sub_price)}</b> / 30 рӯз барои ҳар бот"
+        + f"\n🎁 Озмоиши ройгон: <b>{trial} рӯз</b> (як бор барои ҳар шарик)"
         + (f"\n⛔️ Обуна тамом: {expired} бот" if expired else "")
         + f"\n💰 Обунаҳо дар 30 рӯз: {income[0]} пардохт, <b>{money(income[1])}</b>"
     )

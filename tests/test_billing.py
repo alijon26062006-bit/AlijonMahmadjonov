@@ -162,6 +162,7 @@ def test_migration_gives_grace_and_zero_markup_once(db):
 async def test_new_bot_needs_money_for_first_month(db, cfg, state):
     db.touch_user(PARTNER_ID)
     db.grant_constructor(PARTNER_ID, 1, ADMIN_ID)
+    db.set_setting(f"trial_used:{PARTNER_ID}", "1")           # озмоиш аллакай истифода шуд
     cb = FakeCallback("c:new", user_id=PARTNER_ID)
     await con_h.cb_c_new(cb, state, db, cfg)
     assert await state.get_state() is None and "пур кунед" in cb.answers[0]
@@ -224,3 +225,58 @@ def test_income_counts_paid_subscriptions(db):
     billing.charge(db, db.tenant(tid))
     billing.charge(db, db.tenant(tid))
     assert db.subscription_income("2000-01-01") == (2, 10000)
+
+
+# ── озмоиши ройгон ────────────────────────────────────────────────────
+@pytest.fixture
+def fake_me(monkeypatch):
+    async def fetch(token):
+        return SimpleNamespace(id=4242, username="shop_bot", first_name="Shop")
+
+    monkeypatch.setattr(con_h, "fetch_me", fetch)
+
+
+async def test_first_bot_is_free_for_three_days(db, cfg, state, fake_me):
+    from shop.states import Constructor
+
+    db.touch_user(PARTNER_ID)                                  # баланс 0
+    db.grant_constructor(PARTNER_ID, 2, ADMIN_ID)
+    cb = FakeCallback("c:new", user_id=PARTNER_ID)
+    await con_h.cb_c_new(cb, state, db, cfg)
+    assert await state.get_state() == Constructor.waiting_token.state
+    assert "ройгон" in cb.message.last
+
+    msg = FakeMessage(TOKEN, user_id=PARTNER_ID)
+    manager = _Manager()
+    await con_h.got_token(msg, state, db, cfg, SimpleNamespace(id=1), manager)
+    row = db.tenant_by_bot(4242)
+    assert row["status"] == "active" and manager.started == [row["id"]]
+    assert 2.9 < billing.days_left(row) <= 3
+    assert db.user(PARTNER_ID).balance == 0 and "ройгон" in msg.all_text()
+
+
+async def test_trial_is_given_only_once_per_partner(db):
+    tid = _partner_bot(db)
+    billing.start_trial(db, db.tenant(tid))
+    assert not billing.trial_available(db, PARTNER_ID)
+    assert billing.trial_available(db, 31337)
+
+
+async def test_trial_skips_three_day_warning_but_warns_last_day(db):
+    tid = _partner_bot(db)
+    billing.start_trial(db, db.tenant(tid))
+    mgr = _Mgr(db)
+    await billing.check_all(mgr)
+    assert mgr.messages == []                                  # тозa пас аз пайваст — бе огоҳӣ
+    db.set_tenant(tid, paid_until=_iso(0.5))
+    await billing.check_all(mgr)
+    assert len(mgr.messages) == 1
+
+
+async def test_owner_sets_trial_days(db, state):
+    await state.set_state(Admin.waiting_trial_days)
+    await con_h.got_trial_days(FakeMessage("7", user_id=ADMIN_ID), state, db)
+    assert billing.trial_days(db) == 7
+    await state.set_state(Admin.waiting_trial_days)
+    await con_h.got_trial_days(FakeMessage("0", user_id=ADMIN_ID), state, db)
+    assert billing.trial_days(db) == 0 and not billing.trial_available(db, PARTNER_ID)

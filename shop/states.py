@@ -42,6 +42,7 @@ class Admin(StatesGroup):
     waiting_c_markup = State()
     waiting_max_bots = State()
     waiting_sub_price = State()
+    waiting_trial_days = State()
     # боти шарик
     waiting_partner_markup = State()
     waiting_operator = State()

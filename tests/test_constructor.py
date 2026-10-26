@@ -343,7 +343,7 @@ async def test_partner_connects_bot(db, cfg, state, fake_me):
 
     row = db.tenant_by_bot(4242)
     assert row is not None and row["owner_id"] == PARTNER_ID and row["status"] == "active"
-    assert db.user(PARTNER_ID).balance == 1000 and row["paid_until"]     # моҳи аввал: 50 с.
+    assert db.user(PARTNER_ID).balance == 6000 and row["paid_until"]     # 3 рӯзи аввал ройгон
     assert manager.started == [row["id"]]
     assert "тайёр" in msg.all_text() and TOKEN not in msg.all_text()
 

@@ -108,7 +108,8 @@ async def cb_c_new(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
         return
     cost = 0 if cfg.is_admin(cb.from_user.id) else billing.price(db)
     user = current_user(cb, db)
-    if cost and user.balance < cost:
+    trial = bool(cost) and billing.trial_available(db, cb.from_user.id)
+    if cost and not trial and user.balance < cost:
         # Моҳи аввал ҳангоми пайваст гирифта мешавад — бе пул бот кор намекард.
         await cb.answer(
             f"💳 Обуна: {texts.money(cost, cfg.currency)} дар як моҳ. Дар ҳисоб "
@@ -117,8 +118,14 @@ async def cb_c_new(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
         )
         return
     await state.set_state(Constructor.waiting_token)
-    note = (f"\n\n💳 Обуна: <b>{texts.money(cost, cfg.currency)}</b> / 30 рӯз — моҳи аввал "
-            "ҳангоми пайваст аз ҳисоби шумо гирифта мешавад." if cost else "")
+    if trial:
+        note = (f"\n\n🎁 <b>{billing.trial_days(db)} рӯзи аввал — ройгон.</b> Баъд обуна "
+                f"{texts.money(cost, cfg.currency)} / 30 рӯз.")
+    elif cost:
+        note = (f"\n\n💳 Обуна: <b>{texts.money(cost, cfg.currency)}</b> / 30 рӯз — моҳи аввал "
+                "ҳангоми пайваст аз ҳисоби шумо гирифта мешавад.")
+    else:
+        note = ""
     await safe_edit(cb, texts.ASK_BOT_TOKEN + note, keyboards.constructor_cancel())
     await cb.answer()
 
@@ -173,9 +180,17 @@ async def got_token(message: Message, state: FSMContext, db: Database, cfg: Conf
         await message.answer(texts.BOT_ALREADY_ADDED)
         return
     paid_note = ""
-    if not cfg.is_admin(message.from_user.id):
+    cost = billing.price(db)
+    if cfg.is_admin(message.from_user.id):
+        pass                                # боти соҳиб бепул аст
+    elif cost and billing.trial_available(db, message.from_user.id):
+        until = billing.start_trial(db, db.tenant(tenant_id))
+        paid_note = (f"\n\n🎁 <b>То {texts._date(until)} ройгон.</b> Баъд обуна "
+                     f"{texts.money(cost, cfg.currency)} / 30 рӯз — пешакӣ «🔄 Пардохти худкор»-ро "
+                     "фаъол кунед ё дар вақташ пардохт кунед.")
+    else:
         try:
-            until = db.pay_subscription(tenant_id, billing.price(db), billing.PERIOD_DAYS)
+            until = db.pay_subscription(tenant_id, cost, billing.PERIOD_DAYS)
             paid_note = f"\n\n📅 Обуна пардохт шуд — то <b>{texts._date(until)}</b>."
         except NotEnoughMoney:
             db.set_tenant(tenant_id, status="expired")
@@ -369,6 +384,7 @@ def _owner_text(db: Database) -> str:
         wholesale.wholesale_markup(db), tenants_mod.max_bots_total(db),
         sub_price=billing.price(db), income=db.subscription_income(month_ago),
         expired=sum(1 for r in rows if r["status"] == "expired"),
+        trial=billing.trial_days(db),
     )
 
 
@@ -396,9 +412,11 @@ async def cb_o_toggle(cb: CallbackQuery, db: Database, tenants=None) -> None:
     await cb.answer("🚫 Хомӯш" if now_open else "✅ Фаъол")
 
 
-@owner_router.callback_query(F.data.in_({"o:markup", "o:max", "o:grant", "o:subprice"}))
+@owner_router.callback_query(F.data.in_({"o:markup", "o:max", "o:grant", "o:subprice", "o:trial"}))
 async def cb_o_ask(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     states = {
+        "o:trial": (Admin.waiting_trial_days,
+                    f"{texts.ADMIN_ASK_TRIAL}\n\nҲозир: <b>{billing.trial_days(db)} рӯз</b>"),
         "o:subprice": (Admin.waiting_sub_price,
                        f"{texts.ADMIN_ASK_SUB_PRICE}\n\nҲозир: <b>{texts.money(billing.price(db))}</b>"),
         "o:markup": (Admin.waiting_c_markup,
@@ -444,6 +462,20 @@ async def got_sub_price(message: Message, state: FSMContext, db: Database) -> No
     await message.answer(
         f"✅ Нархи обуна: <b>{texts.money(amount)}</b> / 30 рӯз\n"
         "<i>Аз пардохти навбатӣ амал мекунад.</i>",
+        reply_markup=keyboards.admin_constructor(tenants_mod.constructor_open(db)),
+    )
+
+
+@owner_router.message(Admin.waiting_trial_days, F.text)
+async def got_trial_days(message: Message, state: FSMContext, db: Database) -> None:
+    raw = message.text.strip()
+    if not raw.isdigit() or int(raw) > 365:
+        await message.answer("❌ Шумораи рӯзҳоро нависед (0–365). Намуна: <code>3</code>")
+        return
+    await state.clear()
+    db.set_setting(billing.TRIAL_KEY, raw)
+    await message.answer(
+        f"✅ Озмоиши ройгон: <b>{int(raw)} рӯз</b>",
         reply_markup=keyboards.admin_constructor(tenants_mod.constructor_open(db)),
     )
 

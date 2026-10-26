@@ -706,7 +706,10 @@ def admin_constructor(is_open: bool) -> InlineKeyboardMarkup:
             _btn("💹 Наценкаи яклухт", "o:markup", style.PRIMARY),
             _btn("🔢 Ҳадди ботҳо", "o:max", style.PRIMARY),
         ],
-        [_btn("💳 Нархи обунаи моҳона", "o:subprice", style.PRIMARY)],
+        [
+            _btn("💳 Нархи обуна", "o:subprice", style.PRIMARY),
+            _btn("🎁 Рӯзҳои ройгон", "o:trial", style.PRIMARY),
+        ],
         [_btn("👥 Шарикон (дастрасӣ)", "o:partners", style.PRIMARY)],
         [_btn("🤖 Ҳамаи ботҳо", "o:bots", style.PRIMARY)],
         [_btn(texts.BTN_BACK, "a:home")],
