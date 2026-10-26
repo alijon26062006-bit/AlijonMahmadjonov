@@ -13,9 +13,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from aiogram.filters import BaseFilter
 
-from .. import catalog, keyboards, pricelist, tenants as tenants_mod, wholesale
+from .. import billing, catalog, keyboards, pricelist, tenants as tenants_mod, wholesale
 from ..config import Config
-from ..db import Database
+from ..db import Database, NotEnoughMoney
 from ..i18n import texts
 from ..states import Admin, Constructor
 from .admin import IsAdmin
@@ -71,7 +71,10 @@ async def _home(cb_or_msg, db: Database, cfg: Config, user_id: int, *, edit: boo
     user = db.user(user_id)
     total_ok = len(db.tenants()) < tenants_mod.max_bots_total(db)
     can_add = allowed and len(rows) < limit and total_ok and tenants_mod.constructor_open(db)
-    text = texts.constructor_home(rows, user.balance if user else 0, total_ok, limit, cfg.currency)
+    text = texts.constructor_home(
+        rows, user.balance if user else 0, total_ok, limit, cfg.currency,
+        sub_price=None if cfg.is_admin(user_id) else billing.price(db),
+    )
     markup = keyboards.constructor_home(rows, can_add)
     if edit:
         await safe_edit(cb_or_msg, text, markup)
@@ -103,8 +106,20 @@ async def cb_c_new(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
     if len(db.tenants(cb.from_user.id)) >= limit or _platform_full(db):
         await cb.answer(texts.BOT_LIMIT.replace("❌ ", ""), show_alert=True)
         return
+    cost = 0 if cfg.is_admin(cb.from_user.id) else billing.price(db)
+    user = current_user(cb, db)
+    if cost and user.balance < cost:
+        # Моҳи аввал ҳангоми пайваст гирифта мешавад — бе пул бот кор намекард.
+        await cb.answer(
+            f"💳 Обуна: {texts.money(cost, cfg.currency)} дар як моҳ. Дар ҳисоб "
+            f"{texts.money(user.balance, cfg.currency)} аст — аввал ҳисобро пур кунед.",
+            show_alert=True,
+        )
+        return
     await state.set_state(Constructor.waiting_token)
-    await safe_edit(cb, texts.ASK_BOT_TOKEN, keyboards.constructor_cancel())
+    note = (f"\n\n💳 Обуна: <b>{texts.money(cost, cfg.currency)}</b> / 30 рӯз — моҳи аввал "
+            "ҳангоми пайваст аз ҳисоби шумо гирифта мешавад." if cost else "")
+    await safe_edit(cb, texts.ASK_BOT_TOKEN + note, keyboards.constructor_cancel())
     await cb.answer()
 
 
@@ -157,9 +172,18 @@ async def got_token(message: Message, state: FSMContext, db: Database, cfg: Conf
     except sqlite3.IntegrityError:        # ҳамзамон ду бор фиристода шуд
         await message.answer(texts.BOT_ALREADY_ADDED)
         return
+    paid_note = ""
+    if not cfg.is_admin(message.from_user.id):
+        try:
+            until = db.pay_subscription(tenant_id, billing.price(db), billing.PERIOD_DAYS)
+            paid_note = f"\n\n📅 Обуна пардохт шуд — то <b>{texts._date(until)}</b>."
+        except NotEnoughMoney:
+            db.set_tenant(tenant_id, status="expired")
+            paid_note = ("\n\n💳 <b>Обуна пардохт нашуд</b> — маблағ кофӣ нест. Ҳисобро пур "
+                         "кунед ва дар «🤖 Ботҳои ман» → «💳 Пардохти обуна»-ро пахш кунед.")
     if tenants is not None:
         await tenants.start(db.tenant(tenant_id))
-    await message.answer(texts.bot_created(me.username or ""))
+    await message.answer(texts.bot_created(me.username or "") + paid_note)
     await _home(message, db, cfg, message.from_user.id, edit=False)
 
 
@@ -183,12 +207,62 @@ async def _show_bot(cb: CallbackQuery, db: Database, cfg: Config, raw_id) -> Non
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
     user = db.user(cb.from_user.id)
+    exempt = billing.is_exempt(cfg.admin_ids, row)
     await safe_edit(
         cb, texts.tenant_screen(row, db.tenant_sales(row["id"]), user.balance if user else 0,
-                                cfg.currency),
-        keyboards.tenant_manage(row),
+                                cfg.currency, exempt=exempt, sub_price=billing.price(db)),
+        keyboards.tenant_manage(row, exempt=exempt),
     )
     await cb.answer()
+
+
+@partner_router.callback_query(F.data.startswith("c:pay:"))
+async def cb_c_pay(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    row = _own_tenant(db, cb.from_user.id, cb.data.rsplit(":", 1)[1])
+    if row is None or row["status"] == "blocked":
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    from datetime import datetime, timedelta, timezone
+
+    cost = billing.price(db)
+    user = current_user(cb, db)
+    now = datetime.now(timezone.utc)
+    start = billing.paid_until(row)
+    start = start if start is not None and start > now else now
+    after = (start + timedelta(days=billing.PERIOD_DAYS)).isoformat()
+    await safe_edit(cb, texts.sub_pay_confirm(row, cost, user.balance, after, cfg.currency),
+                    keyboards.sub_pay(row["id"], user.balance >= cost))
+    await cb.answer()
+
+
+@partner_router.callback_query(F.data.startswith("c:payok:"))
+async def cb_c_pay_ok(cb: CallbackQuery, db: Database, cfg: Config, tenants=None) -> None:
+    row = _own_tenant(db, cb.from_user.id, cb.data.rsplit(":", 1)[1])
+    if row is None or row["status"] == "blocked":
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    try:
+        until = billing.charge(db, row)
+    except NotEnoughMoney:
+        await cb.answer(texts.SUB_NOT_ENOUGH, show_alert=True)
+        return
+    fresh = db.tenant(row["id"])
+    if tenants is not None and fresh["status"] == "active":
+        await tenants.start(fresh)
+    await cb.answer("✅")
+    await safe_edit(cb, texts.sub_paid(row["username"] or str(row["bot_id"]), until),
+                    keyboards.back_to_bot(row["id"]))
+
+
+@partner_router.callback_query(F.data.startswith("c:auto:"))
+async def cb_c_auto(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    row = _own_tenant(db, cb.from_user.id, cb.data.rsplit(":", 1)[1])
+    if row is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    on = not row["auto_renew"]
+    db.set_tenant(row["id"], auto_renew=1 if on else 0)
+    await _show_bot(cb, db, cfg, row["id"])          # худаш ба тугма ҷавоб медиҳад
 
 
 @partner_router.callback_query(F.data.startswith("c:pause:") | F.data.startswith("c:resume:"))
@@ -284,17 +358,22 @@ owner_router.message.filter(IsAdmin(), InMain())
 owner_router.callback_query.filter(IsAdmin(), InMain())
 
 
-async def _owner_home(cb: CallbackQuery, db: Database) -> None:
+def _owner_text(db: Database) -> str:
+    from datetime import datetime, timedelta, timezone
+
     rows = db.tenants()
-    await safe_edit(
-        cb,
-        texts.admin_constructor(
-            tenants_mod.constructor_open(db), len(rows),
-            sum(1 for r in rows if r["status"] == "active"), len(db.constructor_partners()),
-            wholesale.wholesale_markup(db), tenants_mod.max_bots_total(db),
-        ),
-        keyboards.admin_constructor(tenants_mod.constructor_open(db)),
+    month_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
+    return texts.admin_constructor(
+        tenants_mod.constructor_open(db), len(rows),
+        sum(1 for r in rows if r["status"] == "active"), len(db.constructor_partners()),
+        wholesale.wholesale_markup(db), tenants_mod.max_bots_total(db),
+        sub_price=billing.price(db), income=db.subscription_income(month_ago),
+        expired=sum(1 for r in rows if r["status"] == "expired"),
     )
+
+
+async def _owner_home(cb: CallbackQuery, db: Database) -> None:
+    await safe_edit(cb, _owner_text(db), keyboards.admin_constructor(tenants_mod.constructor_open(db)))
 
 
 @owner_router.callback_query(F.data == "o:home")
@@ -317,9 +396,11 @@ async def cb_o_toggle(cb: CallbackQuery, db: Database, tenants=None) -> None:
     await cb.answer("🚫 Хомӯш" if now_open else "✅ Фаъол")
 
 
-@owner_router.callback_query(F.data.in_({"o:markup", "o:max", "o:grant"}))
+@owner_router.callback_query(F.data.in_({"o:markup", "o:max", "o:grant", "o:subprice"}))
 async def cb_o_ask(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     states = {
+        "o:subprice": (Admin.waiting_sub_price,
+                       f"{texts.ADMIN_ASK_SUB_PRICE}\n\nҲозир: <b>{texts.money(billing.price(db))}</b>"),
         "o:markup": (Admin.waiting_c_markup,
                      f"{texts.ADMIN_ASK_C_MARKUP}\n\nҲозир: <b>+{wholesale.wholesale_markup(db):g}%</b>"),
         "o:max": (Admin.waiting_max_bots,
@@ -348,6 +429,46 @@ async def got_c_markup(message: Message, state: FSMContext, db: Database, tenant
         tenants.reprice_all()
     await message.answer(f"✅ Наценкаи яклухт: <b>+{value:g}%</b>",
                          reply_markup=keyboards.admin_constructor(tenants_mod.constructor_open(db)))
+
+
+@owner_router.message(Admin.waiting_sub_price, F.text)
+async def got_sub_price(message: Message, state: FSMContext, db: Database) -> None:
+    raw = message.text.strip()
+    amount = 0 if raw in ("0", "0.00") else texts.to_diram(raw)
+    if amount is None:
+        await message.answer("❌ Маблағ нодуруст. Намуна: <code>50</code>")
+        return
+    await state.clear()
+    db.set_setting(billing.PRICE_KEY, str(amount))
+    # Нархи нав аз пардохти навбатӣ амал мекунад; мӯҳлатҳои пардохтшуда намеравад.
+    await message.answer(
+        f"✅ Нархи обуна: <b>{texts.money(amount)}</b> / 30 рӯз\n"
+        "<i>Аз пардохти навбатӣ амал мекунад.</i>",
+        reply_markup=keyboards.admin_constructor(tenants_mod.constructor_open(db)),
+    )
+
+
+@owner_router.callback_query(F.data.startswith("o:gift:"))
+async def cb_o_gift(cb: CallbackQuery, db: Database, bot: Bot, tenants=None) -> None:
+    """Тӯҳфаи соҳиб: +30 рӯз бе пул (масалан, барои озмоиш ё ҷуброн)."""
+    row = _tenant_of(cb.data.rsplit(":", 1)[1], db)
+    if row is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    until = db.pay_subscription(row["id"], 0, billing.PERIOD_DAYS, reason="gift",
+                                admin_id=cb.from_user.id)
+    fresh = db.tenant(row["id"])
+    if tenants is not None and fresh["status"] == "active":
+        await tenants.start(fresh)
+    try:
+        await bot.send_message(row["owner_id"],
+                               f"🎁 Ба боти @{texts.esc(row['username'] or row['bot_id'])} "
+                               f"30 рӯз тӯҳфа шуд — обуна то <b>{texts._date(until)}</b>.")
+    except Exception:
+        pass
+    rows = db.tenants()
+    await safe_edit(cb, texts.admin_tenants(rows), keyboards.admin_tenants(rows))
+    await cb.answer(f"🎁 То {texts._date(until)}")
 
 
 @owner_router.message(Admin.waiting_max_bots, F.text)

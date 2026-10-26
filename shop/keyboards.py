@@ -656,21 +656,41 @@ def constructor_home(rows, can_add: bool) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def tenant_manage(row) -> InlineKeyboardMarkup:
+def tenant_manage(row, *, exempt: bool = False) -> InlineKeyboardMarkup:
     tid = row["id"]
     rows: list[list[InlineKeyboardButton]] = []
     if row["username"]:
         rows.append([_url("🔗 Кушодани бот", f"https://t.me/{row['username']}", style.PRIMARY)])
+    if not exempt and row["status"] != "blocked":
+        expired = row["status"] == "expired"
+        rows.append([_btn("💳 Пардохти обуна" if expired else "💳 Дароз кардани обуна",
+                          f"c:pay:{tid}", style.SUCCESS if expired else style.PRIMARY)])
+        rows.append([_btn("🔄 Пардохти худкор: ✅ фаъол" if row["auto_renew"]
+                          else "🔄 Пардохти худкор: ❌ хомӯш", f"c:auto:{tid}", style.PRIMARY)])
     if row["status"] == "active":
         rows.append([_btn("⏸ Хомӯш кардан", f"c:pause:{tid}", style.DANGER)])
     elif row["status"] == "paused":
         rows.append([_btn("▶️ Фаъол кардан", f"c:resume:{tid}", style.SUCCESS)])
-    if row["status"] in ("disabled", "paused", "active"):
+    if row["status"] in ("disabled", "paused", "active", "expired"):
         rows.append([_btn("🔑 Токени нав", f"c:token:{tid}", style.PRIMARY)])
     if has_translations():
         rows.append([_btn("🌐 Забон: тоҷикӣ / русӣ", f"c:lang:{tid}", style.PRIMARY)])
     rows.append([_btn(texts.BTN_BACK, "c:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def sub_pay(tenant_id: int, enough: bool) -> InlineKeyboardMarkup:
+    rows = []
+    if enough:
+        rows.append([_btn("✅ Пардохт кардан", f"c:payok:{tenant_id}", style.SUCCESS)])
+    else:
+        rows.append([_btn(texts.BTN_TOPUP_WHOLESALE, CB_TOPUP, style.SUCCESS)])
+    rows.append([_btn(texts.BTN_BACK, f"c:bot:{tenant_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def back_to_bot(tenant_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[_btn(texts.BTN_BACK, f"c:bot:{tenant_id}")]])
 
 
 def constructor_cancel() -> InlineKeyboardMarkup:
@@ -686,6 +706,7 @@ def admin_constructor(is_open: bool) -> InlineKeyboardMarkup:
             _btn("💹 Наценкаи яклухт", "o:markup", style.PRIMARY),
             _btn("🔢 Ҳадди ботҳо", "o:max", style.PRIMARY),
         ],
+        [_btn("💳 Нархи обунаи моҳона", "o:subprice", style.PRIMARY)],
         [_btn("👥 Шарикон (дастрасӣ)", "o:partners", style.PRIMARY)],
         [_btn("🤖 Ҳамаи ботҳо", "o:bots", style.PRIMARY)],
         [_btn(texts.BTN_BACK, "a:home")],
@@ -707,11 +728,12 @@ def admin_tenants(rows) -> InlineKeyboardMarkup:
         blocked = row["status"] == "blocked"
         buttons.append([
             _btn(
-                f"{'✅ Кушодан' if blocked else '🚫 Бастан'} @{row['username'] or row['id']}",
+                f"{'✅' if blocked else '🚫'} @{row['username'] or row['id']}",
                 f"o:{'unblock' if blocked else 'block'}:{row['id']}",
                 style.SUCCESS if blocked else style.PRIMARY,
             ),
-            _btn("🗑 Нест кардан", f"o:del:{row['id']}", style.DANGER),
+            _btn("🎁 +30 рӯз", f"o:gift:{row['id']}", style.SUCCESS),
+            _btn("🗑", f"o:del:{row['id']}", style.DANGER),
         ])
     buttons.append([_btn(texts.BTN_BACK, "o:home")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

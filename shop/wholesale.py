@@ -22,7 +22,7 @@ from .supplier import CheckResult, OrderResult
 log = logging.getLogger(__name__)
 
 WHOLESALE_MARKUP_KEY = "constructor_markup_percent"
-DEFAULT_WHOLESALE_MARKUP = 10.0
+DEFAULT_WHOLESALE_MARKUP = 0.0      # ҳоло яклухт = нархи харид; дар панел иваз мешавад
 PARTNER_MARKUP_KEY = "partner_markup_percent"
 DEFAULT_PARTNER_MARKUP = 15.0
 LOW_BALANCE_KEY = "low_balance_dirams"

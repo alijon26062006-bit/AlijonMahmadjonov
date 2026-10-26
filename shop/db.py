@@ -6,7 +6,7 @@ import secrets
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -317,6 +317,10 @@ class Database:
         ("products", "price_locked", "INTEGER NOT NULL DEFAULT 0"),
         ("products", "title_locked", "INTEGER NOT NULL DEFAULT 0"),
         ("products", "auto_off", "INTEGER NOT NULL DEFAULT 0"),
+        # Обунаи моҳонаи конструктор: то кай пардохт шуд, пардохти худкор, огоҳӣ.
+        ("tenants", "paid_until", "TEXT"),
+        ("tenants", "auto_renew", "INTEGER NOT NULL DEFAULT 0"),
+        ("tenants", "sub_notice", "TEXT"),
     )
 
     def _add_missing_columns(self) -> None:
@@ -665,12 +669,69 @@ class Database:
             return self._all("SELECT * FROM tenants ORDER BY id")
         return self._all("SELECT * FROM tenants WHERE owner_id = ? ORDER BY id", (owner_id,))
 
+    def pay_subscription(self, tenant_id: int, price: int, days: int, *,
+                         reason: str = "subscription", admin_id: int | None = None) -> str:
+        """Обунаи боти шарикро дароз мекунад ва пулро аз ҳисоби шарик мегирад.
+
+        Ҳама дар як амалиёт: пул бе дароз кардани мӯҳлат намеравад ва баръакс.
+        ``price=0`` — тӯҳфаи соҳиб (бе пул). Бармегардонад мӯҳлати нав (ISO).
+        Пул нарасад — ``NotEnoughMoney``, ҳеҷ чиз иваз намешавад.
+        """
+        stamp = now()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT owner_id, paid_until, status FROM tenants WHERE id = ?", (tenant_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(tenant_id)
+            if price > 0:
+                user = self._conn.execute(
+                    "SELECT balance FROM users WHERE id = ?", (row["owner_id"],)
+                ).fetchone()
+                balance = user["balance"] if user else 0
+                if balance < price:
+                    raise NotEnoughMoney(f"balance={balance}, price={price}")
+                self._conn.execute(
+                    "UPDATE users SET balance = ? WHERE id = ?", (balance - price, row["owner_id"])
+                )
+                self._conn.execute(
+                    "INSERT INTO balance_log(user_id, delta, balance_after, reason, admin_id, "
+                    "created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (row["owner_id"], -price, balance - price, f"{reason}#{tenant_id}",
+                     admin_id, stamp),
+                )
+            current = datetime.now(timezone.utc)
+            try:
+                paid = datetime.fromisoformat(row["paid_until"]) if row["paid_until"] else None
+            except ValueError:
+                paid = None
+            start = paid if paid is not None and paid > current else current
+            until = (start + timedelta(days=days)).isoformat(timespec="seconds")
+            status = "active" if row["status"] == "expired" else row["status"]
+            self._conn.execute(
+                "UPDATE tenants SET paid_until = ?, status = ?, sub_notice = NULL, updated_at = ? "
+                "WHERE id = ?",
+                (until, status, stamp, tenant_id),
+            )
+            self._conn.commit()
+        return until
+
+    def subscription_income(self, since: str) -> tuple[int, int]:
+        """(шумора, маблағ) — пардохтҳои обунаи конструктор аз ``since``."""
+        row = self._one(
+            "SELECT COUNT(*), COALESCE(SUM(-delta), 0) FROM balance_log "
+            "WHERE reason LIKE 'subscription#%' AND delta < 0 AND created_at >= ?",
+            (since,),
+        )
+        return (int(row[0]), int(row[1])) if row else (0, 0)
+
     def delete_tenant(self, tenant_id: int) -> bool:
         """Боти шарикро аз платформа нест мекунад. Таърихи фармоишҳои яклухт мемонад."""
         return self._run("DELETE FROM tenants WHERE id = ?", (tenant_id,)).rowcount > 0
 
     def set_tenant(self, tenant_id: int, **fields) -> None:
-        allowed = {"status", "note", "token", "lang", "username", "title"}
+        allowed = {"status", "note", "token", "lang", "username", "title", "paid_until",
+                   "auto_renew", "sub_notice"}
         keys = [k for k in fields if k in allowed]
         if not keys:
             return

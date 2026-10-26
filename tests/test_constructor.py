@@ -80,6 +80,7 @@ async def _tenant(p, balance=10000):
     if balance:
         p.db.change_balance(PARTNER_ID, balance, "topup")
     tid = p.db.add_tenant(PARTNER_ID, 4242, "partner_shop_bot", "Shop", TOKEN)
+    p.db.pay_subscription(tid, 0, 30)                  # обунаи пардохтшуда (бе пул)
     ctx = await p.manager.start(p.db.tenant(tid), poll=False)
     ctx.bot = FakeBot()
     return ctx
@@ -332,6 +333,7 @@ async def test_partner_without_access_cannot_add_bot(db, cfg, state):
 
 async def test_partner_connects_bot(db, cfg, state, fake_me):
     db.touch_user(PARTNER_ID)
+    db.change_balance(PARTNER_ID, 6000, "topup")
     db.grant_constructor(PARTNER_ID, 1, ADMIN_ID)
     await state.set_state(Constructor.waiting_token)
     manager = _Manager()
@@ -341,6 +343,7 @@ async def test_partner_connects_bot(db, cfg, state, fake_me):
 
     row = db.tenant_by_bot(4242)
     assert row is not None and row["owner_id"] == PARTNER_ID and row["status"] == "active"
+    assert db.user(PARTNER_ID).balance == 1000 and row["paid_until"]     # моҳи аввал: 50 с.
     assert manager.started == [row["id"]]
     assert "тайёр" in msg.all_text() and TOKEN not in msg.all_text()
 
@@ -473,5 +476,6 @@ async def test_partner_can_add_same_bot_again_after_delete(platform):
     ctx = await _tenant(platform)
     await platform.manager.remove(platform.db.tenant(ctx.id), platform.manager.data_dir / "x")
     tid = platform.db.add_tenant(PARTNER_ID, ctx.bot_id, "partner_shop_bot", "Shop", TOKEN)
+    platform.db.pay_subscription(tid, 0, 30)
     new = await platform.manager.start(platform.db.tenant(tid), poll=False)
     assert new.db.stats()["users"] == 0                           # база нав, тоза

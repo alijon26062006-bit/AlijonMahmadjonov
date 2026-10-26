@@ -1125,12 +1125,36 @@ TENANT_STATUS = {
     "paused": "⏸ хомӯш (худатон)",
     "blocked": "🚫 баста (соҳиби платформа)",
     "disabled": "🔴 токен кор намекунад",
+    "expired": "💳 обуна тамом шуд — пардохт кунед",
 }
 LANG_TITLE = {"tj": "🇹🇯 Тоҷикӣ", "ru": "🇷🇺 Русӣ"}
 
 
+def _date(stamp) -> str:
+    """2026-11-25T08:00:00+00:00 → 25.11.2026"""
+    if stamp is None:
+        return "—"
+    if isinstance(stamp, str):
+        try:
+            stamp = datetime.fromisoformat(stamp)
+        except ValueError:
+            return esc(stamp)
+    return stamp.strftime("%d.%m.%Y")
+
+
+def sub_line(row, exempt: bool) -> str:
+    """Як сатр дар бораи обунаи бот."""
+    if exempt:
+        return "♾ Обуна: бепул (соҳиби платформа)"
+    until = row["paid_until"] if "paid_until" in row.keys() else None
+    auto = " · 🔄 пардохти худкор" if row["auto_renew"] else ""
+    if row["status"] == "expired" or not until:
+        return "💳 Обуна: <b>пардохт нашудааст</b>" + auto
+    return f"📅 Обуна то: <b>{_date(until)}</b>{auto}"
+
+
 def constructor_home(rows: list, balance: int, can_add: bool, limit: int,
-                     currency: str = CURRENCY) -> str:
+                     currency: str = CURRENCY, *, sub_price: int | None = None) -> str:
     lines = [
         "🤖 <b>Ботҳои ман</b>\n",
         "<blockquote>Боти худро пайваст кунед — дӯкони тайёр бо номи худ, нархҳои худ "
@@ -1145,9 +1169,70 @@ def constructor_home(rows: list, balance: int, can_add: bool, limit: int,
     else:
         lines.append("Ҳоло бот надоред.")
     lines.append(f"\n📦 Ботҳо: <b>{len(rows)}</b> аз <b>{limit}</b>")
+    if sub_price:
+        lines.append(f"💳 Обуна: <b>{money(sub_price, currency)}</b> барои ҳар бот дар як моҳ")
     if not can_add and len(rows) < limit:
         lines.append("<i>Ҳадди ботҳои платформа пур аст.</i>")
     return "\n".join(lines)
+
+
+def sub_pay_confirm(row, cost: int, balance: int, until_after: str,
+                    currency: str = CURRENCY) -> str:
+    name = f"@{row['username']}" if row["username"] else f"#{row['id']}"
+    enough = balance >= cost
+    return (
+        f"💳 <b>Обунаи боти {esc(name)}</b>\n\n"
+        f"💵 Нарх: <b>{money(cost, currency)}</b> барои 30 рӯз\n"
+        f"💳 Ҳисоби шумо: <b>{money(balance, currency)}</b>\n"
+        f"📅 Пас аз пардохт — то <b>{_date(until_after)}</b>\n\n"
+        + ("Маблағ аз ҳисоби шумо гирифта мешавад." if enough
+           else f"🔴 Маблағ кофӣ нест — аввал ҳисобро {money(cost - balance, currency)} пур кунед.")
+    )
+
+
+def sub_paid(name: str, until: str) -> str:
+    return (f"✅ <b>Обуна пардохт шуд</b>\n\n🤖 @{esc(name)} кор мекунад то "
+            f"<b>{_date(until)}</b>.")
+
+
+def sub_renewed(name: str, cost: int, until: str, currency: str = CURRENCY) -> str:
+    return (
+        f"🔄 <b>Обунаи @{esc(name)} худкор дароз шуд</b>\n\n"
+        f"➖ {money(cost, currency)} аз ҳисоби шумо\n"
+        f"📅 Акнун то <b>{_date(until)}</b>"
+    )
+
+
+def sub_expired(name: str, cost: int, currency: str = CURRENCY) -> str:
+    return (
+        f"⛔️ <b>Обунаи @{esc(name)} тамом шуд — бот хомӯш шуд</b>\n\n"
+        f"Барои боз фаъол кардан {money(cost, currency)} пардохт кунед: "
+        "«🤖 Ботҳои ман» → бот → «💳 Пардохти обуна».\n"
+        "Маълумоти бот (харидорон, ҳисобҳо, нархҳо) нигоҳ дошта шудааст."
+    )
+
+
+def sub_reminder(name: str, until, cost: int, auto: bool, balance: int,
+                 currency: str = CURRENCY) -> str:
+    head = f"⏰ <b>Обунаи @{esc(name)} то {_date(until)} тамом мешавад</b>\n\n"
+    if auto and balance >= cost:
+        return head + f"🔄 Пардохти худкор фаъол аст — {money(cost, currency)} худкор гирифта мешавад."
+    if auto:
+        return head + (
+            f"🔄 Пардохти худкор фаъол аст, аммо дар ҳисоб {money(balance, currency)} аст — "
+            f"барои {money(cost, currency)} кофӣ нест. Ҳисобро пур кунед, вагарна бот хомӯш мешавад."
+        )
+    return head + (
+        f"💳 Барои давом {money(cost, currency)} пардохт кунед: «🤖 Ботҳои ман» → бот → "
+        "«💳 Пардохти обуна». Ё пардохти худкорро фаъол кунед."
+    )
+
+
+SUB_NOT_ENOUGH = "Маблағ кофӣ нест — аввал ҳисобро пур кунед."
+ADMIN_ASK_SUB_PRICE = (
+    "💳 <b>Нархи обунаи моҳонаи конструктор</b>\n\n"
+    "Барои ҳар бот дар 30 рӯз. <code>0</code> — бепул.\nНамуна: <code>50</code>"
+)
 
 
 ASK_BOT_TOKEN = (
@@ -1184,7 +1269,8 @@ def bot_created(username: str) -> str:
     )
 
 
-def tenant_screen(row, sales: dict, balance: int, currency: str = CURRENCY) -> str:
+def tenant_screen(row, sales: dict, balance: int, currency: str = CURRENCY, *,
+                  exempt: bool = False, sub_price: int = 0) -> str:
     name = f"@{row['username']}" if row["username"] else f"#{row['id']}"
     return (
         f"🤖 <b>{esc(name)}</b>\n\n"
@@ -1192,8 +1278,10 @@ def tenant_screen(row, sales: dict, balance: int, currency: str = CURRENCY) -> s
         f"🌐 Забон: {LANG_TITLE.get(row['lang'], row['lang'])}\n"
         f"🧾 Фармоишҳои иҷрошуда: <b>{sales['orders']}</b>\n"
         f"💰 Харидҳои яклухт: <b>{money(sales['revenue'], currency)}</b>\n"
-        f"💳 Ҳисоби яклухт: <b>{money(balance, currency)}</b>\n\n"
-        f"🔗 t.me/{esc(row['username'] or '')}"
+        f"💳 Ҳисоби яклухт: <b>{money(balance, currency)}</b>\n"
+        f"{sub_line(row, exempt)}\n"
+        + ("" if exempt else f"💵 Нархи обуна: {money(sub_price, currency)} / {30} рӯз\n")
+        + f"\n🔗 t.me/{esc(row['username'] or '')}"
     )
 
 
@@ -1225,7 +1313,18 @@ def partner_empty_balance(balance: int, currency: str = CURRENCY) -> str:
 
 # ── соҳиби платформа ──
 def admin_constructor(is_open: bool, tenants: int, active: int, partners: int,
-                      markup: float, max_bots: int) -> str:
+                      markup: float, max_bots: int, *, sub_price: int = 0,
+                      income: tuple[int, int] = (0, 0), expired: int = 0) -> str:
+    return (
+        admin_constructor_head(is_open, tenants, active, partners, markup, max_bots)
+        + f"\n\n💳 Обуна: <b>{money(sub_price)}</b> / 30 рӯз барои ҳар бот"
+        + (f"\n⛔️ Обуна тамом: {expired} бот" if expired else "")
+        + f"\n💰 Обунаҳо дар 30 рӯз: {income[0]} пардохт, <b>{money(income[1])}</b>"
+    )
+
+
+def admin_constructor_head(is_open: bool, tenants: int, active: int, partners: int,
+                           markup: float, max_bots: int) -> str:
     return (
         "🏗 <b>Конструктор</b>\n\n"
         f"📶 Ҳолат: <b>{'✅ фаъол' if is_open else '🚫 хомӯш'}</b>\n"
@@ -1268,9 +1367,12 @@ def admin_tenants(rows: list) -> str:
         return "🤖 <b>Ботҳои шарикон</b>\n\nҲоло бот нест."
     lines = ["🤖 <b>Ботҳои шарикон</b>\n"]
     for row in rows[:LIST_CAP]:
+        until = row["paid_until"] if "paid_until" in row.keys() else None
         lines.append(
             f"• @{esc(row['username'] or '?')} — шарик <code>{row['owner_id']}</code> — "
             f"{TENANT_STATUS.get(row['status'], row['status'])}"
+            + (f" · то {_date(until)}" if until else "")
+            + (" · 🔄" if row["auto_renew"] else "")
         )
     return "\n".join(lines) + _more(rows)
 

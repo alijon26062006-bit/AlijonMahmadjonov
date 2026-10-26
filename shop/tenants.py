@@ -22,7 +22,7 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramConflictError, TelegramUnauthorizedError
 from aiogram.methods import GetUpdates
 
-from . import requisites, wholesale
+from . import billing, requisites, wholesale
 from .config import Config
 from .db import Database
 
@@ -40,6 +40,7 @@ ORPHAN_AFTER = timedelta(minutes=3)     # фармоиши нав, ки ба и�
 # Сабаби рад барои харидори боти шарик — бе ҷузъиёти дохилии платформа.
 PUBLIC_FAIL = "Таъминкунанда фармоишро иҷро накард"
 REPRICE_EVERY = 600      # сония — нархҳо аз нархи яклухт
+BILLING_EVERY = 300      # сония — обунаи моҳона
 
 
 class TenantBusy(Exception):
@@ -175,9 +176,15 @@ class TenantManager:
 
     # ── оғоз ва қатъ ──────────────────────────────────────────────────
     async def start_all(self) -> int:
+        billing.migrate(self.platform.db)
         if not constructor_open(self.platform.db):
             log.info("Конструктор хомӯш — ботҳои шарикон оғоз намешаванд.")
             return 0
+        # Мӯҳлате, ки ҳангоми хомӯшии сервер гузашт: аввал пардохти худкор.
+        try:
+            await billing.check_all(self)
+        except Exception:
+            log.exception("Санҷиши обунаи конструктор нашуд")
         started = 0
         for row in self.platform.db.tenants():
             if row["status"] != "active":
@@ -198,6 +205,10 @@ class TenantManager:
         if row["bot_id"] in self.contexts:
             return self.contexts[row["bot_id"]]
         if not constructor_open(self.platform.db) or row["status"] != "active":
+            return None
+        if not billing.is_exempt(self.platform.cfg.admin_ids, row) and not billing.is_paid(row):
+            # Обуна пардохт нашудааст — бот то пардохт кор намекунад.
+            self.platform.db.set_tenant(row["id"], status="expired")
             return None
         tdb = self.open_db(row["bot_id"])
         tdb.rotate_order_key_prefix()
@@ -376,10 +387,14 @@ class TenantManager:
             log.exception("Боти шарик #%s: хатои коркард", ctx.id)
 
     async def _tell_owner(self, ctx: TenantContext, text: str) -> None:
+        await self.tell(ctx.owner_id, text)
+
+    async def tell(self, user_id: int, text: str) -> None:
+        """Паём ба шарик аз боти асосӣ."""
         try:
-            await self.platform.bot.send_message(ctx.owner_id, text)
-        except Exception:
-            pass
+            await self.platform.bot.send_message(user_id, text)
+        except Exception as exc:
+            log.info("Паём ба шарик %s нарасид: %s", user_id, exc)
 
     async def _token_revoked(self, ctx: TenantContext) -> None:
         """Шарик токенро бекор кард ё бот нест шуд — ботро хомӯш мекунем ва хабар медиҳем."""
@@ -401,6 +416,13 @@ class TenantManager:
         while True:
             await asyncio.sleep(SYNC_EVERY)
             ticks += 1
+            if ticks * SYNC_EVERY % BILLING_EVERY == 0:
+                try:
+                    await billing.check_all(self)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Санҷиши обунаи конструктор нашуд")
             for ctx in list(self.contexts.values()):
                 try:
                     await self.sync_orders(ctx)
