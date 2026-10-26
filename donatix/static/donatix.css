@@ -2947,3 +2947,8 @@ html.vo-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .adm-orb, .vo-core, .vo-ring, .vo-core::after { animation: none !important; transition: none !important; }
 }
+.vo-audio { display: none; }
+.vo-mode { margin: -4px 0 0; font-size: .7rem; color: rgb(35 28 22 / .55); }
+.vo-mode-b { border: 0; background: none; padding: 0; font: inherit; color: #5b3df5; text-decoration: underline; cursor: pointer; }
+:root[data-theme="dark"] .vo-mode { color: rgb(244 237 230 / .5); }
+:root[data-theme="dark"] .vo-mode-b { color: #b9a3ff; }

@@ -30,7 +30,7 @@ from .config import Config
 log = logging.getLogger(__name__)
 
 OPENAI = "https://api.openai.com/v1"
-TIMEOUT = httpx.Timeout(45, connect=10)
+TIMEOUT = httpx.Timeout(25, connect=8)   # плохая связь — лучше сказать об этом, чем висеть
 MAX_AUDIO = 8 * 1024 * 1024
 MAX_TOOL_ROUNDS = 4
 
@@ -384,8 +384,9 @@ def realtime_session(config: Config, transport: httpx.BaseTransport | None = Non
     model = config.voice_realtime_model
     full = {"type": "realtime", "model": model, "instructions": REALTIME_INSTRUCTIONS, "tools": realtime_tools(),
             "tool_choice": "auto",
+            # Строгая очередь: пока он говорит, эхо и шум его не перебивают (перебить — нажатием на шар)
             "audio": {"input": {"transcription": {"model": config.voice_stt_model},
-                                "turn_detection": {"type": "semantic_vad"}},
+                                "turn_detection": {"type": "semantic_vad", "interrupt_response": False}},
                       "output": {"voice": config.voice_name}}}
     simple = {"type": "realtime", "model": model, "instructions": REALTIME_INSTRUCTIONS, "tools": realtime_tools(),
               "audio": {"output": {"voice": config.voice_name}}}
