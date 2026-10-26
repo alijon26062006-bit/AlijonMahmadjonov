@@ -1,96 +1,129 @@
 {% extends "admin/_layout.html" %}
 {% from "_icons.html" import icon %}
 {% block title %}Админка — {{ site_name }}{% endblock %}
+{% macro usd(micro) %}{{ '{:,.2f}'.format((micro or 0) / 10000) | replace(',', ' ') }}{% endmacro %}
+{% macro delta(d, word='к вчера') %}{% if d is not none %}<span class="gd-delta {{ 'up' if d >= 0 else 'down' }}">{{ '+' if d >= 0 else '−' }}{{ d | abs }}%</span><span class="gd-delta-w">{{ word }}</span>{% endif %}{% endmacro %}
 {% block content %}
-<section class="page-hero dash-hero">
-  <h1>Сводка</h1>
+{% set g = glass %}
+<section class="gd-head">
+  <div>
+    <h1>{{ g.hello }}, {{ user.login }}</h1>
+    <p>Что происходит в магазине сегодня, {{ g.date }}.</p>
+  </div>
   <form method="post" action="/admin/sync"><input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="btn">{{ icon('refresh', 18) }}Обновить каталог</button></form>
+    <button class="gd-pill">{{ icon('refresh', 15) }}Обновить каталог</button></form>
 </section>
 
 {% if counts.attention or counts.pending_payments or counts.pending_users %}
-<div class="todo">
-  {% if counts.attention %}<a class="todo-item bad" href="/admin/orders?status=attention">{{ icon('alert', 20) }}<span>Заказов, требующих внимания: {{ counts.attention }}</span>{{ icon('arrow-right', 18) }}</a>{% endif %}
-  {% if counts.pending_payments %}<a class="todo-item warn" href="/admin/payments">{{ icon('wallet', 20) }}<span>Заявок на пополнение: {{ counts.pending_payments }}</span>{{ icon('arrow-right', 18) }}</a>{% endif %}
-  {% if counts.pending_users %}<a class="todo-item warn" href="/admin/users?status=pending">{{ icon('users', 20) }}<span>Новых заявок: {{ counts.pending_users }}</span>{{ icon('arrow-right', 18) }}</a>{% endif %}
+<div class="gd-todo">
+  {% if counts.attention %}<a class="gd-todo-i bad" href="/admin/orders?status=attention">{{ icon('alert', 16) }}<span>Заказов, требующих внимания: {{ counts.attention }}</span></a>{% endif %}
+  {% if counts.pending_payments %}<a class="gd-todo-i warn" href="/admin/payments">{{ icon('wallet', 16) }}<span>Заявок на пополнение: {{ counts.pending_payments }}</span></a>{% endif %}
+  {% if counts.pending_users %}<a class="gd-todo-i warn" href="/admin/users?status=pending">{{ icon('users', 16) }}<span>Новых заявок: {{ counts.pending_users }}</span></a>{% endif %}
 </div>
 {% endif %}
 
-<div class="grid kpis">
-  <div class="kpi">
-    <span class="tile {{ 'bad' if supplier_balance is not none and supplier_balance < low else 'g2' }}">{{ icon('shield', 20) }}</span>
-    <div class="label">Баланс FazerCards</div>
-    <div class="value">{% if supplier_balance is not none %}${{ supplier_balance }}{% else %}—{% endif %}</div>
-    <div class="note">клиентам должны ${{ fmt(counts.client_balances) }}</div>
-    {% if supplier_balance_error %}<div class="note" style="color:var(--bad)">⚠️ {{ supplier_balance_error[:140] }}</div>{% endif %}
-    <form method="post" action="/admin/supplier-balance" style="margin-top:6px"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="btn sm">{{ icon('refresh', 14) }}Обновить сейчас</button></form>
-  </div>
-  {% for b in extra_balances %}
-  <div class="kpi">
-    <span class="tile {{ 'bad' if b.error }}">{{ icon('shield', 20) }}</span>
-    <div class="label">Баланс {{ b.name }}</div>
-    <div class="value">{% if b.balance is not none %}${{ b.balance }}{% else %}—{% endif %}</div>
-    {% if b.error %}<div class="note" style="color:var(--bad)">⚠️ {{ b.error[:120] }}</div>
-    {% else %}<div class="note">второй поставщик (игры по ID)</div>{% endif %}
-  </div>
-  {% endfor %}
-  <div class="kpi">
-    <span class="tile ok">{{ icon('chart', 20) }}</span>
-    <div class="label">Прибыль за 30 дней</div>
-    <div class="value">${{ fmt(month.profit) }}</div>
-    <div class="note">выручка ${{ fmt(month.revenue) }}</div>
-  </div>
-  <div class="kpi">
-    <span class="tile">{{ icon('bag', 20) }}</span>
-    <div class="label">Заказов сегодня <span class="muted small">с 00:00</span></div>
-    <div class="value">{{ today.orders }}</div>
-    <div class="note">прибыль ${{ fmt(today.profit) }} · в работе {{ counts.processing }}</div>
-  </div>
-  <a class="kpi" href="/admin/shopbot">
-    <span class="tile g2">{{ icon('zap-send', 20) }}</span>
-    <div class="label">Через бот-магазин <span class="muted small">сегодня</span></div>
-    <div class="value">{{ shop.orders }}</div>
-    <div class="note">выручка ${{ fmt(shop.revenue) }} · прибыль ${{ fmt(shop.profit) }}</div>
-  </a>
-  <div class="kpi">
-    <span class="tile g5">{{ icon('users', 20) }}</span>
-    <div class="label">Клиентов</div>
-    <div class="value">{{ counts.clients }}</div>
-    <div class="note">товаров {{ counts.products }} · каталог {{ (catalog_synced_at or 'не загружен')[5:16] | replace('T', ' ') }}</div>
-  </div>
-</div>
+<div class="gd-row">
+  <section class="card gd-balance" aria-label="Баланс у поставщика">
+    <div class="gd-label">Баланс поставщика <span class="gd-chip">USD</span></div>
+    <div class="gd-big">{% if supplier_balance is not none %}${{ '{:,.2f}'.format(supplier_balance | float) | replace(',', ' ') }}{% else %}—{% endif %}</div>
+    <div class="gd-sub"><span class="gd-delta {{ 'down' if supplier_balance is not none and supplier_balance < low else 'up' }}">
+      {{ 'мало' if supplier_balance is not none and supplier_balance < low else 'хватает' }}</span> клиентам должны ${{ usd(counts.client_balances) }}</div>
+    {% if supplier_balance_error %}<div class="gd-err">{{ icon('alert', 14) }}{{ supplier_balance_error[:120] }}</div>{% endif %}
+    <div class="gd-btns">
+      <a class="gd-btn dark" href="/admin/payments">{{ icon('wallet', 15) }}Пополнения</a>
+      <a class="gd-btn" href="/admin/money">{{ icon('chart', 15) }}Учёт денег</a>
+    </div>
+    <div class="gd-wallets">
+      <div class="gd-label sm">Кошельки <span>· деньги по местам</span></div>
+      <div class="gd-wallet-row">
+        <div class="gd-wallet"><span>{{ icon('users', 14) }}</span><b>${{ usd(counts.client_balances) }}</b><small>у клиентов</small></div>
+        {% for b in extra_balances %}<div class="gd-wallet"><span>{{ icon('shield', 14) }}</span><b>{% if b.balance is not none %}${{ b.balance }}{% else %}—{% endif %}</b><small>{{ b.name }}</small></div>{% endfor %}
+        <div class="gd-wallet"><span>{{ icon('grid', 14) }}</span><b>{{ counts.products }}</b><small>товаров</small></div>
+      </div>
+    </div>
+    <form class="gd-refresh" method="post" action="/admin/supplier-balance"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button aria-label="Обновить баланс поставщика" title="Обновить баланс">{{ icon('refresh', 14) }}</button></form>
+  </section>
 
-<div class="grid dash-two">
-  <div class="card">
-    <div class="card-head"><h3>Выручка и прибыль, 14 дней</h3>
-      <span class="legend"><i class="rev"></i>выручка <i class="pro"></i>прибыль</span></div>
-    {% set peak = (days | map(attribute='revenue') | max) or 1 %}
-    <div class="chart" role="img" aria-label="Выручка и прибыль по дням">
-      {% for d in days %}
-      <div class="bar" style="--i: {{ loop.index0 }}" title="{{ d.day }}: выручка ${{ fmt(d.revenue) }}, прибыль ${{ fmt(d.profit) }}, заказов {{ d.orders }}">
-        <div class="stack" style="--h: {{ (d.revenue / peak * 100) | round(1) }}%">
-          <span class="pro" style="--p: {{ ((d.profit / d.revenue * 100) if d.revenue else 0) | round(1) }}%"></span>
-        </div>
-        <span class="day">{{ d.day[8:10] }}</span>
+  <div class="gd-quad">
+    <div class="card gd-stat green">
+      <span class="gd-ico">{{ icon('chart', 15) }}</span>
+      <div class="gd-label">Прибыль сегодня</div>
+      <div class="gd-val">${{ usd(today.profit) }}</div>
+      <div class="gd-sub">{{ delta(g.d_profit) }}</div>
+    </div>
+    <div class="card gd-stat">
+      <span class="gd-ico">{{ icon('bag', 15) }}</span>
+      <div class="gd-label">Заказов сегодня</div>
+      <div class="gd-val">{{ today.orders }}</div>
+      <div class="gd-sub">{{ delta(g.d_orders) }}{% if counts.processing %} · в работе {{ counts.processing }}{% endif %}</div>
+    </div>
+    <div class="card gd-stat">
+      <span class="gd-ico">{{ icon('wallet', 15) }}</span>
+      <div class="gd-label">Выручка за 30 дней</div>
+      <div class="gd-val">${{ usd(month.revenue) }}</div>
+      <div class="gd-sub"><span class="gd-delta up">${{ usd(month.profit) }}</span><span class="gd-delta-w">прибыль</span></div>
+    </div>
+    <a class="card gd-stat" href="/admin/users">
+      <span class="gd-ico">{{ icon('users', 15) }}</span>
+      <div class="gd-label">Клиентов</div>
+      <div class="gd-val">{{ counts.clients }}</div>
+      <div class="gd-sub"><span class="gd-delta-w">через бот сегодня: {{ shop.orders }}</span></div>
+    </a>
+  </div>
+
+  <section class="card gd-chart" aria-label="Выручка за 14 дней">
+    <div class="gd-label">Выручка за 14 дней</div>
+    <div class="gd-chart-sum">${{ usd(g.total14) }} {{ delta(g.d_revenue, 'сегодня к вчера') }}</div>
+    <div class="gd-bars" role="img" aria-label="Выручка по дням, последний столбик — сегодня">
+      {% for d in g.days %}
+      <div class="gd-bar{{ ' today' if loop.last }}" style="--i: {{ loop.index0 }}" title="{{ d.day[8:10] }}.{{ d.day[5:7] }}: выручка ${{ usd(d.revenue) }}, прибыль ${{ usd(d.profit) }}, заказов {{ d.orders }}">
+        <span style="--h: {{ [(d.revenue / g.peak * 100) | round(1), 4] | max }}%"></span>
+        <small>{{ d.day[8:10] }}</small>
       </div>
       {% endfor %}
     </div>
-  </div>
-  <div class="card">
-    <div class="card-head"><h3>Лучшие клиенты, 30 дней</h3></div>
+  </section>
+</div>
+
+<div class="gd-rings">
+  {% for r in g.rings %}
+  <a class="card gd-ring" href="{{ r.href }}">
+    <div class="gd-ring-top"><span class="gd-ico {{ r.tone }}">{{ icon(r.icon, 14) }}</span><span class="gd-when">{{ r.when }}</span></div>
+    <svg class="gd-donut" viewBox="0 0 64 64" role="img" aria-label="{{ r.title }}: {{ r.pct }}%">
+      <circle cx="32" cy="32" r="26" class="trk"/>
+      <circle cx="32" cy="32" r="26" class="val" style="stroke-dashoffset: {{ (163.36 * (1 - r.pct / 100)) | round(2) }}"/>
+      <text x="32" y="31" text-anchor="middle">{{ r.pct }}%</text>
+      <text x="32" y="42" text-anchor="middle" class="t2">{{ r.when }}</text>
+    </svg>
+    <b>{{ r.title }}</b>
+    <small>{{ r.sub }}</small>
+    <span class="gd-ring-btn">{{ icon('arrow-right', 13) }}Открыть</span>
+  </a>
+  {% endfor %}
+  <a class="gd-ring add" href="/admin/banners">
+    <span class="gd-plus">{{ icon('plus', 18) }}</span>
+    <b>Новый баннер</b>
+    <small>Реклама вверху сайта, в ботах и мини-приложении</small>
+  </a>
+</div>
+
+<div class="gd-row two">
+  <section class="card">
+    <div class="gd-card-head"><div class="gd-label">Последние заказы</div><a class="gd-btn sm" href="/admin/orders">Все заказы</a></div>
+    {% set rows = recent %}{% include "admin/_orders_table.html" %}
+  </section>
+  <section class="card">
+    <div class="gd-card-head"><div class="gd-label">Лучшие клиенты · 30 дней</div></div>
     <div class="list tight">
       {% for c in top %}
       <a class="person" href="/admin/users/{{ c.id }}">
         <span class="avatar">{{ c.login[:2] | upper }}</span>
         <span class="grow"><b>{{ c.login }}</b><span class="sub">{{ c.project or (c.n ~ ' заказов') }}</span></span>
-        <span class="amount">${{ fmt(c.revenue) }}</span>
+        <span class="amount">${{ usd(c.revenue) }}</span>
       </a>
       {% else %}<div class="empty small">Пока нет продаж.</div>{% endfor %}
     </div>
-  </div>
+  </section>
 </div>
-
-<div class="section-title"><h2>Последние заказы</h2><a class="btn sm" href="/admin/orders">Все заказы</a></div>
-<div>{% set rows = recent %}{% include "admin/_orders_table.html" %}</div>
 {% endblock %}

@@ -262,3 +262,20 @@ def test_old_pending_clients_activated_once(config, conn):
 def test_docs_explain_product_ids(client):
     page = client.get("/docs").text
     assert 'id="ids"' in page and "topup-" in page and "tg-premium-12" in page and "offer_id" in page
+
+
+def test_admin_glass_layout_and_client_tabbar_untouched(app, conn):
+    """Админка — «стеклянная»: полоска слева, плавающее меню снизу, кольца на сводке. У клиента меню прежнее."""
+    from conftest import make_client
+    from fastapi.testclient import TestClient
+    a = TestClient(app)
+    web_login(a, "admin@example.com", "adminpass123")
+    page = a.get("/admin").text
+    for part in ("adm-rail", "adm-dock", "adm-plus", "gd-ring", "gd-bars", "Добро пожаловать", "adm-bg"):
+        assert part in page, part
+    assert 'href="/panel/balance" class="tab-main' not in page
+    make_client(conn, login="glassy")
+    c = TestClient(app)
+    web_login(c, "glassy@example.com", "password123")
+    panel = c.get("/panel").text
+    assert 'class="tab-main' in panel and "adm-rail" not in panel

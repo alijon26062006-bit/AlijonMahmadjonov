@@ -1,6 +1,71 @@
 {% extends "_app.html" %}
 {% block body_class %}adm{% endblock %}
 {% from "_icons.html" import icon, nav_link %}
+{% from "_icons.html" import theme_button %}
+{#- Админка в стиле «стеклянной» панели: тёплый размытый фон, стеклянные панели, слева — полоска с иконками,
+    внизу — плавающее меню. Разделы, которых нет на полоске и в меню, — в шторке «Все разделы». -#}
+{% set apath = request.url.path %}
+{% macro on(href) %}{{ 'on' if (apath == href if href == '/admin' else apath.startswith(href)) }}{% endmacro %}
+{% block header %}
+<div class="adm-bg" aria-hidden="true"></div>
+<header class="top adm-top">
+  <div class="adm-top-in">
+    <a class="adm-hello" href="/admin" aria-label="Сводка">
+      <span class="adm-ava">{{ (user.login or 'A')[:1] | upper }}</span>
+      <span class="adm-hello-t">Добро пожаловать, <b>{{ user.login }}</b></span>
+    </a>
+    <form class="adm-search" method="get" action="/admin/orders" role="search">
+      <span class="adm-orb" aria-hidden="true"></span>
+      <input name="q" type="search" placeholder="Найти заказ: номер, ID игрока, логин…" aria-label="Поиск заказа" autocomplete="off">
+    </form>
+    <div class="adm-top-act">
+      {{ theme_button() }}
+      <button class="adm-circle" type="button" aria-label="Все разделы" onclick="dxMenu(true)">{{ icon('menu', 18) }}</button>
+    </div>
+  </div>
+</header>
+{% endblock %}
+{% block rail %}
+<nav class="adm-rail" aria-label="Главные разделы админки">
+  {% for href, label, ico in [('/admin', 'Сводка', 'home'), ('/admin/orders', 'Заказы', 'bag'), ('/admin/payments', 'Пополнения', 'wallet'),
+                              ('/admin/money', 'Учёт денег', 'chart'), ('/admin/users', 'Клиенты', 'users'), ('/admin/products', 'Каталог', 'grid'),
+                              ('/admin/banners', 'Реклама', 'image'), ('/admin/bots', 'Боты партнёров', 'zap-send'), ('/admin/settings', 'Настройки', 'shield')] %}
+  <a class="adm-rail-i {{ on(href) }}" href="{{ href }}" data-tip="{{ label }}" aria-label="{{ label }}"{% if on(href) %} aria-current="page"{% endif %}>{{ icon(ico, 18) }}</a>
+  {% endfor %}
+  <button class="adm-rail-i more" type="button" data-tip="Все разделы" aria-label="Все разделы" onclick="dxMenu(true)">{{ icon('chevron', 18) }}</button>
+</nav>
+{% endblock %}
+{% block tabbar %}
+<nav class="tabbar adm-dock" aria-label="Быстрые разделы">
+  {% for href, label, ico in [('/admin', 'Сводка', 'home'), ('/admin/orders', 'Заказы', 'bag'), ('/admin/payments', 'Пополнения', 'wallet'),
+                              ('/admin/money', 'Деньги', 'chart'), ('/admin/users', 'Клиенты', 'users'), ('/admin/stats', 'Отчёты', 'trophy')] %}
+  <a href="{{ href }}" class="{{ on(href) }} {{ 'xs-hide' if loop.index > 4 }}">{{ icon(ico, 18) }}<span>{{ label }}</span></a>
+  {% endfor %}
+  <details class="adm-plus">
+    <summary aria-label="Быстрые действия">{{ icon('plus', 20) }}</summary>
+    <div class="adm-plus-menu">
+      <a href="/admin/banners">{{ icon('image', 16) }}Новый баннер</a>
+      <a href="/admin/payments">{{ icon('wallet', 16) }}Проверить пополнения</a>
+      <a href="/admin/catalog-sync">{{ icon('refresh', 16) }}Загрузить каталог</a>
+      <a href="/admin/money/export?period=yesterday">{{ icon('book', 16) }}Отчёт за вчера (Excel)</a>
+      <button type="button" onclick="dxMenu(true)">{{ icon('menu', 16) }}Все разделы</button>
+    </div>
+  </details>
+</nav>
+<script>
+// Шторка «Все разделы» и меню «+»: закрыть кликом мимо и клавишей Esc (на компьютере тоже)
+document.addEventListener("click", function (e) {
+  if (document.body.classList.contains("menu-open") && !e.target.closest("#side") && !e.target.closest("[onclick*='dxMenu']")) dxMenu(false);
+  var plus = document.querySelector(".adm-plus[open]");
+  if (plus && !e.target.closest(".adm-plus")) plus.removeAttribute("open");
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  if (document.body.classList.contains("menu-open")) dxMenu(false);
+  var plus = document.querySelector(".adm-plus[open]"); if (plus) plus.removeAttribute("open");
+});
+</script>
+{% endblock %}
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 <h4>Админка</h4>

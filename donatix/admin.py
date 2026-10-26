@@ -49,6 +49,7 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
     return render(request, "admin/dashboard.html", {
         "user": admin,
         "counts": counts,
+        "glass": cache.get_or_set("admin:glass", 60, lambda: _glass(conn, config, counts)),
         "today": orders.stats(conn, 1),
         "shop": shopbot.stats(conn, 1),
         # Тяжёлые сводки за месяц/две недели — из кеша на минуту: админка не тормозит сайт клиентам
@@ -66,6 +67,60 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
             "SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.id DESC LIMIT 10"
         ).fetchall()),
     })
+
+
+def _glass(conn, config: Config, counts: dict) -> dict:
+    """Цифры для «стеклянной» сводки: приветствие, сравнение с вчера, кольца с процентами."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from . import timez
+    local = datetime.now(timezone.utc).astimezone(timez.zone(timez.site_zone_name(conn)))
+    h = local.hour
+    hello = "Доброе утро" if 5 <= h < 12 else "Добрый день" if 12 <= h < 18 else "Добрый вечер" if 18 <= h < 23 else "Доброй ночи"
+    days = orders.daily(conn, 14)
+    today, yday = days[-1], days[-2]
+    past = days[:-1]
+    avg = sum(d["revenue"] for d in past) / len(past) if past else 0
+
+    def delta(a: float, b: float):
+        return round((a - b) * 100 / b) if b else None
+
+    def usd(micro: float) -> str:
+        return f"{micro / 10_000:,.2f}".replace(",", " ")
+
+    def pct(a: float, b: float) -> int:
+        return max(0, min(100, round(a * 100 / b))) if b else 0
+    since30, _ = orders._local_start(conn, 30)
+    done, bad = conn.execute(
+        "SELECT COALESCE(SUM(status = 'completed'), 0), COALESCE(SUM(status IN ('failed', 'refunded')), 0) FROM orders "
+        "WHERE created_at >= ?", (since30,)).fetchone()
+    month = orders.stats(conn, 30)
+    shop_today = shopbot.stats(conn, 1)["orders"]
+    supplier = worker.supplier_balance_cached(conn)
+    supplier_micro = int(Decimal(str(supplier)) * 10_000) if supplier is not None else 0
+    owed = counts["client_balances"]
+    months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+    return {
+        "hello": hello, "date": f"{local.day} {months[local.month - 1]}",
+        "days": days, "peak": max([d["revenue"] for d in days] + [1]),
+        "total14": sum(d["revenue"] for d in days),
+        "d_profit": delta(today["profit"], yday["profit"]), "d_orders": delta(today["orders"], yday["orders"]),
+        "d_revenue": delta(today["revenue"], yday["revenue"]),
+        "rings": [
+            {"title": "Маржа", "sub": f"прибыль ${usd(month['profit'])} из ${usd(month['revenue'])}", "pct": pct(month["profit"], month["revenue"]),
+             "when": "30 дней", "icon": "chart", "tone": "violet", "href": "/admin/money"},
+            {"title": "Заказы выполнены", "sub": f"{done} из {done + bad} заказов", "pct": pct(done, done + bad),
+             "when": "30 дней", "icon": "bag", "tone": "blue", "href": "/admin/orders"},
+            {"title": "Деньги клиентов покрыты", "sub": f"у поставщика ${usd(supplier_micro)} из ${usd(owed)}",
+             "pct": pct(supplier_micro, owed) if owed else 100, "when": "сейчас", "icon": "shield", "tone": "green",
+             "href": "/admin/money"},
+            {"title": "Сегодня к среднему дню", "sub": f"${usd(today['revenue'])} из ${usd(avg)} в среднем",
+             "pct": pct(today["revenue"], avg), "when": "сегодня", "icon": "flame", "tone": "orange", "href": "/admin/stats"},
+            {"title": "Через бот-магазин", "sub": f"{shop_today} из {today['orders']} заказов сегодня",
+             "pct": pct(shop_today, today["orders"]), "when": "сегодня", "icon": "zap-send", "tone": "pink", "href": "/admin/shopbot"},
+        ],
+    }
 
 
 def _extra_balances(supplier) -> list:

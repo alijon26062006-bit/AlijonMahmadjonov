@@ -33,6 +33,7 @@
 {% block body %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 <div class="shell">
+  {% block rail %}{% endblock %}
   <aside class="side" id="side">
     <div class="drawer-head">
       <a class="brand" href="/">{{ logo() }}{{ site_name }}</a>
@@ -65,6 +66,7 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+{% block tabbar %}
 {% set tab = request.url.path %}
 <nav class="tabbar" aria-label="Быстрые разделы">
   <a href="/panel" class="{{ 'on' if tab == '/panel' }}">{{ icon('home', 22) }}<span>Главная</span></a>
@@ -73,6 +75,7 @@
   <a href="/panel/orders" class="{{ 'on' if tab.startswith('/panel/orders') }}">{{ icon('bag', 22) }}<span>Заказы</span></a>
   <button type="button" onclick="dxMenu(true)">{{ icon('menu', 22) }}<span>Ещё</span></button>
 </nav>
+{% endblock %}
 <script>
   // Push-уведомления: подписка этого устройства (телефон, приложение, компьютер)
   window.dxPush = (function () {
