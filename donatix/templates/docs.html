@@ -7,7 +7,7 @@
   <aside class="docs-nav" aria-label="Разделы документации">
     <div class="label-caps">API v1</div>
     {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
-                     ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'),
+                     ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
                      ('numbers', 'Виртуальные номера'), ('gifts', 'Подарки Telegram'),
                      ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (совместимый формат)'),
                      ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
@@ -88,6 +88,10 @@
           ('POST', '/payments/{id}/receipt', 'Прислать чек перевода (фото/PDF)'),
           ('GET', '/payments', 'Ваши заявки на пополнение'),
           ('GET', '/payments/{id}', 'Статус заявки'),
+          ('GET', '/glory/regions', 'Боты для гильдии: регионы и цена'),
+          ('POST', '/glory/orders', 'Запустить ботов для клана'),
+          ('GET', '/glory/orders/{id}', 'Очки клана вживую, статус'),
+          ('POST', '/glory/orders/{id}/stop', 'Остановить'),
         ] %}
         <div class="ep"><span class="method {{ m | lower }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}
@@ -188,6 +192,20 @@ done</pre>
       <p class="hint">«Душанбе Сити»: приложение → «Переводы» → «По номеру карты» → вставьте номер карты из ответа.</p>
     </section>
 
+    <section id="glory" class="doc-sec">
+      <h2>Боты для гильдии (Glory клана FF)</h2>
+      <p>Группа ботов заходит в игру за клан и набирает очки славы (glory). На один клан — одна работающая группа.
+        Не запустилось — деньги возвращаются сами. <b>После запуска деньги не возвращаются</b>, можно только остановить.</p>
+<pre data-lang="bash" data-title="регионы и цена">curl {{ base_url }}/api/v1/glory/regions -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json">{"ok": true, "items": [{"id": "bd", "name": "Bangladesh", "code": "BD", "premium": false, "price_usd": "1.8349", "price_tjs": "20.00"}]}</pre>
+<pre data-lang="bash" data-title="запуск">curl -X POST {{ base_url }}/api/v1/glory/orders -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"region": "bd", "clan_id": "3012345678"}'</pre>
+<pre data-lang="json" data-title="GET /glory/orders/gl-15 — каждые 15–30 секунд">{"ok": true, "order": {"id": "gl-15", "clan_id": "3012345678", "status": "running", "glory": 48210, "farmed": 1350,
+  "clan": {"name": "TJ KINGS", "level": 6, "members": 47, "capacity": 55}, "uptime": "1h12m", "bots": 4, "price_usd": "1.8349"}}</pre>
+      <p class="hint">status: <code>running</code> работает · <code>stopped</code> закончила · <code>failed</code> не запустилась (деньги вернулись).
+        Ошибки: <code>invalid_clan_id</code> <code>invalid_region</code> <code>clan_busy</code> (для клана уже работает группа)
+        <code>insufficient_balance</code> <code>launch_failed</code>. Те же адреса есть в <code>/api/v2/glory/…</code>.</p>
+    </section>
     <section id="numbers" class="doc-sec">
       <h2>Виртуальные номера (коды из SMS)</h2>
       <p>Номер на один СМС-код: вы покупаете номер для сервиса, получаете код и отдаёте его клиенту.
@@ -297,6 +315,7 @@ done</pre>
           ('POST', '/steam-gifts/order', 'Отправить гифт'),
           ('GET/POST', '/payments/methods · /payments/create · /payments/{id}', 'Пополнение баланса'),
           ('GET', '/orders · /orders/{id}', 'Заказы'),
+          ('GET/POST', '/glory/…', 'Боты для гильдии (как в v1)'),
         ] %}
         <div class="ep"><span class="method {{ 'get' if m == 'GET' else 'post' }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}

@@ -250,3 +250,9 @@ def test_selling_off_blocks_new_launches(client, conn, config, monkeypatch):
     assert r.status_code == 503 and balance(conn, uid) == before
     with pytest.raises(glory.GloryError):
         glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")
+
+
+def test_glory_back_in_docs_and_selling_on_by_default(client):
+    assert glory.SELLING is True
+    page = client.get("/docs").text
+    assert 'id="glory"' in page and "/glory/orders" in page and "Free Fire" not in page

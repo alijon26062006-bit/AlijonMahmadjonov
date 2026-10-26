@@ -120,6 +120,12 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     if games or runtime.steam_on():
         kb.row(games_entry_btn())
 
+    # Боты для гильдии — когда бот подключён к Donatix и тот сейчас продаёт Glory
+    from app.services import glory
+
+    if glory.available:
+        kb.row(btn("🛡 Glory барои клан", "gl:home", style=PRIMARY))
+
     deposit = btn(labeled("deposit", "Пур кардан"), "m:deposit",
                   style=SUCCESS, icon="deposit")
     profile = btn(labeled("profile", "Профил"), "m:profile", icon="profile")

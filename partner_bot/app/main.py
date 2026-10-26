@@ -193,6 +193,9 @@ async def main() -> None:
     dp.include_router(support.router)
     dp.include_router(reviews.router)
     dp.include_router(games.router)
+    from app.handlers import glory as glory_handlers
+
+    dp.include_router(glory_handlers.router)
     if not donatix.enabled():
         # Раздел «API для разработчиков» — только у самостоятельного бота:
         # у бота из конструктора API даёт сам Donatix.
@@ -315,6 +318,10 @@ async def main() -> None:
 
     interrupted = await db.interrupted_orders(conn)   # до приёма нажатий: свежие заказы сюда не попадут
     resume_task = asyncio.create_task(delivery.resume_interrupted(bot, conn, provider, interrupted))
+    # Glory: «живые» цифры у работающих групп клиентов, раз в 30 секунд
+    from app.services import glory as glory_service
+
+    glory_task = asyncio.create_task(glory_service.live_loop(bot))
 
     try:
         # Сессию закрываем сами, после того как доделаются начатые действия: им ещё отвечать клиентам
@@ -323,7 +330,7 @@ async def main() -> None:
         # Новые нажатия уже не принимаются — доделываем начатые (покупки!), потом выходим
         await inflight.drain()
         await asyncio.wait({resume_task}, timeout=inflight.DRAIN)   # дожимание прерванных — тоже начатое
-        for task in (pricing_task, games_task, api_task, digest_task, resume_task):
+        for task in (pricing_task, games_task, api_task, digest_task, resume_task, glory_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

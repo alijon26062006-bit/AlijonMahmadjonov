@@ -40,7 +40,7 @@ class GloryError(Exception):
     pass
 
 
-SELLING = False   # новые запуски выключены (жалоба правообладателя). Работающие заказы можно смотреть и остановить
+SELLING = True   # False — новые запуски закрыты везде (сайт, API, боты партнёров); работающие можно смотреть и остановить
 
 
 def enabled(config: Config) -> bool:
