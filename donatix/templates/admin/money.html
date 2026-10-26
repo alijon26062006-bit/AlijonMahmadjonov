@@ -17,6 +17,37 @@
     <span class="muted small">{{ m.start.strftime('%d.%m.%Y') }} — {{ (m.end - m.end.resolution).strftime('%d.%m.%Y') }}</span></div>
 </form>
 
+<section class="card money-tax">
+  <div class="mt-row">
+    <div class="mt-dl">
+      <h3>{{ icon('book', 18) }} Файл для ИП и налогов</h3>
+      <p class="muted small">Excel: оборот и прибыль по дням, налог, все заказы (убыточные — красным) и все поступления.</p>
+      <div class="mt-btns">
+        <a class="btn primary sm" href="/admin/money/export?period=yesterday">Вчера</a>
+        <a class="btn sm" href="/admin/money/export?period=today">Сегодня</a>
+        <a class="btn sm" href="/admin/money/export?period=month">Этот месяц</a>
+        <a class="btn sm" href="/admin/money/export?{{ export_q or 'period=' ~ pr.key }}">Период выше</a>
+      </div>
+      <p class="muted small">Каждое утро файл за прошедшие сутки приходит в админ-бот.</p>
+    </div>
+    <form class="mt-tax" method="post" action="/admin/money/tax">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="tax">Налог, % от оборота</label>
+      <div class="mt-tax-in"><input id="tax" name="percent" inputmode="decimal" value="{{ tax }}" placeholder="например 6">
+        <button class="btn sm">Сохранить</button></div>
+      <p class="muted small">За период: оборот ${{ usd(s.received) }}{% if s.rate %} ≈ {{ tjs(s.received, s.rate) }} с.{% endif %}
+        → налог <b>${{ usd(tax_micro) }}{% if s.rate %} ≈ {{ tjs(tax_micro, s.rate) }} с.{% endif %}</b>.
+        Ставку уточните у бухгалтера.</p>
+    </form>
+  </div>
+  <div class="mt-checks">
+    {% if loss_n %}<div class="flash error">{{ icon('alert', 18) }}<span>В минусе <b>{{ loss_n }}</b> заказ(ов) на <b>${{ usd(loss_micro) }}</b>
+      — продали дешевле, чем купили у поставщика. Поднимите наценку или обновите каталог (цены поставщика). Список — в файле, красным.</span></div>
+    {% else %}<div class="muted small">✅ Убыточных заказов за период нет.</div>{% endif %}
+    {% if orders_n %}<div class="muted small">Закупка точно от поставщика — у {{ exact_n }} из {{ orders_n }} заказов, у остальных — по цене каталога.</div>{% endif %}
+  </div>
+</section>
+
 <div class="grid kpis money-kpis">
   <div class="kpi"><span class="tile g2">{{ icon('wallet', 20) }}</span>
     <div class="label">Поступило</div><div class="value">{{ big(s.received) }}</div>

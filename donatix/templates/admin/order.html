@@ -20,7 +20,12 @@
     <div><span class="muted">Попыток отправки</span><span>{{ o.supplier_attempts }}</span></div>
     <div><span class="muted">Webhook</span><span>{{ o.webhook_state }}</span></div>
     <div><span class="muted">Создан / обновлён</span><span class="small">{{ o.created_at | dt('%d.%m.%Y %H:%M:%S') }} / {{ o.updated_at | dt('%d.%m.%Y %H:%M:%S') }}</span></div>
-    <div><span class="muted">Закупка</span><span>${{ fmt(o.cost_micro) }}</span></div>
+    {% set p = o.total_micro - o.cost_micro %}
+    <div><span class="muted">Закупка</span><span>${{ fmt(o.cost_micro) }}
+      <small class="muted">{{ 'точно от поставщика' if o.cost_source == 'supplier' else 'по цене каталога' }}</small></span></div>
+    {% if o.tjs_rate %}<div><span class="muted">Курс в момент заказа</span><span>1 $ = {{ o.tjs_rate }} с.</span></div>{% endif %}
+    <div><span class="muted">Прибыль · наценка</span><span class="{{ 'loss' if p < 0 }}">{{ '−' if p < 0 else '+' }}${{ fmt(p | abs) }}
+      · {{ ((p * 100 / o.cost_micro) | round(1)) if o.cost_micro else '—' }}%</span></div>
     <div class="total"><span>Клиент заплатил</span><span>${{ fmt(o.total_micro) }}</span></div>
   </div>
   <div>

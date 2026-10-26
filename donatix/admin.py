@@ -7,7 +7,7 @@ import json
 import sqlite3
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from . import accounts, cache, catalog, db, orders, payments, shopbot, worker
 from .config import PAY_METHODS, TIERS, Config
@@ -102,10 +102,48 @@ def money_page(request: Request, period: str = "", date_from: str = "", date_to:
     pr = periods.resolve(timez.zone(timez.site_zone_name(conn)), period, date_from, date_to, default="30d")
     m = cache.get_or_set(f"admin:money:{pr.key}:{pr.date_from}:{pr.date_to}", 30,
                          lambda: finance.ledger(conn, config, pr))
+    from . import taxreport
+    a, b = finance._iso(m["start"]), finance._iso(m["end"])
+    loss = conn.execute(   # заказы в минусе: продали дешевле, чем купили у поставщика
+        "SELECT COUNT(*), COALESCE(SUM(cost_micro - total_micro), 0) FROM orders WHERE status = 'completed' "
+        "AND total_micro < cost_micro AND COALESCE(completed_at, created_at) >= ? "
+        "AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
+    exact = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(cost_source = 'supplier'), 0) FROM orders WHERE status = 'completed' "
+        "AND COALESCE(completed_at, created_at) >= ? AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
+    tax = taxreport.tax_percent(conn)
     return render(request, "admin/money.html", {
         "user": admin, "m": m, "s": m["total"], "pr": pr, "presets": periods.PRESETS, "keep": "",
         "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
+        "loss_n": loss[0], "loss_micro": loss[1], "exact_n": exact[1], "orders_n": exact[0],
+        "tax": tax, "tax_micro": int(m["total"]["received"] * tax / 100),
+        "export_q": request.url.query,
     })
+
+
+@router.get("/money/export")
+def money_export(request: Request, period: str = "", date_from: str = "", date_to: str = "",
+                 admin=Depends(admin_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Файл Excel для ИП и налогов: итог по дням, все заказы с прибылью, все поступления."""
+    from . import finance, periods, taxreport, timez
+    pr = periods.resolve(timez.zone(timez.site_zone_name(conn)), period, date_from, date_to, default="today")
+    m = finance.ledger(conn, config, pr)
+    data = taxreport.build(conn, config, m["start"], m["end"])
+    name = taxreport.filename(config, m["start"], m["end"])
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                 headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+@router.post("/money/tax", dependencies=[Depends(check_csrf)])
+def money_tax(request: Request, percent: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import taxreport
+    try:
+        value = taxreport.set_tax_percent(conn, percent)
+        flash(request, f"Налог: {value}% от оборота.")
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+    cache.clear("admin:money")
+    return _back("/admin/money")
 
 
 @router.get("/finance")

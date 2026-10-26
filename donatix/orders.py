@@ -235,7 +235,8 @@ def create_order(
             )
             order_id = int(cur.lastrowid)
             public_id = f"dx-{order_id}"
-            conn.execute("UPDATE orders SET public_id = ? WHERE id = ?", (public_id, order_id))
+            conn.execute("UPDATE orders SET public_id = ?, tjs_rate = ? WHERE id = ?",
+                         (public_id, _tjs_rate(conn, config), order_id))
             balance = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
             gap = rounding_gap(balance, q["total_micro"], source)
             if gap:
@@ -328,6 +329,35 @@ def _replay(existing: sqlite3.Row, product_id: str, qty: int, fields_json: str) 
     return existing
 
 
+def _tjs_rate(conn: sqlite3.Connection, config: Config) -> str | None:
+    """Курс сомони сейчас — запоминаем в заказе."""
+    try:
+        from .payments import settings
+        return str(settings(conn, config)["tjs_rate"])
+    except Exception:  # noqa: BLE001 — курс не важнее самого заказа
+        return None
+
+
+def real_cost(conn: sqlite3.Connection, order: sqlite3.Row, charged: Any) -> bool:
+    """Поставщик сообщил, сколько реально списал, — записать вместо цены каталога (прибыль — точная).
+    Сумма должна быть похожа на правду (от половины до двух цен каталога): иначе это, скорее всего, другое поле
+    (цена за штуку, количество алмазов) — тогда оставляем каталог."""
+    if charged is None or order["cost_source"] == "supplier":
+        return False
+    try:
+        micro = int(to_decimal(charged) * 10_000)
+    except Exception:  # noqa: BLE001
+        return False
+    catalog = int(order["cost_micro"] or 0)
+    if micro <= 0 or (catalog and not catalog // 2 <= micro <= catalog * 2):
+        log.info("заказ %s: поставщик сообщил %s — не похоже на цену заказа, оставляю каталог", order["public_id"], charged)
+        return False
+    conn.execute("UPDATE orders SET cost_micro = ?, cost_source = 'supplier' WHERE id = ?", (micro, order["id"]))
+    if micro != catalog:
+        log.info("заказ %s: закупка по каталогу %s, у поставщика %s", order["public_id"], catalog, micro)
+    return True
+
+
 def _send_to_supplier(
     conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, product: dict[str, Any] | None = None,
     *, from_queue: bool = False,
@@ -380,6 +410,7 @@ def _send_to_supplier(
         "UPDATE orders SET supplier_order_id = ?, supplier_status = ?, error = NULL, updated_at = ? WHERE id = ?",
         (result.order_id, result.raw_status, db.now(), order["id"]),
     )
+    real_cost(conn, order, result.charged)
     if result.order_id is None:
         _to_attention(conn, order["id"], "Поставщик принял заказ, но не вернул его номер.")
     elif result.status == "partial":
@@ -497,6 +528,7 @@ def refresh(conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, *,
         return
     except SupplierUnavailable:
         return
+    real_cost(conn, order, result.charged)
     conn.execute(
         "UPDATE orders SET supplier_status = ?, updated_at = ? WHERE id = ?",
         (result.raw_status, db.now(), order["id"]),

@@ -47,6 +47,29 @@ class SupplierOrder:
     raw_status: str = ""
     delivery: dict[str, Any] | None = None
     message: str = ""
+    charged: Decimal | None = None   # сколько поставщик реально списал за заказ, USD (если сообщил)
+
+
+#: Где поставщик пишет, сколько списал за заказ (имена у разных поставщиков разные)
+CHARGED_KEYS = ("charged", "total_price", "price_total", "total_usd", "price_usd", "amount_usd", "total", "cost",
+                "price")
+
+
+def charged_of(*objs: Any) -> Decimal | None:
+    """Сумма, которую поставщик списал за заказ, из его ответа. None — не сообщил."""
+    for obj in objs:
+        if not isinstance(obj, dict):
+            continue
+        for key in CHARGED_KEYS:
+            raw = obj.get(key)
+            if isinstance(raw, (int, float, str)) and str(raw).strip():
+                try:
+                    value = Decimal(str(raw).strip())
+                except Exception:  # noqa: BLE001 — не число
+                    continue
+                if value > 0:
+                    return value
+    return None
 
 
 def steam_gift_product() -> ProductData:

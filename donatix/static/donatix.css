@@ -2597,3 +2597,15 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .ads-nums div { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; display: grid; gap: 2px; }
 .ads-nums span { font-size: .75rem; color: var(--muted); }
 .ads-nums b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+/* ── Учёт денег: файл для ИП и налог ── */
+.money-tax { margin: 14px 0; display: grid; gap: 12px; }
+.money-tax h3 { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.mt-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
+.mt-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.mt-tax label { font-weight: 600; }
+.mt-tax-in { display: flex; gap: 8px; margin: 6px 0; }
+.mt-tax-in input { max-width: 120px; }
+.mt-checks { display: grid; gap: 6px; }
+@media (max-width: 760px) { .mt-row { grid-template-columns: 1fr; } }
+.order-card .oc-profit.loss, .loss { color: var(--bad); font-weight: 700; }

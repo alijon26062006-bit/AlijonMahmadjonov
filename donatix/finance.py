@@ -227,8 +227,30 @@ def maybe_send(conn: sqlite3.Connection, config: Config, now: datetime | None = 
         return False
     db.set_setting(conn, "finance.last_day", key)
     notify_admin(config, report_text(summary(conn, config, start, end)), html=True)
+    send_day_file(conn, config, start, end)
     from .cashiers import daily_reports
     daily_reports(conn, config, start, end)
+    return True
+
+
+def send_day_file(conn: sqlite3.Connection, config: Config, start: datetime, end: datetime) -> bool:
+    """Файл Excel за сутки (для ИП и налогов) — в админ-бот, следом за текстом отчёта."""
+    import logging
+    import tempfile
+    from pathlib import Path
+
+    from . import taxreport
+    from .worker import notify_admin_file
+    try:
+        data = taxreport.build(conn, config, start, end)
+    except Exception:  # noqa: BLE001 — без файла отчёт текстом всё равно ушёл
+        logging.getLogger(__name__).exception("отчёт Excel за сутки не собрался")
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / taxreport.filename(config, start, end)
+        path.write_bytes(data)
+        notify_admin_file(config, f"📊 Файл за {start.strftime('%d.%m.%Y')}: оборот, прибыль, налог, все заказы "
+                                  "и поступления — для ИП.", None, path, photo=False)
     return True
 
 

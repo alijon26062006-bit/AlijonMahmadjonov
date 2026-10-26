@@ -394,6 +394,10 @@ def init(path: Path | str) -> None:
         order_cols = {r[1] for r in conn.execute("PRAGMA table_info(orders)")}
         if "api_key_id" not in order_cols:  # какой ключ (бот) сделал заказ — для учёта продаж бота
             conn.execute("ALTER TABLE orders ADD COLUMN api_key_id INTEGER")
+        if "cost_source" not in order_cols:   # закупка: catalog — по каталогу, supplier — сколько реально списал поставщик
+            conn.execute("ALTER TABLE orders ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'catalog'")
+        if "tjs_rate" not in order_cols:      # курс сомони в момент заказа — прибыль в сомони не «плывёт» за курсом
+            conn.execute("ALTER TABLE orders ADD COLUMN tjs_rate TEXT")
         bot_cols = {r[1] for r in conn.execute("PRAGMA table_info(bots)")}
         for col, kind in (("warn_count", "INTEGER NOT NULL DEFAULT 0"), ("last_warn_at", "TEXT"),
                           ("active_since", "TEXT"), ("disabled_reason", "TEXT"), ("data_dir", "TEXT")):

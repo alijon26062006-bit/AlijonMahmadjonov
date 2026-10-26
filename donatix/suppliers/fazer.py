@@ -17,6 +17,7 @@ import httpx
 
 from .base import (
     ProductData,
+    charged_of,
     pick_image,
     pick_region,
     steam_cover,
@@ -368,7 +369,8 @@ class FazerSupplier:
         order = data.get("order") or {}
         order_id = order.get("id") or data.get("order_id")
         raw = str(order.get("status") or data.get("status") or "processing")
-        return SupplierOrder(order_id=str(order_id) if order_id else None, status=normalize_status(raw), raw_status=raw)
+        return SupplierOrder(order_id=str(order_id) if order_id else None, status=normalize_status(raw), raw_status=raw,
+                             charged=charged_of(order, data))
 
     def get_order(self, supplier_order_id: str) -> SupplierOrder:
         data = self._request("GET", f"/orders/{supplier_order_id}")
@@ -384,6 +386,7 @@ class FazerSupplier:
             raw_status=raw,
             delivery=payload if isinstance(payload, dict) else ({"payload": payload} if payload else None),
             message=str(order.get("error") or order.get("message") or ""),
+            charged=charged_of(order, data),
         )
 
     def steam_gift_games(self) -> list[dict[str, Any]]:
