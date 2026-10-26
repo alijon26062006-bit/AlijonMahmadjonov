@@ -119,9 +119,8 @@ def test_client_request_waits_for_approval(admin, app, conn):
     a.post(f"/admin/banners/{row['id']}/decide", data={"csrf": atoken, "action": "approve"})
     shown = banners.active(conn)
     assert [b["id"] for b in shown] == [row["id"]]
-    got = conn.execute("SELECT starts_at, ends_at FROM banners WHERE id = ?", (row["id"],)).fetchone()
-    from datetime import date, timedelta
-    assert got["ends_at"] == (date.fromisoformat(got["starts_at"]) + timedelta(days=2)).isoformat()
+    got = conn.execute("SELECT from_ts, until_ts FROM banners WHERE id = ?", (row["id"],)).fetchone()
+    assert got["until_ts"] - got["from_ts"] == 3 * 86400            # 3 дня — ровно 72 часа, до секунды
 
 
 def test_client_request_rejected_with_reason(admin, app, conn):
@@ -289,3 +288,25 @@ def test_partner_api_never_shows_ad_to_bot_staff(admin, app, conn):
     assert sum(1 for a in got if a) == 1                     # клиенту — один показ (дальше 4 часа ждать)
     _, other = make_client(conn, login="nobot")
     assert c.post("/api/v2/ads/next", json={"tg_user_id": 333}, headers={"X-API-Key": other}).json()["ad"] is None
+
+
+
+def test_paid_banner_ends_exactly_after_24h(admin, app, conn):
+    """Одобрили в 07:00 на сутки — завтра в 07:00 показ заканчивается, секунда в секунду."""
+    c, token = _buyer(app, conn)
+    c.post("/panel/ads", data={"csrf": token, "title": "Канал", "link": "t.me/x", "days": "1"},
+           files={"image": ("b.png", _png(1500, 600), "image/png")})
+    bid = banners.pending(conn)[0]["id"]
+    a, atoken = admin
+    a.post(f"/admin/banners/{bid}/decide", data={"csrf": atoken, "action": "approve"})
+    row = conn.execute("SELECT from_ts, until_ts FROM banners WHERE id = ?", (bid,)).fetchone()
+    start = row["from_ts"]
+    assert row["until_ts"] == start + 86400
+    ids = lambda t: [b["id"] for b in banners.active(conn, now=t)]  # noqa: E731
+    assert bid in ids(start + 1)
+    assert bid in ids(start + 86400 - 1)                            # за секунду до конца — ещё показывается
+    assert bid not in ids(start + 86400)                            # ровно через сутки — уже нет
+    assert banners.when(1_800_000_000) == "15.01 13:00"             # время — по Душанбе (UTC+5)
+    assert banners.left(start + 86400, now=start + 3600) == "23 ч 0 мин"
+    page = c.get("/panel/ads").text
+    assert "осталось" in page and "Показ:" in page

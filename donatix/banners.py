@@ -72,7 +72,8 @@ def ensure(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(banners)")}
     for col, kind in (("user_id", "INTEGER"), ("status", "TEXT NOT NULL DEFAULT 'approved'"), ("days", "INTEGER"),
                       ("note", "TEXT NOT NULL DEFAULT ''"), ("paid_micro", "INTEGER NOT NULL DEFAULT 0"),
-                      ("views", "INTEGER NOT NULL DEFAULT 0"), ("bot_views", "INTEGER NOT NULL DEFAULT 0")):
+                      ("views", "INTEGER NOT NULL DEFAULT 0"), ("bot_views", "INTEGER NOT NULL DEFAULT 0"),
+                      ("from_ts", "REAL"), ("until_ts", "REAL")):   # оплаченный показ: точное время, до секунды
         if col not in cols:   # заявки пользователей: чьё, статус проверки, срок, причина отказа
             conn.execute(f"ALTER TABLE banners ADD COLUMN {col} {kind}")
 
@@ -180,26 +181,31 @@ def all_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM banners WHERE status != 'pending' ORDER BY active DESC, sort, id DESC").fetchall()
 
 
-def active(conn: sqlite3.Connection, today: str | None = None) -> list[dict[str, Any]]:
-    """Что показывать сейчас: включённые и в сроке. Кэш на 30 секунд — список нужен на каждой странице."""
+def active(conn: sqlite3.Connection, today: str | None = None, now: float | None = None) -> list[dict[str, Any]]:
+    """Что показывать сейчас: включённые и в сроке. Список из базы — в кэше на 30 секунд (нужен на каждой
+    странице), а точное время оплаченного показа (from_ts / until_ts) проверяем при каждом вызове: баннер,
+    одобренный в 07:00 на сутки, исчезнет завтра ровно в 07:00, а не на полминуты позже."""
+    import time
+
     def load() -> list[dict[str, Any]]:
         ensure(conn)
         from datetime import date
         day = today or date.today().isoformat()
         rows = conn.execute(
-            "SELECT id, title, image, link FROM banners WHERE active = 1 AND status = 'approved' "
+            "SELECT id, title, image, link, from_ts, until_ts FROM banners WHERE active = 1 AND status = 'approved' "
             "AND (starts_at IS NULL OR starts_at <= ?) AND (ends_at IS NULL OR ends_at >= ?) "
             "ORDER BY sort, id DESC", (day, day)).fetchall()
-        # «Здесь может быть ваша реклама» (ведёт на /panel/ads) — всегда последний и всегда в ленте:
-        # платные баннеры клиентов идут впереди и места у него не отнимают
-        house = [r for r in rows if is_house(r["link"])][:1]
-        rows = [r for r in rows if not is_house(r["link"])][:MAX_ACTIVE - len(house)] + house
-        return [{"id": r["id"], "title": r["title"], "link": r["link"],
+        return [{"id": r["id"], "title": r["title"], "link": r["link"], "from_ts": r["from_ts"],
+                 "until_ts": r["until_ts"],
                  "src": f"/static/bn/{r['image']}-{SIZES[0]}.webp", "src_small": f"/static/bn/{r['image']}-{SIZES[1]}.webp"}
                 for r in rows]
-    if today is not None:
-        return load()
-    return cache.get_or_set(CACHE_KEY, 30, load)
+    rows = load() if today is not None else cache.get_or_set(CACHE_KEY, 30, load)
+    t = time.time() if now is None else now
+    rows = [r for r in rows if (r["from_ts"] is None or r["from_ts"] <= t) and (r["until_ts"] is None or t < r["until_ts"])]
+    # «Здесь может быть ваша реклама» (ведёт на /panel/ads) — всегда последний и всегда в ленте:
+    # платные баннеры клиентов идут впереди и места у него не отнимают
+    house = [r for r in rows if is_house(r["link"])][:1]
+    return [r for r in rows if not is_house(r["link"])][:MAX_ACTIVE - len(house)] + house
 
 
 # ── Честный счёт: один человек — один просмотр и одно нажатие в день на баннер, роботы не считаются ──
@@ -238,8 +244,9 @@ def _count(conn: sqlite3.Connection, bid: int, visitor: str, kind: str) -> bool:
 def view(conn: sqlite3.Connection, bid: int, visitor: str | None) -> bool:
     """Баннер побыл на экране (видно хотя бы половину, не меньше секунды) — засчитать просмотр."""
     ensure(conn)
-    if not visitor or conn.execute("SELECT 1 FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
-                                   (bid,)).fetchone() is None:
+    import time
+    if not visitor or conn.execute("SELECT 1 FROM banners WHERE id = ? AND active = 1 AND status = 'approved' "
+                                   "AND (until_ts IS NULL OR until_ts > ?)", (bid, time.time())).fetchone() is None:
         return False
     return _count(conn, bid, visitor, "v")
 
@@ -247,11 +254,12 @@ def view(conn: sqlite3.Connection, bid: int, visitor: str | None) -> bool:
 def click(conn: sqlite3.Connection, bid: int, visitor: str | None = None) -> str | None:
     """Засчитать нажатие (раз в день от человека, роботов — нет) и вернуть ссылку. None — баннера/ссылки нет."""
     ensure(conn)
-    row = conn.execute("SELECT link FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
+    import time
+    row = conn.execute("SELECT link, until_ts FROM banners WHERE id = ? AND active = 1 AND status = 'approved'",
                        (bid,)).fetchone()
     if row is None or not row["link"]:
         return None
-    if visitor:
+    if visitor and (row["until_ts"] is None or row["until_ts"] > time.time()):   # после срока — уводим, но не считаем
         _count(conn, bid, visitor, "c")
     return row["link"]
 
@@ -306,17 +314,18 @@ def submit(conn: sqlite3.Connection, config: Config, user_id: int, *, data: byte
 
 
 def decide(conn: sqlite3.Connection, bid: int, approve: bool, note: str = "") -> sqlite3.Row | None:
-    """Одобрить (показ с сегодня на выбранный срок) или отклонить с причиной."""
+    """Одобрить или отклонить с причиной. Одобренный показывается с этой секунды ровно оплаченное число
+    суток: одобрили в 07:00 на 1 день — закончится завтра в 07:00."""
     ensure(conn)
-    from datetime import date, timedelta
+    import time
     row = conn.execute("SELECT * FROM banners WHERE id = ? AND status = 'pending'", (bid,)).fetchone()
     if row is None:
         return None
     if approve:
-        start = date.today()
-        end = start + timedelta(days=max(int(row["days"] or 1), 1) - 1)
-        conn.execute("UPDATE banners SET status = 'approved', active = 1, starts_at = ?, ends_at = ?, note = '' "
-                     "WHERE id = ?", (start.isoformat(), end.isoformat(), bid))
+        start = time.time()
+        conn.execute("UPDATE banners SET status = 'approved', active = 1, starts_at = NULL, ends_at = NULL, "
+                     "from_ts = ?, until_ts = ?, note = '' WHERE id = ?",
+                     (start, start + max(int(row["days"] or 1), 1) * 86400, bid))
     else:
         from .accounts import post_ledger
         with db.tx(conn):   # отказ — деньги назад на баланс
@@ -407,7 +416,7 @@ def bot_next(conn: sqlite3.Connection, config: Config, tg_id: int, source: str, 
     if today >= BOT_PER_DAY or (last and now - last < BOT_GAP):
         return None
     from datetime import datetime, timezone
-    shown = active(conn, datetime.fromtimestamp(now + BOT_TZ, timezone.utc).date().isoformat())
+    shown = active(conn, datetime.fromtimestamp(now + BOT_TZ, timezone.utc).date().isoformat(), now=now)
     paid = [b for b in shown if not is_house(b["link"])]
     pool = paid or shown
     if not pool:
@@ -441,3 +450,23 @@ def bot_message(ad: dict[str, Any]) -> dict[str, Any]:
     return {"photo": ad["photo"], "caption": f"{title}\n\n{BOT_CAPTION}" if title else BOT_CAPTION,
             "reply_markup": {"inline_keyboard": [[{"text": BOT_GO, "url": ad["url"]}],
                                                  [{"text": BOT_SKIP, "callback_data": BOT_SKIP_DATA}]]}}
+
+
+def when(ts: float | None) -> str:
+    """Время по Душанбе: «27.10 07:00»."""
+    if not ts:
+        return ""
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ts + BOT_TZ, timezone.utc).strftime("%d.%m %H:%M")
+
+
+def left(ts: float | None, now: float | None = None) -> str:
+    """Сколько осталось показа: «23 ч 15 мин». Пусто — уже закончился."""
+    import time
+    if not ts:
+        return ""
+    sec = int(ts - (time.time() if now is None else now))
+    if sec <= 0:
+        return ""
+    h, m = divmod(sec // 60, 60)
+    return f"{h} ч {m} мин" if h else f"{m} мин"

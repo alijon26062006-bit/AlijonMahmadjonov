@@ -57,10 +57,13 @@
   <img src="/static/bn/{{ b.image }}-750.webp" alt="{{ b.title }}" width="750" height="300" loading="lazy" decoding="async">
   <div class="adl-body">
     <div class="adl-top">
-      <span class="badge {{ 'ok' if b.active else '' }}">{{ 'Показывается' if b.active else 'Выключен' }}</span>
+      {% set over = b.until_ts and not ad_left(b.until_ts) %}
+      <span class="badge {{ 'ok' if b.active and not over else '' }}">{{ 'Срок вышел' if over else ('Показывается' if b.active else 'Выключен') }}</span>
       {% if b.status == 'rejected' %}<span class="badge bad">Отклонён</span>{% endif %}
       {% if b.user_id %}<span class="badge">от клиента</span>{% endif %}
-      {% if b.starts_at or b.ends_at %}<span class="muted small">{{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}</span>{% endif %}
+      {% if b.until_ts %}<span class="muted small">оплачен: {{ ad_when(b.from_ts) }} — {{ ad_when(b.until_ts) }}
+        · {{ ('осталось ' ~ ad_left(b.until_ts)) if ad_left(b.until_ts) else 'закончился' }}</span>
+      {% elif b.starts_at or b.ends_at %}<span class="muted small">{{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}</span>{% endif %}
     </div>
     {% include "_ad_stats.html" %}
     <form method="post" action="/admin/banners/{{ b.id }}" class="grid two" style="gap:10px">

@@ -34,7 +34,8 @@
     {% for d in days %}<label class="chip-radio"><input type="radio" name="days" value="{{ d }}" {{ 'checked' if loop.first }}>
       <span>{{ d }} {{ 'день' if d == 1 else 'дня' }} · <b>{{ price_day * d }} с.</b></span></label>{% endfor %}
   </fieldset>
-  <p class="hint">Оплата с баланса сразу при отправке. Если заявку отклоним — деньги вернутся на баланс.</p>
+  <p class="hint">Оплата с баланса сразу при отправке. Сутки считаются ровно по часам: одобрили в 07:00 на 1 день —
+    показ закончится завтра в 07:00 (время Душанбе). Если заявку отклоним — деньги вернутся на баланс.</p>
   <label class="adf-agree"><input type="checkbox" required> Мой баннер не нарушает правила выше</label>
   <button class="btn primary lg block">{{ icon('zap-send', 18) }} Оплатить и отправить на проверку</button>
   <p class="hint center">Ответим в течение дня. Показ начнётся сразу после одобрения.</p>
@@ -54,7 +55,9 @@
       <div class="adl-top"><b>{{ b.title }}</b>
         <span class="badge {{ {'approved': 'ok', 'rejected': 'bad'}.get(b.status, 'warn') }}">{{ statuses.get(b.status, b.status) }}</span></div>
       <div class="muted small">{{ b.days or '—' }} дн. · {{ b.link }}</div>
-      {% if b.status == 'approved' %}<div class="small">Показ: {{ b.starts_at }} — {{ b.ends_at }}</div>
+      {% if b.status == 'approved' %}<div class="small">{% if b.until_ts %}Показ: {{ ad_when(b.from_ts) }} — {{ ad_when(b.until_ts) }}
+        {% if ad_left(b.until_ts) %}· <b>осталось {{ ad_left(b.until_ts) }}</b>{% else %}· <b>закончился</b>{% endif %}
+        {% else %}Показ: {{ b.starts_at or '…' }} — {{ b.ends_at or '…' }}{% endif %}</div>
       {% include "_ad_stats.html" %}{% endif %}
       {% if b.status == 'rejected' and b.note %}<div class="small adl-note">Причина: {{ b.note }}</div>{% endif %}
     </div>

@@ -174,6 +174,20 @@ def _ad_ctr(views: int, clicks: int) -> str:
 templates.env.globals["ad_ctr"] = _ad_ctr
 
 
+def _ad_when(ts: float | None) -> str:
+    from .banners import when
+    return when(ts)
+
+
+def _ad_left(ts: float | None) -> str:
+    from .banners import left
+    return left(ts)
+
+
+templates.env.globals["ad_when"] = _ad_when
+templates.env.globals["ad_left"] = _ad_left
+
+
 @pass_context
 def _dprice(ctx, usd: float) -> str:
     """Цена D-коина (доли цента) в валюте клиента: 3 значащие цифры — коротко и видно каждое движение."""
