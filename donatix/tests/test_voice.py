@@ -84,3 +84,72 @@ def test_endpoint_admin_only_and_needs_key(app, conn, config, monkeypatch):
     make_client(conn, login="nobody")
     web_login(buyer, "nobody@example.com", "password123")
     assert "admin-voice.js" not in buyer.get("/panel").text                   # у клиентов помощника нет
+
+
+def test_realtime_key_like_chatgpt_voice_with_fallbacks(config, monkeypatch):
+    """Голосовой режим (как в ChatGPT): одноразовый ключ с голосом marin, инструментами и инструкциями;
+    не приняли полные настройки — простые; новый адрес недоступен — старый (бета)."""
+    monkeypatch.setattr(config, "openai_api_key", "sk-test")
+    seen = []
+
+    def ok(req):
+        seen.append((req.url.path, json.loads(req.content)))
+        return httpx.Response(200, json={"value": "ek_123", "expires_at": 1})
+    out = voice.realtime_session(config, transport=httpx.MockTransport(ok))
+    assert out == {"ok": True, "key": "ek_123", "model": "gpt-realtime", "mode": "ga"}
+    path, body = seen[0]
+    assert path == "/v1/realtime/client_secrets"
+    s = body["session"]
+    assert s["audio"]["output"]["voice"] == "marin" and s["model"] == "gpt-realtime"
+    assert {t["name"] for t in s["tools"]} >= {"shop_summary", "open_page"} and "function" not in s["tools"][0]
+    assert "Donatix" in s["instructions"]
+
+    calls = []
+
+    def picky(req):
+        calls.append(req.url.path)
+        body = json.loads(req.content)
+        if req.url.path.endswith("/client_secrets") and "turn_detection" in json.dumps(body):
+            return httpx.Response(400, json={"error": {"message": "Unknown parameter"}})
+        return httpx.Response(200, json={"value": "ek_simple"})
+    assert voice.realtime_session(config, transport=httpx.MockTransport(picky))["key"] == "ek_simple"
+
+    def old(req):
+        if req.url.path.endswith("/client_secrets"):
+            return httpx.Response(404, json={"error": "not found"})
+        assert req.headers["OpenAI-Beta"] == "realtime=v1"
+        return httpx.Response(200, json={"client_secret": {"value": "ek_beta"}})
+    out = voice.realtime_session(config, transport=httpx.MockTransport(old))
+    assert out["key"] == "ek_beta" and out["mode"] == "beta"
+    bad = voice.realtime_session(config, transport=httpx.MockTransport(lambda r: httpx.Response(401, json={})))
+    assert not bad["ok"] and "Ключ OpenAI" in bad["error"]
+
+
+def test_speak_falls_back_to_classic_voice(config, monkeypatch):
+    monkeypatch.setattr(config, "openai_api_key", "sk-test")
+    tried = []
+
+    def handler(req):
+        body = json.loads(req.content)
+        tried.append((body["model"], body["voice"]))
+        if body["voice"] == "marin":
+            return httpx.Response(400, json={"error": {"message": "Invalid voice"}})
+        return httpx.Response(200, content=b"mp3")
+    assert voice.speak(config, "Привет", transport=httpx.MockTransport(handler)) == b"mp3"
+    assert tried == [("gpt-4o-mini-tts", "marin"), ("gpt-4o-mini-tts", "coral")]
+
+
+def test_realtime_and_tool_endpoints_admin_only(app, conn, config, monkeypatch):
+    from conftest import csrf_of
+    a = TestClient(app)
+    web_login(a, "admin@example.com", "adminpass123")
+    token = csrf_of(a.get("/admin").text)
+    monkeypatch.setattr(config, "openai_api_key", "sk-test")
+    monkeypatch.setattr(voice, "realtime_session", lambda cfg: {"ok": True, "key": "ek_1", "model": "gpt-realtime", "mode": "ga"})
+    assert a.post("/admin/assistant/realtime", data={"csrf": token}).json()["key"] == "ek_1"
+    r = a.post("/admin/assistant/tool", data={"csrf": token, "name": "open_page", "args": '{"page": "клиенты"}'}).json()
+    assert r["go"] == "/admin/users"
+    r = a.post("/admin/assistant/tool", data={"csrf": token, "name": "shop_summary", "args": '{"period": "today"}'}).json()
+    assert "sales" in r["output"]
+    anon = TestClient(app)
+    assert anon.post("/admin/assistant/tool", data={"name": "pending"}, follow_redirects=False).status_code in (302, 303, 401, 403)

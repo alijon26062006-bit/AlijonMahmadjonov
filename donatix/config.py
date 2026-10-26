@@ -142,7 +142,8 @@ class Config:
     voice_model: str = "gpt-4o-mini"
     voice_stt_model: str = "gpt-4o-mini-transcribe"
     voice_tts_model: str = "gpt-4o-mini-tts"
-    voice_name: str = "nova"
+    voice_name: str = "marin"          # голос как в ChatGPT; ещё: cedar, coral, nova…
+    voice_realtime_model: str = "gpt-realtime"   # голосовой режим (живой разговор), как голос в ChatGPT
     review_ai: bool = True             # ИИ отвечает на отзывы про заказы и скрывает спам (нужен ключ OpenAI)
     support_admin_id: str = ""   # Telegram ID, куда бот поддержки шлёт обращения (по умолчанию — чат админ-бота)
     smtp_host: str = ""
@@ -283,7 +284,8 @@ class Config:
             voice_model=_env("DONATIX_VOICE_MODEL") or "gpt-4o-mini",
             voice_stt_model=_env("DONATIX_VOICE_STT_MODEL") or "gpt-4o-mini-transcribe",
             voice_tts_model=_env("DONATIX_VOICE_TTS_MODEL") or "gpt-4o-mini-tts",
-            voice_name=_env("DONATIX_VOICE_NAME") or "nova",
+            voice_name=_env("DONATIX_VOICE_NAME") or "marin",
+            voice_realtime_model=_env("DONATIX_VOICE_REALTIME_MODEL") or "gpt-realtime",
             review_ai=(_env("DONATIX_REVIEW_AI") or "1") not in ("0", "false", "no", "off"),
             support_admin_id=_env("DONATIX_SUPPORT_ADMIN_ID"),
             smtp_host=_env("DONATIX_SMTP_HOST"),

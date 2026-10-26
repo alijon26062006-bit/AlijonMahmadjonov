@@ -1,8 +1,11 @@
 """Голосовой помощник админки: спрашиваешь голосом — отвечает голосом.
 
-Один запрос на одну реплику: запись голоса → текст (OpenAI, распознавание) → ответ (OpenAI, с инструментами,
-которые смотрят живые цифры магазина) → голос (OpenAI, озвучка). Ключ — тот же, что для чтения чеков
-(DONATIX_OPENAI_API_KEY), он остаётся на сервере: браузер его не видит.
+Основной режим — голосовой режим OpenAI Realtime, как голос в приложении ChatGPT: модель сама слушает и сама
+говорит живым голосом (marin), её можно перебить. Браузер соединяется с OpenAI напрямую (WebRTC) по
+одноразовому ключу на минуту (realtime_session); настоящий ключ (DONATIX_OPENAI_API_KEY) остаётся на сервере.
+Цифры магазина модель спрашивает инструментами — их выполняет наш сервер (run_tool).
+
+Запасной режим, если Realtime недоступен: запись голоса → текст → ответ с инструментами → озвучка (ask).
 
 Помощник только смотрит и подсказывает: деньги, заказы и настройки голосом не меняются — для этого он
 открывает нужный раздел. Работает только в админке и только для админа.
@@ -332,11 +335,19 @@ def think(conn: sqlite3.Connection, config: Config, question: str, history: list
     return "Слишком долго искал ответ — спросите, пожалуйста, проще.", go
 
 
+#: Старые модели озвучки знают не все голоса: marin/cedar (как в ChatGPT) — только новые. Не принят голос — берём
+#: ближайший из классических.
+CLASSIC_VOICES = ("coral", "nova")
+
+
 def speak(config: Config, text: str, transport: httpx.BaseTransport | None = None) -> bytes:
-    """Текст → голос (mp3). Сначала новая модель озвучки (с интонацией), не вышло — tts-1."""
+    """Текст → голос (mp3). Сначала новая модель озвучки голосом из настроек (marin — как в ChatGPT),
+    не вышло — запасной голос, потом tts-1."""
     last = ""
-    for model in dict.fromkeys((config.voice_tts_model, "tts-1")):
-        body: dict[str, Any] = {"model": model, "voice": config.voice_name, "input": text[:1500], "response_format": "mp3"}
+    tries = [(config.voice_tts_model, v) for v in dict.fromkeys((config.voice_name,) + CLASSIC_VOICES)]
+    tries += [("tts-1", v) for v in CLASSIC_VOICES]
+    for model, voice_ in tries:
+        body: dict[str, Any] = {"model": model, "voice": voice_, "input": text[:1500], "response_format": "mp3"}
         if model != "tts-1":
             body["instructions"] = "Говори дружелюбно и бодро, как живой помощник, в среднем темпе."
         with _client(transport) as c:
@@ -344,10 +355,64 @@ def speak(config: Config, text: str, transport: httpx.BaseTransport | None = Non
         if r.status_code == 200 and r.content:
             return r.content
         last = f"{r.status_code} {r.text[:160]}"
-        log.warning("помощник: озвучка (%s): %s", model, last)
+        log.warning("помощник: озвучка (%s, %s): %s", model, voice_, last)
         if r.status_code in (401, 429):
             break
     raise VoiceError(_human(last, "озвучить ответ"))
+
+
+# ── Realtime: голос как в ChatGPT ────────────────────────────
+
+REALTIME_INSTRUCTIONS = (
+    "Ты — голосовой помощник админки магазина Donatix, говоришь как живой человек: тепло, бодро, коротко "
+    "(1–3 предложения). Отвечай на языке собеседника (русский или таджикский). Цифры о магазине бери ТОЛЬКО "
+    "из инструментов — не выдумывай; деньги называй округлённо. Ничего не меняешь сам — если просят что-то "
+    "сделать, скажи, где это нажать, и открой раздел инструментом open_page. Если тебя перебили — замолчи и слушай.\n\n"
+    + GUIDE
+)
+
+
+def realtime_tools() -> list[dict[str, Any]]:
+    """Те же инструменты, но в формате Realtime: без обёртки «function»."""
+    return [{"type": "function", **t["function"]} for t in TOOLS]
+
+
+def realtime_session(config: Config, transport: httpx.BaseTransport | None = None) -> dict[str, Any]:
+    """Одноразовый ключ для браузера (живёт минуту) с готовыми настройками: модель, голос, инструкции,
+    инструменты, распознавание реплик для подписи на экране. Сначала полные настройки, не приняли — проще,
+    потом старый адрес (бета). Вернёт {ok, key, model, mode: ga|beta} или {ok: False, error}."""
+    model = config.voice_realtime_model
+    full = {"type": "realtime", "model": model, "instructions": REALTIME_INSTRUCTIONS, "tools": realtime_tools(),
+            "tool_choice": "auto",
+            "audio": {"input": {"transcription": {"model": config.voice_stt_model},
+                                "turn_detection": {"type": "semantic_vad"}},
+                      "output": {"voice": config.voice_name}}}
+    simple = {"type": "realtime", "model": model, "instructions": REALTIME_INSTRUCTIONS, "tools": realtime_tools(),
+              "audio": {"output": {"voice": config.voice_name}}}
+    last = ""
+    for session in (full, simple):
+        with _client(transport) as c:
+            r = c.post(f"{OPENAI}/realtime/client_secrets", headers=_headers(config),
+                       json={"expires_after": {"anchor": "created_at", "seconds": 60}, "session": session})
+        if r.status_code == 200:
+            data = r.json() or {}
+            key = data.get("value") or (data.get("client_secret") or {}).get("value")
+            if key:
+                return {"ok": True, "key": key, "model": model, "mode": "ga"}
+        last = f"{r.status_code} {r.text[:200]}"
+        log.warning("помощник: realtime-ключ: %s", last)
+        if r.status_code in (401, 429):
+            return {"ok": False, "error": _human(last, "включить голосовой режим")}
+    with _client(transport) as c:   # старый адрес (бета) — на случай, если новый ещё не включён для аккаунта
+        r = c.post(f"{OPENAI}/realtime/sessions", headers={**_headers(config), "OpenAI-Beta": "realtime=v1"},
+                   json={"model": model, "voice": config.voice_name, "instructions": REALTIME_INSTRUCTIONS,
+                         "tools": realtime_tools(), "input_audio_transcription": {"model": "whisper-1"}})
+    if r.status_code == 200:
+        key = ((r.json() or {}).get("client_secret") or {}).get("value")
+        if key:
+            return {"ok": True, "key": key, "model": model, "mode": "beta"}
+    log.warning("помощник: realtime (бета): %s %s", r.status_code, r.text[:200])
+    return {"ok": False, "error": _human(last or f"{r.status_code}", "включить голосовой режим")}
 
 
 def _human(raw: str, what: str) -> str:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import sqlite3
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -157,6 +158,39 @@ def assistant_ask(request: Request, audio: UploadFile | None = File(None), text:
     result = voice.ask(conn, config, audio=data, filename=f"voice.{ext if ext in ('webm', 'mp4', 'm4a', 'ogg', 'wav', 'mp3') else 'webm'}",
                        text=text[:1500], history=past if isinstance(past, list) else [], page=page[:200])
     return JSONResponse(result, 200 if result.get("ok") else 502)
+
+
+@router.post("/assistant/realtime", dependencies=[Depends(check_csrf)])
+def assistant_realtime(request: Request, admin=Depends(admin_user), config: Config = Depends(get_config)):
+    """Одноразовый ключ голосового режима (как голос ChatGPT) для браузера админа. Живёт минуту."""
+    from fastapi.responses import JSONResponse
+
+    from . import voice
+    if not voice.enabled(config):
+        return JSONResponse({"ok": False, "error": "Нужен ключ OpenAI на сервере (deploy/openai.sh)."}, 503)
+    try:
+        out = voice.realtime_session(config)
+    except Exception:  # noqa: BLE001 — нет связи: браузер перейдёт на запасной режим
+        logging.getLogger(__name__).exception("помощник: realtime")
+        out = {"ok": False, "error": "Нет связи с OpenAI."}
+    return JSONResponse(out, 200 if out.get("ok") else 502)
+
+
+@router.post("/assistant/tool", dependencies=[Depends(check_csrf)])
+def assistant_tool(request: Request, name: str = Form(""), args: str = Form("{}"), admin=Depends(admin_user),
+                   conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Голосовой режим спрашивает цифры магазина — отвечаем (только чтение)."""
+    import json as _json
+
+    from fastapi.responses import JSONResponse
+
+    from . import voice
+    try:
+        parsed = _json.loads(args or "{}")
+    except ValueError:
+        parsed = {}
+    data, go = voice.run_tool(conn, config, name[:40], parsed if isinstance(parsed, dict) else {})
+    return JSONResponse({"ok": True, "output": data, "go": go})
 
 
 def _extra_balances(supplier) -> list:
