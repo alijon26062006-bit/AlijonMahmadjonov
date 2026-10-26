@@ -29,7 +29,7 @@ def test_excel_has_turnover_tax_orders_and_losses(config, conn):
     assert wb.sheetnames == ["Итог по дням", "Заказы", "Поступления"]
     day = [c.value for c in wb["Итог по дням"][4]]
     assert day[0] == "26.09.2026" and day[1] == 1100.0           # оборот — как перевели, в сомони
-    assert day[9] == 66.0                                        # налог 6 % от оборота
+    assert day[8] == 54.5 and day[9] == 3.27                     # прибыль $10 − $5 = $5 × 10.9 = 54.5 с.; налог 6 % = 3.27
     rows = list(wb["Заказы"].iter_rows(min_row=4, values_only=True))
     loss = next(r for r in rows if r and r[1] == "dx-f2")
     assert loss[8] == -5.0 and loss[7] == -11.1                  # прибыль $-5, наценка −11.1 %
@@ -67,7 +67,7 @@ def test_admin_money_page_shows_losses_and_download(app, config, conn):
     c = TestClient(app)
     web_login(c, "admin@example.com", "adminpass123")
     page = c.get("/admin/money?period=today").text
-    assert "В минусе" in page and "Файл для ИП" in page and "Налог, % от оборота" in page
+    assert "В минусе" in page and "Файл для ИП" in page and "Налог, % с прибыли" in page
     r = c.get("/admin/money/export?period=today")
     assert r.status_code == 200 and r.headers["content-type"].startswith("application/vnd.openxmlformats")
     assert "attachment" in r.headers["content-disposition"]
@@ -82,3 +82,13 @@ def test_daily_report_sends_excel(config, conn, monkeypatch):
                         lambda cfg, caption, buttons, path, photo: sent.append((path.name, path.read_bytes()[:2])))
     assert finance.maybe_send(conn, config, datetime(2026, 9, 27, 8, 0, tzinfo=UTC))
     assert sent and sent[0][0].endswith(".xlsx") and sent[0][1] == b"PK"
+
+
+def test_no_tax_on_a_day_in_minus(config, conn):
+    uid, _ = make_client(conn)
+    taxreport.set_tax_percent(conn, "6")
+    _pay(conn, uid, 100, "1100.00", "TJS", "2026-09-26T08:00:00")      # оборот большой,
+    _order(conn, uid, 1, 40, 45, "2026-09-26T09:00:00")                # но день в минусе
+    start, end = _day(conn)
+    day = [c.value for c in load_workbook(io.BytesIO(taxreport.build(conn, config, start, end)))["Итог по дням"][4]]
+    assert day[1] == 1100.0 and day[8] < 0 and day[9] == 0          # налог с прибыли, не с оборота

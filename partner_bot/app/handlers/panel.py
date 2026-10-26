@@ -78,7 +78,8 @@ def home_kb() -> InlineKeyboardMarkup:
         # поставщиком, кошелёк и прочее ведёт сам Donatix.
         kb.row(btn("🏦 Счёт Donatix · пополнить", "dx:home", style=SUCCESS))
         kb.row(btn("🕹 Игры и пакеты", "pn:games", style=PRIMARY))
-        kb.row(InlineKeyboardButton(text="💵 Цены и наценка", callback_data="pn:prices"))
+        kb.row(InlineKeyboardButton(text="💵 Цены и наценка", callback_data="pn:prices"),
+               InlineKeyboardButton(text="🛡 Glory — цены", callback_data="pn:glory"))
         kb.row(
             InlineKeyboardButton(text="📥 Заявки клиентов", callback_data="pn:deposits"),
             InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
@@ -718,6 +719,18 @@ FIELDS["volsever_key"] = (
     "(или <code>-</code>, чтобы убрать). Им проверяется ID игрока "
     "и показывается его ник перед покупкой:", "text",
 )
+
+FIELDS["glory_margin"] = (
+    "📈 Наценка на Glory",
+    "Процент к цене Donatix — только для Glory. Например <code>25</code>.\n"
+    "<code>0</code> — как общая наценка бота:", "percent",
+)
+FIELDS["glory_price_diram"] = (
+    "🏷 Цена Glory",
+    "Одна цена для всех регионов, в сомони. Например <code>30</code>.\n"
+    "<code>0</code> — считать по наценке:", "money",
+)
+FIELD_PARENT.update({"glory_margin": "pn:glory", "glory_price_diram": "pn:glory"})
 
 FIELDS["ff_community_key"] = (
     "🔑 Второй справочник ников",
@@ -6284,3 +6297,57 @@ async def cb_bank_unbind(call: CallbackQuery, conn: aiosqlite.Connection) -> Non
     await db.unbind_sender(conn, call.data.split(":", 2)[2])
     await call.answer("Отвязано — в следующий раз попросим чек")
     await cb_bank_senders(call, conn)
+
+
+# ================================================================ Glory
+
+
+async def glory_text() -> str:
+    from app.services import glory
+
+    items = await glory.regions(force=True)
+    fixed = runtime.get_int("glory_price_diram")
+    margin = runtime.get_int("glory_margin")
+    how = (f"одна цена <b>{fmt(fixed)}</b> во всех регионах" if fixed > 0 else
+           f"наценка Glory <b>{margin}%</b>" if margin else
+           f"общая наценка бота <b>{runtime.margin_percent()}%</b>")
+    lines = ["🛡 <b>Glory — цены</b>", "", f"Сейчас: {how}.", ""]
+    if not items:
+        lines.append("Donatix сейчас не продаёт Glory — раздел у клиентов скрыт.")
+        return "\n".join(lines)
+    loss = False
+    for r in items:
+        price, cost = glory.price_of(r)
+        bad = price < cost
+        loss = loss or bad
+        lines.append(f"{glory.flag(r.get('code'))} {esc(str(r.get('name')))}: закупка {fmt(cost)} → "
+                     f"продажа <b>{fmt(price)}</b>" + (" ❗️ в минус" if bad else f" (+{fmt(price - cost)})"))
+    if loss:
+        lines += ["", "❗️ <b>Цена ниже закупки</b> — с каждой продажи вы теряете деньги. Поднимите цену."]
+    lines += ["", "Закупка — цена Donatix по курсу бота; меняется вместе с курсом."]
+    return "\n".join(lines)
+
+
+def glory_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="📈 Наценка на Glory %", callback_data="pn:set:glory_margin"))
+    kb.row(InlineKeyboardButton(text="🏷 Одна цена для всех регионов", callback_data="pn:set:glory_price_diram"))
+    if runtime.get_int("glory_price_diram") > 0 or runtime.get_int("glory_margin"):
+        kb.row(InlineKeyboardButton(text="↩️ Как у всего бота (общая наценка)", callback_data="pn:glory_auto"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:glory")
+async def cb_glory(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(call, await glory_text(), glory_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:glory_auto")
+async def cb_glory_auto(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    await runtime.set_value(conn, "glory_price_diram", "0")
+    await runtime.set_value(conn, "glory_margin", "0")
+    await safe_edit(call, await glory_text(), glory_kb())
+    await call.answer("Цена Glory — по общей наценке")

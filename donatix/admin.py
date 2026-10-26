@@ -116,7 +116,7 @@ def money_page(request: Request, period: str = "", date_from: str = "", date_to:
         "user": admin, "m": m, "s": m["total"], "pr": pr, "presets": periods.PRESETS, "keep": "",
         "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
         "loss_n": loss[0], "loss_micro": loss[1], "exact_n": exact[1], "orders_n": exact[0],
-        "tax": tax, "tax_micro": int(m["total"]["received"] * tax / 100),
+        "tax": tax, "tax_micro": int(max(m["total"]["profit"], 0) * tax / 100),   # налог — с чистой прибыли
         "export_q": request.url.query,
     })
 
@@ -139,7 +139,7 @@ def money_tax(request: Request, percent: str = Form(""), admin=Depends(admin_use
     from . import taxreport
     try:
         value = taxreport.set_tax_percent(conn, percent)
-        flash(request, f"Налог: {value}% от оборота.")
+        flash(request, f"Налог: {value}% с прибыли.")
     except ValueError as exc:
         flash(request, str(exc), "error")
     cache.clear("admin:money")

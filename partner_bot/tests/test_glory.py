@@ -132,6 +132,18 @@ async def main() -> None:
         ok = await glory.stop(conn, await glory.get(conn, gid))
         check("остановить", ok and (await glory.get(conn, gid))["status"] == "stopped")
 
+        await runtime.set_value(conn, "glory_margin", "50")
+        check("своя наценка на Glory", glory.price_of(items[0])[0] >= 3300, str(glory.price_of(items[0])))
+        await runtime.set_value(conn, "glory_price_diram", "3000")
+        check("одна цена для всех регионов", glory.price_of(items[0]) == (3000, 2200))
+        from app.handlers import panel
+        await runtime.set_value(conn, "glory_price_diram", "2000")
+        txt = await panel.glory_text()
+        check("цена ниже закупки — предупреждение владельцу", "в минус" in txt and "ниже закупки" in txt, txt)
+        await runtime.set_value(conn, "glory_price_diram", "0")
+        await runtime.set_value(conn, "glory_margin", "0")
+        check("сброс — снова общая наценка", glory.price_of(items[0])[0] == price)
+
         os.environ.pop("DONATIX_URL", None)
         await glory.regions(force=True)
         check("без Donatix — раздела нет", not glory.available)

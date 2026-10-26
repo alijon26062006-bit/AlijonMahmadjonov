@@ -124,13 +124,19 @@ async def refresh_available() -> bool:
 
 
 def price_of(region: dict) -> tuple[int, int]:
-    """(цена клиенту, себестоимость) в дирамах: цена Donatix по курсу бота + наценка владельца."""
+    """(цена клиенту, себестоимость) в дирамах. Цену задаёт владелец в /panel → «🛡 Glory — цены»:
+    одна цена на все регионы (glory_price_diram) или своя наценка (glory_margin); не задал —
+    цена Donatix по курсу бота + общая наценка."""
     from app.services.games import offer_cost, offer_price
     try:
         usd = Decimal(str(region.get("price_usd") or "0"))
     except InvalidOperation:
         return 0, 0
-    return offer_price(usd, runtime.margin_percent()), offer_cost(usd)
+    cost = offer_cost(usd)
+    fixed = runtime.get_int("glory_price_diram")
+    if fixed > 0:
+        return fixed, cost
+    return offer_price(usd, runtime.get_int("glory_margin") or runtime.margin_percent()), cost
 
 
 def flag(code: str) -> str:

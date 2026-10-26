@@ -21,7 +21,7 @@
   <div class="mt-row">
     <div class="mt-dl">
       <h3>{{ icon('book', 18) }} Файл для ИП и налогов</h3>
-      <p class="muted small">Excel: оборот и прибыль по дням, налог, все заказы (убыточные — красным) и все поступления.</p>
+      <p class="muted small">Excel: оборот и прибыль по дням, налог с прибыли, все заказы (убыточные — красным) и все поступления.</p>
       <div class="mt-btns">
         <a class="btn primary sm" href="/admin/money/export?period=yesterday">Вчера</a>
         <a class="btn sm" href="/admin/money/export?period=today">Сегодня</a>
@@ -32,12 +32,11 @@
     </div>
     <form class="mt-tax" method="post" action="/admin/money/tax">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label for="tax">Налог, % от оборота</label>
+      <label for="tax">Налог, % с прибыли</label>
       <div class="mt-tax-in"><input id="tax" name="percent" inputmode="decimal" value="{{ tax }}" placeholder="например 6">
         <button class="btn sm">Сохранить</button></div>
-      <p class="muted small">За период: оборот ${{ usd(s.received) }}{% if s.rate %} ≈ {{ tjs(s.received, s.rate) }} с.{% endif %}
-        → налог <b>${{ usd(tax_micro) }}{% if s.rate %} ≈ {{ tjs(tax_micro, s.rate) }} с.{% endif %}</b>.
-        Ставку уточните у бухгалтера.</p>
+      <p class="muted small">За период: чистая прибыль ${{ usd(s.profit) }}{% if s.rate %} ≈ {{ tjs(s.profit, s.rate) }} с.{% endif %}
+        → налог <b>${{ usd(tax_micro) }}{% if s.rate %} ≈ {{ tjs(tax_micro, s.rate) }} с.{% endif %}</b>.</p>
     </form>
   </div>
   <div class="mt-checks">
