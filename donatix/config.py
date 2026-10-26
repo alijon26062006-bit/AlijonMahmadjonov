@@ -138,6 +138,11 @@ class Config:
     openai_api_key: str = ""
     support_model: str = "gpt-4o-mini"
     receipt_model: str = "gpt-4o"      # читает чеки пополнений (модель с «зрением»)
+    # Голосовой помощник админки (шарик в поиске): распознавание, ответ, озвучка и голос
+    voice_model: str = "gpt-4o-mini"
+    voice_stt_model: str = "gpt-4o-mini-transcribe"
+    voice_tts_model: str = "gpt-4o-mini-tts"
+    voice_name: str = "nova"
     review_ai: bool = True             # ИИ отвечает на отзывы про заказы и скрывает спам (нужен ключ OpenAI)
     support_admin_id: str = ""   # Telegram ID, куда бот поддержки шлёт обращения (по умолчанию — чат админ-бота)
     smtp_host: str = ""
@@ -275,6 +280,10 @@ class Config:
             openai_api_key=_env("DONATIX_OPENAI_API_KEY") or _env("OPENAI_API_KEY"),
             support_model=_env("DONATIX_SUPPORT_MODEL") or "gpt-4o-mini",
             receipt_model=_env("DONATIX_RECEIPT_MODEL") or "gpt-4o",
+            voice_model=_env("DONATIX_VOICE_MODEL") or "gpt-4o-mini",
+            voice_stt_model=_env("DONATIX_VOICE_STT_MODEL") or "gpt-4o-mini-transcribe",
+            voice_tts_model=_env("DONATIX_VOICE_TTS_MODEL") or "gpt-4o-mini-tts",
+            voice_name=_env("DONATIX_VOICE_NAME") or "nova",
             review_ai=(_env("DONATIX_REVIEW_AI") or "1") not in ("0", "false", "no", "off"),
             support_admin_id=_env("DONATIX_SUPPORT_ADMIN_ID"),
             smtp_host=_env("DONATIX_SMTP_HOST"),

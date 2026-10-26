@@ -15,7 +15,7 @@
       <span class="adm-hello-t">Добро пожаловать, <b>{{ user.login }}</b></span>
     </a>
     <form class="adm-search" method="get" action="/admin/orders" role="search">
-      <span class="adm-orb" aria-hidden="true"></span>
+      <button type="button" class="adm-orb" data-voice aria-label="Голосовой помощник: спросите голосом" title="Голосовой помощник"></button>
       <input name="q" type="search" placeholder="Найти заказ: номер, ID игрока, логин…" aria-label="Поиск заказа" autocomplete="off">
     </form>
     <div class="adm-top-act">
@@ -52,6 +52,23 @@
     </div>
   </details>
 </nav>
+<div class="vo" id="vo" hidden role="dialog" aria-modal="true" aria-label="Голосовой помощник" data-csrf="{{ csrf }}">
+  <div class="vo-card">
+    <button type="button" class="vo-x" aria-label="Закрыть помощника">{{ icon('x', 18) }}</button>
+    <button type="button" class="vo-orb" aria-label="Шар помощника: нажмите, чтобы говорить или перебить">
+      <span class="vo-ring r1"></span><span class="vo-ring r2"></span><span class="vo-core"></span></button>
+    <p class="vo-state" aria-live="polite">Нажмите на шар и говорите</p>
+    <div class="vo-log" aria-live="polite"><p class="vo-you"></p><p class="vo-bot"></p></div>
+    <form class="vo-type"><input type="text" placeholder="или напишите вопрос…" aria-label="Вопрос текстом" autocomplete="off">
+      <button aria-label="Спросить">{{ icon('arrow-right', 16) }}</button></form>
+    <button type="button" class="vo-mic" aria-pressed="false">
+      <svg class="on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <svg class="off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 9.3V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 5 2.2M5 11a7 7 0 0 0 11.9 5M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>
+      <span>Микрофон включён</span></button>
+    <p class="vo-hint">Говорите — я слушаю молча. Замолчите — отвечу голосом. Нажмите на шар, чтобы перебить.</p>
+  </div>
+</div>
+<script src="{{ static_url('/static/admin-voice.js') }}" defer></script>
 <script>
 // Шторка «Все разделы» и меню «+»: закрыть кликом мимо и клавишей Esc (на компьютере тоже)
 document.addEventListener("click", function (e) {

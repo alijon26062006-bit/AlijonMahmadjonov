@@ -123,6 +123,42 @@ def _glass(conn, config: Config, counts: dict) -> dict:
     }
 
 
+_VOICE_HITS: dict[int, list[float]] = {}
+
+
+@router.post("/assistant/ask", dependencies=[Depends(check_csrf)])
+def assistant_ask(request: Request, audio: UploadFile | None = File(None), text: str = Form(""),
+                  history: str = Form("[]"), page: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    """Голосовой помощник: реплика голосом (или текстом) → ответ текстом и голосом. Только админ."""
+    import json as _json
+    import time as _time
+
+    from fastapi.responses import JSONResponse
+
+    from . import voice
+    if not voice.enabled(config):
+        return JSONResponse({"ok": False, "error": "Помощник не подключён: нужен ключ OpenAI на сервере "
+                                                    "(sudo bash /home/donatix/app/donatix/deploy/openai.sh)."}, 503)
+    now = _time.time()   # не больше 40 реплик в минуту — чтобы случайно не потратить деньги OpenAI
+    hits = [t for t in _VOICE_HITS.get(admin["id"], []) if now - t < 60]
+    if len(hits) >= 40:
+        return JSONResponse({"ok": False, "error": "Слишком часто — подождите минуту."}, 429)
+    _VOICE_HITS[admin["id"]] = hits + [now]
+    data = audio.file.read(voice.MAX_AUDIO + 1) if audio is not None else b""
+    if len(data) > voice.MAX_AUDIO:
+        return JSONResponse({"ok": False, "error": "Слишком длинная запись — скажите короче."}, 413)
+    try:
+        past = _json.loads(history or "[]")
+    except ValueError:
+        past = []
+    name = (audio.filename or "voice.webm") if audio is not None else "voice.webm"
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else "webm"
+    result = voice.ask(conn, config, audio=data, filename=f"voice.{ext if ext in ('webm', 'mp4', 'm4a', 'ogg', 'wav', 'mp3') else 'webm'}",
+                       text=text[:1500], history=past if isinstance(past, list) else [], page=page[:200])
+    return JSONResponse(result, 200 if result.get("ok") else 502)
+
+
 def _extra_balances(supplier) -> list:
     """Балансы дополнительных поставщиков (CoinDrop) для сводки — раз в 5 минут, чтобы не ловить их лимит."""
     if not hasattr(supplier, "extra_balances"):
