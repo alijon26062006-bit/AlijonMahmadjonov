@@ -21,6 +21,17 @@
   var pc = null, dc = null, remoteEl = null, rt = false, textBuf = "", goAfter = null, lastOut = 0, lastTalk = 0,
       needTap = false, dropTimer = 0, speakAt = 0, endTimer = 0;                          // живой голос
   var PREF = "dx-voice-mode", FAIL = "dx-voice-live-fail", HOUR = 36e5, liveNow = false;
+  // На iPhone звук Web Audio молчит, если включён беззвучный режим, а обычный проигрыватель — нет. Проигрыватель
+  // «разблокируем» при нажатии на шар (беззвучной записью), дальше ответы играют через него.
+  var player = null, SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+  function unlockPlayer() {
+    if (!IOS) return;
+    player = player || new Audio();
+    player.setAttribute("playsinline", "");
+    player.src = SILENCE;
+    var p = player.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function audioSession(type) { try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) {} }
   try { history = JSON.parse(sessionStorage.getItem("dx-voice") || "[]") || []; } catch (e) { history = []; }
   var TEXT = { idle: "Нажмите на шар и говорите", listening: "Слушаю…", thinking: "Думаю…", speaking: "Говорю…",
                muted: "Микрофон выключен — нажмите на шар или напишите вопрос", connecting: "Подключаюсь…" };
@@ -77,6 +88,7 @@
   }
   function mic() {
     if (stream && stream.getAudioTracks().some(function (t) { return t.readyState === "live"; })) return Promise.resolve(stream);
+    if (IOS) audioSession("auto");
     return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
       .then(function (s) {
         stream = s;
@@ -297,14 +309,17 @@
       var end = function () { if (finished) return; finished = true; clearTimeout(safety); src = null; outAn = null; done(); };
       var bin = atob(b64), buf = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      var viaElement = function () {   // запасной путь: обычный проигрыватель
-        var a = new Audio("data:audio/mpeg;base64," + b64);
+      var viaElement = function () {   // обычный проигрыватель: на iPhone — всегда (громко и в беззвучном режиме)
+        var a = player || new Audio();
+        if (IOS) audioSession("playback");
         a.onended = end; a.onerror = end;
+        a.src = "data:audio/mpeg;base64," + b64;
         src = { stop: function () { a.pause(); end(); } };
         set("speaking");
         safety = setTimeout(end, 60000);
         var p = a.play(); if (p && p.catch) p.catch(end);
       };
+      if (IOS) return viaElement();
       Promise.resolve(ctx.resume ? ctx.resume() : null).catch(function () {}).then(function () {
         ctx.decodeAudioData(buf.buffer.slice(0), function (audio) {
           if (box.hidden) return end();
@@ -328,6 +343,7 @@
     document.documentElement.classList.add("vo-open");
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.resume) ctx.resume();   // звук разрешён: окно открыли нажатием
+    unlockPlayer();
     cancelAnimationFrame(raf); loop();
     if (!bot.textContent && history.length) bot.textContent = history[history.length - 1].text;
     start();
@@ -371,6 +387,7 @@
   trig.addEventListener("click", function (e) { e.preventDefault(); open(); });
   orb.addEventListener("click", function () {
     if (ctx && ctx.resume) ctx.resume();
+    if (IOS && state !== "speaking") unlockPlayer();
     if (needTap) { needTap = false; playRemote(); }
     if (rt) {
       if (state === "speaking") { rtSend({ type: "response.cancel" }); rtSend({ type: "output_audio_buffer.clear" }); spoke(); }
