@@ -230,19 +230,21 @@
   </div>{% endif %}
 </div>
 
-<script>
+<script data-soft>
 (function () {
   // Заявка на проверке: как только админ решит — страница обновится сама
   var w = document.getElementById("wait");
   if (w) {
-    setInterval(function () {
+    var waitTimer = setInterval(function () {
       if (document.hidden) return;
       fetch("/panel/data/payment/" + w.dataset.id, {credentials: "same-origin"}).then(function (r) { return r.json(); })
         .then(function (d) {
+          if (!w.isConnected) return;
           if (d.order) location.href = "/panel/orders/" + d.order;   // оплатили покупку — сразу к заказу
           else if (d.status && d.status !== "pending") location.reload();
         }).catch(function () {});
     }, 8000);
+    if (window.dxOnLeave) dxOnLeave(function () { clearInterval(waitTimer); });
   }
   // Чек сразу копируем в память. На Android (особенно внутри Instagram/Telegram) выбранный файл
   // к моменту отправки часто уже недоступен — ERR_UPLOAD_FILE_CHANGED. Копия в памяти не пропадёт.
@@ -331,6 +333,8 @@
       return r.text().then(function (html) {
         // 100% — и показываем ответ сайта как есть
         check.done(function () {
+          document.body.classList.remove("rcc-open");
+          if (window.dxNav && window.dxNav.render(html, r.url || "/panel/balance")) return;   // без перезагрузки
           try { history.replaceState(null, "", r.url || "/panel/balance"); } catch (err) {}
           document.open(); document.write(html); document.close();
         });
@@ -403,7 +407,7 @@
   }
   f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
   // Курс меняется — пока клиент на странице, берём свежий каждые 30 секунд
-  setInterval(function () {
+  var rateTimer = setInterval(function () {
     if (document.hidden) return;
     fetch("/panel/data/rate", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
       var nr = parseFloat(d.tjs_rate); if (!nr) return;
@@ -414,6 +418,7 @@
       upd();
     }).catch(function () {});
   }, 30000);
+  if (window.dxOnLeave) dxOnLeave(function () { clearInterval(rateTimer); });
 })();
 (function () {   // крипта: кнопки суммы и «Продолжить»
   var a = document.getElementById("cx-amount"), form = document.getElementById("cryptoform");
@@ -453,9 +458,13 @@
   var v = document.getElementById("dcv-video"), g = document.getElementById("dcv-guide"),
       note = document.getElementById("dcv-note"), seen = !v && !g;
   // встроенная анимация сообщает, что досмотрена до конца
-  if (g) window.addEventListener("message", function (e) {
+  function onMsg(e) {
     if (e.data === "dcguide:done" && e.source === g.contentWindow && !seen) { seen = true; sync(); }
-  });
+  }
+  if (g) {
+    window.addEventListener("message", onMsg);
+    if (window.dxOnLeave) dxOnLeave(function () { window.removeEventListener("message", onMsg); });
+  }
   function sync() { agree.disabled = !seen; if (note) note.hidden = seen; ok.disabled = !(seen && agree.checked); }
   if (v) v.addEventListener("timeupdate", function () {
     if (!seen && v.duration && v.currentTime / v.duration > 0.9) { seen = true; sync(); }

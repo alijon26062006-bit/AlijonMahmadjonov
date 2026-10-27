@@ -67,7 +67,7 @@
 .cst-rules ul { margin: 8px 0 0; padding-left: 18px; font-size: .88rem; } .cst-rules li { margin: 3px 0; }
 .cst-past { display: grid; gap: 4px; font-size: .9rem; }
 </style>
-<script>
+<script data-soft>
 (function () {
   var el = document.getElementById("cst-left"); if (!el) return;
   var end = Date.parse(el.dataset.end);
@@ -76,7 +76,9 @@
     var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
     el.textContent = (d ? d + " д " : "") + h + " ч " + ("0" + m).slice(-2) + " мин";
   }
-  tick(); setInterval(tick, 30000);
+  tick();
+  var iv = setInterval(tick, 30000);
+  if (window.dxOnLeave) dxOnLeave(function () { clearInterval(iv); });
 })();
 </script>
 {% endif %}

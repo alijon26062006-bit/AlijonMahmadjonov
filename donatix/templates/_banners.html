@@ -18,7 +18,7 @@
   <div class="bnr-dots">{% for b in banners %}<button type="button" data-i="{{ loop.index0 }}" aria-label="Баннер {{ loop.index }}"></button>{% endfor %}</div>
   {% endif %}
 </section>
-<script>
+<script data-soft>
 (function () {
   var root = document.querySelector("[data-bnr]");
   if (!root) return;
@@ -61,6 +61,7 @@
     if (paused || document.hidden || !document.body.contains(track)) return;
     var i = at() + 1; go(i >= n ? 0 : i);
   }, 5000);
+  if (window.dxOnLeave) dxOnLeave(function () { clearInterval(window.dxBnrTimer); window.dxBnrTimer = 0; });
   mark();
 })();
 </script>

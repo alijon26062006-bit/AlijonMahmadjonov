@@ -3,7 +3,7 @@
 {% block content %}
 <section class="fc-hero"><h1>Заказы</h1><p>История заказов и статусы обработки.</p></section>
 <div class="fc-box">
-  <form class="fc-filter" method="get" id="orders-filter">
+  <form class="fc-filter" method="get" id="orders-filter" data-live-search>
     <input id="q" name="q" type="search" value="{{ q }}" placeholder="Поиск заказов (номер или название)" aria-label="Поиск" autocomplete="off">
     <div class="fc-selects">
       <div><label class="label-caps" for="status">Статус</label>
@@ -46,8 +46,9 @@
   (function () {
     var f = document.getElementById("orders-filter"), q = document.getElementById("q"), t;
     if (!f) return;
-    ["status", "kind"].forEach(function (id) { document.getElementById(id).addEventListener("change", function () { f.submit(); }); });
-    q.addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { f.submit(); }, 600); });
+    function send() { if (f.isConnected) { if (f.requestSubmit) f.requestSubmit(); else f.submit(); } }
+    ["status", "kind"].forEach(function (id) { document.getElementById(id).addEventListener("change", send); });
+    q.addEventListener("input", function () { clearTimeout(t); t = setTimeout(send, 600); });
     if (q.value) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
   })();
 </script>

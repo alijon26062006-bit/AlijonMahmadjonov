@@ -125,7 +125,7 @@
   <form class="kv tz-row" method="post" action="/panel/timezone">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <span class="k">Часовой пояс</span>
-    <span class="v"><select name="tz" aria-label="Часовой пояс" onchange="this.form.submit()">
+    <span class="v"><select name="tz" aria-label="Часовой пояс" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
       <option value="auto" {{ 'selected' if tz_choice == 'auto' }}>Автоматически — {{ tz_label if tz_choice == 'auto' else 'по устройству' }}</option>
       {% for z, title in tz_zones %}<option value="{{ z }}" {{ 'selected' if tz_choice == z }}>{{ title }}</option>{% endfor %}
     </select><noscript><button class="btn sm">Сохранить</button></noscript>

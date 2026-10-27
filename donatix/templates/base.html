@@ -36,6 +36,8 @@
       document.documentElement.setAttribute("data-theme", t);
       document.documentElement.classList.add("js");
     })();
+    // Скрипт страницы отдаёт сюда, что снять при уходе (таймеры и т.п.); static/nav.js выполнит это при переходе
+    window.dxOnLeave = function (fn) { (window.dxLeaveQ = window.dxLeaveQ || []).push(fn); };
     // Часовой пояс устройства → cookie: сервер показывает время так, как у человека на часах.
     // Если выбран «автоматически» и пояс поменялся (поездка, другой телефон) — один раз обновляем страницу.
     (function () {
@@ -71,6 +73,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- Быстрые переходы: Chrome начинает грузить страницу в момент касания ссылки, а не после.
        Не трогаем страницы, которые что-то меняют при открытии (уведомления, новый API-ключ, вход, выход). -->
+  {% if not request.url.path.startswith(('/panel', '/admin')) %}
   <script type="speculationrules">
   {"prefetch": [{"where": {"and": [{"href_matches": "/*"},
       {"not": {"href_matches": ["/logout", "/auth/*", "/api/*", "/currency/*", "/admin*", "/panel/notifications*",
@@ -79,6 +82,7 @@
    "prerender": [{"where": {"href_matches": ["/panel/catalog*", "/panel/buy/*", "/panel/support", "/panel/orders*"]},
     "eagerness": "conservative"}]}
   </script>
+  {% endif %}
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="{{ site_name }}">
@@ -188,9 +192,10 @@
     els.forEach(function (el) { io.observe(el); });
   })();
 
-  // Суммы в карточках-счётчиках плавно набегают от нуля
+  // Суммы в карточках-счётчиках плавно набегают от нуля — один раз за сеанс, а не на каждой странице
   (function () {
     if (dxCalm || !window.requestAnimationFrame) return;
+    try { if (sessionStorage.getItem("dx-count")) return; sessionStorage.setItem("dx-count", "1"); } catch (e) {}
     document.querySelectorAll(".stat .value, .balance-card b, .bal-amount, .bal-tile .t-value").forEach(function (el) {
       el = el.querySelector(".cur-tjs") || el;   // сумма в сомони — внутри своего span (с подсказкой в $)
       var m = el.textContent.trim().match(/^(\$?)(\d+)(?:\.(\d+))?(\s*с\.)?$/);
@@ -232,12 +237,16 @@
     document.addEventListener("click", function (e) {
       var a = e.target.closest("a[href]");
       if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || a.target === "_blank" || a.hasAttribute("download")) return;
+      if (window.dxNav && window.dxNav.handles(a)) return;   // переход без перезагрузки — полоска сама, если долго
       var href = a.getAttribute("href");
       if (!href || href.charAt(0) === "#" || /^(mailto:|tel:|tg:|javascript:)/i.test(href)) return;
       if (a.origin && a.origin !== location.origin) return;
       go();
     });
-    document.addEventListener("submit", function (e) { if (!e.defaultPrevented && e.target.method !== "dialog") go(); });
+    document.addEventListener("submit", function (e) {
+      if (e.defaultPrevented || e.target.method === "dialog" || (window.dxNav && window.dxNav.handlesForm(e.target))) return;
+      go();
+    });
     window.addEventListener("pageshow", function () { bar.classList.remove("go"); bar.classList.add("done"); });
   })();
 

@@ -64,14 +64,16 @@
   </div>
 </div>
 
-<script>
+<script data-soft>
 (function () {
   var sheet = document.getElementById("topic-sheet");
   function open() { sheet.hidden = false; requestAnimationFrame(function () { sheet.classList.add("on"); }); document.body.style.overflow = "hidden"; }
   function close() { sheet.classList.remove("on"); document.body.style.overflow = ""; setTimeout(function () { sheet.hidden = true; }, 220); }
   document.querySelectorAll("[data-sheet-open]").forEach(function (b) { b.addEventListener("click", open); });
   sheet.querySelectorAll("[data-sheet-close]").forEach(function (b) { b.addEventListener("click", close); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !sheet.hidden) close(); });
+  function onKey(e) { if (e.key === "Escape" && !sheet.hidden) close(); }
+  document.addEventListener("keydown", onKey);
+  if (window.dxOnLeave) dxOnLeave(function () { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; });
   if (location.hash === "#new") open();
 
   var KB = {{ kb_index | tojson }}, q = document.getElementById("kb-q"), box = document.getElementById("kb-results");

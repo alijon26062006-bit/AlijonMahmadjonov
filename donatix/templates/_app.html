@@ -51,7 +51,7 @@
       {% endif %}
     </div>
   </aside>
-  <main id="main">
+  <main id="main"{% block main_attrs %}{% endblock %}>
     {% if user and not user.guest %}
     <div class="push-ask" id="push-ask" hidden role="region" aria-label="Уведомления">
       <span class="pa-ico">🔔</span>
@@ -77,6 +77,7 @@
 </nav>
 {% endblock %}
 {% from "_cur_pick.html" import cur_sheet with context %}{{ cur_sheet() }}
+<script src="/static/nav.js?v={{ asset_v }}" defer></script>
 <script>
   // Push-уведомления: подписка этого устройства (телефон, приложение, компьютер)
   window.dxPush = (function () {
@@ -268,6 +269,7 @@
         var fresh = new DOMParser().parseFromString(html, "text/html").getElementById("main");
         var main = document.getElementById("main");
         if (!fresh || !main) return;
+        if (window.dxNav) { window.dxNav.replaceMain(fresh); return; }   // таймеры старой версии снимаются, фокус остаётся
         main.innerHTML = fresh.innerHTML;
         main.querySelectorAll("[data-reveal]").forEach(function (e) { e.classList.add("in", "shown", "visible"); });
         main.querySelectorAll("script").forEach(function (old) {   // скрипты страницы — заново

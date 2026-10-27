@@ -12,8 +12,9 @@
     <button class="btn sm" type="button" id="push-off" hidden>Выключить</button>
   </div>
 </div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {   // dxPush объявлен ниже, в общем шаблоне
+<script data-soft>
+(function init() {   // dxPush объявлен ниже, в общем шаблоне: при полной загрузке ждём его, при переходе — он уже есть
+  if (!window.dxPush) { document.addEventListener("DOMContentLoaded", init, {once: true}); return; }
   var st = document.getElementById("push-state"), on = document.getElementById("push-on"),
       test = document.getElementById("push-test"), off = document.getElementById("push-off");
   var TEXT = { on: "✅ Включены — сообщим о заказах и пополнениях, даже если приложение закрыто.",
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {   // dxPush объя
   off.onclick = function () { run(window.dxPush.disable(), function () { show("off"); }); };
   test.onclick = function () { run(window.dxPush.test(), function (d) {
     st.textContent = d.ok ? "📨 Отправили тестовое уведомление — оно придёт через пару секунд." : (d.error || "Не отправилось."); }); };
-});
+})();
 </script>
 {% if bot_username %}<div class="card notif-code">
   <div><b>🔐 Бот поддержки в Telegram</b>

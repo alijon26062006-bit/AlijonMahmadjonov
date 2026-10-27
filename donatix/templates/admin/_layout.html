@@ -38,6 +38,7 @@
 {% endblock %}
 {% block tabbar %}
 <nav class="tabbar adm-dock" aria-label="Быстрые разделы">
+  <span class="dock-ind" aria-hidden="true"></span>
   {% for href, label, ico in [('/admin', 'Сводка', 'home'), ('/admin/orders', 'Заказы', 'bag'), ('/admin/payments', 'Пополнения', 'wallet'),
                               ('/admin/money', 'Деньги', 'chart'), ('/admin/users', 'Клиенты', 'users'), ('/admin/stats', 'Отчёты', 'trophy')] %}
   <a href="{{ href }}" class="{{ on(href) }} {{ 'xs-hide' if loop.index > 4 }}">{{ icon(ico, 18) }}<span>{{ label }}</span></a>

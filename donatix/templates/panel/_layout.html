@@ -25,6 +25,7 @@
 {% block tabbar %}
 {% set tab = request.url.path %}
 <nav class="tabbar cp-dock" aria-label="Быстрые разделы">
+  <span class="dock-ind" aria-hidden="true"></span>
   <a href="/panel" class="{{ 'on' if tab == '/panel' }}">{{ icon('home', 20) }}<span>Главная</span></a>
   <a href="/panel/catalog" class="{{ 'on' if tab.startswith('/panel/catalog') or tab.startswith('/panel/buy') }}">{{ icon('grid', 20) }}<span>Каталог</span></a>
   <a href="/panel/balance" class="tab-main {{ 'on' if tab.startswith('/panel/balance') }}" aria-label="Пополнить баланс">{{ icon('plus', 22) }}<span>Пополнить</span></a>

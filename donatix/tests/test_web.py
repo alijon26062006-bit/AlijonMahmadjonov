@@ -308,3 +308,27 @@ def test_client_panel_dark_glass(app, conn):
     assert "от $" in page                                           # цена «от» в «Популярном» (Telegram Stars)
     orders_page = c.get("/panel/orders").text
     assert "cp-dock" in orders_page and 'class="cp-ava"' in orders_page
+
+
+def test_soft_navigation_wiring(app, conn):
+    """Переходы без перезагрузки: nav.js подключён в кабинете и админке, у меню есть «таблетка»,
+    страницы с таймерами помечены, предзагрузка Chrome на них выключена (её делает nav.js)."""
+    from conftest import make_client
+    from fastapi.testclient import TestClient
+    make_client(conn, login="softnav")
+    c = TestClient(app)
+    web_login(c, "softnav@example.com", "password123")
+    page = c.get("/panel").text
+    assert "/static/nav.js" in page and 'class="dock-ind"' in page and "speculationrules" not in page
+    assert "window.dxOnLeave" in page                                   # заглушка до загрузки nav.js
+    balance = c.get("/panel/balance").text
+    assert "<script data-soft>" in balance and "dxOnLeave" in balance  # таймеры баланса снимаются при уходе
+    assert "<script data-soft>" in c.get("/panel/notifications").text
+    assert "data-live-search" in c.get("/panel/orders").text
+    assert "speculationrules" in TestClient(app).get("/").text           # на публичных страницах — как раньше
+    a = TestClient(app)
+    web_login(a, "admin@example.com", "adminpass123")
+    assert "/static/nav.js" in a.get("/admin").text and 'class="dock-ind"' in a.get("/admin").text
+    assert '<main id="main" data-full>' in a.get("/admin/catalog-sync").text   # опрос каталога — только целиком
+    js = c.get("/static/nav.js")
+    assert js.status_code == 200 and "dxNav" in js.text
