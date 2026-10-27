@@ -190,7 +190,7 @@ def test_profile_and_login_history(app, config, conn):
     client = TestClient(app)
     web_login(client, "pr@example.com", "password123")
     page = client.get("/panel").text
-    assert "Профиль" in page and "Выполнено заказов" in page and "История входов" in page and "Создать ключ" in page
+    assert "Профиль" in page and "Заказов за месяц" in page and "История входов" in page and "Создать ключ" in page
     token = client.get("/panel").text.split('name="csrf" value="')[1].split('"')[0]
     key = accounts.create_api_key(conn, uid, "bot", config.secret_key)
     page = client.get("/panel").text
@@ -265,7 +265,7 @@ def test_docs_explain_product_ids(client):
 
 
 def test_admin_glass_layout_and_client_tabbar_untouched(app, conn):
-    """Админка — «стеклянная»: полоска слева, плавающее меню снизу, кольца на сводке. У клиента меню прежнее."""
+    """Админка — «стеклянная»: полоска слева, плавающее меню снизу, кольца на сводке. У клиента — свой стиль, без админских частей."""
     from conftest import make_client
     from fastapi.testclient import TestClient
     a = TestClient(app)
@@ -279,3 +279,32 @@ def test_admin_glass_layout_and_client_tabbar_untouched(app, conn):
     web_login(c, "glassy@example.com", "password123")
     panel = c.get("/panel").text
     assert 'class="tab-main' in panel and "adm-rail" not in panel
+
+
+def test_client_panel_dark_glass(app, conn):
+    """Кабинет покупателя — «тёмное стекло»: шапка-таблетка с поиском, баланс, плитки за месяц, кольцо, популярное с ценой «от»."""
+    from conftest import make_client
+    from fastapi.testclient import TestClient
+    from donatix import db
+    uid, _ = make_client(conn, login="glassbuyer")
+    now = db.now()
+    for i, (status, total) in enumerate((("completed", 50_000), ("completed", 30_000), ("failed", 10_000))):
+        conn.execute("INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, total_micro, "
+                     "cost_micro, status, supplier_idem_key, created_at, updated_at, completed_at, fields_json) "
+                     "VALUES (?, ?, 'tg-stars', 'telegram_stars', 'Stars', 1, '1', ?, ?, ?, ?, ?, ?, ?, '{}')",
+                     (f"dx-g{i}", uid, total, total // 2, status, f"gk{i}", now, now, now))
+    conn.commit()
+    c = TestClient(app)
+    web_login(c, "glassbuyer@example.com", "password123")
+    c.cookies.set("dx_cur", "USD")
+    page = c.get("/panel").text
+    for part in ("cp-top-in", "cp-search", 'action="/panel/catalog"', "Чем пополним сегодня?", "cp-bal", "cp-curchip",
+                 "Заказов за месяц", "Потрачено", "cp-ring", "cp-dock", "Популярное", "Все игры"):
+        assert part in page, part
+    assert "adm-rail" not in page and "profile-hero" not in page
+    assert "<h1>Добр" in page and "glassbuyer" in page           # приветствие по времени суток и логин
+    assert ">2</div>" in page and "67% заказов выполнено" in page  # 2 выполнено из 3
+    assert "$8.0000" in page                                        # потрачено за 30 дней: 5 + 3
+    assert "от $" in page                                           # цена «от» в «Популярном» (Telegram Stars)
+    orders_page = c.get("/panel/orders").text
+    assert "cp-dock" in orders_page and 'class="cp-ava"' in orders_page

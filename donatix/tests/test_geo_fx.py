@@ -136,7 +136,7 @@ def test_settings_list_has_all_cis(app, geodb, conn):
     assert r.headers["location"] == "/panel" and r.cookies.get("dx_cur") == "KGS"
     c.cookies.set("dx_cur", "KGS")
     page = c.get("/panel").text
-    assert 'code: "KGS"' in page and "сом" in page and 'href="/currency/KGS"' in page   # и в шапке
+    assert 'code: "KGS"' in page and "сом" in page and "<b>KGS</b>" in page   # и на кнопке валюты у баланса
 
 
 def test_admin_header_has_currency_picker(app, geodb, conn):
