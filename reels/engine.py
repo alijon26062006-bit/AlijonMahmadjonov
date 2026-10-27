@@ -523,7 +523,7 @@ def build_static(lesson):
     x = (W - (tw + gap + logo)) / 2
     d.text(p(x, 110), "Python", font=F_TITLE, fill=YELLOW)
     draw_logo(d, x + tw + gap, 138, logo)
-    badge = f"Урок {lesson['number']} · {lesson['topic']}"
+    badge = lesson.get("badge", f"Урок {lesson['number']} · {lesson['topic']}")
     bw = text_w(F_BADGE, badge) + 56
     bx = (W - bw) / 2
     d.rounded_rectangle(p(bx, 270, bx + bw, 330), radius=30 * S, outline=YELLOW, width=3 * S)
