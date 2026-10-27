@@ -66,6 +66,7 @@ CODE_X = PX0 + 44
 CODE_Y = PY0 + 100
 LINE_H = 60
 SUB_Y = 1150
+POP_POS = (W - 220, PY1 - 8)  # где выпрыгивают слова и клавиша ENTER
 
 # ---------- тайминг ----------
 CPS = 13          # скорость печати кода, символов/с
@@ -74,6 +75,13 @@ TRANSITION = 0.4  # смена сцены
 BEAT_GAP = 0.5    # пауза между фразами
 INTRO = 0.7
 OUTRO = 1.5
+
+# места человечка: x бедра и направление (1 — смотрит влево, -1 — вправо)
+SPOTS = {"right": (832, 1), "center": (620, 1), "left": (250, -1)}
+WALK_SPEED = 430  # px/с
+STAND_T = 0.35    # встать / сесть
+POP_WORDS_OK = ["Ура!", "Работает!", "Супер!", "Готово!", "Отлично!", "Есть!"]
+POP_WORDS_ERR = ["Ой!", "Упс!", "Ошибка!"]
 
 
 # ======================================================================
@@ -126,6 +134,16 @@ def Boxes():
 def Box(name, value):
     """Положить значение в коробку name (если коробка есть — заменить значение)."""
     return {"type": "box", "name": name, "value": value}
+
+
+def Walk(spot):
+    """Человечек встаёт и переходит на место spot: "left", "right" или "center"."""
+    return {"type": "walk", "spot": spot}
+
+
+def Pop(text, color="yellow"):
+    """Слово выпрыгивает над терминалом (color: yellow, red, white)."""
+    return {"type": "pop", "text": text, "color": color}
 
 
 def Beat(say=None, sub=None, do=()):
@@ -266,7 +284,10 @@ class Timeline:
         self.subs = []        # (t0, t1, [строки])
         self.sfx = []         # (t, kind)
         self.typing = []      # (t0, t1)
+        self.pops = []        # выпрыгивающие слова и клавиша ENTER
+        self.walks = []       # переходы человечка
         rnd = random.Random(lesson["number"])
+        self.rnd = rnd
         t = INTRO
         for beat in lesson["beats"]:
             cur = t
@@ -291,6 +312,7 @@ class Timeline:
             t = end
         self.duration = t + OUTRO
         self.frames = int(self.duration * FPS)
+        self._plan_walks(lesson.get("auto_walk", True))
         self._voice_env()
 
     def _prepare(self, a, rnd):
@@ -310,6 +332,11 @@ class Timeline:
         if typ == "box":
             self.sfx.append((t0 + 0.35, "pop"))
             return 0.7
+        if typ == "walk":
+            return 0  # идёт параллельно с остальным, см. _plan_walks
+        if typ == "pop":
+            self._add_pop(a["text"], {"yellow": YELLOW, "red": RED, "white": WHITE}[a["color"]], t0)
+            return 0
         if typ == "type":
             t = t0
             lines = []
@@ -338,10 +365,53 @@ class Timeline:
                 self.sfx.append((ot, "error" if a["error"] else "pop"))
             if outs and not a["error"]:
                 self.sfx.append((outs[-1] + 0.15, "chime"))
+            # клавиша ENTER нажимается, затем выпрыгивает слово
+            self.pops.append({"kind": "key", "t0": cmd_end - 0.25, "t1": cmd_end + 0.4, "press": cmd_end})
+            words = POP_WORDS_ERR if a["error"] else POP_WORDS_OK
+            self._add_pop(rnd.choice(words), RED if a["error"] else YELLOW,
+                          (outs[0] if outs else cmd_end + 0.45), shake=a["error"], sound=not a["error"])
             a["cmd_times"] = times
             a["out_times"] = outs
             return (outs[-1] if outs else cmd_end) - t0 + 0.3
         raise ValueError(f"неизвестное действие {typ}")
+
+    def _add_pop(self, text, color, t0, shake=False, sound=True):
+        self.pops.append({"kind": "word", "text": text, "color": color, "t0": t0, "t1": t0 + 1.6,
+                          "rot": self.rnd.uniform(-8, 8), "shake": shake})
+        if sound:
+            self.sfx.append((t0, "boing"))
+
+    def _plan_walks(self, auto):
+        """Когда человечек встаёт и переходит. Авто: на каждой второй смене карточки/разбора."""
+        cur, n, busy = "right", 0, 0.0
+        nxt = {"right": "left", "left": "right", "center": "left"}
+        for a in self.actions:
+            target, manual = None, False
+            if a["type"] == "walk":
+                target, manual = a["spot"], True
+            elif auto and a["type"] in ("card", "syntax", "boxes"):
+                n += 1
+                if n % 2 == 0:
+                    target = nxt[cur]
+            if not target or target == cur or a["t0"] < busy:
+                continue
+            x0, x1 = SPOTS[cur][0], SPOTS[target][0]
+            t0 = a["t0"] + 0.1
+            t_up = t0 + STAND_T
+            t_move = t_up + abs(x1 - x0) / WALK_SPEED
+            t_end = t_move + STAND_T
+            # автоматически не ходим, пока человечек печатает
+            if not manual and any(b["type"] in ("type", "run") and b["t0"] < t_end and t0 < b["t1"]
+                                  for b in self.actions):
+                continue
+            self.walks.append({"t0": t0, "t_up": t_up, "t_move": t_move, "t_end": t_end,
+                               "from": cur, "to": target})
+            step = 38 * math.pi  # шаг — пол-оборота фазы ходьбы
+            dist = step / 2
+            while dist < abs(x1 - x0):
+                self.sfx.append((t_up + dist / WALK_SPEED, "step"))
+                dist += step
+            cur, busy = target, t_end
 
     def _add_subs(self, text, t0, t1):
         """Делит субтитры на куски по 2 строки и распределяет по времени фразы."""
@@ -651,79 +721,217 @@ def draw_subs(d, t):
             return
 
 
+def figure_pose(t):
+    """Где человечек и в какой позе: (x бедра, направление, «стоит» 0..1, фаза шага, идёт ли)."""
+    x, face = SPOTS["right"]
+    for w in TL.walks:
+        if t < w["t0"]:
+            break
+        x0, f0 = SPOTS[w["from"]]
+        x1, f1 = SPOTS[w["to"]]
+        if t >= w["t_end"]:
+            x, face = x1, f1
+            continue
+        go = 1 if x1 < x0 else -1  # идёт влево — смотрит влево
+        if t < w["t_up"]:
+            k = ease((t - w["t0"]) / STAND_T)
+            return x0, (f0 if k < 0.5 else go), k, 0.0, False
+        if t < w["t_move"]:
+            frac = (t - w["t_up"]) / (w["t_move"] - w["t_up"])
+            xx = x0 + (x1 - x0) * frac
+            return xx, go, 1.0, abs(xx - x0) / 38, True
+        k = 1 - ease((t - w["t_move"]) / STAND_T)
+        return x1, (go if k > 0.5 else f1), k, 0.0, False
+    return x, face, 0.0, 0.0, False
+
+
 def draw_figure(d, st, t, f):
-    ox, oy = 40, 70
     typing = st["typing"]
     happy, confused = st["happy"], st["confused"]
     mouth = TL.mouth[min(f, len(TL.mouth) - 1)]
+    X, face, stand, phase, walking = figure_pose(t)
+    if stand > 0:
+        typing = False
 
-    bob = math.sin(t * 9) * 3 if typing else math.sin(t * 2.2) * 2
-    if happy:
-        bob = -abs(math.sin(t * 6)) * 10 * happy
-
-    # ноутбук
-    lx, ly = 490 + ox, 1590 + oy
-    d.polygon([p(lx, ly), p(lx + 108, ly), p(lx + 141, ly + 78), p(lx + 26, ly + 78)], fill=(232, 232, 232))
-    if typing:
-        d.polygon([p(lx + 14, ly + 10), p(lx + 98, ly + 10), p(lx + 122, ly + 66), p(lx + 36, ly + 66)],
-                  fill=(248, 248, 248))
-    thick_line(d, [(lx + 22, ly + 86), (lx + 160, ly + 86)], 11, (150, 150, 150))
-
-    sh = (648 + ox, 1478 + oy + bob)
-    mid = (760 + ox, 1530 + oy + bob * 0.5)
-    hip = (792 + ox, 1596 + oy)
-    thick_line(d, [sh, mid, hip], 20, FIG)
-    thick_line(d, [hip, (792 + ox, 1686 + oy), (848 + ox, 1686 + oy)], 20, FIG)
-    thick_line(d, [hip, (704 + ox, 1596 + oy), (704 + ox, 1688 + oy)], 20, FIG)
-
-    a1 = math.sin(t * 28) * 7 if typing else 0
-    a2 = math.sin(t * 28 + math.pi) * 7 if typing else 0
-    hand1 = (622 + ox, 1652 + oy + a1)
-    hand2 = (652 + ox, 1644 + oy + a2)
-    elbow1 = (628 + ox, 1565 + oy + bob * 0.7)
-    elbow2 = (660 + ox, 1560 + oy + bob * 0.7)
-    hx, hy, r = 616 + ox, 1420 + oy + bob, 45
+    def P(pt):  # локальные координаты -> экран (с зеркалом)
+        return (X + face * pt[0], pt[1])
 
     def toward(pt, target, k):
         return tuple(pt[i] + (target[i] - pt[i]) * k for i in range(2))
 
+    # --- поза «на коленях за ноутбуком» ---
+    bob = math.sin(t * 9) * 3 if typing else math.sin(t * 2.2) * 2
     if happy:
-        hand2 = toward(hand2, (735 + ox, 1345 + oy + bob), happy)
-        elbow2 = toward(elbow2, (712 + ox, 1420 + oy + bob), happy)
+        bob = -abs(math.sin(t * 6)) * 10 * happy
+    a1 = math.sin(t * 28) * 7 if typing else 0
+    a2 = math.sin(t * 28 + math.pi) * 7 if typing else 0
+    kn = {
+        "head": (-176, 1490 + bob), "sh": (-144, 1548 + bob), "mid": (-32, 1600 + bob * 0.5), "hip": (0, 1666),
+        "ka": (0, 1711), "aa": (0, 1756), "ta": (56, 1756),
+        "kb": (-88, 1666), "ab": (-88, 1758), "tb": (-88, 1758),
+        "e1": (-164, 1635 + bob * 0.7), "h1": (-170, 1722 + a1),
+        "e2": (-132, 1630 + bob * 0.7), "h2": (-140, 1714 + a2),
+    }
+    if happy:
+        kn["h2"] = toward(kn["h2"], (-57, 1415 + bob), happy)
+        kn["e2"] = toward(kn["e2"], (-80, 1490 + bob), happy)
     if confused:
         scratch = math.sin(t * 14) * 5
-        hand2 = toward(hand2, (hx + 34 + scratch, hy - 36), confused)
-        elbow2 = toward(elbow2, (hx + 95, hy + 20), confused)
-        hx += -6 * confused
-    thick_line(d, [sh, elbow1, hand1], 17, FIG)
-    thick_line(d, [sh, elbow2, hand2], 17, FIG)
+        hx0, hy0 = kn["head"]
+        kn["h2"] = toward(kn["h2"], (hx0 + 34 + scratch, hy0 - 36), confused)
+        kn["e2"] = toward(kn["e2"], (hx0 + 95, hy0 + 20), confused)
+        kn["head"] = (hx0 - 6 * confused, hy0)
 
+    # --- поза «стоит / идёт», ноутбук под мышкой ---
+    g = 1758
+    wb = -abs(math.sin(phase)) * 6 if walking else 0
+    la = 0.5 * math.sin(phase) if walking else 0.0
+
+    def limb(base, ang, length):
+        return (base[0] - math.sin(ang) * length, base[1] + math.cos(ang) * length)
+
+    hip = (0, g - 128 + wb)
+    sh = (0, g - 244 + wb)
+    ka, kb = limb(hip, la, 64), limb(hip, -la, 64)
+    aa, ab = limb(hip, la, 126), limb(hip, -la, 126)
+    e1 = limb(sh, -la * 0.8, 58)
+    stn = {
+        "head": (-6, g - 300 + wb), "sh": sh, "mid": (0, g - 186 + wb), "hip": hip,
+        "ka": ka, "aa": aa, "ta": (aa[0] - 18, aa[1]),
+        "kb": kb, "ab": ab, "tb": (ab[0] - 18, ab[1]),
+        "e1": e1, "h1": limb(e1, -la * 0.8 - 0.35, 56),
+        "e2": (16, g - 190 + wb), "h2": (-24, g - 150 + wb),
+    }
+    J = {k: toward(kn[k], stn[k], stand) for k in kn}
+
+    # ноутбук: на полу или под мышкой
+    if stand < 0.5:
+        lx, ly = -302, 1660
+        poly = [(lx, ly), (lx + 108, ly), (lx + 141, ly + 78), (lx + 26, ly + 78)]
+        d.polygon([p(*P(q)) for q in poly], fill=(232, 232, 232))
+        if typing:
+            glow = [(lx + 14, ly + 10), (lx + 98, ly + 10), (lx + 122, ly + 66), (lx + 36, ly + 66)]
+            d.polygon([p(*P(q)) for q in glow], fill=(248, 248, 248))
+        thick_line(d, [P((lx + 22, ly + 86)), P((lx + 160, ly + 86))], 11, (150, 150, 150))
+    else:
+        hx2, hy2 = J["h2"]
+        thick_line(d, [P((hx2 - 52, hy2 + 4)), P((hx2 + 44, hy2 + 4))], 18, (150, 150, 150))
+        thick_line(d, [P((hx2 - 48, hy2 - 2)), P((hx2 + 40, hy2 - 2))], 7, (232, 232, 232))
+
+    thick_line(d, [P(J["sh"]), P(J["mid"]), P(J["hip"])], 20, FIG)
+    thick_line(d, [P(J["hip"]), P(J["ka"]), P(J["aa"]), P(J["ta"])], 20, FIG)
+    thick_line(d, [P(J["hip"]), P(J["kb"]), P(J["ab"]), P(J["tb"])], 20, FIG)
+    thick_line(d, [P(J["sh"]), P(J["e1"]), P(J["h1"])], 17, FIG)
+    thick_line(d, [P(J["sh"]), P(J["e2"]), P(J["h2"])], 17, FIG)
+
+    hx, hy = P(J["head"])
+    r = 45
     d.ellipse(p(hx - r, hy - r, hx + r, hy + r), fill=FIG)
     dark = (30, 30, 30)
-    ex, ey = hx - 21, hy - 5
+    ex, ey = hx - 21 * face, hy - 5
     if (t % 3.3) < 0.12:
         thick_line(d, [(ex - 5, ey), (ex + 5, ey)], 3, dark)
     else:
         d.ellipse(p(ex - 5, ey - 5, ex + 5, ey + 5), fill=dark)
-    mx, my = hx - 24, hy + 18
+    mx, my = hx - 24 * face, hy + 18
     if mouth > 0.08:
         mh = 3 + 11 * mouth
         d.ellipse(p(mx - 8, my - mh / 2, mx + 8, my + mh / 2), fill=dark)
     elif happy:
-        d.arc(p(hx - 38, hy - 4, hx - 8, hy + 22), start=40, end=150, fill=dark, width=3 * S)
+        bx = hx - 38 if face > 0 else hx + 8
+        d.arc(p(bx, hy - 4, bx + 30, hy + 22), start=40 if face > 0 else 30, end=150 if face > 0 else 140,
+              fill=dark, width=3 * S)
     else:
         thick_line(d, [(mx - 6, my), (mx + 5, my)], 3, dark)
 
     if happy:
         for k, (dx, dy) in enumerate([(-60, -70), (40, -85), (95, -30)]):
             s_ = 10 * happy * (0.7 + 0.3 * math.sin(t * 8 + k))
-            cx, cy = hx + dx, hy + dy
+            cx, cy = hx + dx * face, hy + dy
             thick_line(d, [(cx - s_, cy), (cx + s_, cy)], 4, YELLOW)
             thick_line(d, [(cx, cy - s_), (cx, cy + s_)], 4, YELLOW)
     if confused:
-        q = "?"
         col = lerp_col(BG, YELLOW, confused)
-        d.text(p(hx - 70, hy - 130 + math.sin(t * 5) * 4), q, font=F_MID, fill=col)
+        d.text(p(hx - 70 * face - (20 if face < 0 else 0), hy - 130 + math.sin(t * 5) * 4), "?", font=F_MID, fill=col)
+
+
+# ---------- выпрыгивающие слова ----------
+F_POP = font("JetBrainsMono-ExtraBold.ttf", 78)
+F_KEY = font("JetBrainsMono-ExtraBold.ttf", 40)
+_POP_CACHE = {}
+
+
+def _pop_layer(pop, pressed=False):
+    key = (pop["kind"], pop.get("text"), pop.get("color"), pressed)
+    if key in _POP_CACHE:
+        return _POP_CACHE[key]
+    if pop["kind"] == "key":
+        w, h, sh = 250 * S, 110 * S, (4 if pressed else 12) * S
+        img = Image.new("RGBA", (w, h + 12 * S), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        top = 12 * S - sh + (8 * S if pressed else 0)
+        d.rounded_rectangle((0, top + sh, w, top + h), radius=20 * S, fill=(150, 150, 150, 255))
+        d.rounded_rectangle((0, top, w, top + h - sh), radius=20 * S, fill=(238, 238, 238, 255))
+        label, arrow = "ENTER ", "↵"
+        f_arrow = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 44 * S)
+        tw = F_KEY.getlength(label) + f_arrow.getlength(arrow)
+        x0 = (w - tw) / 2
+        ty = top + (h - sh) / 2 - 26 * S
+        d.text((x0, ty), label, font=F_KEY, fill=(40, 40, 40, 255))
+        d.text((x0 + F_KEY.getlength(label), ty - 4 * S), arrow, font=f_arrow, fill=(40, 40, 40, 255))
+    else:
+        text = pop["text"]
+        stroke = 7 * S
+        bbox = F_POP.getbbox(text, stroke_width=stroke)
+        w, h = bbox[2] - bbox[0] + 20 * S, bbox[3] - bbox[1] + 26 * S
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        ox, oy = 10 * S - bbox[0], 8 * S - bbox[1]
+        d.text((ox + 6 * S, oy + 9 * S), text, font=F_POP, fill=(0, 0, 0, 140),
+               stroke_width=stroke, stroke_fill=(0, 0, 0, 140))
+        d.text((ox, oy), text, font=F_POP, fill=pop["color"] + (255,),
+               stroke_width=stroke, stroke_fill=(24, 24, 24, 255))
+    _POP_CACHE[key] = img
+    return img
+
+
+def _back_out(x):
+    x = max(0.0, min(1.0, x))
+    c1 = 2.2
+    return 1 + (c1 + 1) * (x - 1) ** 3 + c1 * (x - 1) ** 2
+
+
+def draw_pops(img, t):
+    for pop in TL.pops:
+        if not (pop["t0"] <= t < pop["t1"]):
+            continue
+        x = t - pop["t0"]
+        left = pop["t1"] - t
+        alpha = min(1.0, left / 0.25)
+        cx, cy = POP_POS
+        rot = 0.0
+        if pop["kind"] == "key":
+            pressed = pop["press"] <= t < pop["press"] + 0.15
+            layer = _pop_layer(pop, pressed)
+            scale = _back_out(x / 0.2)
+        else:
+            layer = _pop_layer(pop)
+            scale = _back_out(x / 0.35) * (0.85 + 0.15 * alpha)
+            rot = pop["rot"] + math.sin(x * 12) * 5 * math.exp(-x * 4)
+            cy -= 18 * _back_out(x / 0.35) + math.sin(x * 3) * 4
+            if pop["shake"]:
+                cx += math.sin(x * 45) * 10 * math.exp(-x * 5)
+        if scale <= 0.02 or alpha <= 0:
+            continue
+        lw, lh = max(1, int(layer.width * scale)), max(1, int(layer.height * scale))
+        lay = layer.resize((lw, lh), Image.BICUBIC)
+        if rot:
+            lay = lay.rotate(rot, resample=Image.BICUBIC, expand=True)
+        if alpha < 1:
+            a = lay.getchannel("A").point(lambda v: int(v * alpha))
+            lay.putalpha(a)
+        px, py = int(cx * S - lay.width / 2), int(cy * S - lay.height / 2)
+        img.paste(lay, (px, py), lay)
 
 
 def render_frame(f):
@@ -755,6 +963,7 @@ def render_frame(f):
 
     draw_subs(d, t)
     draw_figure(d, st, t, f)
+    draw_pops(img, t)
 
     img = img.resize((W, H), Image.LANCZOS)
     if t < 0.6:
@@ -802,6 +1011,18 @@ def sfx_sound(kind, rng):
         f = 420 + 700 * (1 - np.exp(-t * 60))
         s = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 22)
         return s * (0.32 if kind == "pop" else 0.18)
+    if kind == "boing":
+        L = int(0.4 * SR)
+        t = np.arange(L) / SR
+        f = 260 + 520 * (1 - np.exp(-t * 22)) + 40 * np.sin(2 * np.pi * 16 * t) * np.exp(-t * 5)
+        s = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 9)
+        return s * 0.26
+    if kind == "step":
+        L = int(0.12 * SR)
+        t = np.arange(L) / SR
+        thump = np.sin(2 * np.pi * rng.uniform(85, 110) * t) * np.exp(-t * 40)
+        scuff = _onepole_lowpass(rng.standard_normal(L), np.full(L, 1800.0)) * np.exp(-t * 60)
+        return (thump * 0.4 + scuff * 0.25) * rng.uniform(0.7, 1.0)
     if kind == "tick":
         L = int(0.08 * SR)
         t = np.arange(L) / SR
