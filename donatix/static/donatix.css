@@ -2650,7 +2650,7 @@ html:has(body.adm) { background: #cdb79e; }
 .adm .top.adm-top { position: sticky; top: 0; border: 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none;
   padding: 12px 16px 0; }
 .adm-top-in { max-width: 1320px; margin: 0 auto; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 8px;
-  border-radius: 999px; background: var(--g-panel); border: 1px solid var(--g-line); box-shadow: var(--g-hi), var(--g-shadow);
+  border-radius: 24px; background: var(--g-panel); border: 1px solid var(--g-line); box-shadow: var(--g-hi), var(--g-shadow);
   -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); }
 .adm-hello { display: flex; align-items: center; gap: 10px; color: var(--g-text); font-weight: 500; font-size: .88rem; white-space: nowrap; }
 .adm-hello:hover { text-decoration: none; color: var(--g-text); }
@@ -2674,7 +2674,7 @@ html:has(body.adm) { background: #cdb79e; }
 .adm .side { display: none; }
 .adm .side.open { display: flex; }
 .adm-rail { position: sticky; top: 92px; z-index: 6; align-self: start; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 0; width: 52px; border-radius: 999px; background: var(--g-panel); border: 1px solid var(--g-line);
+  padding: 10px 0; width: 52px; border-radius: 24px; background: var(--g-panel); border: 1px solid var(--g-line);
   box-shadow: var(--g-hi), var(--g-shadow); -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); }
 .adm-rail-i { position: relative; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 0;
   background: none; color: var(--g-muted); cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease; }
@@ -2716,8 +2716,8 @@ html:has(body.adm) { background: #cdb79e; }
 .adm .badge { border-radius: 999px; }
 
 /* нижнее плавающее меню */
-.adm .tabbar.adm-dock { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 45;
-  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 999px; width: max-content; max-width: calc(100vw - 24px);
+.adm .tabbar.adm-dock { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: max(16px, env(safe-area-inset-bottom)); transform: none; z-index: 45;
+  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 22px; width: -webkit-max-content; width: max-content; max-width: calc(100vw - 24px);
   background: var(--g-panel); border: 1px solid var(--g-line); box-shadow: var(--g-hi), 0 20px 40px -18px rgb(0 0 0 / .45);
   -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); grid-template-columns: none; }
 .adm .adm-dock > a { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px;
@@ -2766,6 +2766,11 @@ html:has(body.adm) { background: #cdb79e; }
   .adm .adm-dock > a.xs-hide { display: none; }
   .app-ui .adm .tabbar.adm-dock { display: flex; }
   .app-ui.adm main#main, .app-ui .adm main#main { padding-bottom: 22px; }
+  /* пункты меню «+» — строками, как на компьютере: общие правила нижнего меню (столбик, мелкий серый шрифт) не для них */
+  .app-ui .adm .tabbar .adm-plus-menu a, .app-ui .adm .tabbar .adm-plus-menu button { flex-direction: row; justify-content: flex-start;
+    align-items: center; gap: 10px; height: auto; padding: 10px 12px; font-size: .84rem; font-weight: 500; color: #231c16; }
+  .app-ui .adm .tabbar .adm-plus-menu a svg, .app-ui .adm .tabbar .adm-plus-menu button svg { width: 18px; height: 18px; padding: 0; }
+  .app-ui[data-theme="dark"] .adm .tabbar .adm-plus-menu a, .app-ui[data-theme="dark"] .adm .tabbar .adm-plus-menu button { color: #f4ede6; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .adm { --g-panel: rgb(246 238 228 / .92); }
@@ -3078,11 +3083,12 @@ html:has(body.cp) { background: #0f0c26; }
 .cp .label-caps { color: var(--muted); }
 .cp .page-hero { background: var(--surface); border-color: var(--line); border-radius: 22px; box-shadow: var(--g-hi); }
 
-/* шапка-таблетка */
+/* шапка-таблетка. У всего, что размыто (backdrop-filter), радиус меньше половины высоты, а не 999px:
+   Safari на iPhone при «полном» скруглении рисует размытие прямоугольником с углами наружу. */
 .cp .top.cp-top { position: sticky; top: 0; z-index: 40; border: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none;
   padding: 10px 14px 0; }
 .cp-top-in { max-width: 1280px; margin: 0 auto; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 8px;
-  border-radius: 999px; background: rgb(255 255 255 / .10); border: 1px solid rgb(255 255 255 / .18);
+  border-radius: 24px; background: rgb(255 255 255 / .10); border: 1px solid rgb(255 255 255 / .18);
   box-shadow: var(--g-hi), 0 20px 40px -24px rgb(0 0 0 / .8); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
 .cp-ava { width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #fff;
   background: linear-gradient(135deg, #8b7bff, #4f46e5); box-shadow: 0 0 0 2px rgb(255 255 255 / .5); }
@@ -3196,16 +3202,17 @@ html:has(body.cp) { background: #0f0c26; }
 
 /* плавающее меню внизу (телефон) */
 @media (max-width: 900px) {
-  .app-ui .cp .tabbar.cp-dock { left: 50%; right: auto; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-    display: flex; align-items: center; gap: 2px; width: auto; max-width: calc(100vw - 24px); padding: 5px; border-radius: 999px;
+  .app-ui .cp .tabbar.cp-dock { left: 0; right: 0; margin: 0 auto; bottom: calc(12px + env(safe-area-inset-bottom)); transform: none;
+    display: flex; align-items: center; gap: 2px; width: -webkit-max-content; width: max-content; max-width: calc(100vw - 24px);
+    padding: 5px; border-radius: 24px;
     border: 1px solid rgb(255 255 255 / .18); background: rgb(28 22 58 / .62); box-shadow: var(--g-hi), 0 20px 40px -20px rgb(0 0 0 / .95);
     -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
   .app-ui .cp .tabbar.cp-dock::after { display: none; }
-  .app-ui .cp .tabbar.cp-dock a, .app-ui .cp .tabbar.cp-dock button { height: auto; justify-content: center; gap: 2px; padding: 6px 12px 5px;
+  .app-ui .cp .tabbar.cp-dock a, .app-ui .cp .tabbar.cp-dock button { height: 44px; justify-content: center; gap: 2px; padding: 0 12px;
     border-radius: 999px; color: rgb(255 255 255 / .72); font-size: .62rem; font-weight: 600; }
   .app-ui .cp .tabbar.cp-dock a:not(.tab-main) svg, .app-ui .cp .tabbar.cp-dock button svg { width: 18px; height: 18px; padding: 0; background: none; }
   .app-ui .cp .tabbar.cp-dock a.on:not(.tab-main) { background: #fff; color: #1b1640; }
-  .app-ui .cp .tabbar.cp-dock .tab-main { width: 42px; height: 42px; margin: 0 4px; padding: 0; border-radius: 50%; color: #fff;
+  .app-ui .cp .tabbar.cp-dock .tab-main { width: 44px; height: 44px; margin: 0 4px; padding: 0; border-radius: 50%; color: #fff;
     background: linear-gradient(135deg, #8b7bff, #4f46e5); box-shadow: 0 8px 18px -6px #6d5cff; }
   .app-ui .cp .tabbar.cp-dock .tab-main span { display: none; }
   .app-ui .cp .tabbar.cp-dock .tab-main svg { width: 22px; height: 22px; padding: 0; margin: 0; transform: none; background: none; box-shadow: none; border-radius: 0; }
