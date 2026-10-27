@@ -583,7 +583,9 @@ def draw_boxes(d, st, t, dy):
     boxes = st["boxes"]
     if not boxes:
         return
-    bw, bh, gap = 300, 270, 60
+    gap = 60 if len(boxes) < 3 else 36
+    bw = min(300, (980 - (len(boxes) - 1) * gap) / len(boxes))
+    bh = 270
     total = len(boxes) * bw + (len(boxes) - 1) * gap
     x = (W - total) / 2
     top = PY0 + 250 + dy
