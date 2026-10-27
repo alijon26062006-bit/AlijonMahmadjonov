@@ -3081,7 +3081,8 @@ html:has(body.cp) { background: #0f0c26; }
 .cp .install-card { background: rgb(255 255 255 / .1); border: 1px solid var(--line); box-shadow: var(--g-hi); }
 .cp .install-card .btn { background: #fff; color: #4338ca; }
 .cp .label-caps { color: var(--muted); }
-.cp .page-hero { background: var(--surface); border-color: var(--line); border-radius: 22px; box-shadow: var(--g-hi); }
+.cp .page-hero { margin: 14px 4px 12px; }   /* заголовок страницы — как приветствие на главной, без рамки */
+.cp .page-hero h1 { font-weight: 600; letter-spacing: -.01em; }
 
 /* шапка-таблетка. У всего, что размыто (backdrop-filter), радиус меньше половины высоты, а не 999px:
    Safari на iPhone при «полном» скруглении рисует размытие прямоугольником с углами наружу. */
@@ -3276,3 +3277,4 @@ main#main:focus { outline: none; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .adm-top-in, :root:not([data-theme="light"]) .adm .tabbar.adm-dock { background: rgb(36 29 24 / .92); }
 }
+.cp .search input, .cp .search input:focus { background: transparent; border: 0; box-shadow: none; }
