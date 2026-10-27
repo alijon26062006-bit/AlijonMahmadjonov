@@ -146,11 +146,21 @@ def Pop(text, color="yellow"):
     return {"type": "pop", "text": text, "color": color}
 
 
+def Net(state="normal"):
+    """Сцена «интернет → сервер»: запросы летят на сервер, видна нагрузка и статус."""
+    return {"type": "net", "state": state}
+
+
+def NetState(state):
+    """Меняет сцену «сеть»: "normal", "flood" (DDoS), "shield" (защита CDN), "hide_ip"."""
+    return {"type": "netstate", "state": state}
+
+
 def Beat(say=None, sub=None, do=()):
     return {"say": say, "sub": sub if sub is not None else say, "do": list(do)}
 
 
-MODE_TYPES = {"title", "card", "syntax", "term", "boxes"}
+MODE_TYPES = {"title", "card", "syntax", "term", "boxes", "net"}
 RUN_CMD = "$ python main.py"
 
 
@@ -332,6 +342,12 @@ class Timeline:
         if typ == "box":
             self.sfx.append((t0 + 0.35, "pop"))
             return 0.7
+        if typ == "netstate":
+            snd = {"flood": "alarm", "shield": "chime", "hide_ip": "tick", "normal": "pop_soft"}[a["state"]]
+            self.sfx.append((t0, snd))
+            if a["state"] == "shield":
+                self.sfx.append((t0, "whoosh"))
+            return 0.6
         if typ == "walk":
             return 0  # идёт параллельно с остальным, см. _plan_walks
         if typ == "pop":
@@ -478,6 +494,14 @@ class Timeline:
                         break
                 else:
                     st["boxes"].append({"name": a["name"], "value": a["value"], "old": None, "t0": a["t0"]})
+            elif typ == "net":
+                st["net"] = [(a["state"], a["t0"])]
+                st["ip_hidden"] = None
+            elif typ == "netstate":
+                if a["state"] == "hide_ip":
+                    st["ip_hidden"] = a["t0"]
+                else:
+                    st["net"].append((a["state"], a["t0"]))
             elif typ == "hl":
                 st["hls"].append((a["i"], a["t0"]))
             elif typ == "term":
@@ -518,11 +542,16 @@ def draw_logo(d, x, y, s):
 def build_static(lesson):
     img = Image.new("RGB", (W * S, H * S), BG)
     d = ImageDraw.Draw(img)
-    tw = text_w(F_TITLE, "Python")
-    logo, gap = 82, 26
+    header = lesson.get("header", "Python")
+    logo_kind = lesson.get("logo", "python")
+    tw = text_w(F_TITLE, header)
+    logo, gap = (82, 26) if logo_kind else (0, 0)
     x = (W - (tw + gap + logo)) / 2
-    d.text(p(x, 110), "Python", font=F_TITLE, fill=YELLOW)
-    draw_logo(d, x + tw + gap, 138, logo)
+    d.text(p(x, 110), header, font=F_TITLE, fill=YELLOW)
+    if logo_kind == "python":
+        draw_logo(d, x + tw + gap, 138, logo)
+    elif logo_kind == "shield":
+        draw_shield(d, x + tw + gap + logo / 2, 182, 0.62, YELLOW, (60, 54, 24))
     badge = lesson.get("badge", f"Урок {lesson['number']} · {lesson['topic']}")
     bw = text_w(F_BADGE, badge) + 56
     bx = (W - bw) / 2
@@ -693,6 +722,166 @@ def draw_boxes(d, st, t, dy):
         d.rounded_rectangle(p(tx, top + 158, tx + nw, top + 222), radius=12 * S, fill=lerp_col(PANEL, (25, 25, 25), ka))
         d.text(p(tx + 20, top + 162), b["name"], font=F_BOX_NAME, fill=lerp_col(PANEL, C_NAME, ka))
         x += bw + gap
+
+
+F_NET = font("JetBrainsMono-Bold.ttf", 32)
+NET_SRC_X = PX0 + 110
+NET_SRC_Y = [PY0 + 190 + i * 125 for i in range(5)]
+NET_SHIELD_X = W / 2 - 10
+NET_SRV = (PX1 - 250, PY0 + 210, PX1 - 90, PY0 + 500)  # сервер
+NET_RATES = {"normal": 2.5, "flood": 34.0, "shield": 34.0}
+NET_LOAD = {"normal": 0.18, "flood": 0.97, "shield": 0.32}
+GOOD, BAD, REPLY = (120, 214, 140), (238, 92, 92), YELLOW
+NET_HIDDEN_LABEL = "скрыт"
+
+
+def draw_shield(d, cx, cy, k, edge, fill):
+    """Щит с центром (cx, cy), k — масштаб."""
+    w, h = 120 * k, 150 * k
+    pts = [(cx - w / 2, cy - h / 2), (cx + w / 2, cy - h / 2), (cx + w / 2, cy + h * 0.05),
+           (cx, cy + h / 2), (cx - w / 2, cy + h * 0.05)]
+    d.polygon([p(*q) for q in pts], fill=fill)
+    thick_line(d, pts + [pts[0]], max(2, 6 * k), edge)
+
+
+def _hash01(i, seed):
+    v = math.sin(i * 12.9898 + seed * 78.233) * 43758.5453
+    return v - math.floor(v)
+
+
+def net_load(segs, t):
+    load = NET_LOAD["normal"]
+    for i, (state, ts) in enumerate(segs):
+        if ts > t:
+            break
+        target = NET_LOAD[state]
+        load = load + (target - load) * ease((t - ts) / 1.3)
+    if [s for s, ts in segs if ts <= t][-1:] == ["flood"]:
+        load += math.sin(t * 13) * 0.02
+    return max(0.0, min(1.0, load))
+
+
+def draw_net(d, st, t, dy):
+    segs = st["net"]
+    cur = [s for s, ts in segs if ts <= t][-1]
+    flood = cur == "flood"
+    shield_t = next((ts for s, ts in segs if s == "shield"), None)
+    shield_k = ease((t - shield_t) / 0.5) if shield_t is not None and t >= shield_t else 0.0
+    load = net_load(segs, t)
+    sx0, sy0, sx1, sy1 = NET_SRV
+    sy0, sy1 = sy0 + dy, sy1 + dy
+    srv_cy = (sy0 + sy1) / 2
+
+    # подписи
+    d.text(p(NET_SRC_X - 70, PY0 + 95 + dy), "Интернет", font=F_NET, fill=GREY)
+    lab = "Сервер"
+    d.text(p((sx0 + sx1) / 2 - text_w(F_NET, lab) / 2, PY0 + 95 + dy), lab, font=F_NET, fill=GREY)
+
+    # пакеты запросов (рисуем до иконок, чтобы они «вылетали» из компьютеров)
+    for si, (state, ts) in enumerate(segs):
+        te = segs[si + 1][1] if si + 1 < len(segs) else 1e9
+        rate = NET_RATES.get(state, 0)
+        if not rate:
+            continue
+        travel = 1.0 if state == "normal" else 0.75
+        lo = max(ts, t - travel * 2)
+        hi = min(t, te)
+        if hi <= lo:
+            continue
+        for k in range(int(math.ceil((lo - ts) * rate)), int(math.floor((hi - ts) * rate)) + 1):
+            spawn = ts + k / rate
+            if spawn > t:
+                break
+            h = _hash01(k, si + 1)
+            bad = state != "normal" and h < 0.88
+            src_y = NET_SRC_Y[int(h * 997) % 5] + dy
+            dst_y = srv_cy + (_hash01(k, si + 7) - 0.5) * 160
+            u = (t - spawn) / travel
+            x0, x1 = NET_SRC_X + 50, sx0 - 10
+            if u <= 1:
+                x = x0 + (x1 - x0) * u
+                y = src_y + (dst_y - src_y) * u
+                col, r = (BAD if bad else GOOD), 9
+                if state == "shield" and bad:
+                    us = (NET_SHIELD_X - 70 - x0) / (x1 - x0)
+                    if u > us:  # отскок от щита
+                        back = (u - us) * 1.4
+                        x = x0 + (x1 - x0) * us - back * 140
+                        y = src_y + (dst_y - src_y) * us + back * 60 * (1 if h > 0.44 else -1)
+                        fade = max(0.0, 1 - back * 2.2)
+                        if fade <= 0:
+                            continue
+                        col = lerp_col(PANEL, BAD, fade)
+            elif not bad and state != "flood" and u <= 2:
+                v = u - 1  # ответ сервера летит обратно
+                x = x1 + (x0 - x1) * v
+                y = dst_y + (src_y - dst_y) * v
+                col, r = REPLY, 6
+            else:
+                continue
+            d.ellipse(p(x - r, y - r, x + r, y + r), fill=col)
+
+    # компьютеры в интернете
+    for i, yy in enumerate(NET_SRC_Y):
+        y = yy + dy
+        hot = flood or (cur == "shield")
+        edge = lerp_col(GREY, BAD, 0.8) if hot and i % 2 == 0 else GREY
+        d.rounded_rectangle(p(NET_SRC_X - 45, y - 32, NET_SRC_X + 45, y + 24), radius=8 * S,
+                            fill=(30, 30, 30), outline=edge, width=3 * S)
+        thick_line(d, [(NET_SRC_X - 18, y + 34), (NET_SRC_X + 18, y + 34)], 5, edge)
+
+    # щит CDN
+    if shield_k > 0:
+        cy = srv_cy
+        draw_shield(d, NET_SHIELD_X, cy, 1.5 * _back_out_net(shield_k), YELLOW, (52, 47, 22))
+        lab = "CDN"
+        d.text(p(NET_SHIELD_X - text_w(F_NET, lab) / 2, cy - 30), lab, font=F_NET,
+               fill=lerp_col(PANEL, YELLOW, shield_k))
+
+    # сервер: три блока с лампочками
+    led = GOOD if load < 0.6 else ((245, 192, 66) if load < 0.85 else BAD)
+    blink = flood and int(t * 6) % 2 == 0
+    for i in range(3):
+        y0 = sy0 + i * (sy1 - sy0) / 3
+        y1 = y0 + (sy1 - sy0) / 3 - 10
+        d.rounded_rectangle(p(sx0, y0, sx1, y1), radius=10 * S, fill=(42, 42, 42), outline=(80, 80, 80),
+                            width=3 * S)
+        for j in range(3):
+            lc = led if not (blink and j == i % 3) else (60, 30, 30)
+            cx, cyy = sx0 + 28 + j * 26, (y0 + y1) / 2
+            d.ellipse(p(cx - 7, cyy - 7, cx + 7, cyy + 7), fill=lc)
+        thick_line(d, [(sx0 + 100, (y0 + y1) / 2), (sx1 - 20, (y0 + y1) / 2)], 5, (70, 70, 70))
+
+    # нагрузка CPU
+    by = sy1 + 26
+    d.text(p(sx0, by), "CPU", font=F_NET, fill=GREY)
+    bx0, bx1 = sx0 + 80, sx1
+    d.rounded_rectangle(p(bx0, by + 6, bx1, by + 36), radius=8 * S, fill=(40, 40, 40))
+    if load > 0.01:
+        d.rounded_rectangle(p(bx0, by + 6, bx0 + (bx1 - bx0) * load, by + 36), radius=8 * S, fill=led)
+
+    # статус ответа
+    down = flood and load > 0.85
+    status = "503" if down else "200 OK"
+    scol = BAD if down else GOOD
+    if not (down and int(t * 3) % 2 == 1):
+        sw = text_w(F_NET, status)
+        d.text(p((sx0 + sx1) / 2 - sw / 2, by + 60), status, font=F_NET, fill=scol)
+
+    # IP сервера
+    ip_t = st.get("ip_hidden")
+    if ip_t is not None and t >= ip_t:
+        k = ease((t - ip_t) / 0.4)
+        ip, col = "IP: " + NET_HIDDEN_LABEL, lerp_col(GREY, GOOD, k)
+    else:
+        ip, col = "IP: 203.0.113.7", GREY
+    d.text(p((sx0 + sx1) / 2 - text_w(F_NET, ip) / 2, by + 115), ip, font=F_NET, fill=col)
+
+
+def _back_out_net(x):
+    x = max(0.0, min(1.0, x))
+    c1 = 1.7
+    return 1 + (c1 + 1) * (x - 1) ** 3 + c1 * (x - 1) ** 2
 
 
 def draw_markup(d, x, y, line, f, base, accent, center=False):
@@ -956,6 +1145,8 @@ def render_frame(f):
         draw_syntax(d, st, t, dy)
     elif mode == "boxes":
         draw_boxes(d, st, t, dy)
+    elif mode == "net":
+        draw_net(d, st, t, dy)
     if mode and k < 1:  # плавное появление новой сцены
         region = p(PX0 + 10, PY0 + 70, PX1 - 10, PY1 - 10)
         crop = img.crop(region)
@@ -1011,6 +1202,13 @@ def sfx_sound(kind, rng):
         f = 420 + 700 * (1 - np.exp(-t * 60))
         s = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 22)
         return s * (0.32 if kind == "pop" else 0.18)
+    if kind == "alarm":
+        L = int(1.5 * SR)
+        t = np.arange(L) / SR
+        fr = np.where((t * 4).astype(int) % 2 == 0, 880, 660)
+        s = np.sign(np.sin(2 * np.pi * np.cumsum(fr) / SR)) * 0.5 + np.sin(2 * np.pi * np.cumsum(fr) / SR) * 0.5
+        env = np.clip(1.5 - t, 0, 1) * (0.6 + 0.4 * ((t * 8) % 1 < 0.7))
+        return s * env * 0.07
     if kind == "boing":
         L = int(0.4 * SR)
         t = np.arange(L) / SR
@@ -1160,8 +1358,30 @@ def set_code_size(size):
     LINE_H = int(size * 1.5)
 
 
+INTER_DIR = "/usr/share/fonts/opentype/inter"
+
+
+def set_text_font(family):
+    """Шрифт для обычного текста. "inter" — для таджикских букв ҳ, ӣ, ӯ (их нет в JetBrains Mono)."""
+    global F_TITLE, F_BADGE, F_SUB, F_CARD_T, F_CARD, F_BIG, F_MID, F_SMALL, F_LABEL, F_POP, F_NET
+    if family != "inter":
+        return
+
+    def f(weight, size):
+        return ImageFont.truetype(os.path.join(INTER_DIR, f"Inter-{weight}.otf"), int(size * S))
+
+    F_TITLE, F_BADGE, F_SUB = f("ExtraBold", 96), f("SemiBold", 34), f("SemiBold", 46)
+    F_CARD_T, F_CARD, F_BIG = f("ExtraBold", 56), f("Medium", 46), f("Black", 118)
+    F_MID, F_SMALL, F_LABEL = f("Bold", 58), f("Medium", 40), f("SemiBold", 36)
+    F_POP, F_NET = f("Black", 86), f("Bold", 34)
+
+
 def prepare(lesson):
     set_code_size(lesson.get("code_size", 40))
+    set_text_font(lesson.get("text_font", "mono"))
+    global NET_HIDDEN_LABEL, PIPER_SPEED
+    PIPER_SPEED = lesson.get("voice_speed", PIPER_SPEED)
+    NET_HIDDEN_LABEL = lesson.get("net_hidden_label", NET_HIDDEN_LABEL)
     tl = Timeline(lesson)
     _init(tl, build_static(lesson))
     return tl
