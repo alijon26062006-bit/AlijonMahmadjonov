@@ -76,6 +76,7 @@
   <button type="button" onclick="dxMenu(true)">{{ icon('menu', 22) }}<span>Ещё</span></button>
 </nav>
 {% endblock %}
+{% from "_cur_pick.html" import cur_sheet with context %}{{ cur_sheet() }}
 <script>
   // Push-уведомления: подписка этого устройства (телефон, приложение, компьютер)
   window.dxPush = (function () {

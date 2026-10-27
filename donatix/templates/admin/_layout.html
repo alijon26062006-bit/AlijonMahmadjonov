@@ -19,6 +19,7 @@
       <input name="q" type="search" placeholder="Найти заказ: номер, ID игрока, логин…" aria-label="Поиск заказа" autocomplete="off">
     </form>
     <div class="adm-top-act">
+      {% from "_cur_pick.html" import cur_button with context %}{{ cur_button('adm-cur') }}
       {{ theme_button() }}
       <button class="adm-circle" type="button" aria-label="Все разделы" onclick="dxMenu(true)">{{ icon('menu', 18) }}</button>
     </div>

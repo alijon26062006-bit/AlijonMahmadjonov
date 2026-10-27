@@ -1676,15 +1676,16 @@ async def binance_webhook(request: Request, conn=Depends(get_conn), config: Conf
 
 
 @router.get("/currency/{code}")
-def set_currency(code: str, request: Request):
-    """Переключатель USD / TJS / валюта СНГ: только показ сумм, запоминается в браузере на год."""
+def set_currency(code: str, request: Request, next: str = ""):
+    """Выбор валюты показа: сомони, доллар или валюта СНГ. Только показ сумм, запоминается в браузере на год.
+    Возвращает на страницу из next (лист выбора валюты), иначе — откуда пришли."""
     from . import fx
     code = code.upper()
-    code = code if code in ("TJS", *fx.CURRENCIES) else "USD"
+    code = code if code in fx.ALL else "USD"
     from urllib.parse import urlsplit
     ref = urlsplit(request.headers.get("referer") or "")
-    back = (ref.path or "/panel") + (f"?{ref.query}" if ref.query else "")
-    if not back.startswith("/") or back.startswith("//"):
+    back = next or (ref.path or "/panel") + (f"?{ref.query}" if ref.query else "")
+    if not back.startswith("/") or back.startswith("//") or len(back) > 500 or any(ch in back for ch in "\\\r\n\t"):
         back = "/panel"  # только свои страницы — никаких переходов на чужие сайты
     resp = _redirect(back)
     resp.set_cookie("dx_cur", code, max_age=365 * 86400, samesite="lax", httponly=True)
@@ -2237,7 +2238,8 @@ async def panel_live(request: Request, once: int = 0):
         pool.release(c)
     if user is None:
         return JSONResponse({"error": "login"}, status_code=401)
-    cur = "USD" if request.cookies.get("dx_cur") == "USD" else "TJS"
+    from . import fx, geo
+    cur, _ = fx.choose(geo.country(config, _ip(request)), request.cookies.get("dx_cur", ""))   # как на странице
     admin = user["role"] == "admin"
     if once:   # запасной путь, если браузер не держит соединение: раз в несколько секунд
         import asyncio

@@ -30,6 +30,21 @@ CURRENCIES: dict[str, tuple[str, str, int, str]] = {
     "TMT": ("TM", "m", 2, "3.5"),
 }
 BY_COUNTRY = {v[0]: k for k, v in CURRENCIES.items()}
+# Выбор в настройках: сомони и доллар — всем, плюс валюты СНГ. Код: (название, страна)
+NAMES: dict[str, tuple[str, str]] = {
+    "TJS": ("Сомони", "Таджикистан"),
+    "USD": ("Доллар США", "США"),
+    "RUB": ("Российский рубль", "Россия"),
+    "KZT": ("Казахстанский тенге", "Казахстан"),
+    "UZS": ("Узбекский сум", "Узбекистан"),
+    "KGS": ("Киргизский сом", "Кыргызстан"),
+    "BYN": ("Белорусский рубль", "Беларусь"),
+    "AZN": ("Азербайджанский манат", "Азербайджан"),
+    "AMD": ("Армянский драм", "Армения"),
+    "MDL": ("Молдавский лей", "Молдова"),
+    "TMT": ("Туркменский манат", "Туркменистан"),
+}
+ALL = tuple(NAMES)
 MARGIN_PCT = Decimal("3")       # запас на курс и комиссию обмена — показанная цена не ниже настоящей
 KEY = "fx.rates"
 MAX_AGE = 86400
@@ -41,12 +56,30 @@ def for_country(cc: str) -> str:
 
 
 def allowed(cc: str) -> tuple[str, ...]:
-    """Какие валюты показать посетителю: сомони — только из Таджикистана (или пока страну не знаем),
+    """Валюта по умолчанию и быстрые кнопки в шапке: из Таджикистана (или пока страну не знаем) — сомони,
     из СНГ — его валюта и доллар, из остальных стран — доллар."""
     if cc in ("", "TJ"):
         return ("TJS", "USD")
     local = for_country(cc)
     return (local, "USD") if local else ("USD",)
+
+
+def choose(cc: str, chosen: str) -> tuple[str, tuple[str, ...]]:
+    """Валюта показа и быстрые кнопки. Не выбрал сам — по стране; выбрать можно любую из ALL
+    (в настройках кабинета и в шапке админки) — тогда и она среди быстрых кнопок."""
+    quick = allowed(cc)
+    code = chosen if chosen in ALL else quick[0]
+    return code, quick if code in quick else (code, *quick)
+
+
+def options() -> list[dict[str, str]]:
+    """Список для выбора валюты: код, название, страна и знак."""
+    return [{"code": code, "name": name, "country": country, "sym": badge(code)}
+            for code, (name, country) in NAMES.items()]
+
+
+def badge(code: str) -> str:
+    return {"TJS": "с.", "USD": "$"}.get(code) or symbol(code)
 
 
 def symbol(code: str) -> str:

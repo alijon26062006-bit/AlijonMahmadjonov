@@ -47,6 +47,9 @@ def state(config: Config, user_id: int, admin: bool, cur: str) -> dict[str, Any]
             rate = settings(c, config)["tjs_rate"]
     finally:
         pool.release(c)
+    if cur != "TJS":
+        from . import fx
+        rate = fx.rate(config, cur)   # валюта СНГ; у доллара курса нет
     from .deps import _money
     balance = u[0]
     return {"balance": balance, "balance_html": str(_money({"cur_code": cur, "cur_rate": rate}, balance)),

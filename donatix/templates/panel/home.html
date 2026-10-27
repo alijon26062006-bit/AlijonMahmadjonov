@@ -113,6 +113,9 @@
 <div class="list">
   <div class="kv"><span class="k">Email</span><span class="v">{% if is_guest_account(user) %}<a href="/panel/save">Указать</a>{% else %}{{ user.email }}{% endif %}</span></div>
   <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
+  {% from "_cur_pick.html" import cur_button with context %}
+  <div class="kv cur-row"><span class="k">Валюта цен <small class="muted">· в чём показывать цены и баланс</small></span>
+    <span class="v">{{ cur_button(wide=true) }}</span></div>
   <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at | dt }}</span></div>
   <form class="kv tz-row" method="post" action="/panel/timezone">
     <input type="hidden" name="csrf" value="{{ csrf }}">

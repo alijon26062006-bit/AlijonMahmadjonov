@@ -1,0 +1,68 @@
+{#- Выбор валюты показа: кнопка открывает лист со списком и поиском. Лист — popover: поверх всего,
+    закрывается касанием мимо и Esc, работает и без скрипта. Ссылка /currency/КОД?next=… запоминает
+    выбор на год и возвращает на ту же страницу. Меняется только показ — баланс хранится в долларах. -#}
+{% from "_icons.html" import icon %}
+{% macro cur_button(cls='', wide=false) -%}
+{% set me = (cur_all or []) | selectattr('code', 'equalto', cur_code) | first %}
+{% if me %}<button type="button" class="cur-btn {{ cls }}{{ ' wide' if wide }}" popovertarget="cur-sheet" data-cur-open
+        aria-haspopup="dialog" aria-label="Валюта цен: {{ me.name }}. Сменить" title="Валюта цен">
+  <span class="cur-btn-sym" aria-hidden="true">{{ me.sym }}</span>
+  {%- if wide %}<span class="cur-btn-t"><b>{{ me.name }}</b><small>{{ me.code }}</small></span>{{ icon('chevron', 16) }}
+  {%- else %}<b>{{ me.code }}</b>{% endif %}
+</button>{% endif %}
+{%- endmacro %}
+{% macro cur_sheet() -%}
+{% set back = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') if request.method == 'GET'
+   else ('/admin' if request.url.path.startswith('/admin') else '/panel') %}{# страница после формы — назад не POST-адрес #}
+<div id="cur-sheet" class="cur-sheet" popover role="dialog" aria-labelledby="cur-sheet-t">
+  <div class="cur-sheet-head">
+    <b id="cur-sheet-t">Валюта цен</b>
+    <button type="button" class="icon-btn" popovertarget="cur-sheet" popovertargetaction="hide" data-cur-close aria-label="Закрыть">{{ icon('x', 18) }}</button>
+  </div>
+  <label class="cur-sheet-q">{{ icon('search', 16) }}
+    <input type="search" placeholder="Поиск: рубль, KZT, Казахстан…" aria-label="Поиск валюты" autocomplete="off" enterkeyhint="go" data-cur-q></label>
+  <div class="cur-sheet-list">
+    {% for c in cur_all %}
+    <a href="/currency/{{ c.code }}?next={{ back | urlencode }}" class="{{ 'on' if c.code == cur_code }}"{{ ' aria-current="true"' | safe if c.code == cur_code }}
+       data-q="{{ (c.code ~ ' ' ~ c.name ~ ' ' ~ c.country ~ ' ' ~ c.sym) | lower }}">
+      <span class="cur-sym" aria-hidden="true">{{ c.sym }}</span>
+      <span class="grow"><b>{{ c.name }}</b><small>{{ c.country }} · {{ c.code }}</small></span>
+      {% if c.code == cur_code %}{{ icon('check', 18) }}{% endif %}
+    </a>
+    {% endfor %}
+    <p class="cur-sheet-none" hidden>Такой нет. Есть сомони, доллар и валюты СНГ.</p>
+  </div>
+  <p class="cur-sheet-note">Меняется только показ цен — баланс хранится в долларах.</p>
+</div>
+<script>
+  (function () {
+    var s = document.getElementById("cur-sheet");
+    if (!s) return;
+    var q = s.querySelector("[data-cur-q]"), items = [].slice.call(s.querySelectorAll(".cur-sheet-list a")),
+        none = s.querySelector(".cur-sheet-none"), pop = typeof s.showPopover === "function";
+    function filter() {
+      var t = q.value.trim().toLowerCase(), n = 0;
+      items.forEach(function (a) { var ok = !t || a.dataset.q.indexOf(t) >= 0; a.hidden = !ok; if (ok) n++; });
+      none.hidden = n > 0;
+    }
+    function opened() {
+      q.value = ""; filter();
+      if (matchMedia("(hover: hover) and (pointer: fine)").matches) q.focus();   // на телефоне клавиатура не выскакивает
+      else { var on = s.querySelector("a.on"); if (on) on.scrollIntoView({block: "nearest"}); }
+    }
+    q.addEventListener("input", filter);
+    q.addEventListener("keydown", function (e) {   // Enter — первая подходящая валюта
+      if (e.key !== "Enter") return;
+      var a = items.filter(function (x) { return !x.hidden; })[0];
+      if (a) { e.preventDefault(); location.href = a.href; }
+    });
+    if (pop) { s.addEventListener("toggle", function (e) { if (e.newState === "open") opened(); }); return; }
+    // старый браузер без popover: открываем классом
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("[data-cur-open]")) { s.classList.add("open"); opened(); }
+      else if (e.target.closest("[data-cur-close]") || !e.target.closest("#cur-sheet")) s.classList.remove("open");
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") s.classList.remove("open"); });
+  })();
+</script>
+{%- endmacro %}

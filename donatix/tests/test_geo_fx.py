@@ -99,9 +99,69 @@ def test_other_country_usd_and_crypto(app, geodb, conn):
     assert web._crypto_only(req)
 
 
-def test_tjs_only_for_tajik_ip(app, geodb):
+def test_default_by_country_choice_any(app, geodb):
     c = _client_from(app, RU_IP)
+    assert 'code: "RUB"' in c.get("/").text          # не выбрал сам — валюта страны
     c.cookies.set("dx_cur", "TJS")
-    assert 'code: "RUB"' in c.get("/").text          # сомони не из Таджикистана не показываем
+    assert 'code: "TJS"' in c.get("/").text          # выбрал сам — любая из списка, сомони тоже
+    c.cookies.set("dx_cur", "XYZ")
+    assert 'code: "RUB"' in c.get("/").text          # чужой код — как по умолчанию
     assert fx.allowed("TJ") == ("TJS", "USD") and fx.allowed("RU") == ("RUB", "USD")
     assert fx.allowed(geo.OTHER) == ("USD",) and fx.allowed("") == ("TJS", "USD")
+    assert fx.choose("KZ", "") == ("KZT", ("KZT", "USD"))
+    assert fx.choose("KZ", "TJS") == ("TJS", ("TJS", "KZT", "USD"))   # выбранная — и в быстрых кнопках
+    assert fx.choose("TJ", "USD") == ("USD", ("TJS", "USD"))
+    assert fx.choose(geo.OTHER, "UZS") == ("UZS", ("UZS", "USD"))
+    codes = [o["code"] for o in fx.options()]
+    assert codes[:2] == ["TJS", "USD"] and set(codes) == {"TJS", "USD", *fx.CURRENCIES}
+    assert fx.badge("TJS") == "с." and fx.badge("USD") == "$" and fx.badge("RUB") == "₽"
+
+
+def _login(c, conn, login):
+    from conftest import web_login
+    from donatix import accounts
+    accounts.create_user(conn, email=f"{login}@example.com", login=login, password="password123", status="active")
+    web_login(c, f"{login}@example.com", "password123")
+
+
+def test_settings_list_has_all_cis(app, geodb, conn):
+    c = _client_from(app, TJ_IP)
+    _login(c, conn, "tjuser1")
+    page = c.get("/panel").text
+    assert "Валюта цен" in page and 'popovertarget="cur-sheet"' in page and 'id="cur-sheet"' in page
+    for code in fx.ALL:                                # в настройках — сомони, доллар и все валюты СНГ
+        assert f'href="/currency/{code}?next=/panel"' in page
+    assert "Поиск валюты" in page
+    r = c.get("/currency/KGS?next=/panel", follow_redirects=False)
+    assert r.headers["location"] == "/panel" and r.cookies.get("dx_cur") == "KGS"
+    c.cookies.set("dx_cur", "KGS")
+    page = c.get("/panel").text
+    assert 'code: "KGS"' in page and "сом" in page and 'href="/currency/KGS"' in page   # и в шапке
+
+
+def test_admin_header_has_currency_picker(app, geodb, conn):
+    from conftest import web_login
+    c = _client_from(app, RU_IP)                       # админа определило как Россию
+    web_login(c, "admin@example.com", "adminpass123")
+    page = c.get("/admin/stats").text
+    assert 'class="cur-btn adm-cur"' in page and 'id="cur-sheet"' in page
+    assert 'href="/currency/TJS?next=/admin/stats"' in page   # сомони выбрать можно
+    r = c.get("/currency/TJS?next=/admin/stats", follow_redirects=False)
+    assert r.headers["location"] == "/admin/stats"
+    c.cookies.set("dx_cur", "TJS")
+    assert 'code: "TJS"' in c.get("/admin/stats").text
+
+
+@pytest.mark.parametrize("bad", ["https://evil.example/x", "//evil.example", "/\\evil.example", "/a\r\nSet-Cookie: x=1"])
+def test_currency_next_only_own_pages(app, bad):
+    from fastapi.testclient import TestClient
+    r = TestClient(app).get("/currency/USD", params={"next": bad}, follow_redirects=False)
+    assert r.headers["location"] == "/panel"
+
+
+def test_live_balance_in_chosen_currency(app, geodb, conn, config):
+    from donatix import live
+    uid = conn.execute("SELECT id FROM users WHERE role = 'admin'").fetchone()[0]
+    assert "₽" in live.state(config, uid, False, "RUB")["balance_html"]
+    assert "с." in live.state(config, uid, False, "TJS")["balance_html"]
+    assert live.state(config, uid, False, "USD")["balance_html"].startswith("$")
