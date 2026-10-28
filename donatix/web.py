@@ -930,8 +930,6 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     ).fetchone()
     return render(request, "panel/home.html", {
         "user": user, "summary": summary, "key": key, "kinds": KINDS,
-        "month": _month_card(conn, user["id"]), "ref": referrals.stats(conn, user["id"]),
-        "from_price": _from_prices(conn, config, user),
         "orders_all": conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (user["id"],)).fetchone()[0],
         "tg_linked": conn.execute("SELECT 1 FROM shop_users WHERE user_id = ?", (user["id"],)).fetchone() is not None,
         "tg_bot": db.get_setting(conn, "shop.bot_username") or "",
@@ -942,46 +940,6 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
         "verify_mail": _needs_verify(user),
         "cst": _contest_card(conn, config, user["id"]),
     })
-
-
-def _month_card(conn: sqlite3.Connection, user_id: int) -> dict[str, int]:
-    """Выполненные заказы за 30 дней против прошлых 30 — плитка «Заказов за месяц» на главной кабинета."""
-    from datetime import datetime, timedelta, timezone
-    now = datetime.now(timezone.utc)
-    a30, a60 = [(now - timedelta(days=d)).strftime("%Y-%m-%dT%H:%M:%S") for d in (30, 60)]
-    r = conn.execute(
-        "SELECT COALESCE(SUM(created_at >= ?), 0) AS n, COALESCE(SUM(created_at < ?), 0) AS prev, "
-        "COALESCE(SUM(CASE WHEN created_at >= ? THEN total_micro END), 0) AS spent FROM orders "
-        "WHERE user_id = ? AND status = 'completed' AND created_at >= ?", (a30, a30, a30, user_id, a60)).fetchone()
-    return {"n": int(r["n"]), "diff": int(r["n"]) - int(r["prev"]), "spent": int(r["spent"])}
-
-
-def _from_prices(conn: sqlite3.Connection, config: Config, user) -> dict[str, int]:
-    """Цена «от …» для плиток «Популярное» — самый дешёвый товар раздела с наценкой клиента."""
-    out: dict[str, int] = {}
-    from .popular import services as popular_services, with_extras
-    for s in with_extras(popular_services(conn), config):
-        key = s.get("key") or ""
-        if s.get("category_id"):
-            where, args = "kind = 'topup' AND category_id = ?", [s["category_id"]]
-            if s.get("region"):
-                where += " AND region = ?"
-                args.append(s["region"])
-        elif key == "telegram":
-            where, args = "kind IN ('telegram_stars', 'telegram_premium')", []
-        elif ":" in key:
-            kind, cat = key.split(":", 1)
-            where, args = "kind = ? AND category_id = ?", [kind, cat]
-        else:
-            continue
-        try:
-            row = conn.execute("SELECT id, kind, base_price, min_qty FROM products WHERE active = 1 AND hidden = 0 "
-                               f"AND {where} ORDER BY CAST(base_price AS REAL) LIMIT 1", args).fetchone()
-            if row:
-                out[key] = orders.quote(config, user, dict(row), max(int(row["min_qty"] or 1), 1))["total_micro"]
-        except (sqlite3.Error, ValueError, ArithmeticError):
-            continue
-    return out
 
 
 def _contest_card(conn, config: Config, user_id: int):

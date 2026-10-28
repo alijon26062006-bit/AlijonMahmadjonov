@@ -199,4 +199,4 @@ def test_app_ready_manifest_service_worker_offline_assetlinks(client, config):
     target = client.get("/.well-known/assetlinks.json").json()[0]["target"]
     assert target["package_name"] == "tj.donatix.app" and target["sha256_cert_fingerprints"] == ["AA:BB"]
     page = client.get("/panel/catalog").text
-    assert 'rel="manifest"' in page and 'class="tabbar' in page
+    assert 'rel="manifest"' in page and 'class="tabbar"' in page

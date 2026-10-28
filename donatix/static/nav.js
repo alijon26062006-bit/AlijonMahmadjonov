@@ -135,7 +135,7 @@
       l.searchParams.set("next", back);
       a.setAttribute("href", l.pathname + l.search);
     });
-    var d = dock(), nd = doc.querySelector(".tabbar.cp-dock, .tabbar.adm-dock");
+    var d = dock(), nd = doc.querySelector(".tabbar");
     if (d && nd) {
       var on = {};
       Array.prototype.forEach.call(nd.children, function (a) { if (a.tagName === "A" && a.classList.contains("on")) on[a.getAttribute("href")] = 1; });
@@ -291,8 +291,8 @@
     jump(0);
   }
 
-  // ── нижнее меню: подсветка-«таблетка» плавно едет к нажатой кнопке ──
-  function dock() { return document.querySelector(".tabbar.cp-dock, .tabbar.adm-dock"); }
+  // ── нижнее меню: подсветка нажатой кнопки сразу; в админке «таблетка» плавно едет к ней ──
+  function dock() { return document.querySelector(".tabbar"); }
   function placeInd(animate) {
     var d = dock();
     if (!d) return;
