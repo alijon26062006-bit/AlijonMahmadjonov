@@ -22,6 +22,8 @@ from .support_app import check_init
 router = APIRouter(prefix="/tg", include_in_schema=False)
 SOURCE = "tgapp"
 STAR_PACKS = (50, 75, 100, 150, 250, 350, 500, 750, 1000)
+# Куда мини-приложение пускает на сайт под аккаунтом Telegram (только эти страницы — без открытого редиректа)
+SITE_PAGES = {"games": "/panel/catalog?kind=topup", "cards": "/panel/catalog?kind=gift_card", "orders": "/panel/orders"}
 USERNAME_RE = re.compile(r"^@?[A-Za-z][A-Za-z0-9_]{3,31}$")
 
 
@@ -197,8 +199,12 @@ async def api_session(request: Request, conn=Depends(get_conn), config: Config =
     user = _account(conn, tg)
     from .web import _record_login
     request.session["user_id"] = user["id"]
+    request.session["tg_app"] = 1   # сайт внутри Telegram: показать системную кнопку «Назад»
     _record_login(conn, request, user["id"])
     body = await request.json()
+    to = SITE_PAGES.get(str(body.get("to") or ""))
+    if to:
+        return {"url": to}
     need = str(body.get("need") or "")
     return {"url": "/panel/balance" + (f"?amount={int(need) / 10_000:.2f}" if need.isdigit() and int(need) else "")}
 

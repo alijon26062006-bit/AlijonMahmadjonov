@@ -519,3 +519,29 @@ def test_ad_under_menu_for_clients_not_admins_and_skip_removes_it(app, config, c
     api.calls.clear()
     bot.screen_home(conn, shopbot.shop_user(conn, TG))
     assert not [m for m, _ in api.calls if m == "sendPhoto"]          # админу — без рекламы
+
+
+def test_games_sorted_by_orders_last_30_days(app, config, conn, supplier):
+    """Популярность считается одним запросом по заказам, но порядок тот же: чаще покупаемая игра — выше."""
+    now = db.now()
+    for cat in ("zz", "yy"):
+        conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, fields_json, "
+                     "updated_at) VALUES (?, 'topup', ?, ?, '10 pack', '1', '[]', ?)", (f"{cat}-1", cat, f"Aaa {cat}", now))
+    uid = accounts.create_user(conn, email="pop@example.com", login="pop", password="password123", status="active")
+    for i, (pid, ago) in enumerate((("zz-1", "-1 day"), ("zz-1", "-2 day"), ("yy-1", "-40 day"), ("yy-1", "-41 day"),
+                                    ("yy-1", "-42 day"))):
+        conn.execute("INSERT INTO orders (user_id, product_id, kind, product_name, quantity, unit_price, total_micro, "
+                     "cost_micro, status, supplier_idem_key, created_at, updated_at) VALUES (?, ?, 'topup', 'x', 1, "
+                     "'1', 1, 1, 'completed', ?, strftime('%Y-%m-%dT%H:%M:%S', 'now', ?), ?)",
+                     (uid, pid, f"pop{i}", ago, now))
+    names_ = [g["category_name"] for g in shopbot.game_list(conn, "games")]
+    assert names_.index("Aaa zz") == 0 and "Aaa yy" in names_   # старые заказы yy (>30 дней) не в счёт
+
+
+def test_repeat_presses_do_not_write_last_seen_each_time(app, config, conn, supplier):
+    su = shopbot.ensure_user(conn, 777, "Ali", username="ali")
+    seen = su["last_seen"]
+    again = shopbot.ensure_user(conn, 777, "Ali", username="ali")
+    assert again["last_seen"] == seen
+    renamed = shopbot.ensure_user(conn, 777, "Ali", username="ali2")
+    assert renamed["username"] == "ali2"

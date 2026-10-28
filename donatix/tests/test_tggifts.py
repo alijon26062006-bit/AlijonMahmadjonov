@@ -443,3 +443,14 @@ def test_gift_animation_downloaded_and_served(conn, gcfg, fake, monkeypatch, tgc
     r = tgclient.get(g["anim"])
     assert r.status_code == 200 and r.json()["op"] == 60 and r.headers["content-type"].startswith("application/json")
     assert tgclient.get("/tg/gift/..%2Fx.json").status_code == 404
+
+
+def test_mini_app_opens_site_pages_signed_in(tgclient, conn, gcfg, fake):
+    h = {"X-Tg-Init": _init(TOKEN, {"id": 9002, "first_name": "Ali"})}
+    r = tgclient.post("/tg/api/session", json={"to": "games"}, headers=h).json()
+    assert r["url"] == "/panel/catalog?kind=topup"
+    page = tgclient.get(r["url"])
+    assert page.status_code == 200 and "telegram-web-app.js" in page.text   # кнопка «Назад» Telegram
+    assert tgclient.post("/tg/api/session", json={"to": "https://evil.example"}, headers=h).json()["url"].startswith(
+        "/panel/balance")
+    assert tgclient.post("/tg/api/session", json={"to": "games"}).status_code == 403

@@ -78,6 +78,16 @@
 {% endblock %}
 {% from "_cur_pick.html" import cur_sheet with context %}{{ cur_sheet() }}
 <script src="/static/nav.js?v={{ asset_v }}" defer></script>
+{% if request.session.get('tg_app') %}
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  // Открыто из мини-приложения Telegram: на весь экран и системная кнопка «Назад» (первый шаг — обратно в магазин)
+  (function () {
+    var tg = window.Telegram && Telegram.WebApp; if (!tg) return;
+    try { tg.ready(); tg.expand(); tg.BackButton.show(); tg.BackButton.onClick(function () { history.back(); }); } catch (e) {}
+  })();
+</script>
+{% endif %}
 <script>
   // Push-уведомления: подписка этого устройства (телефон, приложение, компьютер)
   window.dxPush = (function () {

@@ -273,6 +273,11 @@ def shop_user(conn: sqlite3.Connection, tg_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM shop_users WHERE tg_id = ?", (tg_id,)).fetchone()
 
 
+def _ago_iso(seconds: int) -> str:
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
 def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str = "",
                 username: str = "") -> sqlite3.Row:
     """Аккаунт сайта для этого Telegram — создаётся при первом /start, дальше тот же.
@@ -280,6 +285,11 @@ def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str
     username = (username or "").lstrip("@")[:64]
     row = shop_user(conn, tg_id)
     if row is not None:
+        # Запись в базу — только когда что-то изменилось или раз в 5 минут: запись на каждое нажатие кнопки
+        # вставала в очередь за другими писателями базы (сайт, оплаты) и тормозила ответ бота
+        same = (row["name"] or "") == (name[:64] or row["name"] or "") and (row["username"] or None) == (username or None)
+        if same and (row["last_seen"] or "") >= _ago_iso(300):
+            return row
         conn.execute("UPDATE shop_users SET last_seen = ?, name = COALESCE(NULLIF(?, ''), name), username = ? "
                      "WHERE tg_id = ?", (db.now(), name[:64], username or None, tg_id))
         return shop_user(conn, tg_id)
@@ -455,11 +465,14 @@ def _dedupe(rows: list[sqlite3.Row], limit: int | None = None, split: bool = Tru
 def game_list(conn: sqlite3.Connection, group: str, q: str = "", split: bool = True) -> list[dict[str, Any]]:
     """Игры раздела: сначала популярные (заказы за 30 дней), потом по алфавиту. rid — для кнопок."""
     where, args = _kinds_sql(group)
-    sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, {_HEAD} AS head, "
-           f"(SELECT COUNT(*) FROM orders o JOIN products x ON x.id = o.product_id "
-           f" WHERE x.category_id = p.category_id "
-           f" AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-30 day')) AS pop "
-           f"FROM products p WHERE p.active = 1 AND p.hidden = 0 AND p.{where}")
+    # Популярность считаем одним проходом по заказам за 30 дней, а не отдельно для каждой игры:
+    # подзапрос на каждую строку на большой базе делал кнопку «Игры» в боте многосекундной
+    sql = ("WITH pop AS (SELECT x.category_id, COUNT(*) AS n FROM orders o JOIN products x ON x.id = o.product_id "
+           " WHERE o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-30 day') GROUP BY x.category_id) "
+           f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, {_HEAD} AS head, "
+           "COALESCE(MAX(pop.n), 0) AS pop "
+           f"FROM products p LEFT JOIN pop ON pop.category_id = p.category_id "
+           f"WHERE p.active = 1 AND p.hidden = 0 AND p.{where}")
     if q:
         sql += " AND (p.category_name LIKE ? OR p.name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
@@ -781,6 +794,21 @@ class ShopBot:
                        disable_web_page_preview=True) or {}
         return res.get("message_id")
 
+    def _ack(self, cq_id: str) -> None:
+        """Погасить «часики» на кнопке параллельно с ответом: новый экран не ждёт лишнего запроса к Telegram."""
+        pool = getattr(self, "_pool", None)
+        if pool is None:
+            self.api("answerCallbackQuery", callback_query_id=cq_id)
+            return
+
+        def run() -> None:
+            with contextlib.suppress(Exception):
+                self.api("answerCallbackQuery", callback_query_id=cq_id)
+        try:
+            pool.submit(run)
+        except RuntimeError:   # бот останавливается
+            pass
+
     def _limited(self, tg_id: int) -> bool:
         count, window = MSG_LIMIT
         now = time.time()
@@ -823,7 +851,7 @@ class ShopBot:
                     self.api("answerCallbackQuery", callback_query_id=cq["id"], text=tr(su["lang"], "sub_still"),
                              show_alert=True)
                 return
-            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            self._ack(cq["id"])
             if not data.startswith(("l:", "lang")) and not self.subscribed(conn, tg_id):
                 self.screen_subscribe(conn, su, msg.get("message_id"))
                 return

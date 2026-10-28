@@ -254,6 +254,8 @@ const SUPPORT = {{ support | tojson }};
 const L = {
   tj: { hi: "Салом,", t_home: "Асосӣ", t_gifts: "Тӯҳфа", t_profile: "Профил", balance: "Баланси шумо", som: "сомонӣ",
     topup: "Пур кардан", history: "Таърих", fast: "Фаврӣ", months: "3 · 6 · 12 моҳ", from_bot: "Аз номи бот",
+    games: "Алмосҳо ва бозиҳо", games_sub: "FF СНГ, PUBG ва дигар · бо ID", cards_t: "Кортҳо ва Steam", cards_sub: "Кодҳо фавран меоянд",
+    my_orders: "Фармоишҳои ман", opening: "Мекушоем…",
     invite: "Дӯстонро даъват кунед", invite_sub: "Аз ҳар хариди дӯстатон {p}% ба шумо", recent: "Харидҳои охирин",
     stars_sub: "1 ⭐ = {r} сомонӣ · аз {min} то {max}", amount: "Миқдор", self: "Ба худам", friend: "Ба дӯстам",
     to_self: "Ба @{u} фиристода мешавад", to_self_noname: "Дар Telegram username гузоред", friend_ph: "@username-и дӯст",
@@ -276,6 +278,8 @@ const L = {
     expired: "Вақт гузашт — дархости нав кунед.", choose: "Интихоб кунед" },
   ru: { hi: "Привет,", t_home: "Главная", t_gifts: "Подарки", t_profile: "Профиль", balance: "Ваш баланс", som: "сомони",
     topup: "Пополнить", history: "История", fast: "Мгновенно", months: "3 · 6 · 12 мес", from_bot: "От имени бота",
+    games: "Алмазы и игры", games_sub: "FF СНГ, PUBG и другие · по ID", cards_t: "Карты и Steam", cards_sub: "Коды приходят сразу",
+    my_orders: "Мои заказы", opening: "Открываем…",
     invite: "Пригласите друзей", invite_sub: "{p}% с каждой покупки друга — вам", recent: "Последние покупки",
     stars_sub: "1 ⭐ = {r} сомони · от {min} до {max}", amount: "Количество", self: "Себе", friend: "Другу",
     to_self: "Отправим на @{u}", to_self_noname: "Задайте username в настройках Telegram", friend_ph: "@username друга",
@@ -318,6 +322,14 @@ async function api(path, body) {
   if (!r.ok && !j.error) j.error = "Хато / Ошибка " + r.status;
   return j;
 }
+// Игры, карты, заказы — страницы сайта прямо в мини-приложении, уже под этим аккаунтом (вход по подписи Telegram)
+async function openSite(btn, to) {
+  if (btn.disabled) return; btn.disabled = true; haptic();
+  const sub = btn.querySelector(".grow span"); if (sub) sub.textContent = t("opening");
+  const j = await api("session", {to});
+  if (j.url) { location.href = j.url; return; }
+  btn.disabled = false; toast(j.error || "Ошибка", "err"); render();
+}
 function toast(text, kind) {
   const el = document.createElement("div"); el.className = "toast " + (kind || ""); el.textContent = text;
   document.body.appendChild(el); setTimeout(() => el.remove(), 4200);
@@ -352,11 +364,14 @@ function home() {
     <div class="row"><button class="btn primary grow" data-act="topup">${IC.plus} ${t("topup")}</button>
     <button class="btn soft" data-act="history">${IC.clock} ${t("history")}</button></div></section>
   <div class="menu">
+    <button class="mi" data-act="site" data-v="games"><div class="ic ac">${IC.gem}</div><div class="grow"><b>${t("games")}</b><span>${t("games_sub")}</span></div><span class="go">›</span></button>
+    <button class="mi" data-act="site" data-v="cards"><div class="ic">${IC.card}</div><div class="grow"><b>${t("cards_t")}</b><span>${t("cards_sub")}</span></div><span class="go">›</span></button>
     <button class="mi" data-tab="stars"><div class="ic st">${IC.star}</div><div class="grow"><b>Telegram Stars</b><span>${t("fast")}</span></div><span class="go">›</span></button>
     <button class="mi" data-tab="premium"><div class="ic">${IC.gem}</div><div class="grow"><b>Telegram Premium</b><span>${t("months")}</span></div><span class="go">›</span></button>
     <button class="mi" data-tab="gifts"><div class="ic">${IC.gift}</div><div class="grow"><b>${t("gifts_title")}</b><span>${t("from_bot")}</span></div><span class="go">›</span></button>
     <button class="mi" data-act="refs"><div class="ic ac">${IC.users}</div><div class="grow"><b>${t("invite")}</b><span>${t("invite_sub", {p: D.ref.percent})}</span></div><span class="go">›</span></button>
   </div>
+  <button class="btn soft full mt" data-act="site" data-v="orders">${IC.clock} ${t("my_orders")}</button>
   <h2 class="sec-title">${t("recent")}</h2><div class="feed">${feed}</div>`;
 }
 
@@ -601,6 +616,7 @@ document.addEventListener("click", async (e) => {
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act, v = a.dataset.v;
   if (act === "topup") topup(v);
+  else if (act === "site") openSite(a, v);
   else if (act === "history") history();
   else if (act === "refs") refs();
   else if (act === "close") closeSheet();
