@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
-import {Background, Brand, ChapterTag, Cursor, Desktop, EASE, useRamp, useSec, WindowFrame} from '../components/common';
+import {Background, Brand, ChapterTag, Cursor, Desktop, EASE, Explainer, Highlight, useRamp, useSec, WindowFrame} from '../components/common';
 import {fonts, theme} from '../theme';
 
 type Typed = {t: number; text: string; times: number[]};
@@ -16,7 +16,7 @@ const n = (ev: SceneData['ev'], k: string) => ev[k] as number;
 const typedText = (tp: Typed, sec: number) => tp.text.slice(0, tp.times.filter((t) => t <= sec).length);
 
 // ---------------------------------------------------------------- заставка
-export const IntroScene: React.FC<{d: SceneData}> = ({d}) => {
+const IntroTitle: React.FC<{d: SceneData}> = ({d}) => {
   const r = useRamp();
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -100,6 +100,55 @@ export const IntroScene: React.FC<{d: SceneData}> = ({d}) => {
           }}
         />
       </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+const WHY = [
+  {k: 'u1', title: 'Телеграм-боты', icon: 'M3 11l18-8-6 18-3-7-9-3z'},
+  {k: 'u2', title: 'Сайты', icon: 'M3 5h18v14H3z M3 9h18'},
+  {k: 'u3', title: 'Таблицы и отчёты', icon: 'M4 4h16v16H4z M4 10h16 M4 15h16 M10 4v16'},
+  {k: 'u4', title: 'Искусственный интеллект', icon: 'M9 3v3 M15 3v3 M9 18v3 M15 18v3 M3 9h3 M3 15h3 M18 9h3 M18 15h3 M6 6h12v12H6z M10 10h4v4h-4z'},
+];
+
+export const IntroScene: React.FC<{d: SceneData}> = ({d}) => {
+  const r = useRamp();
+  const why = d.ev.why === undefined ? 1e9 : n(d.ev, 'why');
+  const out = r(why - 0.2, 0.5);
+  const inn = r(why + 0.2, 0.6);
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{opacity: 1 - out}}>
+        <IntroTitle d={d} />
+      </AbsoluteFill>
+      {inn > 0 ? (
+        <AbsoluteFill style={{opacity: inn}}>
+          <Background />
+          <div style={{position: 'absolute', top: 170, width: '100%', textAlign: 'center', fontFamily: fonts.display, fontWeight: 800, fontSize: 80, color: theme.text}}>
+            Почему <span style={{color: theme.accent}}>Python</span>?
+          </div>
+          <div style={{position: 'absolute', top: 300, width: '100%', textAlign: 'center', fontFamily: fonts.body, fontWeight: 700, fontSize: 34, color: theme.muted}}>
+            Один из самых популярных языков в мире
+          </div>
+          <div style={{position: 'absolute', top: 430, left: 140, right: 140, display: 'flex', gap: 36}}>
+            {WHY.map((w) => {
+              const k = r(n(d.ev, w.k), 0.5);
+              return (
+                <div key={w.k} style={{flex: 1, height: 300, borderRadius: 26, background: `linear-gradient(160deg, ${theme.surface2}, ${theme.surface})`, border: `1.5px solid ${theme.border}`, opacity: k, translate: `0 ${(1 - k) * 50}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 30}}>
+                  <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke={theme.accent2} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
+                    <path d={w.icon} />
+                  </svg>
+                  <div style={{fontFamily: fonts.body, fontWeight: 800, fontSize: 34, color: theme.text, textAlign: 'center', padding: '0 20px'}}>{w.title}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{position: 'absolute', top: 800, width: '100%', textAlign: 'center', fontFamily: fonts.body, fontWeight: 700, fontSize: 36, color: theme.green, opacity: r(n(d.ev, 'u4') + 1.5, 0.6)}}>
+            Простой синтаксис — удобно начинать
+          </div>
+          <Brand />
+        </AbsoluteFill>
+      ) : null}
     </AbsoluteFill>
   );
 };
@@ -200,7 +249,7 @@ const BY = 110;
 const BW = 1500;
 const BH = 850;
 
-const PyLogo: React.FC<{size: number}> = ({size}) => (
+export const PyLogo: React.FC<{size: number}> = ({size}) => (
   <div style={{position: 'relative', width: size, height: size}}>
     <div style={{position: 'absolute', left: 0, top: 0, width: size * 0.64, height: size * 0.64, borderRadius: size * 0.2, background: '#3B77C9'}} />
     <div style={{position: 'absolute', right: 0, bottom: 0, width: size * 0.64, height: size * 0.64, borderRadius: size * 0.2, background: '#F2C94C'}} />
@@ -360,6 +409,9 @@ export const BrowserScene: React.FC<{d: SceneData}> = ({d}) => {
         )}
       </WindowFrame>
       <Cursor path={path} clicks={clicks} />
+      {ev.warn !== undefined ? (
+        <Explainer show={n(ev, 'warn')} hide={n(ev, 'move_download') - 0.3} label="ВАЖНО" color={theme.red} term="Только официальный сайт" text="Программы скачивайте только с официальных сайтов: на чужих сайтах может оказаться вирус." x={1180} y={560} w={600} />
+      ) : null}
       <ChapterTag step="ШАГ 1" title="Скачиваем Python" />
     </AbsoluteFill>
   );
@@ -444,7 +496,8 @@ export const InstallerScene: React.FC<{d: SceneData}> = ({d}) => {
   const zoom = r(n(ev, 'zoom_in'), 0.9) * (1 - r(n(ev, 'zoom_out'), 0.9));
   const checked = sec >= n(ev, 'click_check');
   const ring = r(n(ev, 'zoom_in') + 0.4, 0.4) * (1 - r(n(ev, 'click_check'), 0.3));
-  const callout = r(n(ev, 'callout'), 0.5) * (1 - r(n(ev, 'zoom_out'), 0.4));
+  const calloutEnd = ev.path_card !== undefined ? n(ev, 'path_card') : n(ev, 'zoom_out');
+  const callout = r(n(ev, 'callout'), 0.5) * (1 - r(calloutEnd, 0.4));
   const install = {x: 906, y: 452};
   const path = [
     {t: 0, x: 1400, y: 700},
@@ -483,6 +536,9 @@ export const InstallerScene: React.FC<{d: SceneData}> = ({d}) => {
           Без неё компьютер не найдёт Python
         </div>
       </div>
+      {ev.path_card !== undefined ? (
+        <Explainer show={n(ev, 'path_card')} hide={n(ev, 'zoom_out') + 0.2} term="PATH" text="Список папок, в которых компьютер ищет программы. С галочкой Python попадёт в этот список и будет запускаться откуда угодно." x={1200} y={380} w={620} />
+      ) : null}
       <ChapterTag step="ШАГ 2" title="Устанавливаем Python" />
     </AbsoluteFill>
   );
@@ -605,6 +661,13 @@ export const TerminalScene: React.FC<{d: SceneData}> = ({d}) => {
       >
         <span style={{fontSize: 44}}>←</span> Python работает!
       </div>
+      {ev.hl_path !== undefined ? (
+        <>
+          <Highlight show={n(ev, 'hl_path')} hide={n(ev, 'hl_cursor')} x={292} y={334} w={292} h={56} label="путь к папке" />
+          <Highlight show={n(ev, 'hl_cursor')} hide={(ev['type:cmd'] as Typed).t} x={598} y={334} w={36} h={56} label="здесь печатаем" color={theme.green} />
+          <Explainer show={n(ev, 'err_card')} label="ЕСЛИ ОШИБКА" color={theme.red} term="«python» не является командой" text="Значит, при установке не поставили галочку PATH. Запустите установщик ещё раз и отметьте её." x={1000} y={560} w={640} />
+        </>
+      ) : null}
       <ChapterTag step="ШАГ 3" title="Проверяем установку" />
     </AbsoluteFill>
   );

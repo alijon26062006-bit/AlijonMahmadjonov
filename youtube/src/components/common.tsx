@@ -340,3 +340,119 @@ const TaskIcon: React.FC<{x: number; kind: string}> = ({x, kind}) => {
     </div>
   );
 };
+
+/** Карточка «новое понятие»: появляется во время объяснения термина. */
+export const Explainer: React.FC<{
+  show: number;
+  hide?: number;
+  term: string;
+  text: string;
+  label?: string;
+  color?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+}> = ({show, hide = 1e9, term, text, label = 'НОВОЕ ПОНЯТИЕ', color = theme.accent2, x = 1260, y = 300, w = 580}) => {
+  const r = useRamp();
+  const k = r(show, 0.55) * (1 - r(hide, 0.4));
+  if (k <= 0) return null;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: w,
+        padding: '30px 34px',
+        borderRadius: 24,
+        background: 'rgba(14,20,34,0.94)',
+        border: `2px solid ${color}`,
+        boxShadow: `0 30px 90px rgba(0,0,0,0.55), 0 0 40px ${color}33`,
+        opacity: k,
+        translate: `${(1 - k) * 60}px 0`,
+        fontFamily: fonts.body,
+        zIndex: 40,
+      }}
+    >
+      <div style={{fontWeight: 800, fontSize: 18, letterSpacing: 3, color}}>{label}</div>
+      <div style={{marginTop: 12, fontFamily: fonts.display, fontWeight: 800, fontSize: 36, color: theme.text, lineHeight: 1.15}}>
+        {term}
+      </div>
+      <div style={{marginTop: 14, fontWeight: 600, fontSize: 27, color: '#C9D2E3', lineHeight: 1.4}}>{text}</div>
+    </div>
+  );
+};
+
+/** Клавиша клавиатуры; нажимается в момент press. */
+export const Keycap: React.FC<{label: string; press?: number; w?: number}> = ({label, press = -1, w = 150}) => {
+  const sec = useSec();
+  const down = press >= 0 && sec >= press && sec < press + 0.25;
+  return (
+    <div
+      style={{
+        width: w,
+        height: 130,
+        borderRadius: 22,
+        background: down ? '#2A3550' : '#1E2638',
+        border: `2px solid ${down ? theme.accent2 : '#3A4766'}`,
+        boxShadow: down ? '0 2px 0 #0B0F17' : '0 10px 0 #0B0F17',
+        translate: `0 ${down ? 8 : 0}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: fonts.display,
+        fontWeight: 800,
+        fontSize: 48,
+        color: down ? theme.accent2 : theme.text,
+      }}
+    >
+      {label}
+    </div>
+  );
+};
+
+/** Набранный к моменту sec текст (для эффектов печати). */
+export type Typed = {t: number; text: string; times: number[]};
+export const typedNow = (tp: Typed, sec: number) => tp.text.slice(0, tp.times.filter((t) => t <= sec).length);
+
+/** Рамка-подсветка с подписью. */
+export const Highlight: React.FC<{show: number; hide?: number; x: number; y: number; w: number; h: number; label?: string; color?: string; labelPos?: 'top' | 'bottom' | 'right'}> = ({
+  show,
+  hide = 1e9,
+  x,
+  y,
+  w,
+  h,
+  label,
+  color = theme.accent2,
+  labelPos = 'bottom',
+}) => {
+  const r = useRamp();
+  const k = r(show, 0.4) * (1 - r(hide, 0.3));
+  if (k <= 0) return null;
+  const lp: React.CSSProperties =
+    labelPos === 'top' ? {left: 0, bottom: h + 12} : labelPos === 'right' ? {left: w + 18, top: h / 2 - 22} : {left: 0, top: h + 12};
+  return (
+    <div style={{position: 'absolute', left: x, top: y, width: w, height: h, zIndex: 45, opacity: k}}>
+      <div style={{position: 'absolute', inset: 0, borderRadius: 12, border: `3px solid ${color}`, boxShadow: `0 0 24px ${color}66`, scale: interpolate(k, [0, 1], [1.08, 1])}} />
+      {label ? (
+        <div
+          style={{
+            position: 'absolute',
+            ...lp,
+            whiteSpace: 'nowrap',
+            padding: '8px 16px',
+            borderRadius: 10,
+            background: color,
+            color: '#0B0F17',
+            fontFamily: fonts.body,
+            fontWeight: 800,
+            fontSize: 24,
+          }}
+        >
+          {label}
+        </div>
+      ) : null}
+    </div>
+  );
+};
