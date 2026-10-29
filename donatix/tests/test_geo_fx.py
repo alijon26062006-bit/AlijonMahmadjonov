@@ -190,3 +190,18 @@ def test_tj_user_other_currency_hides_somoni_methods(app, geodb, conn):
     c.cookies.set("dx_cur", "RUB")
     html = c.get("/panel/balance").text
     assert "способы оплаты в сомони скрыты" in html and "/currency/TJS" in html
+
+
+def test_chosen_somoni_shows_somoni_banks_from_any_country(app, geodb, conn):
+    """Выбрал в настройках сомони — видит банки в сомони, даже если зашёл из другой страны."""
+    import json
+    from donatix import db, web
+    from starlette.requests import Request
+    db.set_setting(conn, "pay.methods_json", json.dumps([
+        {"code": "alif", "title": "Алиф", "details": "+992 900 000 000", "currency": "TJS", "enabled": True},
+        {"code": "usdt", "title": "USDT TRC20", "details": "TXyz", "currency": "USDT", "network": "TRC20",
+         "enabled": True}]))
+    uz = Request({"type": "http", "client": (UZ_IP, 1), "app": app, "headers": []})
+    assert all(m["currency"] != "TJS" for m in web._pay_methods(uz, conn, app.state.config))
+    uz_tjs = Request({"type": "http", "client": (UZ_IP, 1), "app": app, "headers": [(b"cookie", b"dx_cur=TJS")]})
+    assert any(m["code"] == "alif" for m in web._pay_methods(uz_tjs, conn, app.state.config))

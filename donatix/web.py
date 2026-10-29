@@ -822,8 +822,11 @@ def logout(request: Request, conn=Depends(get_conn)):
 
 
 def _crypto_only(request: Request) -> bool:
-    """Посетитель из СНГ (не Таджикистан): местных способов оплаты у нас нет — только крипта (USDT)."""
+    """Посетитель из СНГ (не Таджикистан): местных способов оплаты у нас нет — только крипта (USDT).
+    Сам выбрал в настройках сомони (TJS) — видит банки, которые принимают сомони, откуда бы ни зашёл."""
     from . import geo
+    if request.cookies.get("dx_cur") == "TJS":
+        return False
     cc = geo.country(request.app.state.config, _ip(request))
     return bool(cc) and cc != "TJ"   # СНГ и остальные страны; "" — страну не знаем, как раньше
 
