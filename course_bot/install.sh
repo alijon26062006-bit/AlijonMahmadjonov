@@ -16,6 +16,9 @@ ok()   { printf '  %s✓%s %s\n' "$GREEN" "$OFF" "$*"; }
 die()  { printf '  %s✗%s %s\n' "$RED" "$OFF" "$*" >&2; exit 1; }
 hint() { printf '  %s%s%s\n' "$DIM" "$*" "$OFF"; }
 
+# Чужой PYTHONPATH (бывает на хостингах) подмешивает в .venv посторонние папки.
+unset PYTHONPATH
+
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
   command -v sudo >/dev/null 2>&1 && SUDO="sudo"
