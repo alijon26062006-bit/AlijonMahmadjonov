@@ -7,11 +7,13 @@ i=0; s=0
 while [ $s -lt $TOTAL ]; do
   e=$(( s + 2699 )); [ $e -ge $TOTAL ] && e=$(( TOTAL - 1 ))
   name=$(printf "p%02d" $i)
-  if [ ! -f $OUT/$name.mp4 ]; then
+  # вторая попытка — если браузер не успел запуститься (бывает на холодной машине)
+  for attempt in 1 2; do
+    [ -f $OUT/$name.mp4 ] && break
     st=$(date +%s)
     npx remotion render src/index.ts $COMP $OUT/tmp_$name.mp4 --frames=$s-$e --muted --browser-executable=$EXE --concurrency=$(nproc) --log=error > $OUT/$name.log 2>&1 && mv $OUT/tmp_$name.mp4 $OUT/$name.mp4
-    echo "$name $s-$e exit=$? sec=$(( $(date +%s) - st ))" >> $OUT/progress.txt
-  fi
+    echo "$name $s-$e try=$attempt exit=$? sec=$(( $(date +%s) - st ))" >> $OUT/progress.txt
+  done
   s=$(( e + 1 )); i=$(( i + 1 ))
 done
 cd $OUT
