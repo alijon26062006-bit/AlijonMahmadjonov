@@ -1,3 +1,4 @@
 node_modules/
 out/
-public/ep01/*.wav
+public/*/*.wav
+public/*/voice/

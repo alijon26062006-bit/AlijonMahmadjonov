@@ -66,10 +66,11 @@ export const VSCodeWindow: React.FC<{
   menuHl?: number;
   appear?: number;
   runHl?: boolean;
-}> = ({active = 0, sidebarTitle = 'EXPLORER', sidebar, tabs = [], editor, panel, panelK = 0, menuOpen = false, menuHl, appear = 0, runHl = false}) => {
+  panelHeight?: number;
+}> = ({active = 0, sidebarTitle = 'EXPLORER', sidebar, tabs = [], editor, panel, panelK = 0, menuOpen = false, menuHl, appear = 0, runHl = false, panelHeight = PANEL_H}) => {
   const r = useRamp();
   const k = r(appear, 0.45);
-  const panelH = PANEL_H * panelK;
+  const panelH = panelHeight * panelK;
   return (
     <div style={{position: 'absolute', inset: 0, opacity: k, scale: interpolate(k, [0, 1], [0.96, 1])}}>
       <div style={{position: 'absolute', left: VX, top: VY, width: VW, height: VH, borderRadius: 14, overflow: 'hidden', background: '#1E1E24', boxShadow: '0 40px 120px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)'}}>
@@ -140,13 +141,13 @@ export const VSCodeWindow: React.FC<{
 /** Строка кода с простой подсветкой Python. */
 export const CodeLine: React.FC<{text: string; n: number}> = ({text, n}) => {
   const parts: React.ReactNode[] = [];
-  const re = /("[^"]*"?)|(\b(?:print|input|exit)\b)|(\b\d+\b)/g;
+  const re = /(#.*$)|("[^"]*"?|'[^']*'?)|(\b(?:print|input|exit)\b)|(\b(?:sep|end)(?==))|(\b\d+(?:\.\d+)?\b)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(<span key={i++}>{text.slice(last, m.index)}</span>);
-    const col = m[1] ? '#CE9178' : m[2] ? '#DCDCAA' : '#B5CEA8';
+    const col = m[1] ? '#6A9955' : m[2] ? '#CE9178' : m[3] ? '#DCDCAA' : m[4] ? '#9CDCFE' : '#B5CEA8';
     parts.push(
       <span key={i++} style={{color: col}}>
         {m[0]}

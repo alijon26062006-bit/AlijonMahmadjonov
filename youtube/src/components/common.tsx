@@ -102,7 +102,7 @@ export const ChapterTag: React.FC<{step?: string; title: string}> = ({step, titl
 };
 
 /** Подпись курса внизу слева. */
-export const Brand: React.FC = () => (
+export const Brand: React.FC<{text?: string}> = ({text = 'PYTHON С НУЛЯ · УРОК 1'}) => (
   <div
     style={{
       position: 'absolute',
@@ -116,7 +116,7 @@ export const Brand: React.FC = () => (
       zIndex: 20,
     }}
   >
-    PYTHON С НУЛЯ · УРОК 1
+    {text}
   </div>
 );
 
