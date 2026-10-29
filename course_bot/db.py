@@ -10,11 +10,14 @@ from pathlib import Path
 #   new             — просто открыл бота
 #   waiting_receipt — нажал «Я оплатил», ждём фото чека
 #   pending         — чек у админа на проверке
-#   paid            — оплата подтверждена, доступ выдан
+#   paid            — подписка активна (до paid_until), ученик в канале
+#   renew_waiting   — подписка активна, нажал «Я оплатил» для продления, ждём чек
+#   renew_pending   — подписка активна, чек о продлении у админа
 #   rejected        — админ отклонил чек (можно прислать снова)
-#   refund_details  — ученик просит возврат, ждём, куда вернуть деньги
-#   refund_requested — запрос на возврат у админа
-#   refunded        — деньги возвращены, доступ закрыт (можно купить снова)
+#   expired         — подписка закончилась, ученик убран из канала
+
+# У этих статусов есть доступ к каналу.
+ACTIVE = ("paid", "renew_waiting", "renew_pending")
 
 DEFAULTS = {
     "price": "уточняйте у администратора",
@@ -45,10 +48,18 @@ def connect(path: Path | str) -> sqlite3.Connection:
             status       TEXT NOT NULL DEFAULT 'new',
             created_at   REAL NOT NULL,
             paid_at      REAL,
-            last_link_at REAL
+            last_link_at REAL,
+            paid_until   REAL,
+            warned_at    REAL
         );
         """
     )
+    # База от первой версии бота — без колонок подписки.
+    columns = {r["name"] for r in conn.execute("PRAGMA table_info(students)")}
+    for column in ("paid_until", "warned_at"):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE students ADD COLUMN {column} REAL")
+    conn.commit()
     return conn
 
 
@@ -93,24 +104,46 @@ def status_of(conn: sqlite3.Connection, user_id: int) -> str:
 
 
 def set_status(conn: sqlite3.Connection, user_id: int, status: str) -> None:
-    paid_at = time.time() if status == "paid" else None
+    conn.execute("UPDATE students SET status = ? WHERE user_id = ?", (status, user_id))
+    conn.commit()
+
+
+def extend(conn: sqlite3.Connection, user_id: int, days: int, now: float | None = None) -> float:
+    """Плюс days дней доступа. Продление до конца срока добавляется к оставшимся дням."""
+    now = now or time.time()
+    row = get_student(conn, user_id)
+    active = row is not None and row["status"] in ACTIVE and (row["paid_until"] or 0) > now
+    until = (row["paid_until"] if active else now) + days * 86400
     conn.execute(
-        "UPDATE students SET status = ?, paid_at = COALESCE(?, paid_at) WHERE user_id = ?",
-        (status, paid_at, user_id),
+        "UPDATE students SET status = 'paid', paid_at = ?, paid_until = ?, warned_at = NULL "
+        "WHERE user_id = ?",
+        (now, until, user_id),
     )
     conn.commit()
+    return until
 
 
-def restore_paid(conn: sqlite3.Connection, user_id: int) -> None:
-    """Вернуть статус «оплачено», не сдвигая дату оплаты — срок возврата не продлевается."""
-    conn.execute("UPDATE students SET status = 'paid' WHERE user_id = ?", (user_id,))
+def ending_soon(conn: sqlite3.Connection, within: float, now: float) -> list[sqlite3.Row]:
+    """Активные, кому ещё не напоминали, а до конца осталось меньше within секунд."""
+    marks = ",".join("?" * len(ACTIVE))
+    return conn.execute(
+        f"SELECT * FROM students WHERE status IN ({marks}) AND warned_at IS NULL "
+        "AND paid_until > ? AND paid_until <= ?",
+        (*ACTIVE, now, now + within),
+    ).fetchall()
+
+
+def overdue(conn: sqlite3.Connection, now: float) -> list[sqlite3.Row]:
+    """Срок вышел. Чек о продлении на проверке (renew_pending) не трогаем — ждём админа."""
+    return conn.execute(
+        "SELECT * FROM students WHERE status IN ('paid', 'renew_waiting') AND paid_until <= ?",
+        (now,),
+    ).fetchall()
+
+
+def mark_warned(conn: sqlite3.Connection, user_id: int, now: float) -> None:
+    conn.execute("UPDATE students SET warned_at = ? WHERE user_id = ?", (now, user_id))
     conn.commit()
-
-
-def refund_seconds_left(student: sqlite3.Row, days: int, now: float | None = None) -> float:
-    if not student or not student["paid_at"]:
-        return 0.0
-    return student["paid_at"] + days * 86400 - (now or time.time())
 
 
 def mark_link_issued(conn: sqlite3.Connection, user_id: int) -> None:
@@ -123,8 +156,10 @@ def counts(conn: sqlite3.Connection) -> dict[str, int]:
     return {r["status"]: r["n"] for r in rows}
 
 
-def students_with(conn: sqlite3.Connection, status: str, limit: int = 20) -> list[sqlite3.Row]:
+def students_with(conn: sqlite3.Connection, *statuses: str, limit: int = 20) -> list[sqlite3.Row]:
+    marks = ",".join("?" * len(statuses))
     return conn.execute(
-        "SELECT * FROM students WHERE status = ? ORDER BY COALESCE(paid_at, created_at) DESC LIMIT ?",
-        (status, limit),
+        f"SELECT * FROM students WHERE status IN ({marks}) "
+        "ORDER BY COALESCE(paid_at, created_at) DESC LIMIT ?",
+        (*statuses, limit),
     ).fetchall()

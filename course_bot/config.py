@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -16,6 +17,11 @@ class Config:
     token: str
     admin_ids: frozenset[int]
     db_path: Path
+    tz_name: str = "Asia/Dushanbe"
+
+    @property
+    def tz(self) -> ZoneInfo:
+        return ZoneInfo(self.tz_name)
 
 
 def _parse_ids(raw: str) -> frozenset[int]:
@@ -39,4 +45,6 @@ def load_config() -> Config:
     if not admins:
         raise RuntimeError("не задан ADMIN_IDS (ваш id в Telegram) в course_bot/.env")
     db_path = Path(os.getenv("DB_PATH", HERE / "data" / "course.db"))
-    return Config(token=token, admin_ids=admins, db_path=db_path)
+    tz_name = os.getenv("TZ_NAME", "Asia/Dushanbe").strip() or "Asia/Dushanbe"
+    ZoneInfo(tz_name)  # опечатка в поясе — ошибка сразу при запуске
+    return Config(token=token, admin_ids=admins, db_path=db_path, tz_name=tz_name)

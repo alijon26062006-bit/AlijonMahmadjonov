@@ -1,6 +1,7 @@
 """Бот курса: рассказ о курсе, покупка по чеку, одноразовая ссылка в канал."""
 
 import importlib
+import time
 from datetime import datetime
 
 import pytest
@@ -31,7 +32,7 @@ from aiogram.types import (
     User,
 )
 
-from course_bot import admin, content, db, handlers, main
+from course_bot import admin, content, db, handlers, main, subscriptions
 from course_bot.config import Config
 
 TOKEN = "42:TESTTESTTESTTESTTESTTESTTESTTESTTEST"
@@ -88,6 +89,7 @@ class FakeTelegram:
 def stand(tmp_path):
     importlib.reload(handlers)
     importlib.reload(admin)
+    importlib.reload(subscriptions)
     importlib.reload(main)
     conn = db.connect(tmp_path / "course.db")
     config = Config(token=TOKEN, admin_ids=frozenset({ADMIN}), db_path=tmp_path / "course.db")
@@ -290,79 +292,120 @@ async def test_give_grants_access_manually(stand):
     assert tg.of(CreateChatInviteLink)
 
 
-# ── возврат: только первые 3 дня ─────────────────────────────────────────────
+# ── подписка на месяц ───────────────────────────────────────────────────────
 
-def paid_student(conn, days_ago=0.0):
+DAY = 86400
+
+
+def active_student(conn, days_left=20.0):
     db.touch_student(conn, STUDENT, "u", "Ученик")
-    db.set_status(conn, STUDENT, "paid")
-    conn.execute("UPDATE students SET paid_at = paid_at - ? WHERE user_id = ?", (days_ago * 86400, STUDENT))
+    conn.execute("UPDATE students SET status = 'paid', paid_at = ?, paid_until = ?, warned_at = NULL "
+                 "WHERE user_id = ?", (time.time(), time.time() + days_left * DAY, STUDENT))
     conn.commit()
 
 
-async def test_refund_within_three_days(stand):
+async def test_payment_gives_thirty_days(stand):
     dispatcher, bot, tg, conn = stand
     ready_to_sell(conn)
-    paid_student(conn, days_ago=1)
-    await feed(dispatcher, bot, text("/start"))
-    menu = tg.of(SendMessage)[-1].reply_markup
-    assert "refund" in [b.callback_data for row in menu.inline_keyboard for b in row]
+    await feed(dispatcher, bot, text("/start"), press("paid"), photo(), press(f"ok:{STUDENT}", user_id=ADMIN))
+    left = db.get_student(conn, STUDENT)["paid_until"] - time.time()
+    assert 29.9 * DAY < left <= 30 * DAY
+    assert any("Доступ до" in t for t in tg.texts_to(STUDENT))
 
-    await feed(dispatcher, bot, press("refund"), press("refund_yes"))
-    assert db.status_of(conn, STUDENT) == "refund_details"
-    await feed(dispatcher, bot, text("Карта 9999, Ученик"))
-    assert db.status_of(conn, STUDENT) == "refund_requested"
+
+async def test_renewal_adds_month_to_remaining_days_without_new_link(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    active_student(conn, days_left=2)
+    await feed(dispatcher, bot, text("/start"))
+    buttons = [b.callback_data for row in tg.of(SendMessage)[-1].reply_markup.inline_keyboard for b in row]
+    assert "m:sub" in buttons and "m:buy" in buttons and "link" in buttons
+
+    await feed(dispatcher, bot, press("m:buy"))
+    assert "Продление" in tg.of(EditMessageText)[-1].text
+    await feed(dispatcher, bot, press("paid"))
+    assert db.status_of(conn, STUDENT) == "renew_waiting"
+    await feed(dispatcher, bot, photo())
+    assert db.status_of(conn, STUDENT) == "renew_pending"
     card = [m for m in tg.of(SendMessage) if m.chat_id == ADMIN][-1]
-    assert "Карта 9999" in card.text
-    assert card.reply_markup.inline_keyboard[0][0].callback_data == f"rfok:{STUDENT}"
+    assert "Продление" in card.text
 
-    await feed(dispatcher, bot, press(f"rfok:{STUDENT}", user_id=ADMIN, html=card.text))
-    assert db.status_of(conn, STUDENT) == "refunded"
-    assert [m for m in tg.sent if type(m).__name__ == "BanChatMember"]
+    await feed(dispatcher, bot, press(f"ok:{STUDENT}", user_id=ADMIN, html=card.text))
+    left = db.get_student(conn, STUDENT)["paid_until"] - time.time()
+    assert 31.9 * DAY < left <= 32 * DAY          # 2 оставшихся дня + 30
+    assert db.status_of(conn, STUDENT) == "paid"
+    assert not tg.of(CreateChatInviteLink)        # уже в канале — ссылка не нужна
+    assert any("продлён" in t for t in tg.texts_to(STUDENT))
+
+
+async def test_rejected_renewal_keeps_current_access(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    active_student(conn, days_left=5)
+    until = db.get_student(conn, STUDENT)["paid_until"]
+    await feed(dispatcher, bot, press("paid"), photo(), press(f"no:{STUDENT}", user_id=ADMIN))
+    assert db.status_of(conn, STUDENT) == "paid"
+    assert db.get_student(conn, STUDENT)["paid_until"] == until
+
+
+async def test_warning_three_days_before_end_only_once(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    config = dispatcher["config"]
+    active_student(conn, days_left=10)
+    await subscriptions.check(bot, conn, config)
+    assert not tg.texts_to(STUDENT)
+
+    active_student(conn, days_left=2.5)
+    await subscriptions.check(bot, conn, config)
+    warnings = [t for t in tg.texts_to(STUDENT) if "заканчивается" in t]
+    assert len(warnings) == 1
+    await subscriptions.check(bot, conn, config)
+    assert len([t for t in tg.texts_to(STUDENT) if "заканчивается" in t]) == 1
+    assert db.status_of(conn, STUDENT) == "paid"
+
+
+async def test_not_renewed_student_is_removed_from_channel(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    active_student(conn, days_left=0.5)
+    until = db.get_student(conn, STUDENT)["paid_until"]
+    await subscriptions.check(bot, conn, dispatcher["config"], now=until + 60)
+    assert db.status_of(conn, STUDENT) == "expired"
+    ban = [m for m in tg.sent if type(m).__name__ == "BanChatMember"]
+    assert ban and ban[0].user_id == STUDENT and ban[0].chat_id == CHANNEL
     assert [m for m in tg.sent if type(m).__name__ == "UnbanChatMember"]
-    assert content.REFUND_DONE in tg.texts_to(STUDENT)
+    assert content.EXPIRED in tg.texts_to(STUDENT)
+    assert any("закончилась" in t for t in tg.texts_to(ADMIN))
 
-    # после возврата можно купить снова
+    # вернулся и оплатил снова — новая ссылка и новый месяц
+    await feed(dispatcher, bot, press("paid"), photo(), press(f"ok:{STUDENT}", user_id=ADMIN))
+    assert db.status_of(conn, STUDENT) == "paid"
+    assert tg.of(CreateChatInviteLink)
+
+
+async def test_renewal_on_review_is_not_removed(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    active_student(conn, days_left=1)
     await feed(dispatcher, bot, press("paid"), photo())
-    assert db.status_of(conn, STUDENT) == "pending"
-
-
-async def test_no_refund_after_three_days(stand):
-    dispatcher, bot, tg, conn = stand
-    ready_to_sell(conn)
-    paid_student(conn, days_ago=3.1)
-    await feed(dispatcher, bot, text("/start"))
-    menu = tg.of(SendMessage)[-1].reply_markup
-    assert "refund" not in [b.callback_data for row in menu.inline_keyboard for b in row]
-
-    await feed(dispatcher, bot, press("refund"))   # старая кнопка
-    assert tg.of(AnswerCallbackQuery)[-1].text == content.REFUND_EXPIRED
-    await feed(dispatcher, bot, press("refund_yes"))
-    assert db.status_of(conn, STUDENT) == "paid"
-
-
-async def test_declined_refund_keeps_access_and_deadline(stand):
-    dispatcher, bot, tg, conn = stand
-    ready_to_sell(conn)
-    paid_student(conn, days_ago=2)
-    paid_at = db.get_student(conn, STUDENT)["paid_at"]
-    await feed(dispatcher, bot, press("refund_yes"), text("Карта 9999"), press(f"rfno:{STUDENT}", user_id=ADMIN))
-    assert db.status_of(conn, STUDENT) == "paid"
-    assert db.get_student(conn, STUDENT)["paid_at"] == paid_at   # срок не продлился
-    assert content.REFUND_DECLINED in tg.texts_to(STUDENT)
+    until = db.get_student(conn, STUDENT)["paid_until"]
+    await subscriptions.check(bot, conn, dispatcher["config"], now=until + 60)
+    assert db.status_of(conn, STUDENT) == "renew_pending"   # ждём решения админа
     assert not [m for m in tg.sent if type(m).__name__ == "BanChatMember"]
 
 
-def test_refund_rule_is_visible_before_buying():
-    assert "3 дня" in content.honest("каждые 2 дня", 2, False)
-    assert "3 дня" in content.buy("300", "Карта")
-    assert any("вернуть деньги" in q.lower() for q, _ in content.FAQ)
+def test_rules_are_visible_before_paying():
+    rules = content.honest("каждые 2 дня", 2, False)
+    assert "30 дней" in rules and "3 дня" in rules and "не продлевайте" in rules
+    assert "не возвращаются" in content.buy("300", "Карта")
+    assert any("Сколько длится доступ" in q for q, _ in content.FAQ)
 
 
 async def test_new_link_for_paid_student(stand):
     dispatcher, bot, tg, conn = stand
     ready_to_sell(conn)
-    db.touch_student(conn, STUDENT, "u", "Ученик")
-    db.set_status(conn, STUDENT, "paid")
+    active_student(conn)
 
     tg.member_status = "member"
     await feed(dispatcher, bot, press("link"))

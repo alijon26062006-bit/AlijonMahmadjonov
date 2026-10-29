@@ -1,4 +1,4 @@
-"""Админ-панель на кнопках: цена, реквизиты, канал, подтверждение оплат и возвратов."""
+"""Админ-панель на кнопках: цена, реквизиты, канал, подтверждение оплат."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, MessageO
 
 from . import content, db
 from .config import Config
-from .handlers import _btn, back_menu, grant_access, remove_from_channel
+from .handlers import _btn, back_menu, fmt_date, grant_access
 
 router = Router()
 
@@ -29,7 +29,7 @@ router.callback_query.filter(_is_admin)
 
 # (ключ, кнопка, что прислать, пример, можно ли очистить)
 SETTINGS = [
-    ("price", "💰 Цена", "цену курса", "300 сомони", False),
+    ("price", "💰 Цена за месяц", "цену за месяц", "300 сомони", False),
     ("pay", "💳 Реквизиты", "реквизиты для оплаты (можно в несколько строк)",
      "Карта Алиф: 1234 5678 9012 3456\nПолучатель: Алиджон М.", False),
     ("schedule", "📅 График", "как часто выходят уроки", "новый урок каждые 2 дня", False),
@@ -52,7 +52,9 @@ def panel_text(conn: sqlite3.Connection) -> str:
     channel = db.get_setting(conn, "channel_id")
     lines.append(f"📢 Канал: {'подключён ✅' if channel else 'не подключён ❌'}")
     c = db.counts(conn)
-    lines.append(f"\n🎓 Купили курс: <b>{c.get('paid', 0)}</b>, чеков на проверке: {c.get('pending', 0)}")
+    active = sum(c.get(st, 0) for st in db.ACTIVE)
+    checking = c.get("pending", 0) + c.get("renew_pending", 0)
+    lines.append(f"\n🎓 Активных подписок: <b>{active}</b>, чеков на проверке: {checking}")
     lines.append("\nЧтобы поменять — нажмите кнопку 👇")
     return "\n".join(lines)
 
@@ -118,26 +120,25 @@ async def channel_help(callback: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "adm:stats")
-async def stats(callback: CallbackQuery, conn: sqlite3.Connection) -> None:
+async def stats(callback: CallbackQuery, conn: sqlite3.Connection, config: Config) -> None:
     c = db.counts(conn)
     lines = [
         "📊 <b>Ученики</b>\n",
-        f"Купили курс: <b>{c.get('paid', 0)}</b>",
-        f"Чек на проверке: {c.get('pending', 0)}",
-        f"Нажали «Я оплатил», но чек не прислали: {c.get('waiting_receipt', 0)}",
-        f"Отклонено: {c.get('rejected', 0)}",
-        f"Просят возврат: {c.get('refund_details', 0) + c.get('refund_requested', 0)}",
-        f"Вернули деньги: {c.get('refunded', 0)}",
+        f"Активная подписка: <b>{sum(c.get(st, 0) for st in db.ACTIVE)}</b>",
+        f"Чек на проверке: {c.get('pending', 0) + c.get('renew_pending', 0)}",
+        f"Нажали «Я оплатил», но чек не прислали: {c.get('waiting_receipt', 0) + c.get('renew_waiting', 0)}",
+        f"Подписка закончилась: {c.get('expired', 0)}",
         f"Всего открывали бота: {sum(c.values())}",
     ]
-    pending = db.students_with(conn, "pending")
+    pending = db.students_with(conn, "pending", "renew_pending")
     if pending:
         lines.append("\n<b>Ждут проверки чека:</b>")
         lines += [f"• {escape(s['full_name'] or '')} — <code>{s['user_id']}</code>" for s in pending]
-    paid = db.students_with(conn, "paid", limit=10)
-    if paid:
-        lines.append("\n<b>Последние покупатели:</b>")
-        lines += [f"• {escape(s['full_name'] or '')} — <code>{s['user_id']}</code>" for s in paid]
+    active = sorted(db.students_with(conn, *db.ACTIVE, limit=50), key=lambda s: s["paid_until"] or 0)
+    if active:
+        lines.append("\n<b>Подписки (сначала те, у кого скоро конец):</b>")
+        lines += [f"• {escape(s['full_name'] or '')} — до {fmt_date(s['paid_until'], config)}"
+                  for s in active[:30]]
     await _show(callback, "\n".join(lines), to_panel())
 
 
@@ -146,7 +147,8 @@ async def ask_give(callback: CallbackQuery) -> None:
     WAITING[callback.from_user.id] = "give"
     await _show(callback, (
         "🎓 <b>Выдать доступ вручную</b>\n\n"
-        "Например, если ученик оплатил наличными.\n\n"
+        "Например, если ученик оплатил наличными. Даёт ещё месяц доступа: "
+        "новичку бот пришлёт ссылку, а тому, кто уже в канале, — продлит срок.\n\n"
         "Отправьте <b>ID ученика</b> — он есть в карточке чека и в «📊 Ученики». "
         "Ученик должен хотя бы раз открыть бота."
     ), cancel_menu())
@@ -197,7 +199,7 @@ def _is_waiting(message: Message) -> bool:
 
 
 @router.message(_is_waiting)
-async def receive_value(message: Message, bot: Bot, conn: sqlite3.Connection) -> None:
+async def receive_value(message: Message, bot: Bot, conn: sqlite3.Connection, config: Config) -> None:
     admin_id = message.from_user.id
     key = WAITING[admin_id]
     value = (message.text or "").strip()
@@ -211,8 +213,8 @@ async def receive_value(message: Message, bot: Bot, conn: sqlite3.Connection) ->
                                  "открыть бота.", reply_markup=cancel_menu())
             return
         WAITING.pop(admin_id)
-        error = await grant_access(bot, conn, int(value))
-        await message.answer(f"❌ {error}" if error else "✅ Доступ выдан, ссылка отправлена ученику.",
+        error = await grant_access(bot, conn, config, int(value))
+        await message.answer(f"❌ {error}" if error else "✅ Доступ на месяц выдан, ученику сообщили.",
                              reply_markup=to_panel())
         return
 
@@ -239,44 +241,25 @@ async def _mark(callback: CallbackQuery, verdict: str) -> None:
 
 
 @router.callback_query(F.data.regexp(r"^(ok|no):(\d+)$").as_("match"))
-async def decide(callback: CallbackQuery, match, bot: Bot, conn: sqlite3.Connection) -> None:
+async def decide(callback: CallbackQuery, match, bot: Bot, conn: sqlite3.Connection, config: Config) -> None:
     action, user_id = match.group(1), int(match.group(2))
     status = db.status_of(conn, user_id)
-    if status == "paid":
-        await callback.answer("Уже подтверждено раньше.", show_alert=True)
-        return
-    if status != "pending":
+    if status not in ("pending", "renew_pending"):
         await callback.answer("Этот чек уже обработан.", show_alert=True)
         return
 
     if action == "ok":
-        error = await grant_access(bot, conn, user_id)
-        if error and db.status_of(conn, user_id) != "paid":
+        error = await grant_access(bot, conn, config, user_id)
+        if error and db.status_of(conn, user_id) == status:
             await callback.answer(error, show_alert=True)  # канал не подключён — чек ждёт
             return
-        await _mark(callback, f"❌ {error}" if error else "✅ Подтверждено — ссылка отправлена ученику")
+        until = fmt_date(db.get_student(conn, user_id)["paid_until"], config)
+        await _mark(callback, f"❌ {error}" if error else f"✅ Подтверждено — доступ до {until}")
         return
 
-    db.set_status(conn, user_id, "rejected")
+    # Продление отклонено — текущий оплаченный срок остаётся.
+    db.set_status(conn, user_id, "paid" if status == "renew_pending" else "rejected")
     with contextlib.suppress(TelegramAPIError):
         await bot.send_message(user_id, content.REJECTED,
                                reply_markup=back_menu(_btn("✅ Отправить чек ещё раз", "paid")))
     await _mark(callback, "❌ Отклонено — ученику сообщили")
-
-
-@router.callback_query(F.data.regexp(r"^(rfok|rfno):(\d+)$").as_("match"))
-async def decide_refund(callback: CallbackQuery, match, bot: Bot, conn: sqlite3.Connection) -> None:
-    action, user_id = match.group(1), int(match.group(2))
-    if db.status_of(conn, user_id) != "refund_requested":
-        await callback.answer("Этот запрос уже обработан.", show_alert=True)
-        return
-    if action == "rfok":
-        db.set_status(conn, user_id, "refunded")
-        await remove_from_channel(bot, conn, user_id)
-        text, verdict = content.REFUND_DONE, "✅ Деньги возвращены — ученик убран из канала"
-    else:
-        db.restore_paid(conn, user_id)
-        text, verdict = content.REFUND_DECLINED, "❌ В возврате отказано — доступ остался"
-    with contextlib.suppress(TelegramAPIError):
-        await bot.send_message(user_id, text, reply_markup=back_menu())
-    await _mark(callback, verdict)

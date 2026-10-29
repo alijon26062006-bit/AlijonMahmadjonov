@@ -1,4 +1,4 @@
-"""Всё, что видит ученик: рассказ о курсе, покупка, ссылка в канал."""
+"""Всё, что видит ученик: рассказ о курсе, оплата, продление, ссылка в канал."""
 
 from __future__ import annotations
 
@@ -29,9 +29,11 @@ router = Router()
 
 LINK_COOLDOWN = 600  # новая ссылка — не чаще раза в 10 минут
 LINK_TTL = timedelta(hours=24)
-# Ученик с доступом: оплатил, в том числе если сейчас просит возврат.
-HAS_ACCESS = {"paid", "refund_details", "refund_requested"}
 IN_CHANNEL = {ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR}
+
+
+def fmt_date(ts: float, config: Config) -> str:
+    return datetime.fromtimestamp(ts, config.tz).strftime("%d.%m.%Y")
 
 
 # ── клавиатуры ──────────────────────────────────────────────────────────────
@@ -52,14 +54,12 @@ def main_menu(conn: sqlite3.Connection, user_id: int, is_admin: bool = False) ->
     demo = db.get_setting(conn, "demo")
     if demo:
         rows.append([InlineKeyboardButton(text="🎁 Бесплатный урок", url=demo)])
-    student = db.get_student(conn, user_id)
-    status = student["status"] if student else "new"
-    if status in HAS_ACCESS:
+    if db.status_of(conn, user_id) in db.ACTIVE:
+        rows.append(_btn("📆 Моя подписка", "m:sub"))
+        rows.append(_btn("🔄 Продлить на месяц", "m:buy"))
         rows.append(_btn("🔑 Получить ссылку в канал", "link"))
-        if status == "paid" and db.refund_seconds_left(student, content.REFUND_DAYS) > 0:
-            rows.append(_btn("↩️ Вернуть деньги", "refund"))
     else:
-        rows.append(_btn("💳 Купить курс", "m:buy"))
+        rows.append(_btn("💳 Оплатить курс", "m:buy"))
     contact = db.get_setting(conn, "contact")
     if contact:
         rows.append([InlineKeyboardButton(text="💬 Написать администратору", url=f"https://t.me/{contact}")])
@@ -81,11 +81,11 @@ def buy_menu() -> InlineKeyboardMarkup:
     return back_menu(_btn("✅ Я оплатил — отправить чек", "paid"), _btn("⚠️ Честно о курсе", "m:honest"))
 
 
-def link_menu() -> InlineKeyboardMarkup:
-    return back_menu(_btn("🔑 Получить ссылку в канал", "link"))
+def renew_menu() -> InlineKeyboardMarkup:
+    return back_menu(_btn("🔄 Продлить на месяц", "m:buy"))
 
 
-# ── ссылка в канал ──────────────────────────────────────────────────────────
+# ── доступ ──────────────────────────────────────────────────────────────────
 
 async def issue_link(bot: Bot, conn: sqlite3.Connection, user_id: int) -> str:
     """Одноразовая ссылка: впустит ровно одного человека и сгорит через сутки.
@@ -104,24 +104,41 @@ async def issue_link(bot: Bot, conn: sqlite3.Connection, user_id: int) -> str:
     return link.invite_link
 
 
-async def grant_access(bot: Bot, conn: sqlite3.Connection, user_id: int) -> str | None:
-    """Отмечает оплату и отправляет ученику ссылку. Возвращает текст ошибки или None."""
+async def grant_access(bot: Bot, conn: sqlite3.Connection, config: Config, user_id: int) -> str | None:
+    """Плюс месяц доступа. Новичку — ссылка в канал, тому, кто уже в канале, — «продлено».
+
+    Возвращает текст ошибки для админа или None.
+    """
     if not db.get_setting(conn, "channel_id"):
         return "Канал не подключён. Откройте ⚙️ Админ-панель → 📢 Подключить канал."
-    if db.status_of(conn, user_id) not in HAS_ACCESS:
-        db.set_status(conn, user_id, "paid")
+    was_active = db.status_of(conn, user_id) in db.ACTIVE
+    until = fmt_date(db.extend(conn, user_id, content.SUB_DAYS), config)
+    if was_active:
+        with contextlib.suppress(TelegramAPIError):
+            await bot.send_message(user_id, content.renewed(until), reply_markup=back_menu())
+        return None
     try:
         link = await issue_link(bot, conn, user_id)
     except TelegramAPIError as exc:
         log.warning("Не удалось создать ссылку для %s: %s", user_id, exc)
         return (f"Оплата отмечена, но ссылку создать не удалось: {exc.message}\n"
                 "Проверьте, что бот — администратор канала с правом «Пригласительные ссылки». "
-                "Потом выдайте доступ снова: ⚙️ Админ-панель → 🎓 Выдать доступ вручную.")
+                "Ученик сможет взять ссылку сам кнопкой «🔑 Получить ссылку в канал».")
     try:
-        await bot.send_message(user_id, content.access_link(link), reply_markup=back_menu())
+        await bot.send_message(user_id, content.access_link(link, until), reply_markup=back_menu())
     except TelegramAPIError as exc:
         return f"Ссылка создана, но ученику не отправилась ({exc.message}). Ссылка: {link}"
     return None
+
+
+async def remove_from_channel(bot: Bot, conn: sqlite3.Connection, user_id: int) -> None:
+    """Убрать из канала. Бан сразу снимаем — иначе после новой оплаты ученик не смог бы войти."""
+    channel_id = db.get_setting(conn, "channel_id")
+    if not channel_id:
+        return
+    with contextlib.suppress(TelegramAPIError):
+        await bot.ban_chat_member(int(channel_id), user_id)
+        await bot.unban_chat_member(int(channel_id), user_id, only_if_banned=True)
 
 
 # ── меню ────────────────────────────────────────────────────────────────────
@@ -155,6 +172,8 @@ async def menu(callback: CallbackQuery, conn: sqlite3.Connection, config: Config
     page = callback.data[2:]
     ready = db.ready_count(conn)
     schedule = db.get_setting(conn, "schedule")
+    student = db.get_student(conn, user.id)
+    active = student["status"] in db.ACTIVE
 
     if page == "about":
         await _show(callback, content.about(), back_menu(_btn("🗺 Программа курса", "m:program")))
@@ -166,18 +185,22 @@ async def menu(callback: CallbackQuery, conn: sqlite3.Connection, config: Config
         await _show(callback, content.schedule_text(schedule, ready), back_menu())
     elif page == "honest":
         await _show(callback, content.honest(schedule, ready, bool(db.get_setting(conn, "demo"))),
-                    back_menu(_btn("💳 Купить курс", "m:buy")))
+                    back_menu(_btn("🔄 Продлить на месяц" if active else "💳 Оплатить курс", "m:buy")))
     elif page == "faq":
         await _show(callback, content.faq(), back_menu())
+    elif page == "sub" and active:
+        left = student["paid_until"] - time.time()
+        await _show(callback, content.my_subscription(fmt_date(student["paid_until"], config), left),
+                    back_menu(_btn("🔄 Продлить на месяц", "m:buy"), _btn("🔑 Получить ссылку в канал", "link")))
     elif page == "buy":
-        if db.status_of(conn, user.id) in HAS_ACCESS:
-            await _show(callback, content.ALREADY_PAID, link_menu())
+        if student["status"] in ("pending", "renew_pending"):
+            await _show(callback, content.RECEIPT_ALREADY, back_menu())
             return
         pay = db.get_setting(conn, "pay")
         if not pay:
             await _show(callback, content.PAY_NOT_SET, back_menu())
             return
-        await _show(callback, content.buy(db.get_setting(conn, "price"), pay), buy_menu())
+        await _show(callback, content.buy(db.get_setting(conn, "price"), pay, renew=active), buy_menu())
     else:
         await _show(callback, content.welcome(_name(user)),
                     main_menu(conn, user.id, user.id in config.admin_ids))
@@ -193,7 +216,7 @@ async def module(callback: CallbackQuery, conn: sqlite3.Connection) -> None:
                 back_menu(_btn("⬅️ Все модули", "m:program")))
 
 
-# ── покупка ─────────────────────────────────────────────────────────────────
+# ── оплата и продление ──────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "paid")
 async def paid_pressed(callback: CallbackQuery, conn: sqlite3.Connection) -> None:
@@ -201,13 +224,11 @@ async def paid_pressed(callback: CallbackQuery, conn: sqlite3.Connection) -> Non
     db.touch_student(conn, user.id, user.username, _name(user))
     status = db.status_of(conn, user.id)
     await callback.answer()
-    if status in HAS_ACCESS:
-        await callback.message.answer(content.ALREADY_PAID, reply_markup=link_menu())
-    elif status == "pending":
+    if status in ("pending", "renew_pending"):
         await callback.message.answer(content.RECEIPT_ALREADY)
-    else:
-        db.set_status(conn, user.id, "waiting_receipt")
-        await callback.message.answer(content.SEND_RECEIPT)
+        return
+    db.set_status(conn, user.id, "renew_waiting" if status in db.ACTIVE else "waiting_receipt")
+    await callback.message.answer(content.SEND_RECEIPT)
 
 
 def approve_menu(user_id: int) -> InlineKeyboardMarkup:
@@ -221,23 +242,21 @@ def approve_menu(user_id: int) -> InlineKeyboardMarkup:
 async def receipt(message: Message, bot: Bot, conn: sqlite3.Connection, config: Config) -> None:
     user = message.from_user
     db.touch_student(conn, user.id, user.username, _name(user))
-    status = db.status_of(conn, user.id)
-    if status == "refund_details":
-        await message.answer(content.REFUND_ASK_DETAILS)
-        return
-    if status in HAS_ACCESS:
-        await message.answer(content.ALREADY_PAID, reply_markup=link_menu())
-        return
-    if status == "pending":
+    student = db.get_student(conn, user.id)
+    status = student["status"]
+    if status in ("pending", "renew_pending"):
         await message.answer(content.RECEIPT_ALREADY)
         return
-    if status != "waiting_receipt":
-        await message.answer(content.PRESS_BUY_FIRST,
-                             reply_markup=main_menu(conn, user.id, user.id in config.admin_ids))
+    if status not in ("waiting_receipt", "renew_waiting"):
+        hint = content.PRESS_RENEW_FIRST if status == "paid" else content.PRESS_BUY_FIRST
+        await message.answer(hint, reply_markup=main_menu(conn, user.id, user.id in config.admin_ids))
         return
 
+    renew = status == "renew_waiting"
     username = f" @{user.username}" if user.username else ""
-    info = (f"🧾 <b>Новый чек</b>\n"
+    kind = (f"🔄 <b>Продление</b> (сейчас доступ до {fmt_date(student['paid_until'], config)})"
+            if renew else "🧾 <b>Новая оплата</b>")
+    info = (f"{kind}\n"
             f"Ученик: <a href=\"tg://user?id={user.id}\">{escape(_name(user))}</a>{username}\n"
             f"ID: <code>{user.id}</code>\n\n"
             f"Проверьте, пришли ли деньги, и нажмите кнопку.")
@@ -253,7 +272,7 @@ async def receipt(message: Message, bot: Bot, conn: sqlite3.Connection, config: 
     if not delivered:
         await message.answer("Не получилось передать чек администратору. Попробуйте позже.")
         return
-    db.set_status(conn, user.id, "pending")
+    db.set_status(conn, user.id, "renew_pending" if renew else "pending")
     await message.answer(content.RECEIPT_RECEIVED)
 
 
@@ -263,7 +282,7 @@ async def receipt(message: Message, bot: Bot, conn: sqlite3.Connection, config: 
 async def new_link(callback: CallbackQuery, bot: Bot, conn: sqlite3.Connection) -> None:
     user_id = callback.from_user.id
     student = db.get_student(conn, user_id)
-    if not student or student["status"] not in HAS_ACCESS:
+    if not student or student["status"] not in db.ACTIVE:
         await callback.answer(content.NOT_PAID, show_alert=True)
         return
     channel_id = db.get_setting(conn, "channel_id")
@@ -285,92 +304,8 @@ async def new_link(callback: CallbackQuery, bot: Bot, conn: sqlite3.Connection) 
         log.warning("Не удалось создать ссылку для %s: %s", user_id, exc)
         await callback.message.answer(content.NO_CHANNEL)
         return
-    await callback.message.answer(content.access_link(link), reply_markup=back_menu())
-
-
-# ── возврат денег (только первые REFUND_DAYS дней) ──────────────────────────
-
-@router.callback_query(F.data == "refund")
-async def refund(callback: CallbackQuery, conn: sqlite3.Connection) -> None:
-    student = db.get_student(conn, callback.from_user.id)
-    status = student["status"] if student else "new"
-    if status in ("refund_details", "refund_requested"):
-        await callback.answer(content.REFUND_IN_PROGRESS, show_alert=True)
-        return
-    if status != "paid":
-        await callback.answer(content.NOT_PAID, show_alert=True)
-        return
-    left = db.refund_seconds_left(student, content.REFUND_DAYS)
-    if left <= 0:
-        await callback.answer(content.REFUND_EXPIRED, show_alert=True)
-        return
-    await _show(callback, content.refund_confirm(left), InlineKeyboardMarkup(inline_keyboard=[
-        _btn("Да, вернуть деньги", "refund_yes"),
-        _btn("Нет, продолжаю учиться", "m:home"),
-    ]))
-
-
-@router.callback_query(F.data == "refund_yes")
-async def refund_yes(callback: CallbackQuery, conn: sqlite3.Connection) -> None:
-    student = db.get_student(conn, callback.from_user.id)
-    if not student or student["status"] != "paid":
-        await callback.answer(content.REFUND_IN_PROGRESS if student and student["status"] in HAS_ACCESS
-                              else content.NOT_PAID, show_alert=True)
-        return
-    # Срок проверяем ещё раз: экран подтверждения мог висеть открытым.
-    if db.refund_seconds_left(student, content.REFUND_DAYS) <= 0:
-        await callback.answer(content.REFUND_EXPIRED, show_alert=True)
-        return
-    db.set_status(conn, student["user_id"], "refund_details")
-    await callback.answer()
-    await callback.message.answer(content.REFUND_ASK_DETAILS)
-
-
-def refund_menu(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Деньги вернул", callback_data=f"rfok:{user_id}"),
-        InlineKeyboardButton(text="❌ Отказать", callback_data=f"rfno:{user_id}"),
-    ]])
-
-
-async def _waits_refund_details(message: Message, conn: sqlite3.Connection) -> bool:
-    return message.from_user is not None and db.status_of(conn, message.from_user.id) == "refund_details"
-
-
-@router.message(F.chat.type == "private", F.text, _waits_refund_details)
-async def refund_details(message: Message, bot: Bot, conn: sqlite3.Connection, config: Config) -> None:
-    user = message.from_user
-    student = db.get_student(conn, user.id)
-    paid = datetime.fromtimestamp(student["paid_at"]).strftime("%d.%m.%Y %H:%M")
-    username = f" @{user.username}" if user.username else ""
-    text = (f"↩️ <b>Запрос на возврат</b>\n"
-            f"Ученик: <a href=\"tg://user?id={user.id}\">{escape(_name(user))}</a>{username}\n"
-            f"ID: <code>{user.id}</code>\n"
-            f"Оплатил: {paid}\n\n"
-            f"<b>Куда вернуть:</b>\n{escape(message.text)}\n\n"
-            f"Верните деньги и нажмите «✅ Деньги вернул» — бот уберёт ученика из канала.")
-    delivered = 0
-    for admin_id in config.admin_ids:
-        try:
-            await bot.send_message(admin_id, text, reply_markup=refund_menu(user.id))
-            delivered += 1
-        except TelegramAPIError as exc:
-            log.warning("Запрос на возврат не дошёл до админа %s: %s", admin_id, exc)
-    if not delivered:
-        await message.answer("Не получилось передать запрос администратору. Попробуйте позже.")
-        return
-    db.set_status(conn, user.id, "refund_requested")
-    await message.answer(content.REFUND_SENT)
-
-
-async def remove_from_channel(bot: Bot, conn: sqlite3.Connection, user_id: int) -> None:
-    """Убрать из канала. Бан сразу снимаем — иначе ученик не смог бы купить курс снова."""
-    channel_id = db.get_setting(conn, "channel_id")
-    if not channel_id:
-        return
-    with contextlib.suppress(TelegramAPIError):
-        await bot.ban_chat_member(int(channel_id), user_id)
-        await bot.unban_chat_member(int(channel_id), user_id, only_if_banned=True)
+    await callback.message.answer(
+        f"🔑 Ваша новая ссылка в канал (работает один раз, 24 часа):\n{link}", reply_markup=back_menu())
 
 
 # ── кто вошёл в канал по чужой ссылке ───────────────────────────────────────
