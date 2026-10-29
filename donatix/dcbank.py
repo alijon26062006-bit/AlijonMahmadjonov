@@ -47,11 +47,11 @@ def window_hours(conn: sqlite3.Connection) -> int:
 
 
 def receipt_after_min(conn: sqlite3.Connection) -> int:
-    """Через сколько минут без совпавших денег клиенту предлагаем прислать чек."""
+    """Через сколько минут без совпавших денег клиенту предлагаем прислать чек. 0 — сразу (по умолчанию)."""
     try:
-        return max(1, int(db.get_setting(conn, "pay.dc_receipt_min") or 5))
+        return max(0, int(db.get_setting(conn, "pay.dc_receipt_min") or 0))
     except ValueError:
-        return 5
+        return 0
 
 
 def ready(config: Config) -> bool:

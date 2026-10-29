@@ -424,3 +424,21 @@ def test_same_sum_at_once_gets_tail_and_one_transfer_credits_once(app, dc, conn)
     uid3, c3, t3 = _client(app, conn, 6)
     _pay(c3, t3, "20")
     assert conn.execute("SELECT pay_amount FROM payments ORDER BY id DESC").fetchone()[0] == "20.00"
+
+
+def test_dc_receipt_accepted_right_away_in_bot(app, dc, conn, supplier, monkeypatch):
+    """«Душанбе Сити»: чек можно прислать сразу после заявки — не ждать минут."""
+    from conftest import RECEIPT_PNG
+    from test_shopbot import FakeApi, _bot, _start, msg, press
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    assert dcbank.receipt_after_min(conn) == 0
+    bot = _bot(dc, supplier, FakeApi(photo=RECEIPT_PNG))
+    _start(bot, conn)
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("1"))
+    assert "прислать сюда фото чека" in bot.api.last_text()
+    bot.handle(conn, {"update_id": 3, "message": {"chat": {"id": 700001, "type": "private"}, "from": {"id": 700001},
+                                                  "photo": [{"file_id": "f1"}]}})
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    assert p["auto_kind"] == "dcbank" and p["receipt_file"]

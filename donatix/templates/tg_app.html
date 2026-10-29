@@ -274,7 +274,7 @@ const L = {
     address: "Суроға", network: "Шабака", amount: "Маблағ", left_t: "Вақт: {t}", waiting: "Пардохтро интизорем…",
     paid_ok: "✅ Баланс пур шуд!", go_pay: "Гузаштан ба пардохт", i_paid: "Ман пардохт кардам", searching: "Пардохтро ҷустуҷӯ мекунем…",
     receipt: "Чекро бор кунед (акс ё PDF)", send_receipt: "Фиристодани чек", details: "Реквизитҳо", transfer: "Ба ин реквизитҳо гузаронед ва чекро бор кунед",
-    not_found: "Пардохт ҳоло ёфт нашуд. Агар пардохт карда бошед — чекро фиристед.", watch: "Видео-дастур", agree: "Видеоро дидам, фаҳмидам",
+    not_found: "Пардохт кардед, вале баланс пур нашуд? Акси чекро фиристед — дастӣ месанҷем.", watch: "Видео-дастур", agree: "Видеоро дидам, фаҳмидам",
     expired: "Вақт гузашт — дархости нав кунед.", choose: "Интихоб кунед" },
   ru: { hi: "Привет,", t_home: "Главная", t_gifts: "Подарки", t_profile: "Профиль", balance: "Ваш баланс", som: "сомони",
     topup: "Пополнить", history: "История", fast: "Мгновенно", months: "3 · 6 · 12 мес", from_bot: "От имени бота",
@@ -298,7 +298,7 @@ const L = {
     address: "Адрес", network: "Сеть", amount: "Сумма", left_t: "Осталось: {t}", waiting: "Ждём оплату…",
     paid_ok: "✅ Баланс пополнен!", go_pay: "Перейти к оплате", i_paid: "Я оплатил", searching: "Ищем ваш платёж…",
     receipt: "Прикрепите чек (фото или PDF)", send_receipt: "Отправить чек", details: "Реквизиты", transfer: "Переведите по реквизитам и прикрепите чек",
-    not_found: "Платёж пока не найден. Если вы оплатили — отправьте чек.", watch: "Видео-инструкция", agree: "Посмотрел видео, всё понятно",
+    not_found: "Оплатили, а баланс не пополнился? Отправьте фото чека — проверим вручную.", watch: "Видео-инструкция", agree: "Посмотрел видео, всё понятно",
     expired: "Время вышло — создайте новую заявку.", choose: "Выберите" },
 };
 const t = (k, v) => (L[LANG][k] || k).replace(/\{(\w+)\}/g, (_, x) => (v && v[x] !== undefined ? v[x] : ""));
@@ -542,7 +542,7 @@ function payView() {
     ${p.pay_url ? `<button class="btn primary full mt" data-act="open" data-v="${esc(p.pay_url)}">${t("go_pay")} →</button>` : ""}
     <button class="btn soft full mt" data-act="tpaid">✓ ${t("i_paid")}</button>
     <div class="status" id="tstat"><span class="spin"></span>${t("waiting")}</div>
-    <div id="trcbox" class="${P.showReceipt ? "" : "hidden"}"><p class="note">${t("not_found")}</p>
+    <div id="trcbox" class="${P.showReceipt || !p.receipt_after ? "" : "hidden"}"><p class="note">${t("not_found")}</p>
       <label class="file"><input type="file" id="trc2" accept="image/*,application/pdf">${IC.plus}<span id="trcn2">${t("receipt")}</span></label>
       <button class="btn primary full mt" data-act="trc2">${t("send_receipt")}</button></div>`;
   else body = `
@@ -635,7 +635,7 @@ document.addEventListener("click", async (e) => {
   else if (act === "tnew") { P.pay = null; render(); }
   else if (act === "open") { tg && tg.openLink ? tg.openLink(v) : window.open(v); }
   else if (act === "video") { e.preventDefault(); tg && tg.openLink ? tg.openLink(location.origin + D.pay.dc_video) : window.open(D.pay.dc_video); }
-  else if (act === "tpaid") { P.showReceipt = false; const st = document.getElementById("tstat"); if (st) st.lastChild.textContent = t("searching");
+  else if (act === "tpaid") { P.showReceipt = !(P.pay && P.pay.receipt_after); const st = document.getElementById("tstat"); if (st) st.lastChild.textContent = t("searching");
       setTimeout(() => { if (P.pay && P.pay.status === "pending") { P.showReceipt = true; const b = document.getElementById("trcbox"); if (b) b.classList.remove("hidden"); } }, 90000); }
   else if (act === "trc2") sendLateReceipt(a);
   else if (act === "buy-stars" || act === "buy-premium") {

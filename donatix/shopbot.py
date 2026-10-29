@@ -2212,6 +2212,8 @@ class ShopBot:
                     rows.insert(len(rows) - 1, [(tr(lang, "dc_video_btn"), "dv:show")])
             text = tr(lang, "pay_auto", id=pid, amount=amount_text, address=_e(view["address"] or view["details"]),
                       note=_e(view["auto_note"]))
+            if p["auto_kind"] == "dcbank":   # чек можно сразу: деньги не совпали или банк опоздал — проверим вручную
+                text += "\n\n📸 Уже оплатили? Можно сразу прислать сюда фото чека — проверим вручную."
             intent = self.intent(conn, st.get("resume"))
             if intent:
                 text += tr(lang, "will_buy", product=_e(intent["name"]))
@@ -2239,7 +2241,7 @@ class ShopBot:
         pid = st.get("pid") if st.get("step") == "receipt" else None
         if pid is None:
             p = conn.execute("SELECT id FROM payments WHERE user_id = ? AND status = 'pending' "
-                             "AND receipt_file IS NULL AND COALESCE(auto_kind, '') = '' ORDER BY id DESC LIMIT 1",
+                             "AND receipt_file IS NULL AND COALESCE(auto_kind, '') IN ('', 'dcbank') ORDER BY id DESC LIMIT 1",
                              (su["user_id"],)).fetchone()
             pid = p["id"] if p else None
         if pid is None:

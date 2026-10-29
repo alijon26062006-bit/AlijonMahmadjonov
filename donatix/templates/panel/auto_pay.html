@@ -99,7 +99,7 @@
 
   <form class="dcp-receipt" id="dc-receipt" method="post" action="/panel/balance/{{ p.id }}/receipt" enctype="multipart/form-data" {{ '' if receipt_now else 'hidden' }} data-after="{{ receipt_wait }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <b>Пардохт ҳоло наёфт шуд</b>
+    <b>Пардохт кардед? Чекро фиристед / Оплатили? Отправьте чек</b>
     <p>Шояд маблағи дигар гузаронидед ё бонк дер кард. Акси чекро фиристед — дастӣ месанҷем ва балансро пур мекунем.</p>
     <label class="dcp-file"><input type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required><span>📎 Интихоби акси чек</span></label>
     <button class="btn primary block">Чекро фиристед</button>
@@ -121,7 +121,7 @@
       <li>Пардохтро тасдиқ кунед ва ба ин саҳифа баргардед.</li>
       <li>Баланс худаш пур мешавад, одатан дар 1 дақиқа. Саҳифа худаш нав мешавад.</li>
     </ol>
-    <p class="muted small">Дастӣ гузаронидан ҳам мумкин: рақами кортро нусха гиред ва <b>маҳз {{ p.pay_amount }}</b> гузаронед. Агар то {{ (receipt_wait // 60) + 1 if not receipt_now else 5 }} дақиқа пур нашавад — тугмаи «Чекро фиристед» пайдо мешавад.</p>
+    <p class="muted small">Дастӣ гузаронидан ҳам мумкин: рақами кортро нусха гиред ва <b>маҳз {{ p.pay_amount }}</b> гузаронед. {% if receipt_now %}Агар баланс зуд пур нашавад — акси чекро дар ҳамин саҳифа фиристед.{% else %}Агар то {{ (receipt_wait // 60) + 1 }} дақиқа пур нашавад — тугмаи «Чекро фиристед» пайдо мешавад.{% endif %}</p>
   </details>
 </div>
 {% elif p.auto in ('trc20', 'bybit') and p.network %}
