@@ -104,7 +104,9 @@ async def cb_menu(call: CallbackQuery, state: FSMContext) -> None:
     if not items:
         await call.answer("Ҳоло минтақаҳои дастрас нестанд.", show_alert=True)
         return
-    await call.message.edit_text(texts.GLORY_ENTRY, reply_markup=regions_kb(items))
+    from app import screens
+
+    await screens.show(call, texts.GLORY_ENTRY, regions_kb(items), keys=("glory", "games"))
     await call.answer()
 
 
@@ -121,7 +123,7 @@ async def cb_region(call: CallbackQuery, state: FSMContext) -> None:
         return
     await state.set_state(Glory.clan)
     await state.update_data(region=region["id"], region_title=region["name"],
-                            price=region["price"], cost=dx.cost_of(region["price_usd"]))
+                            price=region["price"], cost=region["cost"])
     await call.message.edit_text(
         texts.GLORY_ASK_CLAN.format(region=region["name"], price=fmt(region["price"])),
         reply_markup=keyboards.back("gl:menu", "‹ Минтақаҳо"),

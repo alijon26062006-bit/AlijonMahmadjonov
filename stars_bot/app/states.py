@@ -64,6 +64,7 @@ class Panel(StatesGroup):
     admin_add = State()   # ждём ID того, кому открыть панель
     game_find = State()   # ждём название игры для поиска по каталогу
     ru_photo = State()    # ждём картинку-пример чека из Сбербанка
+    image = State()       # ждём картинку для экрана (главный, игры, игра)
 
 
 class Review(StatesGroup):

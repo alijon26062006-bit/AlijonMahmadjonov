@@ -85,9 +85,10 @@ async def cb_games(
     if not games and not runtime.steam_on() and not donatix.ready():
         await call.answer("Бахш муваққатан баста аст.", show_alert=True)
         return
-    await call.message.edit_text(
-        texts.GAMES_ENTRY, reply_markup=keyboards.games_menu(games)
-    )
+    from app import screens
+
+    await screens.show(call, texts.GAMES_ENTRY, keyboards.games_menu(games),
+                       keys=("games",))
     await call.answer()
 
 
@@ -138,10 +139,10 @@ async def cb_family(
     if not items:
         await call.answer("Ин бозӣ дигар фурӯхта намешавад.", show_alert=True)
         return
-    await call.message.edit_text(
-        texts.GAME_REGION.format(title=items[0].title),
-        reply_markup=keyboards.game_regions(items),
-    )
+    from app import screens
+
+    await screens.show(call, texts.GAME_REGION.format(title=items[0].title),
+                       keyboards.game_regions(items), keys=(f"fam:{family}", "games"))
     await call.answer()
 
 
@@ -192,10 +193,12 @@ async def cb_game(
         return
 
     await state.clear()
-    await call.message.edit_text(
-        texts.GAME_PACKS.format(title=game.title, region=_region(game)),
-        reply_markup=keyboards.game_packs(game, offers),
-    )
+    from app import screens
+
+    # Картинка игры над пакетами: своя у региона, иначе — общая у игры.
+    await screens.show(call, texts.GAME_PACKS.format(title=game.title, region=_region(game)),
+                       keyboards.game_packs(game, offers),
+                       keys=(f"game:{game.category_id}", f"fam:{regions.family_of(game)}"))
 
 
 @router.callback_query(F.data.startswith("gp:"))

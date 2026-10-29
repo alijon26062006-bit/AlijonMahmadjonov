@@ -685,7 +685,21 @@ FIELDS["glory_margin"] = (
     "На сколько процентов клиент платит больше цены Donatix (по курсу "
     "доллара из «Цен»). Например <code>25</code>:", "int")
 
+FIELDS["glory_price_diram"] = (
+    "💵 Цена запуска ботов для гильдии",
+    "Одна цена на любой показанный регион, в сомони, например <code>30</code>. "
+    "<code>0</code> — считать по цене Donatix и наценке:", "money")
+FIELDS["glory_regions"] = (
+    "🌍 Какие регионы показывать",
+    "id или начало названия региона через запятую, например "
+    "<code>ru,russia</code>. <code>-</code> — показывать все:", "text")
+FIELDS["glory_region_title"] = (
+    "🏷 Как называть регион клиенту",
+    "Например <code>СНГ</code>. <code>-</code> — как у Donatix:", "text")
+
 FIELD_PARENT.update({
+    "glory_price_diram": "pn:glory", "glory_regions": "pn:glory",
+    "glory_region_title": "pn:glory",
     "donatix_key": "pn:glory", "glory_margin": "pn:glory",
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
@@ -1040,7 +1054,8 @@ async def on_field_value(
         )
         return
 
-    if field in ("donatix_key", "glory_margin"):
+    if field in ("donatix_key", "glory_margin", "glory_price_diram",
+                 "glory_regions", "glory_region_title"):
         from app.services import donatix
 
         donatix.forget()
@@ -1795,6 +1810,7 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
     ))
     from app import effects
 
+    kb.row(btn("🖼 Картинки экранов (главный, игры)", "pn:imgs", style=PRIMARY))
     kb.row(btn(
         "🔥 Выключить анимацию сообщений" if effects.on()
         else "🔥 Включить анимацию сообщений",
@@ -1840,13 +1856,25 @@ async def cb_glory(call: CallbackQuery, state: FSMContext,
         except (donatix.GloryError, donatix.GloryUnknown) as exc:
             lines.append(f"💼 Баланс у Donatix: ⚠️ <i>{str(exc)[:120]}</i>")
         try:
-            regions = await donatix.regions(fresh=True)
-            for r in regions[:8]:
-                lines.append(f"├ {r['name']}: у Donatix ${r['price_usd']} → клиенту "
-                             f"<b>{fmt(r['price'])}</b>")
+            regions = await donatix.regions(fresh=True, everything=True)
+            shown = [r for r in regions if r["shown"]]
+            title = runtime.get("glory_region_title") or ""
+            lines.append(f"\n<b>Клиенты видят:</b> "
+                         + (", ".join(f"{title or r['name']} ({r['name']})" for r in shown)
+                            or "⚠️ <i>ни одного региона — проверьте настройку</i>"))
+            for r in shown:
+                profit = r["price"] - r["cost"]
+                lines.append(f"├ цена <b>{fmt(r['price'])}</b>, у Donatix ${r['price_usd']} "
+                             f"≈ {fmt(r['cost'])}, прибыль <b>{fmt(profit)}</b>"
+                             + (" ⚠️ <b>в убыток!</b>" if profit <= 0 else ""))
+            hidden = [r["name"] for r in regions if not r["shown"]]
+            if hidden:
+                lines.append(f"<i>Скрыты: {', '.join(hidden[:15])}</i>")
         except (donatix.GloryError, donatix.GloryUnknown) as exc:
             lines.append(f"⚠️ Регионы не получены: <i>{str(exc)[:120]}</i>")
-    lines.append(f"\n📈 Наценка: <b>{donatix.margin()}%</b>")
+    price = donatix.fixed_price()
+    lines.append(f"\n💵 Цена запуска: <b>{fmt(price) if price else 'по наценке'}</b>"
+                 + ("" if price else f" ({donatix.margin()}%)"))
     lines.append(f"Раздел в меню: <b>{'включён' if on else 'выключен'}</b>")
     recent = await db.glory_runs_recent(conn, 6)
     if recent:
@@ -1856,7 +1884,10 @@ async def cb_glory(call: CallbackQuery, state: FSMContext,
                          f"{run['status']} · +{run['farmed']}")
     kb = InlineKeyboardBuilder()
     kb.row(btn("🔑 Ключ Donatix", "pn:set:donatix_key", style=PRIMARY))
-    kb.row(btn(f"📈 Наценка · {donatix.margin()}%", "pn:set:glory_margin"))
+    kb.row(btn("💵 Цена запуска", "pn:set:glory_price_diram"),
+           btn(f"📈 Наценка · {donatix.margin()}%", "pn:set:glory_margin"))
+    kb.row(btn("🌍 Какие регионы", "pn:set:glory_regions"),
+           btn("🏷 Название региона", "pn:set:glory_region_title"))
     kb.row(btn("🚫 Убрать из меню" if on else "✅ Показать в меню", "pn:glory_toggle",
                style=DANGER if on else SUCCESS))
     kb.row(btn("‹ К играм", "pn:games"))
@@ -1870,6 +1901,104 @@ async def cb_glory_toggle(call: CallbackQuery, state: FSMContext,
     await runtime.set_value(conn, "glory_on",
                             "0" if runtime.get("glory_on", "1") != "0" else "1")
     await cb_glory(call, state, conn)
+
+
+async def image_slots(conn: aiosqlite.Connection) -> list[tuple[str, str]]:
+    """Куда можно поставить картинку: (место, как называть в панели)."""
+    from app.services import regions
+
+    slots = [("main", "🏠 Главный экран (/start)"), ("games", "🎮 Раздел «Игры»"),
+             ("glory", "🏆 Боты для гильдии")]
+    games = await db.list_games(conn, only_enabled=True)
+    for group in regions.group(games):
+        items = group["games"]
+        slots.append((f"fam:{group['family']}", f"🕹 {group['title']} — общая"))
+        if len(items) > 1:
+            for game in items:
+                slots.append((f"game:{game.category_id}",
+                              f"   └ {regions.region_title(game) or game.title}"))
+    # callback_data у Telegram — до 64 байт.
+    return [(k, t) for k, t in slots if len(f"pn:img:{k}".encode()) <= 64]
+
+
+@router.callback_query(F.data == "pn:imgs")
+async def cb_images(call: CallbackQuery, state: FSMContext,
+                    conn: aiosqlite.Connection) -> None:
+    from app import screens
+
+    await state.clear()
+    kb = InlineKeyboardBuilder()
+    for key, title in await image_slots(conn):
+        mark = "✅" if screens.image(key) else "➕"
+        kb.row(btn(f"{mark} {title}"[:60], f"pn:img:{key}"))
+    kb.row(btn("‹ К оформлению", "pn:look"))
+    await safe_edit(
+        call,
+        "🖼 <b>Картинки экранов</b>\n\n"
+        "<blockquote>Картинка встаёт над текстом и кнопками экрана. У региона "
+        "игры без своей картинки показывается общая картинка игры.\n\n"
+        "✅ — картинка есть, ➕ — нет. Нажмите, чтобы поставить или "
+        "заменить.</blockquote>\n\n"
+        "<i>Лучше всего — горизонтальная, 16:9 (например 1280×720).</i>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:img:"))
+async def cb_image_slot(call: CallbackQuery, state: FSMContext,
+                        conn: aiosqlite.Connection) -> None:
+    from app import screens
+
+    key = call.data.split(":", 2)[2]
+    titles = dict(await image_slots(conn))
+    if key not in titles:
+        await call.answer("Такого места нет.", show_alert=True)
+        return
+    await state.set_state(Panel.image)
+    await state.update_data(image_key=key)
+    kb = InlineKeyboardBuilder()
+    if screens.image(key):
+        kb.row(btn("🗑 Убрать картинку", f"pn:imgdel:{key}"[:64], style=DANGER))
+    kb.row(btn("‹ Назад", "pn:imgs"))
+    await safe_edit(
+        call,
+        f"🖼 <b>{titles[key].strip(' └')}</b>\n\n"
+        f"Сейчас: <b>{'есть картинка' if screens.image(key) else 'нет'}</b>\n\n"
+        "Пришлите картинку <b>как фото</b> (не файлом).",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.message(Panel.image, F.photo)
+async def on_image(message: Message, state: FSMContext,
+                   conn: aiosqlite.Connection) -> None:
+    key = (await state.get_data()).get("image_key", "")
+    if not key:
+        await state.clear()
+        return
+    await runtime.set_value(conn, f"img:{key}", message.photo[-1].file_id)
+    await state.clear()
+    await message.answer_photo(
+        message.photo[-1].file_id,
+        caption=f"✅ Картинка сохранена. Клиенты видят её сразу.",
+        reply_markup=back_kb("pn:imgs", "‹ К картинкам"),
+    )
+
+
+@router.message(Panel.image)
+async def on_image_wrong(message: Message) -> None:
+    await message.answer("Пришлите картинку как фото — не файлом и не текстом.")
+
+
+@router.callback_query(F.data.startswith("pn:imgdel:"))
+async def cb_image_delete(call: CallbackQuery, state: FSMContext,
+                          conn: aiosqlite.Connection) -> None:
+    key = call.data.split(":", 2)[2]
+    await runtime.set_value(conn, f"img:{key}", "")
+    await call.answer("Картинка убрана")
+    await cb_images(call, state, conn)
 
 
 @router.callback_query(F.data == "pn:fx_toggle")
@@ -3089,7 +3218,7 @@ async def cb_ban_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None
     await db.set_banned(conn, user_id, not user.is_banned)
     await call.answer("Разблокирован" if user.is_banned else "Заблокирован")
     if user.is_banned:
-        await _tell_unbanned(call.bot, user_id)
+        await _tell_unbanned(getattr(call, "bot", None), user_id)
     await show_user(call, conn, user_id)
 
 
@@ -3103,6 +3232,8 @@ def _who(user: db.User) -> str:
 
 async def _tell_unbanned(bot, user_id: int) -> None:
     """Сказать человеку, что он снова может пользоваться ботом."""
+    if bot is None:
+        return
     try:
         await bot.send_message(user_id, texts.UNBANNED)
     except Exception as exc:  # noqa: BLE001 — он мог заблокировать бота сам
@@ -3163,7 +3294,7 @@ async def cb_unban(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     else:
         await db.set_banned(conn, user.id, False)
         await call.answer(f"✅ {_who(user)} разблокирован")
-        await _tell_unbanned(call.bot, user.id)
+        await _tell_unbanned(getattr(call, "bot", None), user.id)
     await show_banned(call, conn, int(page))
 
 

@@ -110,23 +110,54 @@ def cost_of(price_usd) -> int:
         return 0
 
 
-async def regions(fresh: bool = False) -> list[dict]:
-    """[{id, name, premium, price_usd, price}] — price наша, в дирамах."""
+def wanted(region_id: str, name: str) -> bool:
+    """Показывать ли регион клиентам. Пусто в настройке — все.
+
+    В настройке — id или начало названия через запятую: «ru,russia».
+    По началу, а не по вхождению: «ru» иначе зацепил бы и «Peru».
+    """
+    tokens = [t.strip().lower() for t in (runtime.get("glory_regions") or "").split(",")
+              if t.strip()]
+    if not tokens:
+        return True
+    rid, low = region_id.lower(), name.lower()
+    return any(t == rid or low.startswith(t) for t in tokens)
+
+
+def fixed_price() -> int:
+    """Одна цена на все регионы, в дирамах. 0 — считать по наценке."""
+    return max(runtime.get_int("glory_price_diram"), 0)
+
+
+async def regions(fresh: bool = False, everything: bool = False) -> list[dict]:
+    """[{id, name, premium, price_usd, price, cost, shown}] — цены в дирамах.
+
+    Клиенту — только регионы из настройки и под своим названием (например,
+    Россия как «СНГ»); everything=True — все, для панели.
+    """
     global _regions
-    if not fresh and _regions[1] and time.monotonic() - _regions[0] < REGIONS_TTL:
-        return _regions[1]
-    data = await _call("GET", "/glory/regions")
+    if fresh or not _regions[1] or time.monotonic() - _regions[0] >= REGIONS_TTL:
+        data = await _call("GET", "/glory/regions")
+        raw_items = []
+        for raw in data.get("items") or []:
+            if isinstance(raw, dict) and raw.get("id"):
+                raw_items.append(raw)
+        _regions = (time.monotonic(), raw_items)
+
+    title = (runtime.get("glory_region_title") or "").strip()
     items = []
-    for raw in data.get("items") or []:
-        if not isinstance(raw, dict) or not raw.get("id"):
+    for raw in _regions[1]:
+        rid, name = str(raw["id"])[:20], str(raw.get("name") or raw["id"])[:40]
+        shown = wanted(rid, name)
+        if not shown and not everything:
             continue
-        price = price_of(raw.get("price_usd"))
+        price = fixed_price() or price_of(raw.get("price_usd"))
         if price <= 0:
             continue
-        items.append({"id": str(raw["id"])[:20], "name": str(raw.get("name") or raw["id"])[:40],
-                      "premium": bool(raw.get("premium")),
-                      "price_usd": str(raw.get("price_usd")), "price": price})
-    _regions = (time.monotonic(), items)
+        items.append({"id": rid, "name": (title or name) if shown and not everything else name,
+                      "premium": bool(raw.get("premium")), "shown": shown,
+                      "price_usd": str(raw.get("price_usd")), "price": price,
+                      "cost": cost_of(raw.get("price_usd"))})
     return items
 
 

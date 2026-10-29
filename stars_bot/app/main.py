@@ -118,6 +118,11 @@ async def main() -> None:
     from app.middlewares.effect_guard import EffectGuard
 
     bot.session.middleware(EffectGuard())
+    # Экран с картинкой, а следующий — текстовый: правку превращаем в
+    # новое сообщение, иначе кнопка под картинкой выглядит мёртвой.
+    from app.middlewares.photo_text import PhotoTextGuard
+
+    bot.session.middleware(PhotoTextGuard())
     conn = await db.connect()
     await db.init(conn)
     # Журнал WAL сворачивается в базу сам, но только когда её никто не

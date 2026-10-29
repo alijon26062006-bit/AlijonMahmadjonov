@@ -136,6 +136,11 @@ async def run(conn) -> None:
     fake = Fake()
     dx._call = fake
     await runtime.set_value(conn, "usd_rate_diram", "1100")      # 11.00 с. за $
+    # Здесь проверяем цену по наценке и все регионы; «только СНГ за 30» —
+    # в test_screens.
+    await runtime.set_value(conn, "glory_regions", "")
+    await runtime.set_value(conn, "glory_price_diram", "0")
+    await runtime.set_value(conn, "glory_region_title", "")
     await db.upsert_user(conn, UID, "u", "U")
     await db.credit(conn, UID, 100_00)
 

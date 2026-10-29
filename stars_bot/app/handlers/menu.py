@@ -46,6 +46,13 @@ async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connectio
     # нажатия кнопки внутри лежит сообщение, у обычного сообщения —
     # нет. Так же это работает и в проверках, где Telegram подставной.
     message = getattr(target, "message", None)
+    from app import screens
+
+    if screens.image("main"):
+        # Главная картинка задана в панели — меню под ней.
+        await screens.show(target, text, markup, keys=("main",), effect=effect)
+        return
+
     if message is None:
         await target.answer(text, reply_markup=markup, **(effect or {}))
         return
