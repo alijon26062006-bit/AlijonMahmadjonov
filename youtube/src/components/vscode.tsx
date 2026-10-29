@@ -139,7 +139,7 @@ export const VSCodeWindow: React.FC<{
 };
 
 /** Строка кода с простой подсветкой Python. */
-export const CodeLine: React.FC<{text: string; n: number}> = ({text, n}) => {
+export const CodeLine: React.FC<{text: string; n: number; noNum?: boolean}> = ({text, n, noNum}) => {
   const parts: React.ReactNode[] = [];
   const re = /(#.*$)|("[^"]*"?|'[^']*'?)|(\b(?:print|input|exit)\b)|(\b(?:sep|end)(?==))|(\b\d+(?:\.\d+)?\b)/g;
   let last = 0;
@@ -158,7 +158,7 @@ export const CodeLine: React.FC<{text: string; n: number}> = ({text, n}) => {
   if (last < text.length) parts.push(<span key={i++}>{text.slice(last)}</span>);
   return (
     <div style={{display: 'flex', fontFamily: fonts.mono, fontSize: 30, lineHeight: 1.7}}>
-      <span style={{width: 70, color: '#5A6478', textAlign: 'right', paddingRight: 24}}>{n}</span>
+      {noNum ? null : <span style={{width: 70, color: '#5A6478', textAlign: 'right', paddingRight: 24}}>{n}</span>}
       <span style={{color: '#D4D4D4', whiteSpace: 'pre'}}>{parts}</span>
     </div>
   );

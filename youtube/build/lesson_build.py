@@ -55,6 +55,10 @@ def openai_tts(text, out_path):
         wf.writeframes(pcm)
 
 
+TRIM_AF = ("silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:"
+           "stop_duration=0.55:stop_threshold=-42dB:stop_silence=0.45")
+
+
 def sfx_for(name):
     if name.startswith("run"):
         return [("key", 0.9, 0.0), ("enter", 0.8, 0.05)]
@@ -111,8 +115,15 @@ def main():
     if "--download" in sys.argv:
         manifest = json.load(open(os.path.join(HERE, f"{ep}_voice.json")))
         for i, v in manifest["lines"].items():
-            subprocess.run(["curl", "-sSfL", "-o", os.path.join(voice_dir, f"{int(i):02d}.wav"), v["url"]], check=True)
+            out = os.path.join(voice_dir, f"{int(i):02d}.wav")
+            subprocess.run(["curl", "-sSfL", "-o", out, v["url"]], check=True)
+            if manifest.get("trim_pauses"):
+                # длинные паузы внутри фразы сокращаем до ~0.5 с, чтобы речь шла живо
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-af", TRIM_AF, "-ar", "44100", "-ac", "1", out + ".t.wav"], check=True)
+                os.replace(out + ".t.wav", out)
 
+    mpath = os.path.join(HERE, f"{ep}_voice.json")
+    manifest_dur = {k: v["dur"] for k, v in json.load(open(mpath))["lines"].items()} if os.path.exists(mpath) else {}
     t, li = 0.0, 0
     voices, sfx, scenes = [], [], []
     for sc in script.SCENES:
@@ -120,10 +131,14 @@ def main():
         cur = start + LEAD
         lines = []
         for text in sc["lines"]:
-            v = load_wav(os.path.join(voice_dir, f"{li:02d}.wav"))
-            v = v / (np.max(np.abs(v)) or 1) * 0.9
-            dur = len(v) / SR
-            voices.append((cur, v))
+            path = os.path.join(voice_dir, f"{li:02d}.wav")
+            if os.path.exists(path) and "--manifest-durations" not in sys.argv:
+                v = load_wav(path)
+                v = v / (np.max(np.abs(v)) or 1) * 0.9
+                dur = len(v) / SR
+                voices.append((cur, v))
+            else:  # голоса нет — длительность из списка озвучки (для превью без звука)
+                dur = manifest_dur[str(li)]
             lines.append({"start": round(cur - start, 3), "dur": round(dur, 3), "text": text})
             cur += dur + GAP
             li += 1
