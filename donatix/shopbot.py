@@ -20,12 +20,13 @@ import secrets
 import sqlite3
 import threading
 import time
+import urllib.parse
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Callable
 
 import httpx
 
-from . import accounts, db, orders, payments
+from . import accounts, bottour, db, orders, payments
 from . import packs as packs_mod
 from .catalog import get_product
 from .config import Config
@@ -262,7 +263,7 @@ def _e(value: Any) -> str:
     return html.escape(str(value), quote=False)
 
 
-Btn = tuple  # (текст, callback_data) или (текст, callback_data, style) или (текст, None, url)
+Btn = tuple  # (текст, callback_data[, style[, премиум-эмодзи]]) или (текст, None, url[, style])
 
 
 def kb(rows: list[list[Btn]]) -> dict[str, Any]:
@@ -270,12 +271,14 @@ def kb(rows: list[list[Btn]]) -> dict[str, Any]:
     for row in rows:
         line = []
         for b in row:
-            if len(b) == 3 and b[1] is None:
-                line.append({"text": b[0], "url": b[2]})
+            if len(b) >= 3 and b[1] is None:
+                line.append({"text": b[0], "url": b[2], **({"style": b[3]} if len(b) == 4 and b[3] else {})})
                 continue
             item = {"text": b[0], "callback_data": b[1]}
-            if len(b) == 3 and b[2]:
+            if len(b) >= 3 and b[2]:
                 item["style"] = b[2]          # цвет кнопки: success (зелёная), danger (красная), primary
+            if len(b) == 4 and b[3]:
+                item["icon_custom_emoji_id"] = b[3]   # премиум-эмодзи перед текстом кнопки
             line.append(item)
         out.append(line)
     return {"inline_keyboard": out}
@@ -379,6 +382,7 @@ def base_name(category_name: str) -> str:
 
 
 _FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+_TG_EMOJI = re.compile(r'<tg-emoji emoji-id="\d+">(.*?)</tg-emoji>', re.S)
 
 
 def flag_code(text: str) -> str:
@@ -539,6 +543,11 @@ def featured(conn: sqlite3.Connection) -> list[tuple[str, str]]:
                 out.append((key, f"c:{r['rid']}:0:{reg}"))
                 break
     return out
+
+
+def contest_week(config: Config):
+    from .contest import week_bounds
+    return week_bounds(config.tz_offset)
 
 
 def section_key(sec: int, name: str) -> str:
@@ -715,6 +724,7 @@ class ShopBot:
         self._locks_guard = threading.Lock()
         self._queues: dict[int, list[dict[str, Any]]] = {}   # очередь сообщений каждого покупателя
         self._draining: set[int] = set()                      # у кого очередь уже разбирается
+        self._sticker_day: dict[int, str] = {}                # стикер турнира — раз в день каждому
 
     # цикл
     def start(self) -> None:
@@ -741,10 +751,17 @@ class ShopBot:
             conn.execute("ROLLBACK")
         return conn
 
-    def _process(self, upd: dict[str, Any]) -> None:
+    @staticmethod
+    def _chat_of(upd: dict[str, Any]) -> int:
+        """Чья очередь: чат покупателя; вход/выход из канала турнира — по самому человеку."""
+        if "chat_member" in upd:
+            return int(((upd["chat_member"].get("new_chat_member") or {}).get("user") or {}).get("id") or 0)
         chat = ((upd.get("callback_query") or {}).get("message") or upd.get("message") or {}).get("chat") or {}
+        return int(chat.get("id") or 0)
+
+    def _process(self, upd: dict[str, Any]) -> None:
         with self._locks_guard:
-            lock = self._chat_locks.setdefault(int(chat.get("id") or 0), threading.Lock())
+            lock = self._chat_locks.setdefault(self._chat_of(upd), threading.Lock())
         with lock:
             try:
                 self.handle(self._thread_conn(), upd)
@@ -754,8 +771,7 @@ class ShopBot:
     def _enqueue(self, upd: dict[str, Any]) -> None:
         """Очередь на каждого покупателя: его сообщения — по порядку и в ОДНОМ потоке. Раньше каждое сообщение
         занимало поток и ждало замка: 10 быстрых сообщений после чека занимали все потоки — бот молчал всем."""
-        chat = ((upd.get("callback_query") or {}).get("message") or upd.get("message") or {}).get("chat") or {}
-        cid = int(chat.get("id") or 0)
+        cid = self._chat_of(upd)
         with self._locks_guard:
             q = self._queues.setdefault(cid, [])
             if len(q) >= CHAT_QUEUE:   # засыпает сообщениями — лишние не обрабатываем
@@ -781,11 +797,18 @@ class ShopBot:
         """Статусы заказов и пополнений — в своём потоке: не ждут сообщений и не задерживают их."""
         conn = db.connect(self.config.db_path)
         try:
+            last_tour = 0.0
             while not self._stop.wait(WATCH_EVERY):
                 try:
                     self.watch(conn, force=True)
                 except Exception:
                     log.exception("бот-магазин: статусы")
+                if time.monotonic() - last_tour > 60:   # итоги турнира друзей — раз в неделю, проверка раз в минуту
+                    last_tour = time.monotonic()
+                    try:
+                        self.tour_settle(conn)
+                    except Exception:
+                        log.exception("бот-магазин: итоги турнира")
         finally:
             conn.close()
 
@@ -806,7 +829,8 @@ class ShopBot:
             log.warning("бот-магазин: %s", exc)
         if self.gift is not None:
             self.gift.setup(commands=False)   # синяя кнопка меню открывает мини-приложение
-        allowed = ["message", "callback_query"] + (["pre_checkout_query"] if self.gift is not None else [])
+        # chat_member — входы и выходы из канала турнира (приходят, если бот — админ канала)
+        allowed = ["message", "callback_query", "chat_member"] + (["pre_checkout_query"] if self.gift is not None else [])
         try:
             while not self._stop.is_set():
                 try:
@@ -828,7 +852,20 @@ class ShopBot:
     def show(self, chat: int, text: str, rows: list[list[Btn]] | None = None, *, edit: int | None = None,
              effect: str | None = None) -> int | None:
         """Показать экран: поправить сообщение edit, а не вышло — прислать новое. Вернёт message_id.
-        effect — анимация Telegram на новом сообщении (🔥, 🎉); правка сообщения идёт без неё."""
+        effect — анимация Telegram на новом сообщении (🔥, 🎉); правка сообщения идёт без неё.
+        Премиум-эмодзи Telegram разрешает не каждому боту: не приняли — тот же экран с обычными эмодзи."""
+        try:
+            return self._show(chat, text, rows, edit=edit, effect=effect)
+        except Exception as exc:  # noqa: BLE001
+            plain = _TG_EMOJI.sub(r"\1", text)
+            plain_rows = [[b[:3] if len(b) == 4 else b for b in row] for row in rows] if rows else rows
+            if plain == text and plain_rows == rows:
+                raise
+            log.info("бот-магазин: премиум-эмодзи не приняты (%s) — показываю обычные", exc)
+            return self._show(chat, plain, plain_rows, edit=edit, effect=effect)
+
+    def _show(self, chat: int, text: str, rows: list[list[Btn]] | None = None, *, edit: int | None = None,
+              effect: str | None = None) -> int | None:
         markup = kb(rows) if rows else None
         if edit:
             try:
@@ -876,6 +913,9 @@ class ShopBot:
     def handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
         if self.gift is not None and self.gift.special(conn, upd):   # подарок по ссылке, оплата Stars, /topup
             return
+        if "chat_member" in upd:
+            self.on_chat_member(conn, upd["chat_member"])
+            return
         if "callback_query" in upd:
             cq = upd["callback_query"]
             msg = cq.get("message") or {}
@@ -906,6 +946,9 @@ class ShopBot:
                     self.api("answerCallbackQuery", callback_query_id=cq["id"], text=tr(su["lang"], "sub_still"),
                              show_alert=True)
                 return
+            if data.startswith(("tc:", "tsub")):   # «Я не бот» и подписка друга из турнира — до обязательной подписки
+                self.on_tour_join_button(conn, su, data, cq["id"], msg.get("message_id"))
+                return
             self._ack(cq["id"])
             if not data.startswith(("l:", "lang")) and not self.subscribed(conn, tg_id):
                 self.screen_subscribe(conn, su, msg.get("message_id"))
@@ -929,7 +972,14 @@ class ShopBot:
             else:
                 self.login_contact(conn, su, msg["contact"])
             return
+        fresh = shop_user(conn, tg_id) is None   # для турнира засчитываются только новые
         su = ensure_user(conn, tg_id, sender.get("first_name") or "", start, username=sender.get("username") or "")
+        if start.startswith("t_"):
+            self.tour_join(conn, su, start[2:], fresh)
+            return
+        if (self.state.get(tg_id) or {}).get("step") == "tbadge" and self.is_admin(tg_id):
+            self.tour_set_badge(conn, su, msg)
+            return
         need_lang = text.startswith(("/start", "/lang")) and not su["lang"] or text.startswith("/lang")
         if not need_lang and not self.subscribed(conn, tg_id):
             self.screen_subscribe(conn, su)
@@ -1084,30 +1134,318 @@ class ShopBot:
     def add_sponsor(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str) -> None:
         """@channel, t.me/channel или «-100… https://t.me/+ссылка» для закрытого канала."""
         tg_id = su["tg_id"]
-        parts = text.split()
-        ref = parts[0].strip()
-        link = next((p for p in parts[1:] if p.startswith("http")), "")
-        m = re.match(r"(?:https?://)?t\.me/([A-Za-z0-9_]{4,})/?$", ref)
-        chat_id = "@" + m.group(1) if m else ref if ref.startswith(("@", "-100")) else "@" + ref.lstrip("@")
         try:
-            info = self.api("getChat", chat_id=chat_id) or {}
-            if self.bot_id:
-                me = self.api("getChatMember", chat_id=chat_id, user_id=self.bot_id) or {}
-                if me.get("status") not in ("administrator", "creator"):
-                    raise RuntimeError("бот не админ в канале")
+            ch = self.resolve_channel(text)
         except Exception as exc:  # noqa: BLE001
             self.state[tg_id] = {"step": "spa"}
             self.show(tg_id, f"⚠️ Не получилось: {_e(exc)}\n\nДобавьте бота <b>админом</b> в канал и пришлите "
                              "@юзернейм канала ещё раз.", [[("‹ Назад", "sp")]])
             return
-        username = info.get("username")
-        url = link or (f"https://t.me/{username}" if username else info.get("invite_link") or "")
-        chans = [c for c in sponsors(conn) if str(c["chat_id"]) != str(info.get("id") or chat_id)]
-        chans.append({"chat_id": info.get("id") or chat_id, "title": info.get("title") or chat_id, "url": url})
+        chans = [c for c in sponsors(conn) if str(c["chat_id"]) != str(ch["chat_id"])]
+        chans.append(ch)
         db.set_setting(conn, "shop.sponsors", json.dumps(chans, ensure_ascii=False))
         self._subbed.clear()
         self.state.pop(tg_id, None)
         self.screen_sponsors(conn, su)
+
+    # ── Турнир друзей (bottour.py) ──
+
+    def _badge_text(self, conn: sqlite3.Connection, fallback: str = "🏆") -> str:
+        b = bottour.badge(conn)
+        if b.get("emoji_id"):
+            return f'<tg-emoji emoji-id="{_e(b["emoji_id"])}">{_e(b.get("emoji") or fallback)}</tg-emoji>'
+        return fallback
+
+    def tour_link(self, conn: sqlite3.Connection, tg_id: int) -> str:
+        return f"https://t.me/{bot_username(conn)}?start=t_{tg_id}"
+
+    def tour_join(self, conn: sqlite3.Connection, su: sqlite3.Row, raw: str, fresh: bool) -> None:
+        """Друг пришёл по ссылке турнира: новый — «Я не бот», остальных — просто в меню."""
+        tg_id = su["tg_id"]
+        if not (bottour.enabled(conn) and fresh and raw.isdigit()) or bottour.add_friend(
+                conn, tg_id, su["user_id"], int(raw)):
+            self.screen_home(conn, su, effect=EFFECT_FIRE)
+            return
+        self.screen_captcha(conn, su)
+
+    def screen_captcha(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None, note: str = "") -> None:
+        want = secrets.randbelow(len(bottour.CAPTCHA))
+        self.state[su["tg_id"]] = {"step": "tcap", "want": want}
+        order = list(range(len(bottour.CAPTCHA)))
+        secrets.SystemRandom().shuffle(order)
+        rows = [[(bottour.CAPTCHA[i], f"tc:{i}") for i in order]]
+        self.show(su["tg_id"], f"{note}🤖 <b>Подтвердите, что вы не бот</b>\n\n"
+                               f"Нажмите на <b>{bottour.CAPTCHA[want]}</b> 👇", rows, edit=edit)
+
+    def on_tour_join_button(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str, cq_id: str,
+                            mid: int | None) -> None:
+        tg_id = su["tg_id"]
+        fr = bottour.friend(conn, tg_id)
+        if fr is None:
+            self.api("answerCallbackQuery", callback_query_id=cq_id)
+            self.screen_home(conn, su, mid)
+            return
+        if data.startswith("tc:"):
+            st = self.state.get(tg_id) or {}
+            if st.get("step") != "tcap":   # бот перезапускался — новая проверка
+                self.api("answerCallbackQuery", callback_query_id=cq_id)
+                self.screen_captcha(conn, su, mid)
+                return
+            res = bottour.captcha_try(conn, tg_id, data == f"tc:{st.get('want')}")
+            if res == 0:
+                self.api("answerCallbackQuery", callback_query_id=cq_id, text="Не тот значок — попробуйте ещё раз")
+                self.screen_captcha(conn, su, mid, "❌ Не тот значок.\n\n")
+                return
+            self.state.pop(tg_id, None)
+            self.api("answerCallbackQuery", callback_query_id=cq_id)
+            if res < 0:
+                self.show(tg_id, "⚠️ Проверка не пройдена — в турнире вы не засчитаны.", [[(tr("", "home"), "h")]],
+                          edit=mid)
+                return
+            ch = bottour.channel(conn)
+            if ch is None:   # канала нет — друг засчитан сразу
+                self._tour_counted(conn, bottour.set_subscribed(conn, tg_id, True), su)
+                self.screen_home(conn, su, mid)
+                return
+            self.screen_tour_subscribe(conn, su, ch, mid)
+            return
+        # tsub — «Я подписался»
+        ch = bottour.channel(conn)
+        if ch is None or not fr["human"]:
+            self.api("answerCallbackQuery", callback_query_id=cq_id)
+            self.screen_captcha(conn, su, mid) if not fr["human"] else self.screen_home(conn, su, mid)
+            return
+        if not self.is_member(ch["chat_id"], tg_id):
+            self.api("answerCallbackQuery", callback_query_id=cq_id, show_alert=True,
+                     text="Подписка не найдена — подпишитесь на канал и нажмите ещё раз.")
+            return
+        self.api("answerCallbackQuery", callback_query_id=cq_id, text="✅ Готово!")
+        self._tour_counted(conn, bottour.set_subscribed(conn, tg_id, True), su)
+        self._subbed[tg_id] = time.monotonic()
+        self.screen_home(conn, su, mid)
+
+    def screen_tour_subscribe(self, conn: sqlite3.Connection, su: sqlite3.Row, ch: dict[str, Any],
+                              edit: int | None = None) -> None:
+        rows: list[list[Btn]] = []
+        if ch.get("url"):
+            rows.append([(f"📢 Подписаться: {ch['title'][:30]}", None, ch["url"])])
+        rows.append([("✅ Я подписался", "tsub", "success")])
+        self.show(su["tg_id"], "✅ <b>Отлично, вы не бот!</b>\n\nПоследний шаг — подпишитесь на наш канал "
+                               "и нажмите «Я подписался» 👇", rows, edit=edit)
+
+    def _tour_counted(self, conn: sqlite3.Connection, fr: sqlite3.Row | None, su: sqlite3.Row | None = None) -> None:
+        """Друг засчитан (+1) — порадовать пригласившего."""
+        if fr is None:
+            return
+        name = (su["name"] if su is not None else "") or "Друг"
+        self._tour_notify(conn, fr["inviter_tg"], f"🎉 Друг <b>{_e(name)}</b> засчитан: <b>+1 балл</b> в турнире!")
+
+    def _tour_notify(self, conn: sqlite3.Connection, inviter_tg: int, text: str) -> None:
+        v = bottour.view(conn, self.config.tz_offset, inviter_tg)
+        pts = v["me"]["points"] if v["me"] else 0
+        place = f" · {v['me']['place']} место" if v["me"] else ""
+        with contextlib.suppress(Exception):
+            self.show(inviter_tg, f"{text}\n\n{self._badge_text(conn)} Ваши баллы: <b>{pts}</b>{place}",
+                      [[("🏆 Турнир", "tour", "success")]])
+
+    def on_chat_member(self, conn: sqlite3.Connection, cm: dict[str, Any]) -> None:
+        """Вход и выход из канала турнира: вышел — −1 балл пригласившему, вернулся — снова +1."""
+        ch = bottour.channel(conn)
+        chat = cm.get("chat") or {}
+        if ch is None or str(chat.get("id")) != str(ch["chat_id"]) and \
+                f"@{chat.get('username') or ''}".lower() != str(ch["chat_id"]).lower():
+            return
+        new = cm.get("new_chat_member") or {}
+        uid = int((new.get("user") or {}).get("id") or 0)
+        member = new.get("status") in ("creator", "administrator", "member") or bool(new.get("is_member"))
+        fr = bottour.set_subscribed(conn, uid, member)
+        if fr is None:
+            return
+        su = shop_user(conn, uid)
+        name = _e((su["name"] if su is not None else "") or "Друг")
+        if member:
+            self._tour_notify(conn, fr["inviter_tg"], f"🎉 Друг <b>{name}</b> вернулся в канал: <b>+1 балл</b>")
+        else:
+            self._tour_notify(conn, fr["inviter_tg"], f"😕 Друг <b>{name}</b> вышел из канала: <b>−1 балл</b>")
+
+    def tour_bought(self, conn: sqlite3.Connection, user_id: int, order_id: int) -> None:
+        """Первая покупка друга — +5 пригласившему."""
+        fr = conn.execute("SELECT * FROM bot_tour WHERE friend_user = ? AND banned = 0", (user_id,)).fetchone()
+        if fr is None or not bottour.enabled(conn):
+            return
+        n = conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ? AND status = 'completed' AND created_at >= ? "
+                         "AND id <= ?", (user_id, fr["joined_at"], order_id)).fetchone()[0]
+        if n == 1:
+            su = shop_user(conn, fr["friend_tg"])
+            name = _e((su["name"] if su is not None else "") or "Друг")
+            self._tour_notify(conn, fr["inviter_tg"], f"🛒 Друг <b>{name}</b> сделал покупку: <b>+5 баллов</b>!")
+
+    def screen_tour(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        tg_id = su["tg_id"]
+        if not bottour.enabled(conn):
+            self.screen_home(conn, su, edit)
+            return
+        b = bottour.badge(conn)
+        if b.get("sticker") and self._sticker_day.get(tg_id) != time.strftime("%Y-%m-%d"):
+            self._sticker_day[tg_id] = time.strftime("%Y-%m-%d")   # стикер — раз в день, не на каждое открытие
+            with contextlib.suppress(Exception):
+                self.api("sendSticker", chat_id=tg_id, sticker=b["sticker"])
+                edit = None   # экран — новым сообщением под стикером
+        v = bottour.view(conn, self.config.tz_offset, tg_id)
+        left = v["left"]
+        days, hours = left.days, left.seconds // 3600
+        medals = ("🥇", "🥈", "🥉")
+        pz = v["prizes"]
+        top = "\n".join(f"{medals[r['place'] - 1] if r['place'] <= 3 else str(r['place']) + '.'} "
+                        f"{_e(bottour.mask(r['name']))} — <b>{r['points']}</b>" for r in v["top"]) \
+            or "Пока никого — станьте первым!"
+        me = v["me"]
+        mine = (f"📊 <b>Ваши баллы: {me['points']}</b> · {me['place']} место\n"
+                f"(друзей в канале: {me['subs']}, покупок: {me['buys']})") if me else "📊 <b>Ваши баллы: 0</b>"
+        link = self.tour_link(conn, tg_id)
+        text = (f"{self._badge_text(conn)} <b>Турнир друзей</b>\n"
+                f"⏳ Итоги в воскресенье в 20:00 · осталось {days} дн. {hours} ч\n\n"
+                f"🎁 <b>Призы на баланс:</b> 🥇 {pz[0]} с. · 🥈 {pz[1]} с. · 🥉 {pz[2]} с.\n\n"
+                "<b>Как получить баллы</b>\n"
+                f"➕{bottour.SUB_POINTS} — друг пришёл по вашей ссылке, нажал «Я не бот» и подписался на канал\n"
+                f"➕{bottour.BUY_POINTS} — друг сделал покупку\n"
+                f"➖{bottour.SUB_POINTS} — друг вышел из канала\n"
+                "<blockquote expandable>Правила: засчитываются только новые пользователи бота и только после "
+                "подтверждения «Я не бот». Себя пригласить нельзя. Не больше "
+                f"{bottour.DAY_LIMIT} друзей в день. Перед итогами подписка каждого друга проверяется заново. "
+                "За накрутку (фейки, боты) — снятие с турнира без приза. Призы — на баланс бота.</blockquote>\n\n"
+                f"{mine}\n\n<b>Топ-10</b>\n{top}\n\n🔗 Ваша ссылка:\n<code>{_e(link)}</code>")
+        share = "https://t.me/share/url?" + urllib.parse.urlencode({
+            "url": link, "text": "🎁 Алмазы FF и UC PUBG за сомони — быстро и по ID. Заходи в Donatix 👇"})
+        rows = [[("📤 Поделиться ссылкой", None, share, "primary")],
+                [("🔄 Обновить", "tour"), (tr("", "home"), "h")]]
+        self.show(tg_id, text, rows, edit=edit)
+
+    def tour_settle(self, conn: sqlite3.Connection) -> None:
+        won = bottour.settle(conn, self.config, self.is_member)
+        if not won:
+            return
+        medals = ("🥇", "🥈", "🥉")
+        for r in won:
+            with contextlib.suppress(Exception):
+                self.show(r["tg"], f"{medals[r['place'] - 1]} <b>Вы заняли {r['place']} место в турнире друзей!</b>\n\n"
+                                   f"Баллы: {r['points']}\n🎁 Приз <b>{r['prize']} сомони</b> уже на балансе.",
+                          [[(tr("", "balance"), "b", "success")], [(tr("", "home"), "h")]], effect=EFFECT_PARTY)
+        from .worker import notify_admin
+        notify_admin(self.config, "🏆 Итоги турнира друзей в боте:\n" + "\n".join(
+            f"{medals[r['place'] - 1]} {r['name']} (tg {r['tg']}) — {r['points']} баллов, {r['prize']} сомони"
+            for r in won))
+
+    # админ: настройки турнира
+    def screen_tour_admin(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None,
+                          note: str = "") -> None:
+        on, ch, pz, b = bottour.enabled(conn), bottour.channel(conn), bottour.prizes(conn), bottour.badge(conn)
+        mark = ("✅ премиум-эмодзи " + self._badge_text(conn) if b.get("emoji_id") else "") + \
+            (" ✅ стикер" if b.get("sticker") else "")
+        text = (f"{note}🏆 <b>Турнир друзей — настройки</b>\n\n"
+                f"Статус: {'🟢 включён' if on else '⚪ выключен'}\n"
+                f"Канал: {_e(ch['title']) if ch else 'не выбран — +1 сразу после «Я не бот»'}\n"
+                f"Призы: {pz[0]} / {pz[1]} / {pz[2]} сомони\n"
+                f"Значок: {mark or 'нет'}\n"
+                f"Участников с баллами на этой неделе: {len(bottour.leaderboard(conn, *contest_week(self.config), None))}\n\n"
+                "Бот должен быть <b>админом канала</b> — тогда выход из канала сразу снимает балл.")
+        rows = [[("⏸ Выключить" if on else "🟢 Включить", "tat", "danger" if on else "success")],
+                [("📢 Канал турнира", "tach"), ("🎁 Призы", "tapz")],
+                [("✨ Значок турнира", "tab")] + ([("🗑 Убрать значок", "tabx")] if b else []),
+                [("🚫 Снять за накрутку", "tban", "danger")]]
+        if ch:
+            rows.insert(2, [("❌ Убрать канал", "tachx")])
+        rows.append([("‹ Админ-панель", "adm")])
+        self.show(su["tg_id"], text, rows, edit=edit)
+
+    def on_tour_admin(self, conn: sqlite3.Connection, su: sqlite3.Row, head: str, mid: int | None) -> None:
+        tg_id = su["tg_id"]
+        back = [[("‹ Назад", "ta")]]
+        if head == "tat":
+            bottour.set_enabled(conn, not bottour.enabled(conn))
+        elif head == "tachx":
+            bottour.set_channel(conn, None)
+        elif head == "tabx":
+            bottour.set_badge(conn, None)
+        elif head == "tach":
+            self.state[tg_id] = {"step": "tach"}
+            self.show(tg_id, "📢 Пришлите @юзернейм канала турнира (или ссылку t.me/…).\n"
+                             "Для закрытого канала: <code>-100ID ссылка-приглашение</code>.\n\n"
+                             "Сначала добавьте этого бота в канал <b>админом</b>.", back, edit=mid)
+            return
+        elif head == "tapz":
+            self.state[tg_id] = {"step": "tapz"}
+            self.show(tg_id, "🎁 Пришлите три суммы в сомони за 1, 2 и 3 место через пробел, например: "
+                             "<code>100 50 30</code>", back, edit=mid)
+            return
+        elif head == "tab":
+            self.state[tg_id] = {"step": "tbadge"}
+            self.show(tg_id, "✨ Пришлите сообщение с <b>премиум-эмодзи</b> или <b>стикер</b> — бот сам найдёт его "
+                             "и поставит значком турнира.", back, edit=mid)
+            return
+        elif head == "tban":
+            self.state[tg_id] = {"step": "tban"}
+            self.show(tg_id, "🚫 Пришлите Telegram ID участника, которого снять за накрутку "
+                             "(его видно в итогах и в «Топ-10» у админа).", back, edit=mid)
+            return
+        self.state.pop(tg_id, None)
+        self.screen_tour_admin(conn, su, mid)
+
+    def tour_admin_text(self, conn: sqlite3.Connection, su: sqlite3.Row, step: str, text: str) -> None:
+        tg_id = su["tg_id"]
+        self.state.pop(tg_id, None)
+        if step == "tach":
+            try:
+                bottour.set_channel(conn, self.resolve_channel(text))
+            except Exception as exc:  # noqa: BLE001
+                self.state[tg_id] = {"step": "tach"}
+                self.show(tg_id, f"⚠️ Не получилось: {_e(exc)}\n\nДобавьте бота <b>админом</b> в канал и пришлите "
+                                 "@юзернейм канала ещё раз.", [[("‹ Назад", "ta")]])
+                return
+            self.screen_tour_admin(conn, su, note="✅ Канал турнира сохранён.\n\n")
+        elif step == "tapz":
+            got = bottour.set_prizes(conn, text)
+            self.screen_tour_admin(conn, su, note="✅ Призы сохранены.\n\n" if got else
+                                   "⚠️ Нужно три числа, например <code>100 50 30</code>.\n\n")
+        elif step == "tban":
+            n = bottour.ban(conn, int(text)) if text.strip().isdigit() else 0
+            self.screen_tour_admin(conn, su, note=f"🚫 Снято друзей: {n}.\n\n" if n else "Такого участника нет.\n\n")
+
+    def tour_set_badge(self, conn: sqlite3.Connection, su: sqlite3.Row, msg: dict[str, Any]) -> None:
+        b = bottour.badge_from_message(msg)
+        if b is None:
+            self.show(su["tg_id"], "Не нашёл премиум-эмодзи или стикер. Пришлите ещё раз — именно премиум-эмодзи "
+                                   "(с анимацией) или стикер.", [[("‹ Назад", "ta")]])
+            return
+        self.state.pop(su["tg_id"], None)
+        bottour.set_badge(conn, b)
+        found = "премиум-эмодзи" if b.get("emoji_id") else "стикер"
+        self.screen_tour_admin(conn, su, note=f"✅ Бот нашёл {found} и поставил значком турнира.\n\n")
+
+    def resolve_channel(self, text: str) -> dict[str, Any]:
+        """@channel, t.me/channel или «-100… https://t.me/+ссылка» → {chat_id, title, url}. Бот должен быть админом."""
+        parts = text.split()
+        ref = parts[0].strip() if parts else ""
+        link = next((p for p in parts[1:] if p.startswith("http")), "")
+        m = re.match(r"(?:https?://)?t\.me/([A-Za-z0-9_]{4,})/?$", ref)
+        chat_id = "@" + m.group(1) if m else ref if ref.startswith(("@", "-100")) else "@" + ref.lstrip("@")
+        info = self.api("getChat", chat_id=chat_id) or {}
+        if self.bot_id:
+            me = self.api("getChatMember", chat_id=chat_id, user_id=self.bot_id) or {}
+            if me.get("status") not in ("administrator", "creator"):
+                raise RuntimeError("бот не админ в канале")
+        username = info.get("username")
+        url = link or (f"https://t.me/{username}" if username else info.get("invite_link") or "")
+        return {"chat_id": info.get("id") or chat_id, "title": info.get("title") or chat_id, "url": url}
+
+    def is_member(self, chat_id: Any, user_id: int) -> bool | None:
+        """Подписан ли на канал: True/False, None — не удалось проверить (бот не админ, сбой)."""
+        try:
+            m = self.api("getChatMember", chat_id=chat_id, user_id=user_id) or {}
+        except Exception as exc:  # noqa: BLE001
+            log.warning("бот-магазин: подписка на %s не проверена: %s", chat_id, exc)
+            return None
+        return m.get("status") in ("creator", "administrator", "member") or bool(m.get("is_member"))
 
     def is_admin(self, tg_id: int) -> bool:
         """Админ — тот, чей Telegram ID указан для админ-бота / поддержки или в DONATIX_SHOP_ADMIN_IDS."""
@@ -1126,6 +1464,7 @@ class ShopBot:
                   users=o["users"], buyers=o["buyers"], new=t["new_users"], subs=o["subscribed"], top=top)
         self.show(su["tg_id"], text, [[(tr(lang, "bc"), "bc", "primary")], [("🛠 Витрина: названия и показ", "ve")],
                                       [("📢 Обязательная подписка", "sp")],
+                                      [("🏆 Турнир друзей", "ta", "success")],
                                       [("🔄", "adm"), (tr(lang, "home"), "h")]], edit=edit)
 
     # Витрина: что видят покупатели (только админ)
@@ -1214,6 +1553,8 @@ class ShopBot:
             rows.append([(tr(lang, "games"), "g:games:0", "primary")])
         else:
             rows.append([(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
+        if bottour.enabled(conn):
+            rows.append([("🏆 Турнир друзей — призы", "tour", "success", bottour.badge(conn).get("emoji_id"))])
         rows += [[(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
                  [(tr(lang, "support"), "sup")]]
         if self.is_admin(su["tg_id"]):
@@ -1525,6 +1866,8 @@ class ShopBot:
             self.create_topup(conn, su, text)
         elif step == "spa" and self.is_admin(tg_id):
             self.add_sponsor(conn, su, text)
+        elif step in ("tach", "tapz", "tban") and self.is_admin(tg_id):
+            self.tour_admin_text(conn, su, step, text)
         elif step in ("vgn", "vpn") and self.is_admin(tg_id):
             p = product_by_rid(conn, st["rid"])
             self.state.pop(tg_id, None)
@@ -1565,6 +1908,10 @@ class ShopBot:
             self.open_deep_link(conn, su, after, mid) if after else self.screen_home(conn, su, mid)
         elif head == "nop":   # заголовок раздела в списке пакетов — не кнопка
             return
+        elif head == "tour":
+            self.screen_tour(conn, su, mid)
+        elif head in ("ta", "tat", "tach", "tachx", "tapz", "tab", "tabx", "tban") and self.is_admin(tg_id):
+            self.on_tour_admin(conn, su, head, mid)
         elif head == "h" or head == "lang":
             self.state.pop(tg_id, None)
             self.screen_home(conn, su, mid)
@@ -2051,6 +2398,9 @@ class ShopBot:
                 if mark(conn, "order", o["id"]):   # одно событие — одно сообщение
                     self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb,
                               effect=EFFECT_PARTY if status == "completed" else None)
+                    if status == "completed":
+                        with contextlib.suppress(Exception):
+                            self.tour_bought(conn, o["user_id"], o["id"])
             else:
                 p = conn.execute("SELECT * FROM payments WHERE id = ?", (w["obj_id"],)).fetchone()
                 if p is None or p["status"] == "pending":

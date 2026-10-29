@@ -628,6 +628,30 @@ CREATE TABLE IF NOT EXISTS glory_orders (     -- FFGlory: накрутка оч�
 );
 CREATE INDEX IF NOT EXISTS glory_user ON glory_orders(user_id, id DESC);
 CREATE INDEX IF NOT EXISTS glory_open ON glory_orders(status, updated_at);
+
+-- Турнир друзей в боте-магазине (bottour.py): кто пришёл по чьей ссылке, прошёл ли «Я не бот», подписан ли
+CREATE TABLE IF NOT EXISTS bot_tour (
+    friend_tg    INTEGER PRIMARY KEY,
+    inviter_tg   INTEGER NOT NULL,
+    friend_user  INTEGER,
+    inviter_user INTEGER NOT NULL,
+    joined_at    TEXT NOT NULL,
+    human        INTEGER NOT NULL DEFAULT 0,
+    tries        INTEGER NOT NULL DEFAULT 0,
+    subscribed   INTEGER NOT NULL DEFAULT 0,
+    banned       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS bot_tour_inviter ON bot_tour(inviter_tg, joined_at);
+CREATE TABLE IF NOT EXISTS bot_tour_winners (
+    week       TEXT NOT NULL,
+    place      INTEGER NOT NULL,
+    inviter_tg INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    points     INTEGER NOT NULL,
+    prize_tjs  INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (week, place)
+);
 CREATE TABLE IF NOT EXISTS reviews (          -- отзывы покупателей к выполненным заказам + ответ магазина
     id          INTEGER PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(id),
