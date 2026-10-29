@@ -226,7 +226,8 @@ async def test_approve_without_channel_keeps_receipt_pending(stand):
 async def test_student_cannot_use_admin_powers(stand):
     dispatcher, bot, tg, conn = stand
     ready_to_sell(conn)
-    await feed(dispatcher, bot, text("/start"), text("/setprice 1 сомони"), text(f"/give {STUDENT}"))
+    await feed(dispatcher, bot, text("/start"), press("set:price"), text("1 сомони"), press("adm:give"),
+               text(str(STUDENT)))
     assert db.get_setting(conn, "price") == "300 сомони"
     assert db.status_of(conn, STUDENT) == "new"
 
@@ -235,16 +236,35 @@ async def test_student_cannot_use_admin_powers(stand):
     assert not tg.of(CreateChatInviteLink)
 
 
-async def test_admin_settings_and_validation(stand):
+async def test_only_admin_sees_admin_panel_button(stand):
+    dispatcher, bot, tg, conn = stand
+    await feed(dispatcher, bot, text("/start"), text("/start", user_id=ADMIN))
+    student_menu, admin_menu = [m.reply_markup for m in tg.of(SendMessage)[-2:]]
+    data = lambda kb: [b.callback_data for row in kb.inline_keyboard for b in row]  # noqa: E731
+    assert "adm" not in data(student_menu)
+    assert "adm" in data(admin_menu)
+
+
+async def test_admin_sets_everything_with_buttons(stand):
     dispatcher, bot, tg, conn = stand
     await feed(dispatcher, bot,
-               text("/setpay Карта Алиф: 1111\nПолучатель: Алиджон", user_id=ADMIN),
-               text("/setready 100", user_id=ADMIN),
-               text("/setready 5", user_id=ADMIN),
-               text("/setcontact @alijon_admin", user_id=ADMIN))
+               press("set:pay", user_id=ADMIN), text("Карта Алиф: 1111\nПолучатель: Алиджон", user_id=ADMIN),
+               press("set:ready", user_id=ADMIN), text("100", user_id=ADMIN), text("5", user_id=ADMIN),
+               press("set:contact", user_id=ADMIN), text("@alijon_admin", user_id=ADMIN),
+               press("set:demo", user_id=ADMIN), text("https://example.com/urok1", user_id=ADMIN))
     assert db.get_setting(conn, "pay") == "Карта Алиф: 1111\nПолучатель: Алиджон"
     assert db.get_setting(conn, "ready") == "5"
     assert db.get_setting(conn, "contact") == "alijon_admin"
+    assert db.get_setting(conn, "demo") == "https://example.com/urok1"
+
+    # «-» убирает необязательную настройку
+    await feed(dispatcher, bot, press("set:demo", user_id=ADMIN), text("-", user_id=ADMIN))
+    assert db.get_setting(conn, "demo") == ""
+
+    # «Отмена» — следующее сообщение уже не считается значением
+    await feed(dispatcher, bot, press("set:price", user_id=ADMIN), press("adm", user_id=ADMIN),
+               text("просто текст", user_id=ADMIN))
+    assert db.get_setting(conn, "price") == db.DEFAULTS["price"]
 
 
 async def test_forwarded_channel_post_connects_channel(stand):
@@ -263,9 +283,79 @@ async def test_forwarded_channel_post_connects_channel(stand):
 async def test_give_grants_access_manually(stand):
     dispatcher, bot, tg, conn = stand
     ready_to_sell(conn)
-    await feed(dispatcher, bot, text("/start"), text(f"/give {STUDENT}", user_id=ADMIN))
+    await feed(dispatcher, bot, text("/start"), press("adm:give", user_id=ADMIN), text("999", user_id=ADMIN))
+    assert not tg.of(CreateChatInviteLink)   # такого ученика нет
+    await feed(dispatcher, bot, text(str(STUDENT), user_id=ADMIN))
     assert db.status_of(conn, STUDENT) == "paid"
     assert tg.of(CreateChatInviteLink)
+
+
+# ── возврат: только первые 3 дня ─────────────────────────────────────────────
+
+def paid_student(conn, days_ago=0.0):
+    db.touch_student(conn, STUDENT, "u", "Ученик")
+    db.set_status(conn, STUDENT, "paid")
+    conn.execute("UPDATE students SET paid_at = paid_at - ? WHERE user_id = ?", (days_ago * 86400, STUDENT))
+    conn.commit()
+
+
+async def test_refund_within_three_days(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    paid_student(conn, days_ago=1)
+    await feed(dispatcher, bot, text("/start"))
+    menu = tg.of(SendMessage)[-1].reply_markup
+    assert "refund" in [b.callback_data for row in menu.inline_keyboard for b in row]
+
+    await feed(dispatcher, bot, press("refund"), press("refund_yes"))
+    assert db.status_of(conn, STUDENT) == "refund_details"
+    await feed(dispatcher, bot, text("Карта 9999, Ученик"))
+    assert db.status_of(conn, STUDENT) == "refund_requested"
+    card = [m for m in tg.of(SendMessage) if m.chat_id == ADMIN][-1]
+    assert "Карта 9999" in card.text
+    assert card.reply_markup.inline_keyboard[0][0].callback_data == f"rfok:{STUDENT}"
+
+    await feed(dispatcher, bot, press(f"rfok:{STUDENT}", user_id=ADMIN, html=card.text))
+    assert db.status_of(conn, STUDENT) == "refunded"
+    assert [m for m in tg.sent if type(m).__name__ == "BanChatMember"]
+    assert [m for m in tg.sent if type(m).__name__ == "UnbanChatMember"]
+    assert content.REFUND_DONE in tg.texts_to(STUDENT)
+
+    # после возврата можно купить снова
+    await feed(dispatcher, bot, press("paid"), photo())
+    assert db.status_of(conn, STUDENT) == "pending"
+
+
+async def test_no_refund_after_three_days(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    paid_student(conn, days_ago=3.1)
+    await feed(dispatcher, bot, text("/start"))
+    menu = tg.of(SendMessage)[-1].reply_markup
+    assert "refund" not in [b.callback_data for row in menu.inline_keyboard for b in row]
+
+    await feed(dispatcher, bot, press("refund"))   # старая кнопка
+    assert tg.of(AnswerCallbackQuery)[-1].text == content.REFUND_EXPIRED
+    await feed(dispatcher, bot, press("refund_yes"))
+    assert db.status_of(conn, STUDENT) == "paid"
+
+
+async def test_declined_refund_keeps_access_and_deadline(stand):
+    dispatcher, bot, tg, conn = stand
+    ready_to_sell(conn)
+    paid_student(conn, days_ago=2)
+    paid_at = db.get_student(conn, STUDENT)["paid_at"]
+    await feed(dispatcher, bot, press("refund_yes"), text("Карта 9999"), press(f"rfno:{STUDENT}", user_id=ADMIN))
+    assert db.status_of(conn, STUDENT) == "paid"
+    assert db.get_student(conn, STUDENT)["paid_at"] == paid_at   # срок не продлился
+    assert content.REFUND_DECLINED in tg.texts_to(STUDENT)
+    assert not [m for m in tg.sent if type(m).__name__ == "BanChatMember"]
+
+
+def test_refund_rule_is_visible_before_buying():
+    assert "3 дня" in content.honest("каждые 2 дня", 2, False)
+    assert "3 дня" in content.buy("300", "Карта")
+    assert any("вернуть деньги" in q.lower() for q, _ in content.FAQ)
 
 
 async def test_new_link_for_paid_student(stand):

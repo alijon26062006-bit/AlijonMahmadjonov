@@ -12,6 +12,9 @@ from pathlib import Path
 #   pending         — чек у админа на проверке
 #   paid            — оплата подтверждена, доступ выдан
 #   rejected        — админ отклонил чек (можно прислать снова)
+#   refund_details  — ученик просит возврат, ждём, куда вернуть деньги
+#   refund_requested — запрос на возврат у админа
+#   refunded        — деньги возвращены, доступ закрыт (можно купить снова)
 
 DEFAULTS = {
     "price": "уточняйте у администратора",
@@ -96,6 +99,18 @@ def set_status(conn: sqlite3.Connection, user_id: int, status: str) -> None:
         (status, paid_at, user_id),
     )
     conn.commit()
+
+
+def restore_paid(conn: sqlite3.Connection, user_id: int) -> None:
+    """Вернуть статус «оплачено», не сдвигая дату оплаты — срок возврата не продлевается."""
+    conn.execute("UPDATE students SET status = 'paid' WHERE user_id = ?", (user_id,))
+    conn.commit()
+
+
+def refund_seconds_left(student: sqlite3.Row, days: int, now: float | None = None) -> float:
+    if not student or not student["paid_at"]:
+        return 0.0
+    return student["paid_at"] + days * 86400 - (now or time.time())
 
 
 def mark_link_issued(conn: sqlite3.Connection, user_id: int) -> None:
