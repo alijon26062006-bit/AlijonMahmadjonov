@@ -165,7 +165,7 @@ REGION_TITLES = {
 _REGION_WORDS = {
     "global": "GLOBAL", "глобал": "GLOBAL", "worldwide": "GLOBAL", "россия": "RU", "russia": "RU",
     "турция": "TR", "turkey": "TR", "türkiye": "TR", "казахстан": "KZ", "kazakhstan": "KZ",
-    "europe": "EU", "европа": "EU", "снг": "CIS", "usa": "US", "indonesia": "ID", "индонезия": "ID",
+    "europe": "EU", "европа": "EU", "снг": "CIS", "usa": "US", "indonesia": "ID", "индонезия": "ID", "инд": "ID",
     "philippines": "PH", "malaysia": "MY", "brazil": "BR", "india": "IN", "ukraine": "UA", "украина": "UA",
 }
 _REGION_KEYS = ("region", "region_code", "regionCode", "country", "country_code", "countryCode", "server_region")

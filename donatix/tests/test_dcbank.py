@@ -219,7 +219,7 @@ def test_shop_bot_replaces_requisites_with_paid(app, dc, conn, supplier):
     bot.watch(conn, force=True)
     method, last = bot.api.calls[-1]
     assert method == "editMessageText" and last["message_id"] == req_mid
-    assert "Пардохт гирифта шуд" in last["text"] and "1 с." in last["text"]
+    assert "Оплата получена" in last["text"] and "1 с." in last["text"]
 
 
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
@@ -276,7 +276,7 @@ def test_video_required_in_shop_bot(app, dc, conn, supplier):
     su = _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
     bot.handle(conn, press(bot.api.button("Душанбе")))
-    assert sent and sent[0][0] == "sendVideo" and "ҷавобгаред" in sent[0][1]["caption"]
+    assert sent and sent[0][0] == "sendVideo" and "отвечаете сами" in sent[0][1]["caption"]
     ok = sent[0][1]["reply_markup"]["inline_keyboard"][0][0]
     assert ok["callback_data"] == "dv:ok:dc"
     bot.handle(conn, msg("1"))                                             # сумму без видео не принимаем
@@ -309,7 +309,7 @@ def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monke
 
     assert _handle(conn, dc, notice(p["pay_amount"], "9901"), 60)["status"] == "matched"
     edits = [c for m, c in pushed.calls if m == "editMessageText"]
-    assert len(edits) == 1 and edits[0]["message_id"] == req_mid and "Пардохт гирифта шуд" in edits[0]["text"]
+    assert len(edits) == 1 and edits[0]["message_id"] == req_mid and "Оплата получена" in edits[0]["text"]
 
     before = len(bot.api.calls)
     bot.watch(conn, force=True)                                   # бот уже не дублирует
@@ -377,11 +377,11 @@ def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
     bot.handle(conn, press(f"pc:{p['id']}"))
-    assert "бекор шуд" in bot.api.last_text()
+    assert "отменена" in bot.api.last_text()
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "cancelled"
     assert conn.execute("SELECT COUNT(*) FROM shop_watch WHERE obj_id = ?", (p["id"],)).fetchone()[0] == 0
     bot.handle(conn, press(f"pc:{p['id']}"))                                        # второй раз — уже нельзя
-    assert "мумкин нест" in bot.api.last_text()
+    assert "отменить нельзя" in bot.api.last_text()
 
 
 def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
@@ -396,7 +396,7 @@ def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     bot.handle(conn, press("h"))
     bot.handle(conn, press("t"))                                   # снова «Пополнить» — заявка уже есть
-    assert f"Дархост #{p['id']}" in bot.api.last_text()
+    assert f"Заявка #{p['id']}" in bot.api.last_text()
     assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
     bot.handle(conn, press("b"))                                   # «Баланс» — тоже видно и можно отменить
     assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())

@@ -43,6 +43,11 @@ POLL_SECONDS = 25             # долгий опрос Telegram: новое с�
 HANDLERS = 32                 # сколько покупателей обслуживаем одновременно (ждут поставщика — не держат остальных)
 CHAT_QUEUE = 20               # больше сообщений одного покупателя в очереди не держим
 FINAL = ("completed", "failed", "cancelled", "refunded")
+# Анимации Telegram на сообщении (message_effect_id, только личные чаты): 🔥 приветствие, 🎉 заказ готов
+EFFECT_FIRE = "5104841245755180586"
+EFFECT_PARTY = "5046509860389126442"
+# Главный экран: эти игры — крупными кнопками сразу (ключ текста, как узнать игру, регион)
+FEATURED = (("ff_cis", "ff", ("CIS", "RU")), ("ff_id", "ff", ("ID",)), ("pubg", "pubg", None))
 
 GROUPS = {   # раздел меню → виды товаров
     "games": ("topup", "game_key"),
@@ -53,13 +58,23 @@ GROUPS = {   # раздел меню → виды товаров
 
 # Тексты: (русский, таджикский)
 T: dict[str, tuple[str, str]] = {
-    "hello": ("<b>{name}, добро пожаловать в {site}!</b>\n\n"
-              "🎮 Донат в игры, ⭐ Telegram Stars и Premium, 🎁 карты — быстро и по честной цене.\n\n"
-              "💰 Баланс: <b>{balance}</b>",
+    "hello": ("🔥 <b>{name}, добро пожаловать в {site}!</b>\n\n"
+              "💎 Алмазы и UC — по ID игрока, оплата в сомони.\n"
+              "⚡️ Заказ уходит автоматически сразу после оплаты.\n\n"
+              "💰 Баланс: <b>{balance}</b>\n\n"
+              "Выберите игру 👇",
               "<b>{name}, хуш омадед ба {site}!</b>\n\n"
               "🎮 Донат ба бозиҳо, ⭐ Telegram Stars ва Premium, 🎁 кортҳо — зуд ва бо нархи ҳалол.\n\n"
               "💰 Баланс: <b>{balance}</b>"),
-    "games": ("🎮 Игры", "🎮 Бозиҳо"),
+    "games": ("🎮 Все игры", "🎮 Бозиҳо"),
+    "ff_cis": ("💎 FF СНГ — алмазы", "💎 FF СНГ"),
+    "ff_id": ("💎 FF Индонезия — алмазы", "💎 FF Индонезия"),
+    "pubg": ("🪙 PUBG Mobile — UC", "🪙 PUBG Mobile"),
+    "sec_currency": ("💎 Алмазы", "💎 Алмосҳо"),
+    "sec_uc": ("🪙 UC", "🪙 UC"),
+    "sec_pass": ("🎫 Ваучеры и пропуска", "🎫 Ваучерҳо"),
+    "sec_level": ("🚀 Прокачка", "🚀 Прокачка"),
+    "sec_other": ("🎁 Другое", "🎁 Дигар"),
     "tg": ("⭐ Stars / Premium", "⭐ Stars / Premium"),
     "cards": ("🎁 Карты", "🎁 Кортҳо"),
     "steam": ("🕹 Steam", "🕹 Steam"),
@@ -133,7 +148,7 @@ T: dict[str, tuple[str, str]] = {
     "history": ("📜 История", "📜 Таърих"),
     "created": ("⏳ <b>Заказ {id} принят</b>\n{product}\nСписано: {total}\n\nКак только будет готово — напишу.",
                 "⏳ <b>Фармоиш {id} қабул шуд</b>\n{product}\nПардохт: {total}\n\nВақте тайёр шавад — менависам."),
-    "done": ("✅ <b>Заказ {id} выполнен!</b>\n{product}", "✅ <b>Фармоиш {id} иҷро шуд!</b>\n{product}"),
+    "done": ("🎉 <b>Заказ {id} выполнен!</b>\n{product}\n\nСпасибо, что выбрали нас 💜", "✅ <b>Фармоиш {id} иҷро шуд!</b>\n{product}"),
     "failed": ("❌ <b>Заказ {id} не выполнен</b>\n{product}\n{reason}\n\n{total} вернулись на баланс.",
                "❌ <b>Фармоиш {id} иҷро нашуд</b>\n{product}\n{reason}\n\n{total} ба баланс баргашт."),
     "repeat": ("🔁 Повторить", "🔁 Такрор"),
@@ -239,8 +254,7 @@ def tell_buyer(conn: sqlite3.Connection, config: Config, tg_id: int, delta_micro
 
 
 def tr(lang: str, key: str, **kw: Any) -> str:
-    pair = T[key]
-    text = pair[1] if lang == "tj" else pair[0]
+    text = T[key][0]   # бот-магазин только на русском (таджикские тексты оставлены в T про запас)
     return text.format(**kw) if kw else text
 
 
@@ -288,10 +302,10 @@ def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str
         # Запись в базу — только когда что-то изменилось или раз в 5 минут: запись на каждое нажатие кнопки
         # вставала в очередь за другими писателями базы (сайт, оплаты) и тормозила ответ бота
         same = (row["name"] or "") == (name[:64] or row["name"] or "") and (row["username"] or None) == (username or None)
-        if same and (row["last_seen"] or "") >= _ago_iso(300):
+        if same and row["lang"] == "ru" and (row["last_seen"] or "") >= _ago_iso(300):
             return row
-        conn.execute("UPDATE shop_users SET last_seen = ?, name = COALESCE(NULLIF(?, ''), name), username = ? "
-                     "WHERE tg_id = ?", (db.now(), name[:64], username or None, tg_id))
+        conn.execute("UPDATE shop_users SET last_seen = ?, name = COALESCE(NULLIF(?, ''), name), username = ?, "
+                     "lang = 'ru' WHERE tg_id = ?", (db.now(), name[:64], username or None, tg_id))
         return shop_user(conn, tg_id)
     with db.tx(conn):
         row = shop_user(conn, tg_id)
@@ -306,7 +320,7 @@ def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str
                                        password=secrets.token_urlsafe(24), status="active",
                                        project="Покупатель из Telegram-бота")
         conn.execute("INSERT INTO shop_users (tg_id, user_id, name, lang, start_param, created_at, last_seen, "
-                     "username) VALUES (?, ?, ?, '', ?, ?, ?, ?)",
+                     "username) VALUES (?, ?, ?, 'ru', ?, ?, ?, ?)",
                      (tg_id, uid, name[:64], start[:64] or None, db.now(), db.now(), username or None))
     return shop_user(conn, tg_id)
 
@@ -393,7 +407,7 @@ def flag(code: str) -> str:
 
 def region_name(code: str, lang: str = "") -> str:
     if not code:
-        return "Другие" if lang != "tj" else "Дигар"
+        return "Другие"
     return region_title(code)
 
 
@@ -498,6 +512,39 @@ def hits(conn: sqlite3.Connection, days: int = 7, limit: int = 8) -> list[dict[s
         "AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ?) "
         "GROUP BY p.category_id, p.region, head ORDER BY n DESC LIMIT ?",
         (f"-{days} days", limit * 2)).fetchall(), limit)
+
+
+def _featured_game(kind: str, category_name: str) -> bool:
+    from .suppliers.base import is_ff
+    if kind == "ff":
+        return is_ff(category_name)
+    return bool(re.search(r"\bpubg\b", category_name or "", re.I)) and not re.search(r"lite|new\s*state", category_name, re.I)
+
+
+def featured(conn: sqlite3.Connection) -> list[tuple[str, str]]:
+    """Кнопки главных игр: (ключ текста, callback). Игры, которой нет в каталоге, не показываем."""
+    rows = conn.execute("SELECT rowid AS rid, category_name, name, region FROM products "
+                        "WHERE active = 1 AND hidden = 0 AND kind = 'topup' ORDER BY rowid").fetchall()
+    hidden = {k for k, r in names(conn).items() if r["hidden"]}
+    out = []
+    for key, game, regions in FEATURED:
+        for r in rows:
+            if not _featured_game(game, r["category_name"]) or game_key(r["category_name"]) in hidden:
+                continue
+            reg = region_of(dict(r))
+            if regions is None:
+                out.append((key, f"c:{r['rid']}:0"))
+                break
+            if reg in regions:
+                out.append((key, f"c:{r['rid']}:0:{reg}"))
+                break
+    return out
+
+
+def section_key(sec: int, name: str) -> str:
+    if sec == packs_mod.CURRENCY:
+        return "sec_uc" if packs_mod.emoji(name) == "🪙" else "sec_currency"
+    return {packs_mod.PASS: "sec_pass", packs_mod.LEVEL: "sec_level"}.get(sec, "sec_other")
 
 
 def product_by_rid(conn: sqlite3.Connection, rid: Any) -> dict[str, Any] | None:
@@ -753,8 +800,7 @@ class ShopBot:
                 db.set_setting(conn, "shop.bot_username", me["username"])
             self.api("setMyCommands", commands=[{"command": "start", "description": "Меню / Меню"},
                                                 {"command": "balance", "description": "Баланс"},
-                                                {"command": "orders", "description": "Мои заказы"},
-                                                {"command": "lang", "description": "Язык / Забон"}])
+                                                {"command": "orders", "description": "Мои заказы"}])
             log.info("бот-магазин запущен: @%s", me.get("username"))
         except Exception as exc:
             log.warning("бот-магазин: %s", exc)
@@ -779,8 +825,10 @@ class ShopBot:
             conn.close()
 
     # отправка
-    def show(self, chat: int, text: str, rows: list[list[Btn]] | None = None, *, edit: int | None = None) -> int | None:
-        """Показать экран: поправить сообщение edit, а не вышло — прислать новое. Вернёт message_id."""
+    def show(self, chat: int, text: str, rows: list[list[Btn]] | None = None, *, edit: int | None = None,
+             effect: str | None = None) -> int | None:
+        """Показать экран: поправить сообщение edit, а не вышло — прислать новое. Вернёт message_id.
+        effect — анимация Telegram на новом сообщении (🔥, 🎉); правка сообщения идёт без неё."""
         markup = kb(rows) if rows else None
         if edit:
             try:
@@ -790,6 +838,13 @@ class ShopBot:
             except Exception as exc:  # noqa: BLE001
                 if "not modified" in str(exc):
                     return edit
+        if effect:
+            try:
+                res = self.api("sendMessage", chat_id=chat, text=text, parse_mode="HTML", reply_markup=markup,
+                               disable_web_page_preview=True, message_effect_id=effect) or {}
+                return res.get("message_id")
+            except Exception as exc:  # noqa: BLE001 — эффект не принят (старый клиент, другой id) — шлём без него
+                log.info("бот-магазин: эффект %s не принят: %s", effect, exc)
         res = self.api("sendMessage", chat_id=chat, text=text, parse_mode="HTML", reply_markup=markup,
                        disable_web_page_preview=True) or {}
         return res.get("message_id")
@@ -891,11 +946,7 @@ class ShopBot:
     def on_command(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str, start: str) -> None:
         tg_id, cmd = su["tg_id"], text.split()[0].split("@")[0].lower()
         self.state.pop(tg_id, None)
-        if cmd == "/lang" or (cmd == "/start" and not su["lang"]):
-            if start:
-                self.state[tg_id] = {"after_lang": start}
-            self.show(tg_id, tr("", "lang_pick"), [[("🇷🇺 Русский", "l:ru"), ("🇹🇯 Тоҷикӣ", "l:tj")]])
-        elif cmd == "/id":
+        if cmd == "/id":
             self.show(tg_id, f"🆔 Ваш Telegram ID: <code>{tg_id}</code>")
         elif cmd == "/admin" and self.is_admin(tg_id):
             self.screen_admin(conn, su)
@@ -909,7 +960,7 @@ class ShopBot:
         elif cmd == "/start" and start:
             self.open_deep_link(conn, su, start)
         else:
-            self.screen_home(conn, su)
+            self.screen_home(conn, su, effect=EFFECT_FIRE if cmd == "/start" else None)
 
     # ── Вход на сайт и в приложение через Telegram ──
 
@@ -1152,18 +1203,22 @@ class ShopBot:
         rows.append([("‹ Пакеты", f"vp:{first[0]['rid'] if first else rid}:0")])
         self.show(su["tg_id"], text, rows, edit=edit)
 
-    def screen_home(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+    def screen_home(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None,
+                    effect: str | None = None) -> None:
         lang, user = su["lang"], self._user(conn, su)
         text = tr(lang, "hello", name=_e(su["name"] or "👋"), site=_e(self.config.site_name),
                   balance=money(user["balance_micro"], tjs_rate(conn, self.config)))
-        rows = [[(tr(lang, "games"), "g:games:0", "primary")],
-                [(tr(lang, "tg"), "g:tg:0"), (tr(lang, "cards"), "g:cards:0")],
-                [(tr(lang, "hits"), "hit"), (tr(lang, "steam"), "g:steam:0")],
-                [(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
-                [(tr(lang, "support"), "sup"), (tr(lang, "lang"), "lang")]]
+        # Наверху — главные игры крупными синими кнопками, остальное — ниже и скромнее
+        rows: list[list[Btn]] = [[(tr(lang, key), cb, "primary")] for key, cb in featured(conn)]
+        if not rows:
+            rows.append([(tr(lang, "games"), "g:games:0", "primary")])
+        else:
+            rows.append([(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
+        rows += [[(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
+                 [(tr(lang, "support"), "sup")]]
         if self.is_admin(su["tg_id"]):
-            rows.append([(tr(lang, "admin"), "adm", "primary")])
-        self.show(su["tg_id"], text, rows, edit=edit)
+            rows.append([(tr(lang, "admin"), "adm", "danger")])
+        self.show(su["tg_id"], text, rows, edit=edit, effect=effect)
         self.maybe_ad(conn, su["tg_id"])
 
     def maybe_ad(self, conn: sqlite3.Connection, tg_id: int) -> None:
@@ -1240,19 +1295,30 @@ class ShopBot:
             return
         if region is not None:
             items = [p for p in items if region_of(p) == region]
-            game += f" · {flag(region)} {region_name(region, lang)}"
+            if region_name(region, lang).lower() not in game.lower():   # «FF СНГ · 🇷🇺 СНГ» — без повтора
+                game += f" · {flag(region)} {region_name(region, lang)}"
         rate = tjs_rate(conn, self.config)
         part = items[page * PACKS:(page + 1) * PACKS]
         rows: list[list[Btn]] = []
         short: list[Btn] = []
+        sections = {packs_mod.group(_FLAG_RE.sub("", p["name"])) for p in items if p["kind"] == "topup"}
+        last_sec: int | None = None
         for p in part:
+            if len(sections) > 1 and p["kind"] == "topup":
+                sec = packs_mod.group(_FLAG_RE.sub("", p["name"]))
+                if sec != last_sec:
+                    if short:
+                        rows.append(short)
+                        short = []
+                    rows.append([(f"━━  {tr(lang, section_key(sec, p['name']))}  ━━", "nop")])
+                    last_sec = sec
             label, is_short = pack_button(p)
             own = custom.get("p:" + p["id"])
             if own is not None and own["title"]:
                 label, is_short = own["title"], is_short and len(own["title"]) <= 14
             price = money(unit_price_micro(self.config, user, p), rate)
             if p["max_qty"] > 1 or p["kind"] == "steam_topup":
-                price = ("от " if lang != "tj" else "аз ") + price
+                price = "от " + price
             btn = (f"{label} — {price}", f"p:{p['rid']}")
             if is_short:
                 short.append(btn)
@@ -1488,8 +1554,8 @@ class ShopBot:
         parts = data.split(":")
         head = parts[0]
         st = self.state.get(tg_id)
-        if head == "l" and len(parts) == 2 and parts[1] in ("ru", "tj"):
-            conn.execute("UPDATE shop_users SET lang = ? WHERE tg_id = ?", (parts[1], tg_id))
+        if head == "l" and len(parts) == 2 and parts[1] in ("ru", "tj"):   # кнопки языка в старых сообщениях
+            conn.execute("UPDATE shop_users SET lang = 'ru' WHERE tg_id = ?", (tg_id,))
             su = shop_user(conn, tg_id)
             after = (st or {}).get("after_lang")
             self.state.pop(tg_id, None)
@@ -1497,9 +1563,9 @@ class ShopBot:
                 self.screen_subscribe(conn, su, mid)
                 return
             self.open_deep_link(conn, su, after, mid) if after else self.screen_home(conn, su, mid)
-        elif head == "lang":
-            self.show(tg_id, tr("", "lang_pick"), [[("🇷🇺 Русский", "l:ru"), ("🇹🇯 Тоҷикӣ", "l:tj")]], edit=mid)
-        elif head == "h":
+        elif head == "nop":   # заголовок раздела в списке пакетов — не кнопка
+            return
+        elif head == "h" or head == "lang":
             self.state.pop(tg_id, None)
             self.screen_home(conn, su, mid)
         elif head == "g" and len(parts) == 3 and parts[1] in GROUPS and parts[2].isdigit():
@@ -1983,7 +2049,8 @@ class ShopBot:
                            [(tr(w["lang"], "home"), "h")]]
                 from .buyernotify import mark
                 if mark(conn, "order", o["id"]):   # одно событие — одно сообщение
-                    self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb)
+                    self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb,
+                              effect=EFFECT_PARTY if status == "completed" else None)
             else:
                 p = conn.execute("SELECT * FROM payments WHERE id = ?", (w["obj_id"],)).fetchone()
                 if p is None or p["status"] == "pending":

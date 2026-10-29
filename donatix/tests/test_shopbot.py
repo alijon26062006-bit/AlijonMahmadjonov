@@ -71,7 +71,7 @@ def test_start_creates_account_and_shows_menu(app, config, conn, supplier):
     text = bot.api.last_text()
     assert "Али" in text and "Баланс" in text
     styles = {b["text"]: b.get("style") for b in bot.api.last_buttons()}
-    assert styles["🎮 Игры"] == "primary" and styles["💰 Баланс"] == "success"
+    assert styles["🪙 PUBG Mobile — UC"] == "primary" and styles["💰 Баланс"] == "success"
     bot.handle(conn, msg("/start"))                                   # второй раз — тот же аккаунт
     assert conn.execute("SELECT COUNT(*) FROM shop_users").fetchone()[0] == 1
 
@@ -179,10 +179,12 @@ def test_topup_offers_exact_missing_amount_and_failed_auto_buy_asks(app, config,
     assert any("Заказ сам не оформился" in t for t in texts) and "Проверьте заказ" in api.last_text()
 
 
-def test_tajik_language(app, config, conn, supplier):
+def test_bot_is_russian_only(app, config, conn, supplier):
+    """Бот только на русском: даже старая кнопка «Тоҷикӣ» ведёт в русское меню, выбора языка нет."""
     bot = _bot(config, supplier)
-    _start(bot, conn, "tj")
-    assert "Бозиҳо" in str(bot.api.last_buttons())
+    su = _start(bot, conn, "tj")
+    assert su["lang"] == "ru" and "Все игры" in str(bot.api.last_buttons())
+    assert "Забон" not in str(bot.api.last_buttons())
 
 
 def test_deep_link_opens_game(app, config, conn, supplier):
@@ -545,3 +547,45 @@ def test_repeat_presses_do_not_write_last_seen_each_time(app, config, conn, supp
     assert again["last_seen"] == seen
     renamed = shopbot.ensure_user(conn, 777, "Ali", username="ali2")
     assert renamed["username"] == "ali2"
+
+
+def _ff_catalog(conn):
+    now = db.now()
+    for i, (cat, name) in enumerate((("ff-cis", "Weekly Membership"), ("ff-cis", "110 Diamonds"),
+                                     ("ff-cis", "Level Up Pass"), ("ff-cis", "520 Diamonds"),
+                                     ("ff-ind", "100 Diamonds"))):
+        title = "FF СНГ" if cat == "ff-cis" else "FF Инд"
+        conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, fields_json, "
+                     "updated_at) VALUES (?, 'topup', ?, ?, ?, '1', '[]', ?)", (f"{cat}-{i}", cat, title, name, now))
+
+
+def test_home_shows_main_games_first_with_fire_effect(app, config, conn, supplier):
+    _ff_catalog(conn)
+    bot = _bot(config, supplier)
+    bot.handle(conn, msg("/start"))
+    method, p = bot.api.calls[-1] if bot.api.calls[-1][0] == "sendMessage" else \
+        next(c for c in reversed(bot.api.calls) if c[0] == "sendMessage")
+    assert p.get("message_effect_id") == shopbot.EFFECT_FIRE
+    top = [b["text"] for b in bot.api.last_buttons()][:3]
+    assert top == ["💎 FF СНГ — алмазы", "💎 FF Индонезия — алмазы", "🪙 PUBG Mobile — UC"]
+    assert all(b.get("style") == "primary" for b in bot.api.last_buttons()[:3])
+    # FF СНГ: сразу пакеты, по разделам — алмазы, потом ваучеры, потом прокачка
+    bot.handle(conn, press(bot.api.button("FF СНГ")))
+    texts = [b["text"] for b in bot.api.last_buttons()]
+    heads = [t for t in texts if t.startswith("━━")]
+    assert heads == ["━━  💎 Алмазы  ━━", "━━  🎫 Ваучеры и пропуска  ━━", "━━  🚀 Прокачка  ━━"]
+    assert texts.index(heads[0]) < texts.index(next(t for t in texts if t.startswith("110 💎")))
+    n = len(bot.api.calls)
+    bot.handle(conn, press("nop"))   # заголовок раздела не открывает ничего
+    assert not any(m in ("sendMessage", "editMessageText") for m, _ in bot.api.calls[n:])
+
+
+def test_effect_rejected_message_still_sent(app, config, conn, supplier):
+    class NoEffects(FakeApi):
+        def __call__(self, method, **p):
+            if p.get("message_effect_id"):
+                raise RuntimeError("telegram sendMessage: Bad Request: EFFECT_ID_INVALID")
+            return super().__call__(method, **p)
+    bot = _bot(config, supplier, NoEffects())
+    bot.handle(conn, msg("/start"))
+    assert "добро пожаловать" in bot.api.last_text()
