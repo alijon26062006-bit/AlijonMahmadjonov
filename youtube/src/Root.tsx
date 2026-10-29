@@ -4,6 +4,7 @@ import data from './data/ep01.json';
 import {Episode01} from './ep01/Episode01';
 import {Intro} from './intro/Intro';
 import {EP02_FRAMES, Episode02} from './ep02/Episode02';
+import {EP03_FRAMES, Episode03} from './ep03/Episode03';
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -16,6 +17,7 @@ export const RemotionRoot: React.FC = () => (
       height={1080}
     />
     <Composition id="Ep02Print" component={Episode02} durationInFrames={EP02_FRAMES} fps={30} width={1920} height={1080} />
+    <Composition id="Ep03Variables" component={Episode03} durationInFrames={EP03_FRAMES} fps={30} width={1920} height={1080} />
     <Composition id="Intro" component={Intro} durationInFrames={150} fps={30} width={1920} height={1080} />
   </>
 );

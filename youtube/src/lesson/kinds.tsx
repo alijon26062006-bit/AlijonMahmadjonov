@@ -108,7 +108,7 @@ export const CardsKind: React.FC<P> = ({d, brand}) => {
             <Card key={c[0]} k={k} style={{flex: 1, height: 420, padding: 46, display: 'flex', flexDirection: 'column', gap: 24, border: `1.5px solid ${k > 0.5 ? 'rgba(34,211,238,0.45)' : theme.border}`}}>
               <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 72, color: 'rgba(255,255,255,0.08)'}}>0{i + 1}</div>
               <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 46, color: theme.text}}>{c[1]}</div>
-              <div style={{fontFamily: fonts.body, fontWeight: 600, fontSize: 32, color: '#C9D2E3', lineHeight: 1.4}}>{c[2]}</div>
+              <div style={{fontFamily: fonts.body, fontWeight: 600, fontSize: 32, color: '#C9D2E3', lineHeight: 1.4, whiteSpace: 'pre-line'}}>{c[2]}</div>
             </Card>
           );
         })}
@@ -185,7 +185,14 @@ export const CodeKind: React.FC<P> = ({d}) => {
   const panelHeight = p.panel || 300;
   // строки кода: набранные к этому моменту
   let typingLine = -1;
+  // правки: [номер строки, новый текст]; событие retype:i допечатывает конец новой строки
+  const edits: Record<number, string> = Object.fromEntries((p.edits || []).map((e: [number, string]) => [e[0], e[1]]));
   const shown = code.map((line, i) => {
+    const rt = d.ev[`retype:${i}`] as Typed | undefined;
+    if (rt && edits[i] !== undefined && sec >= rt.t) {
+      if (sec < rt.times[rt.times.length - 1] + 0.2) typingLine = i;
+      return edits[i].slice(0, edits[i].length - rt.text.length) + typedNow(rt, sec);
+    }
     const t = d.ev[`type:${i}`] as Typed | undefined;
     if (!t) return line;
     if (sec < t.t) return null;
@@ -199,20 +206,20 @@ export const CodeKind: React.FC<P> = ({d}) => {
     </div>
   );
   // вывод в терминале
-  const rows: {text: string; kind: 'cmd' | 'out'}[] = [];
+  const rows: {text: string; kind: 'cmd' | 'out' | 'err'}[] = [];
   runs.forEach((rk) => {
     if (sec < ev(d, rk)) return;
     rows.push({text: CMD, kind: 'cmd'});
     (p.out || []).forEach((o: string[]) => {
       const grp = o[2] || 'run';
-      if (grp === rk && has(d, o[0]) && sec >= ev(d, o[0])) rows.push({text: o[1], kind: 'out'});
+      if (grp === rk && has(d, o[0]) && sec >= ev(d, o[0])) rows.push({text: o[1], kind: o[3] === 'err' ? 'err' : 'out'});
     });
   });
   const maxRows = Math.floor((panelHeight - 60) / 35);
   const panel = (
     <>
       {rows.slice(-maxRows).map((row, i) => (
-        <div key={i} style={{color: row.kind === 'cmd' ? '#8E98AA' : '#fff', fontSize: row.kind === 'cmd' ? 19 : 24, fontWeight: row.kind === 'out' ? 700 : 400, whiteSpace: 'pre', minHeight: 35}}>
+        <div key={i} style={{color: row.kind === 'cmd' ? '#8E98AA' : row.kind === 'err' ? '#FF8A8A' : '#fff', fontSize: row.kind === 'out' ? 24 : row.kind === 'err' ? 21 : 19, fontWeight: row.kind === 'cmd' ? 400 : 700, whiteSpace: 'pre', minHeight: 35}}>
           {row.text}
         </div>
       ))}
@@ -241,8 +248,79 @@ export const CodeKind: React.FC<P> = ({d}) => {
       <Background />
       <VSCodeWindow sidebar={sidebar} tabs={[{name: 'main.py'}]} editor={editor} panel={panel} panelK={r(firstRun, 0.5)} panelHeight={panelHeight} runHl={runHl} />
       {runs.length ? <Cursor path={path} clicks={runs.map((rk) => ev(d, rk))} appear={firstRun - 1.2} /> : null}
-      <Explains d={d} x={ED_X + 650} y={VY + 120} w={560} />
+      {/* explainAt: [сдвиг от левого края редактора, сдвиг от верха окна, ширина] — когда строки кода длинные */}
+      <Explains d={d} x={ED_X + (p.explainAt?.[0] ?? 650)} y={VY + (p.explainAt?.[1] ?? 120)} w={p.explainAt?.[2] ?? 560} />
       {p.chapter ? <ChapterTag step={p.chapter[0]} title={p.chapter[1]} /> : null}
+    </AbsoluteFill>
+  );
+};
+
+// ================================================================ переменные — коробки в памяти
+// ops: [ключ, 'new' | 'set' | 'print', имя коробки, значение (для print — что на экране), строка кода]
+const valColor = (v: string) => (/^["']/.test(v) ? '#CE9178' : '#B5CEA8');
+const BOX_W = 400;
+const BOX_GAP = 70;
+
+export const MemoryKind: React.FC<P> = ({d, brand}) => {
+  const r = useRamp();
+  const sec = useSec();
+  const p = d.params;
+  const ops = (p.ops as any[])
+    .filter((o) => has(d, o[0]))
+    .map((o) => ({k: o[0] as string, t: ev(d, o[0]), op: o[1] as string, box: o[2] as string, value: o[3] as string, code: o[4] as string | undefined}))
+    .sort((a, b) => a.t - b.t);
+  const past = ops.filter((o) => o.t <= sec);
+  const code = [...past].reverse().find((o) => o.code);
+  const prints = past.filter((o) => o.op === 'print');
+  const names: string[] = p.boxes;
+  const x0 = 960 - (names.length * BOX_W + (names.length - 1) * BOX_GAP) / 2;
+  const center: React.CSSProperties = {position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fonts.mono, fontWeight: 700, fontSize: 60};
+  return (
+    <AbsoluteFill>
+      <Background />
+      <Title top={110}>{p.title}</Title>
+      {code ? (
+        <div key={code.k} style={{position: 'absolute', top: 240, width: '100%', display: 'flex', justifyContent: 'center', opacity: r(code.t, 0.35)}}>
+          <div style={{padding: '10px 30px', borderRadius: 14, background: '#0B0E14', border: `1.5px solid ${theme.border}`, scale: 1.6}}>
+            <CodeLine n={0} text={code.code!} noNum />
+          </div>
+        </div>
+      ) : null}
+      {names.map((name, i) => {
+        const mine = ops.filter((o) => o.box === name && o.op !== 'print');
+        const done = mine.filter((o) => o.t <= sec);
+        if (!done.length) return null;
+        const cur = done[done.length - 1];
+        const prev = done.length > 1 ? done[done.length - 2] : null;
+        const appear = r(mine[0].t, 0.5);
+        const kIn = r(cur.t, 0.7);
+        const reading = prints.some((o) => o.box === name && sec < o.t + 1.4);
+        const col = reading ? theme.accent2 : theme.accent;
+        return (
+          <div key={name} style={{position: 'absolute', left: x0 + i * (BOX_W + BOX_GAP), top: 400, width: BOX_W, opacity: appear, translate: `0 ${(1 - appear) * 40}px`}}>
+            <div style={{display: 'inline-block', marginLeft: 26, padding: '8px 24px', borderRadius: '12px 12px 0 0', background: col, fontFamily: fonts.mono, fontWeight: 700, fontSize: 34, color: '#0B0F17'}}>{name}</div>
+            <div style={{position: 'relative', height: 240, borderRadius: 24, overflow: 'hidden', border: `3px solid ${col}`, background: 'linear-gradient(160deg, rgba(76,141,255,0.10), rgba(15,20,32,0.9))', boxShadow: reading ? '0 0 70px rgba(34,211,238,0.45)' : '0 30px 80px rgba(0,0,0,0.35)'}}>
+              {prev && kIn < 1 ? (
+                <div style={{...center, color: valColor(prev.value), opacity: 1 - kIn, translate: `${kIn * 260}px ${kIn * 60}px`, rotate: `${kIn * 25}deg`}}>{prev.value}</div>
+              ) : null}
+              <div style={{...center, color: valColor(cur.value), opacity: kIn, translate: `0 ${(1 - kIn) * -150}px`}}>{cur.value}</div>
+            </div>
+          </div>
+        );
+      })}
+      {prints.length ? (
+        <div style={{position: 'absolute', left: 160, top: 760, width: 700, padding: '20px 30px', borderRadius: 18, background: '#0B0E14', border: `1.5px solid ${theme.border}`, opacity: r(prints[0].t, 0.4)}}>
+          <div style={{fontFamily: fonts.body, fontWeight: 800, fontSize: 20, letterSpacing: 3, color: theme.muted}}>ЭКРАН (ВЫВОД print)</div>
+          {prints.slice(-3).map((o) => (
+            <div key={o.k} style={{marginTop: 8, fontFamily: fonts.mono, fontSize: 36, fontWeight: 700, color: '#fff', opacity: r(o.t + 0.3, 0.4)}}>
+              {o.value}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <Explains d={d} x={1000} y={760} w={760} />
+      {p.chapter ? <ChapterTag step={p.chapter[0]} title={p.chapter[1]} /> : null}
+      <Brand text={brand} />
     </AbsoluteFill>
   );
 };
@@ -344,6 +422,7 @@ export const KINDS: Record<string, React.FC<P>> = {
   cards: CardsKind,
   syntax: SyntaxKind,
   code: CodeKind,
+  memory: MemoryKind,
   errors: ErrorsKind,
   recap: RecapKind,
   final: FinalKind,

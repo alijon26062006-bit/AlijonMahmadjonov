@@ -68,9 +68,47 @@ def sfx_for(name):
         return [("pop", 0.6, 0.0)]
     if re.fullmatch(r"f\d+", name):
         return [("chime", 0.7, 0.0)]
+    if re.fullmatch(r"m\d+", name):  # коробка-переменная: значение кладётся / меняется / читается
+        return [("pop", 0.55, 0.0)]
     if re.fullmatch(r"[chrs]\d+", name) or name in ("hw", "next", "sub"):
         return [("pop_soft", 0.7, 0.0)]
     return []
+
+
+MAX_CPS = 22  # быстрее печатать уже неестественно
+
+
+def fix_timeline(ev, typing, out):
+    """Набор строк не должен наезжать друг на друга, а запуск ▶ — на набор.
+
+    typing: [[имя, начало, текст, скорость]] — правится на месте. Если строка не успевает
+    набраться до следующей, печать ускоряется до MAX_CPS, а дальше следующая строка ждёт.
+    Запуск переносится на момент после последней набранной до него строки, вместе с выводом.
+    """
+    typing.sort(key=lambda x: x[1])
+    planned = [x[1] for x in typing]  # когда строку собирались печатать по сценарию
+    runs = sorted(v for k, v in ev.items() if k.startswith("run"))
+    prev_end = -1.0
+    for i, item in enumerate(typing):
+        item[1] = max(item[1], prev_end + 0.12)
+        limits = [typing[i + 1][1]] if i + 1 < len(typing) else []
+        limits += [r for r in runs if r > item[1]]
+        if limits:
+            room = min(limits) - 0.15 - item[1]
+            if room > 0 and len(item[2]) / item[3] > room:
+                item[3] = min(MAX_CPS, len(item[2]) / room)
+        prev_end = item[1] + len(item[2]) / item[3]
+    group_of = {o[0]: (o[2] if len(o) > 2 else "run") for o in out}
+    for rk in sorted((k for k in ev if k.startswith("run")), key=lambda k: ev[k]):
+        typed_before = [t + len(x) / c for (_, t, x, c), p in zip(typing, planned) if p < ev[rk] + 0.3]
+        need = max(typed_before, default=0.0) + 0.35
+        if ev[rk] >= need:
+            continue
+        ev[rk] = round(need, 3)
+        # вывод этого запуска не может появиться раньше самого запуска
+        mine = sorted((k for k, g in group_of.items() if g == rk and k in ev), key=lambda k: ev[k])
+        for j, k in enumerate(mine):
+            ev[k] = round(max(ev[k], need + 0.3 + 0.12 * j), 3)
 
 
 def load_wav(path):
@@ -152,17 +190,23 @@ def main():
                 raise ValueError(f"{sc['id']}: якорь «{anchor}» не найден")
             return ln["start"] + ln["dur"] * pos / len(ln["text"])
 
-        ev, last = {}, 0.0
+        ev, typing = {}, []
         for e in sc["ev"]:
             name, et = e[0], round(at(e[1], e[2]), 3)
-            if name.startswith("type:"):
-                text, cps = e[3], e[4]
-                times = [round(et + (k + 1) / cps, 3) for k in range(len(text))]
-                ev[name] = {"t": et, "text": text, "times": times}
-                sfx += [(start + tt, "space" if ch == " " else "key", 0.5) for tt, ch in zip(times, text)]
-                last = max(last, times[-1])
+            if name.startswith(("type:", "retype:")):  # retype — правка уже набранной строки
+                typing.append([name, et, e[3], e[4]])
+            else:
+                ev[name] = et
+        fix_timeline(ev, typing, sc.get("params", {}).get("out", []))
+        last = 0.0
+        for name, et, text, cps in typing:
+            times = [round(et + (k + 1) / cps, 3) for k in range(len(text))]
+            ev[name] = {"t": round(et, 3), "text": text, "times": times}
+            sfx += [(start + tt, "space" if ch == " " else "key", 0.5) for tt, ch in zip(times, text)]
+            last = max(last, times[-1])
+        for name, et in ev.items():
+            if isinstance(et, dict):
                 continue
-            ev[name] = et
             last = max(last, et)
             sfx += [(start + et + dt, snd, vol) for snd, vol, dt in sfx_for(name)]
         dur = round(max(cur - GAP - start, last + 1.5) + TAIL, 3)
