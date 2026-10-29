@@ -828,10 +828,19 @@ def _crypto_only(request: Request) -> bool:
     return bool(cc) and cc != "TJ"   # СНГ и остальные страны; "" — страну не знаем, как раньше
 
 
+def _no_tjs(request: Request) -> bool:
+    """Выбрана валюта не сомони (TJS) — способы оплаты в сомони не показываем: крипта и способы этой валюты."""
+    from . import fx, geo
+    cur, _ = fx.choose(geo.country(request.app.state.config, _ip(request)), request.cookies.get("dx_cur", ""))
+    return cur != "TJS"
+
+
 def _pay_methods(request: Request, conn, config: Config) -> list[dict]:
     from . import payments
     ms = payments.methods(conn, config)
-    return [m for m in ms if m.get("network")] if _crypto_only(request) else ms
+    if _crypto_only(request):
+        return [m for m in ms if m.get("network")]
+    return [m for m in ms if m["currency"] != "TJS"] if _no_tjs(request) else ms
 
 
 def _ip(request: Request) -> str:
@@ -1453,7 +1462,7 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
         "dcv": dcv, "dcv_src": dcvideo.src(config, dcv) if dcv else "",
         "pre_method": request.query_params.get("m", ""),
         "user": user, "methods": _pay_methods(request, conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
-        "crypto_only": _crypto_only(request),
+        "crypto_only": _crypto_only(request), "no_tjs": not _crypto_only(request) and _no_tjs(request),
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: payments.method_label(m) for m in conf["stored"] + conf["all_methods"]},
     })
@@ -1713,8 +1722,10 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     from .tgbot import send_receipt
     from . import rates
     data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
-    if _crypto_only(request) and not any(m["code"] == method for m in _pay_methods(request, conn, config)):
-        flash(request, "Из вашей страны оплата только криптой (USDT) — выберите сеть.", "error")
+    if (_crypto_only(request) or _no_tjs(request)) and not any(m["code"] == method
+                                                                for m in _pay_methods(request, conn, config)):
+        flash(request, "Из вашей страны оплата только криптой (USDT) — выберите сеть." if _crypto_only(request) else
+              "Этот способ — в сомони. Чтобы платить в сомони, переключите валюту на TJS.", "error")
         return _redirect("/panel/balance")
     if not data and not payments.is_auto(conn, config, method):
         flash(request, "Прикрепите чек об оплате — фото или PDF. Без чека заявку не проверить.", "error")

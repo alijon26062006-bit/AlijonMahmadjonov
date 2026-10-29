@@ -165,3 +165,28 @@ def test_live_balance_in_chosen_currency(app, geodb, conn, config):
     assert "₽" in live.state(config, uid, False, "RUB")["balance_html"]
     assert "с." in live.state(config, uid, False, "TJS")["balance_html"]
     assert live.state(config, uid, False, "USD")["balance_html"].startswith("$")
+
+
+def test_tj_user_other_currency_hides_somoni_methods(app, geodb, conn):
+    """Из Таджикистана, но выбрал не сомони — способы в сомони не показываем, подсказка «переключите на TJS»."""
+    from conftest import csrf_of
+    from donatix import accounts, web
+    from starlette.requests import Request
+    import json
+    from donatix import db
+    db.set_setting(conn, "pay.methods_json", json.dumps([
+        {"code": "alif", "title": "Алиф", "details": "+992 900 000 000", "currency": "TJS", "enabled": True},
+        {"code": "usdt", "title": "USDT TRC20", "details": "TXyz", "currency": "USDT", "network": "TRC20",
+         "enabled": True}]))
+    req = Request({"type": "http", "client": (TJ_IP, 1), "app": app, "headers": [(b"cookie", b"dx_cur=RUB")]})
+    assert web._no_tjs(req) and not web._crypto_only(req)
+    assert all(m["currency"] != "TJS" for m in web._pay_methods(req, conn, app.state.config))
+    req_tjs = Request({"type": "http", "client": (TJ_IP, 1), "app": app, "headers": [(b"cookie", b"dx_cur=TJS")]})
+    assert any(m["currency"] == "TJS" for m in web._pay_methods(req_tjs, conn, app.state.config))
+    accounts.create_user(conn, email="tj@example.com", login="tojik1", password="password123", status="active")
+    c = _client_from(app, TJ_IP)
+    token = csrf_of(c.get("/login").text)
+    c.post("/login", data={"csrf": token, "email": "tj@example.com", "password": "password123"})
+    c.cookies.set("dx_cur", "RUB")
+    html = c.get("/panel/balance").text
+    assert "способы оплаты в сомони скрыты" in html and "/currency/TJS" in html

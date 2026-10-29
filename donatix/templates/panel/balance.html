@@ -76,6 +76,8 @@
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if crypto_only %}<div class="flash" role="status"><span>Из вашей страны оплата — <b>криптой (USDT)</b>.
         Цены показаны в вашей валюте для удобства, списание — в долларах по курсу.</span></div>{% endif %}
+      {% if no_tjs %}<div class="flash" role="status"><span>Выбрана валюта <b>{{ cur_code }}</b> — способы оплаты в сомони скрыты.
+        Платить в сомони (Алиф, ДС…) — <a href="/currency/TJS?next=/panel/balance">переключите валюту на TJS</a>.</span></div>{% endif %}
       {% if methods %}
       {% set codes = methods | map(attribute='code') | list %}
       {% set pre = pre_method if pre_method in codes else codes[0] %}
