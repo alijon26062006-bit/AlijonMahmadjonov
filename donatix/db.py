@@ -415,6 +415,18 @@ def init(path: Path | str) -> None:
                          "WHERE ext_id IS NOT NULL")
         except sqlite3.IntegrityError:   # в старой базе уже есть повтор — сайт не роняем, админ проверит вручную
             logging.getLogger(__name__).warning("payments.ext_id: есть повторы — уникальный индекс не создан")
+        # «Душанбе Сити» перестал присылать уведомления о переводах — автоплатёж ДС выключаем один раз:
+        # способ становится обычным (реквизиты на виду + чек). Вернуть авто можно в «Реквизиты и пополнение».
+        if get_setting(conn, "pay.dc_manual_v1") is None:
+            raw = get_setting(conn, "pay.methods_json")
+            if raw:
+                import json
+                methods = json.loads(raw)
+                for m in methods:
+                    if m.get("auto") == "dcbank":
+                        m["auto"] = ""
+                set_setting(conn, "pay.methods_json", json.dumps(methods, ensure_ascii=False))
+            set_setting(conn, "pay.dc_manual_v1", "1")
         cs_cols = {r[1] for r in conn.execute("PRAGMA table_info(cashiers)")}
         if cs_cols and "full" not in cs_cols:   # кассир с полными правами админа в админ-боте
             conn.execute("ALTER TABLE cashiers ADD COLUMN full INTEGER NOT NULL DEFAULT 0")

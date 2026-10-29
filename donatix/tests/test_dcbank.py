@@ -442,3 +442,22 @@ def test_dc_receipt_accepted_right_away_in_bot(app, dc, conn, supplier, monkeypa
                                                   "photo": [{"file_id": "f1"}]}})
     p = conn.execute("SELECT * FROM payments").fetchone()
     assert p["auto_kind"] == "dcbank" and p["receipt_file"]
+
+
+def test_update_turns_dc_auto_into_manual_once(tmp_path):
+    """Банк больше не шлёт уведомления: после обновления ДС — обычный способ (реквизиты + чек), один раз."""
+    import json
+
+    from donatix import db
+    path = tmp_path / "m.db"
+    db.init(path)
+    c = db.connect(path)
+    dc_method = {"code": "dc", "title": "Душанбе Сити", "details": "+992 900 00 00 00", "currency": "TJS",
+                 "enabled": True, "auto": "dcbank"}
+    db.set_setting(c, "pay.methods_json", json.dumps([dc_method]))
+    c.execute("DELETE FROM settings WHERE key = 'pay.dc_manual_v1'")
+    db.init(path)
+    assert json.loads(db.get_setting(c, "pay.methods_json"))[0]["auto"] == ""
+    db.set_setting(c, "pay.methods_json", json.dumps([dc_method]))   # админ вернул авто сам
+    db.init(path)
+    assert json.loads(db.get_setting(c, "pay.methods_json"))[0]["auto"] == "dcbank"
