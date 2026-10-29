@@ -1,6 +1,7 @@
 """Сборка таймингов и звуковой дорожки урока по сценарию build/<ep>_script.py.
 
   python3 build/lesson_build.py ep02 --voice piper    черновой голос (бесплатный Piper, локально)
+  python3 build/lesson_build.py ep02 --voice openai   живой голос OpenAI (нужен OPENAI_API_KEY и доступ к api.openai.com)
   python3 build/lesson_build.py ep02 --download       живой голос по ссылкам из build/<ep>_voice.json
   python3 build/lesson_build.py ep02                  собрать из уже лежащих public/<ep>/voice/NN.wav
 
@@ -29,6 +30,29 @@ LEAD, GAP, TAIL = 0.9, 0.6, 1.4
 PIPER_SAY = [("VS Code", "ви-эс код"), ("SyntaxError", "синтакс эррор"), ("NameError", "нейм эррор"),
              ("separator", "сепарэйтор"), ("Print", "Принт"), ("print", "принт"), ("sep", "сэп"),
              ("end", "энд"), ("main", "мэйн"), ("py", "пай"), ("Python", "Пайтон"), ("Enter", "энтер")]
+
+
+OPENAI_MODEL = "gpt-4o-mini-tts"
+OPENAI_VOICE = os.environ.get("OPENAI_TTS_VOICE", "onyx")  # мужские: onyx, ash, echo
+OPENAI_STYLE = ("Ты дружелюбный преподаватель программирования на YouTube. Говори по-русски спокойно, "
+                "чётко и с живой интонацией, в умеренном темпе. Английские слова и код произноси по-английски.")
+
+
+def openai_tts(text, out_path):
+    """Озвучка одной реплики через OpenAI. Ключ берётся из переменной окружения OPENAI_API_KEY."""
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        sys.exit("Нет OPENAI_API_KEY в переменных окружения")
+    body = json.dumps({"model": OPENAI_MODEL, "voice": OPENAI_VOICE, "input": text,
+                       "instructions": OPENAI_STYLE, "response_format": "pcm"})
+    pcm = subprocess.run(["curl", "-sSf", "https://api.openai.com/v1/audio/speech",
+                          "-H", f"Authorization: Bearer {key}", "-H", "Content-Type: application/json",
+                          "--data-binary", "@-"], input=body.encode(), check=True, capture_output=True).stdout
+    with wave.open(out_path, "wb") as wf:  # pcm: 24 кГц, 16 бит, моно
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(24000)
+        wf.writeframes(pcm)
 
 
 def sfx_for(name):
@@ -80,6 +104,10 @@ def main():
             for en, ru in PIPER_SAY:
                 say = re.sub(rf"\b{re.escape(en)}\b", ru, say)
             write_wav(os.path.join(voice_dir, f"{i:02d}.wav"), E.tts(say))
+    if "--voice" in sys.argv and sys.argv[sys.argv.index("--voice") + 1] == "openai":
+        for i, text in enumerate(lines_all):
+            openai_tts(text, os.path.join(voice_dir, f"{i:02d}.wav"))
+            print(f"  озвучено {i + 1}/{len(lines_all)}", flush=True)
     if "--download" in sys.argv:
         manifest = json.load(open(os.path.join(HERE, f"{ep}_voice.json")))
         for i, v in manifest["lines"].items():
