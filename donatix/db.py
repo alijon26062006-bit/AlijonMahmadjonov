@@ -642,6 +642,16 @@ CREATE TABLE IF NOT EXISTS bot_tour (
     banned       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS bot_tour_inviter ON bot_tour(inviter_tg, joined_at);
+-- Условия для ботов партнёров (botterms.py): какой бот на какую рассылку что ответил
+CREATE TABLE IF NOT EXISTS bot_terms (
+    bot_id      INTEGER NOT NULL,
+    version     INTEGER NOT NULL,
+    token       TEXT NOT NULL UNIQUE,
+    sent_at     TEXT NOT NULL,
+    answer      TEXT,             -- agree | decline | delete | timeout; NULL — ещё не ответил
+    answered_at TEXT,
+    PRIMARY KEY (bot_id, version)
+);
 CREATE TABLE IF NOT EXISTS bot_tour_winners (
     week       TEXT NOT NULL,
     place      INTEGER NOT NULL,

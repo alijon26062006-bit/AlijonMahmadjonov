@@ -174,6 +174,11 @@ class Worker:
                     except Exception:
                         log.exception("проверка ботов")
                     try:
+                        from . import botterms
+                        botterms.enforce(conn)   # не ответили на условия за 72 часа — бот выключается
+                    except Exception:
+                        log.exception("условия ботов")
+                    try:
                         from . import bots
                         bots.backup_all(self.config)   # раз в сутки — копия базы каждого бота партнёра
                     except Exception:

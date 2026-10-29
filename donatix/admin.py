@@ -377,12 +377,14 @@ def sync_now(request: Request, admin=Depends(admin_user), config: Config = Depen
 
 @router.get("/bots")
 def bots_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
-    from . import bots
+    from . import bots, botterms
     clients = conn.execute(
         "SELECT id, login, email, project FROM users WHERE status = 'active' ORDER BY login").fetchall()
     return render(request, "admin/bots.html", {
         "user": admin, "bots": bots.listing(conn), "clients": clients,
         "runner": bots.runner_alive(conn), "template_ok": bots.TEMPLATE_DIR.exists(),
+        "terms_text": botterms.text(conn), "terms": botterms.statuses(conn), "terms_stats": botterms.stats(conn),
+        "terms_status": botterms.STATUS,
     })
 
 
@@ -401,6 +403,21 @@ def bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""),
         bots.RUNNER.poke()
     flash(request, f"Бот @{username} подключён — запустится в течение минуты. "
                    "Откройте его в Telegram и нажмите /start." + bots.restored_note(conn, config, bid))
+    return _back("/admin/bots")
+
+
+@router.post("/bots/terms", dependencies=[Depends(check_csrf)])
+def bots_terms(request: Request, text: str = Form(""), send: str = Form(""), admin=Depends(admin_user),
+               conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Условия для ботов партнёров: сохранить текст и (по кнопке) разослать во все боты."""
+    from . import botterms
+    botterms.save_text(conn, text)
+    if send:
+        sent, failed = botterms.send_all(conn, config)
+        flash(request, f"Условия отправлены в {sent} бот(ов)" + (f", не доставлено: {failed}" if failed else "")
+              + f". Кто не ответит за {botterms.DEADLINE_HOURS} ч — бот выключится сам.", "ok" if not failed else "warn")
+    else:
+        flash(request, "Текст условий сохранён.", "ok")
     return _back("/admin/bots")
 
 

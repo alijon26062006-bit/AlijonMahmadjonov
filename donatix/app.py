@@ -335,6 +335,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.include_router(support_app.router)
     from . import tgapp
     app.include_router(tgapp.router)
+    from . import botterms   # условия для ботов партнёров: страница ответа владельца
+    app.include_router(botterms.router)
 
     @app.exception_handler(api.ApiError)
     async def _api_error(request: Request, exc: api.ApiError):

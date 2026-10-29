@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Шартҳои ҳамкорӣ — {{ site_name }}{% endblock %}
+{% block body %}
+<main class="section">
+  <div class="wrap" style="max-width:640px">
+  {% if row is none %}
+    <div class="card"><h1>Пайванд нодуруст аст</h1><p class="muted">Паёми навро дар боти худ кушоед.</p></div>
+  {% else %}
+    <div class="card">
+      <div class="legal">{{ body }}</div>
+      {% if row.answer %}<p class="muted" style="margin-top:14px">Ҷавоби шумо: <b>{{ status[row.answer] }}</b></p>{% endif %}
+    </div>
+    {% if done %}
+      <div class="flash ok" style="margin-top:16px"><span>{{ done }}</span></div>
+    {% elif current %}
+      <form method="post" class="card" style="margin-top:16px;display:grid;gap:10px">
+        {% if action %}<p style="margin:0">Интихоби шумо: <b>{{ titles[action] }}</b> — тасдиқ кунед:</p>{% endif %}
+        {% if action == 'delete' %}
+          <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="sure" value="1" required>
+            Ман мефаҳмам, ки бот аз Donatix нест карда мешавад</label>
+          <button class="btn danger lg block" name="action" value="delete">{{ titles['delete'] }}</button>
+          <a class="btn ghost block" href="?">‹ Бозгашт</a>
+        {% else %}
+          <button class="btn {{ 'primary' if action in ('', 'agree') else 'ghost' }} lg block" name="action" value="agree">{{ titles['agree'] }}</button>
+          <button class="btn {{ 'danger' if action == 'decline' else 'ghost' }} lg block" name="action" value="decline">{{ titles['decline'] }}</button>
+          {% if not action %}<a class="btn ghost block" href="?a=delete">{{ titles['delete'] }}</a>{% endif %}
+        {% endif %}
+      </form>
+    {% else %}
+      <p class="muted" style="margin-top:16px">Ин пайванд кӯҳна шудааст — паёми навро дар бот кушоед.</p>
+    {% endif %}
+  {% endif %}
+  </div>
+</main>
+{% endblock %}

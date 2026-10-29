@@ -387,6 +387,8 @@ def can_enable(conn: sqlite3.Connection, bot_id: int) -> tuple[bool, str]:
         return False, BLOCKED_TEXT
     if row["disabled_reason"] == "admin":
         return False, "Бота остановил администратор — напишите в поддержку."
+    if row["disabled_reason"] == "terms":
+        return False, "Бот выключен: условия Donatix не приняты. Откройте сообщение с условиями в боте и нажмите «Розӣ ҳастам»."
     return True, ""
 
 
