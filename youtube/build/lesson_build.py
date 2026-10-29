@@ -161,7 +161,7 @@ def main():
                 os.replace(out + ".t.wav", out)
 
     mpath = os.path.join(HERE, f"{ep}_voice.json")
-    manifest_dur = {k: v["dur"] for k, v in json.load(open(mpath))["lines"].items()} if os.path.exists(mpath) else {}
+    manifest_dur = {k: v.get("dur") for k, v in json.load(open(mpath))["lines"].items()} if os.path.exists(mpath) else {}
     t, li = 0.0, 0
     voices, sfx, scenes = [], [], []
     for sc in script.SCENES:
