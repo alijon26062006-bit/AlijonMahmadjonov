@@ -20,6 +20,11 @@ def market(conn, monkeypatch):
     return seller, buyer
 
 
+def _px(conn, pct):
+    """Цена объявления в процентах от рыночной (как ввёл бы человек)."""
+    return p2p.ref_price_m(conn) * pct // 100
+
+
 def _money_total(conn):
     return conn.execute("SELECT SUM(balance_micro) FROM users").fetchone()[0]
 
@@ -42,7 +47,7 @@ def test_order_freezes_both_sides_then_owner_confirms(conn, market):
     seller, buyer = market
     money0, coins0, pool0 = _money_all(conn), _coins_total(conn), dcoin.state(conn)["pool"]
     have = dcoin.balance(conn, seller)
-    ad = p2p.create_ad(conn, seller, "sell", 110, 300 * dcoin.UNIT)       # продаю 300 D на 10% дороже копилки
+    ad = p2p.create_ad(conn, seller, "sell", _px(conn, 110), 300 * dcoin.UNIT)       # продаю 300 D на 10% дороже копилки
     assert dcoin.balance(conn, seller) == have - 300 * dcoin.UNIT          # монеты заморожены в объявлении
     assert p2p.book(conn, "sell")[0]["who"] == "sel***"
     with pytest.raises(p2p.P2PError, match="ваше"):
@@ -68,7 +73,7 @@ def test_order_cancel_and_timeout_unfreeze(conn, market):
     from datetime import datetime, timedelta, timezone
     seller, buyer = market
     money0, coins0 = _money_all(conn), _coins_total(conn)
-    ad = p2p.create_ad(conn, buyer, "buy", 95, 200 * dcoin.UNIT)           # покупаю: деньги в резерве
+    ad = p2p.create_ad(conn, buyer, "buy", _px(conn, 95), 200 * dcoin.UNIT)           # покупаю: деньги в резерве
     c0 = dcoin.balance(conn, seller)
     oid = p2p.open_order(conn, seller, ad, 100 * dcoin.UNIT)                # продаю — мои монеты заморожены
     assert dcoin.balance(conn, seller) == c0 - 100 * dcoin.UNIT
@@ -87,7 +92,7 @@ def test_order_cancel_and_timeout_unfreeze(conn, market):
 def test_closed_ad_with_open_order_returns_to_owner(conn, market):
     seller, buyer = market
     have = dcoin.balance(conn, seller)
-    ad = p2p.create_ad(conn, seller, "sell", 100, 100 * dcoin.UNIT)
+    ad = p2p.create_ad(conn, seller, "sell", _px(conn, 100), 100 * dcoin.UNIT)
     oid = p2p.open_order(conn, buyer, ad, 40 * dcoin.UNIT)
     p2p.cancel(conn, seller, ad)                                            # закрыл объявление: 60 D вернулись
     assert dcoin.balance(conn, seller) == have - 40 * dcoin.UNIT
@@ -98,7 +103,7 @@ def test_closed_ad_with_open_order_returns_to_owner(conn, market):
 def test_buy_ad_fully_filled_returns_rounding(conn, market):
     seller, buyer = market
     bal0 = balance(conn, buyer)
-    ad = p2p.create_ad(conn, buyer, "buy", 95, 200 * dcoin.UNIT)
+    ad = p2p.create_ad(conn, buyer, "buy", _px(conn, 95), 200 * dcoin.UNIT)
     oid = p2p.open_order(conn, seller, ad, 200 * dcoin.UNIT)
     total = conn.execute("SELECT total_micro FROM p2p_orders WHERE id = ?", (oid,)).fetchone()[0]
     p2p.confirm(conn, buyer, oid)
@@ -109,13 +114,13 @@ def test_buy_ad_fully_filled_returns_rounding(conn, market):
 def test_guards(conn, market):
     seller, buyer = market
     with pytest.raises(p2p.P2PError, match="от 80%"):
-        p2p.create_ad(conn, seller, "sell", 300, 10 * dcoin.UNIT)
+        p2p.create_ad(conn, seller, "sell", _px(conn, 300), 10 * dcoin.UNIT)
     with pytest.raises(p2p.P2PError, match="свободных"):
-        p2p.create_ad(conn, seller, "sell", 100, 10**9)
+        p2p.create_ad(conn, seller, "sell", _px(conn, 100), 10**9)
     with pytest.raises(p2p.P2PError, match="Не хватает денег"):
-        p2p.create_ad(conn, buyer, "buy", 100, 10**9)
+        p2p.create_ad(conn, buyer, "buy", _px(conn, 100), 10**9)
     assert conn.execute("SELECT COUNT(*) FROM p2p_ads").fetchone()[0] == 0
-    ad = p2p.create_ad(conn, seller, "sell", 100, 500 * dcoin.UNIT, min_units=20 * dcoin.UNIT)
+    ad = p2p.create_ad(conn, seller, "sell", _px(conn, 100), 500 * dcoin.UNIT, min_units=20 * dcoin.UNIT)
     with pytest.raises(p2p.P2PError, match="Минимум"):
         p2p.open_order(conn, buyer, ad, 5 * dcoin.UNIT)
     with pytest.raises(p2p.P2PError):
@@ -128,31 +133,36 @@ def test_guards(conn, market):
 
 def test_p2p_sale_does_not_block_daily_exchange(conn, market):
     seller, buyer = market
-    p2p.create_ad(conn, seller, "sell", 100, 10 * dcoin.UNIT)
+    p2p.create_ad(conn, seller, "sell", _px(conn, 100), 10 * dcoin.UNIT)
     assert dcoin.exchange(conn, seller, dcoin.balance(conn, seller)) > 0
 
 
-def test_pages_order_flow(app, conn, market):
+def test_pages_instant_deal_number_and_complaint(app, conn, market):
     seller, buyer = market
+    db.set_setting(conn, "pay.tjs_rate", "10")
     s = TestClient(app)
     token = web_login(s, "seller@example.com", "password123")
-    r = s.post("/panel/p2p/ad", data={"csrf": token, "side": "sell", "pct": "105", "amount": "100"})
+    s.cookies.set("dx_cur", "TJS")
+    price_tjs = dcoin.price(conn) * 10 * 1.05                               # человек сам вводит цену в сомони
+    r = s.post("/panel/p2p/ad", data={"csrf": token, "side": "sell", "price": f"{price_tjs:.10f}", "amount": "100"})
     assert "размещено" in r.text
+    ad = conn.execute("SELECT id, pct FROM p2p_ads").fetchone()
+    assert ad["pct"] == 105
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
     page = b.get("/panel/p2p").text
-    assert "sel***" in page and "Быстрое получение" in page and "bx-canvas" in page and "покупают" not in page
-    ad = conn.execute("SELECT id FROM p2p_ads").fetchone()[0]
-    r = b.post(f"/panel/p2p/{ad}/take", data={"csrf": csrf_of(page), "amount": "40"})
-    assert "заморожено" in r.text and "Ждём подтверждения" in r.text and "bx-timer" in r.text
-    oid = conn.execute("SELECT id FROM p2p_orders").fetchone()[0]
-    page_s = s.get("/panel/p2p?tab=orders").text
-    assert "Подтвердите ордер" in page_s
-    r = s.post(f"/panel/p2p/order/{oid}/confirm", data={"csrf": csrf_of(page_s)})
-    assert "подтверждён" in r.text
-    assert dcoin.balance(conn, buyer) == 40 * dcoin.UNIT
-    assert "Завершён" in b.get("/panel/p2p?tab=orders").text
-    assert "Заморожено D" in b.get("/panel/p2p?tab=profile").text
+    assert "sel***" in page and "Мгновенно" in page and "dc-canvas" in page and "покупают" not in page
+    s_bal = balance(conn, seller)
+    r = b.post(f"/panel/p2p/{ad['id']}/take", data={"csrf": csrf_of(page), "amount": "40"})
+    assert "Куплено 40.00 D" in r.text and "P2P-000001" in r.text                 # сразу, без подтверждения
+    assert dcoin.balance(conn, buyer) == 40 * dcoin.UNIT and balance(conn, seller) > s_bal
+    o = conn.execute("SELECT status FROM p2p_orders").fetchone()
+    assert o["status"] == "done"
+    assert "/panel/support/new?topic=p2p&order=P2P-000001" in r.text       # жалоба по номеру ордера
+    form = b.get("/panel/support/new?topic=p2p&order=P2P-000001").text
+    assert 'value="P2P-000001"' in form
+    ads = s.get("/panel/p2p?tab=ads").text
+    assert "Самая низкая у продавцов" in ads and "Макс" in ads
 
 
 def test_book_sort_amount_filter_and_tabs(app, conn, market):
@@ -160,8 +170,8 @@ def test_book_sort_amount_filter_and_tabs(app, conn, market):
     other = _user(conn, "third")
     for _ in range(3):
         _buy(conn, other, 100_000, cost=50_000)
-    cheap = p2p.create_ad(conn, other, "sell", 90, 100 * dcoin.UNIT)
-    pricey = p2p.create_ad(conn, seller, "sell", 120, 300 * dcoin.UNIT)
+    cheap = p2p.create_ad(conn, other, "sell", _px(conn, 90), 100 * dcoin.UNIT)
+    pricey = p2p.create_ad(conn, seller, "sell", _px(conn, 120), 300 * dcoin.UNIT)
     p2p.confirm(conn, seller, p2p.open_order(conn, buyer, pricey, 10 * dcoin.UNIT))   # у продавца есть сделка
     assert [a["id"] for a in p2p.book(conn, "sell")] == [cheap, pricey]   # по цене: сначала дешёвые
     by_deals = p2p.book(conn, "sell", sort="deals")
@@ -170,22 +180,26 @@ def test_book_sort_amount_filter_and_tabs(app, conn, market):
     assert [a["id"] for a in p2p.book(conn, "sell", amount_usd=big)] == [pricey]   # фильтр «Сумма»
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
-    for tab, text in (("orders", "Покупка 10.00 D"), ("profile", "Заморожено D"), ("ads", "Разместить объявление")):
+    for tab, text in (("orders", "Покупка 10.00 D"), ("profile", "В объявлениях, D"), ("ads", "Разместить объявление")):
         assert text in b.get(f"/panel/p2p?tab={tab}").text
 
 
-def test_price_follows_chart_and_owner_changes_it(conn, market, monkeypatch):
+def test_owner_sets_own_price_and_best_price_hint(conn, market):
     seller, buyer = market
-    ad = p2p.create_ad(conn, seller, "sell", 105, 200 * dcoin.UNIT)
-    base = p2p.book(conn, "sell")[0]
-    assert base["diff"] == 5
-    monkeypatch.setattr(p2p, "ref_price_m", lambda c: p2p.PRICE_SCALE * 2)   # график вырос
-    up = p2p.book(conn, "sell")[0]
-    assert up["price_m"] == p2p.PRICE_SCALE * 2 * 105 // 100                 # цена объявления — за графиком
-    p2p.set_pct(conn, seller, ad, 98)                                          # владелец поменял цену
-    assert p2p.book(conn, "sell")[0]["diff"] == -2
+    third = _user(conn, "third")
+    for _ in range(3):
+        _buy(conn, third, 100_000, cost=50_000)
+    ad = p2p.create_ad(conn, seller, "sell", _px(conn, 105), 200 * dcoin.UNIT)
+    p2p.create_ad(conn, third, "sell", _px(conn, 97), 100 * dcoin.UNIT)
+    p2p.create_ad(conn, buyer, "buy", _px(conn, 92), 100 * dcoin.UNIT)
+    best = p2p.best_prices(conn, seller)
+    assert abs(best["min_sell"] - _px(conn, 97) / 10_000 / p2p.PRICE_SCALE) < 1e-12   # самая низкая у других
+    assert best["max_buy"] is not None
+    p2p.set_price(conn, seller, ad, _px(conn, 98))                            # владелец сам поменял цену
+    assert conn.execute("SELECT pct FROM p2p_ads WHERE id = ?", (ad,)).fetchone()[0] == 98
     with pytest.raises(p2p.P2PError):
-        p2p.set_pct(conn, buyer, ad, 90)                                       # чужое не поменять
-    oid = p2p.open_order(conn, buyer, ad, 10 * dcoin.UNIT)
-    o = conn.execute("SELECT price_m FROM p2p_orders WHERE id = ?", (oid,)).fetchone()
-    assert o["price_m"] == p2p.PRICE_SCALE * 2 * 98 // 100                    # ордер — по цене в момент открытия
+        p2p.set_price(conn, buyer, ad, _px(conn, 90))                         # чужое не поменять
+    with pytest.raises(p2p.P2PError, match="рыночной"):
+        p2p.set_price(conn, seller, ad, _px(conn, 10))                        # слишком дёшево — нельзя
+    res = p2p.execute(conn, buyer, ad, 10 * dcoin.UNIT)
+    assert res["number"].startswith("P2P-") and dcoin.balance(conn, buyer) == 10 * dcoin.UNIT

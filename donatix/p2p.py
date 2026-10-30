@@ -42,11 +42,6 @@ def ref_price_m(conn: sqlite3.Connection) -> int:
     return int(round(dcoin.price(conn) * 10_000 * PRICE_SCALE))
 
 
-def live_price_m(ref_m: int, pct: int) -> int:
-    """Цена объявления сейчас: график (цена копилки) × процент владельца — двигается вместе с графиком."""
-    return ref_m * pct // 100
-
-
 def available(ad: sqlite3.Row, price_m: int) -> int:
     """Сколько D можно взять сейчас: «покупаю» — не больше, чем покрывает резерв при сегодняшней цене."""
     if ad["side"] == "buy" and price_m > 0:
@@ -80,20 +75,32 @@ def _money(conn: sqlite3.Connection, user_id: int, micro: int, note: str) -> Non
         raise P2PError("Не хватает денег на балансе — пополните баланс.") from None
 
 
-def create_ad(conn: sqlite3.Connection, user_id: int, side: str, pct: int, units: int, min_units: int = 0) -> int:
+def check_price(conn: sqlite3.Connection, price_m: int) -> int:
+    """Цену ставит сам владелец, но в разумных пределах от рыночной. Вернёт процент к рынку (для показа)."""
+    ref = ref_price_m(conn)
+    if ref <= 0:
+        raise P2PError("У D-коина ещё нет цены — подождите первых покупок.")
+    pct = round(price_m * 100 / ref)
+    if price_m <= 0 or not MIN_PCT <= pct <= MAX_PCT:
+        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% рыночной (сейчас рыночная — {_human(ref)}).")
+    return pct
+
+
+def _human(price_m: int) -> str:
+    usd = price_m / 10_000 / PRICE_SCALE
+    return f"${usd:.8f}".rstrip("0")
+
+
+def create_ad(conn: sqlite3.Connection, user_id: int, side: str, price_m: int, units: int, min_units: int = 0) -> int:
     if not dcoin.enabled(conn):
         raise P2PError("D-коин сейчас выключен.")
     if not dcoin.exchange_open(conn):
         raise P2PError(f"P2P откроется вместе с обменом — {dcoin.exchange_opens(conn):%d.%m.%Y}.")
     if side not in SIDES:
         raise P2PError("Выберите: продаю или покупаю.")
-    if not MIN_PCT <= pct <= MAX_PCT:
-        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% рыночной.")
     if units <= 0:
         raise P2PError("Сколько D? Укажите количество.")
-    price_m = ref_price_m(conn) * pct // 100
-    if price_m <= 0:
-        raise P2PError("У D-коина ещё нет цены — подождите первых покупок.")
+    pct = check_price(conn, price_m)
     min_units = max(0, min(min_units, units))
     with db.tx(conn):
         n = conn.execute("SELECT COUNT(*) FROM p2p_ads WHERE user_id = ? AND status = 'open'", (user_id,)).fetchone()[0]
@@ -135,7 +142,7 @@ def open_order(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -
             raise P2PError("Объявление уже закрыто.")
         if ad["user_id"] == user_id:
             raise P2PError("Это ваше объявление.")
-        price_m = live_price_m(ref_price_m(conn), ad["pct"])   # цена — по графику прямо сейчас
+        price_m = ad["price_m"]
         can = available(ad, price_m)
         if units <= 0 or units > can:
             raise P2PError(f"Доступно {dcoin.fmt_d(can)} D.")
@@ -165,6 +172,29 @@ def open_order(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -
             conn.execute("UPDATE p2p_ads SET remaining = remaining - ?, locked_micro = locked_micro - ?, updated_at = ? "
                          "WHERE id = ?", (units, total, db.now(), ad_id))
     return oid
+
+
+def number(order_id: int) -> str:
+    """Номер ордера для людей и поддержки: P2P-000123 — по нему находится вся сделка."""
+    return f"P2P-{order_id:06d}"
+
+
+def execute(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -> dict[str, Any]:
+    """Сделка сразу, без подтверждений: нажал «Купить» (или «Продать»), указал сколько — монеты и деньги
+    переходят автоматически. Ордер с номером сохраняется навсегда — по нему решаются любые вопросы."""
+    oid = open_order(conn, user_id, ad_id, units)
+    owner = conn.execute("SELECT owner_id FROM p2p_orders WHERE id = ?", (oid,)).fetchone()["owner_id"]
+    res = confirm(conn, owner, oid)
+    return {**res, "id": oid, "number": number(oid)}
+
+
+def best_prices(conn: sqlite3.Connection, user_id: int | None = None) -> dict[str, float | None]:
+    """Подсказка при размещении: самая низкая цена у продавцов и самая высокая у покупателей (без своих)."""
+    def one(side: str, fn: str) -> float | None:
+        row = conn.execute(f"SELECT {fn}(price_m) FROM p2p_ads WHERE status = 'open' AND side = ? AND remaining > 0 "
+                           "AND user_id != ?", (side, user_id or 0)).fetchone()
+        return row[0] / 10_000 / PRICE_SCALE if row and row[0] else None
+    return {"min_sell": one("sell", "MIN"), "max_buy": one("buy", "MAX")}
 
 
 def _order(conn: sqlite3.Connection, order_id: int) -> sqlite3.Row:
@@ -273,7 +303,7 @@ def orders(conn: sqlite3.Connection, user_id: int, limit: int = 30) -> list[dict
         if r["status"] == "pending":
             end = datetime.fromisoformat(r["expires_at"].replace("Z", "+00:00"))
             left = max(0, int((end - _now_dt()).total_seconds()))
-        out.append({"id": r["id"], "buying": buying, "owner": mine_ad, "status": r["status"], "left": left,
+        out.append({"id": r["id"], "number": number(r["id"]), "buying": buying, "owner": mine_ad, "status": r["status"], "left": left,
                     "units_text": dcoin.fmt_d(r["units"]), "total_usd": r["total_micro"] / 10_000,
                     "price_usd": r["price_m"] / 10_000 / PRICE_SCALE, "created_at": r["created_at"],
                     "other": _mask(r["taker_login"] if mine_ad else r["owner_login"])})
@@ -293,12 +323,11 @@ def cancel(conn: sqlite3.Connection, user_id: int, ad_id: int) -> None:
                      (db.now(), ad_id))
 
 
-def set_pct(conn: sqlite3.Connection, user_id: int, ad_id: int, pct: int) -> None:
-    """Владелец меняет цену своего объявления: % к графику. Открытые ордера идут по своей цене."""
-    if not MIN_PCT <= pct <= MAX_PCT:
-        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% рыночной.")
-    cur = conn.execute("UPDATE p2p_ads SET pct = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status = 'open'",
-                       (pct, db.now(), ad_id, user_id))
+def set_price(conn: sqlite3.Connection, user_id: int, ad_id: int, price_m: int) -> None:
+    """Владелец меняет цену своего объявления. Уже открытые ордера идут по своей цене."""
+    pct = check_price(conn, price_m)
+    cur = conn.execute("UPDATE p2p_ads SET price_m = ?, pct = ?, updated_at = ? WHERE id = ? AND user_id = ? "
+                       "AND status = 'open'", (price_m, pct, db.now(), ad_id, user_id))
     if not cur.rowcount:
         raise P2PError("Объявление уже закрыто.")
 
@@ -309,7 +338,7 @@ def _mask(login: str) -> str:
 
 
 def _view(r: sqlite3.Row, ref_m: int) -> dict[str, Any]:
-    price_m = live_price_m(ref_m, r["pct"])
+    price_m = r["price_m"]
     can = available(r, price_m) if r["status"] == "open" else r["remaining"]
     return {"id": r["id"], "side": r["side"], "pct": r["pct"], "price_usd": price_m / 10_000 / PRICE_SCALE,
             "remaining": can, "remaining_text": dcoin.fmt_d(can), "price_m": price_m,
@@ -322,7 +351,7 @@ def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "pric
          amount_usd: float | None = None) -> list[dict[str, Any]]:
     """Открытые объявления: продающие — сначала дешёвые, покупающие — сначала дорогие (или по числу сделок).
     amount_usd — фильтр «Сумма»: только объявления, где такую сумму можно провести одной сделкой."""
-    order = "pct ASC" if side == "sell" else "pct DESC"   # у всех одна база — график, разница только в %
+    order = "price_m ASC" if side == "sell" else "price_m DESC"
     if sort == "deals":
         order = "deals DESC, " + order
     rows = conn.execute(
@@ -336,7 +365,7 @@ def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "pric
         v = {**_view(r, ref), "who": _mask(r["login"]), "deals": r["deals"], "user_id": r["user_id"],
              "letter": (r["login"] or "?")[:1].upper(), "color": r["user_id"] % 6,
              "rate": round(100 * r["ok"] / r["ended"]) if r["ended"] else 100,
-             "diff": r["pct"] - 100}
+             "diff": round(r["price_m"] * 100 / ref) - 100 if ref else 0}
         v["min_usd"] = cost(min(r["min_units"], v["remaining"]), v["price_m"]) / 10_000 if r["min_units"] else 0.0
         v["max_usd"] = v["total_usd"]
         if v["remaining"] <= 0:

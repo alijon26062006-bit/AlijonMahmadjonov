@@ -18,6 +18,7 @@ TOPICS: list[tuple[str, str, str, str, str, bool]] = [
     ("bot", "zap-send", "pink", "Свой бот-магазин", "Настройка, наценка, клиенты и оплата в боте", False),
     ("api", "code", "indigo", "API и интеграция", "Ключи, вебхуки, ошибки запросов", False),
     ("account", "user", "gray", "Аккаунт и вход", "Вход, пароль, Google, перенос аккаунта", False),
+    ("p2p", "swap", "amber", "P2P D-коинов", "Сделка, ордер, спор с продавцом или покупателем", True),
     ("other", "help", "gray", "Другое", "Вопрос, который не подошёл к остальным темам", False),
 ]
 TOPIC_TITLES = {k: t for k, _, _, t, _, _ in TOPICS}

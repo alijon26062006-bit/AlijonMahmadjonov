@@ -3236,3 +3236,27 @@ body:has(.bx) { background: #0b0b0e; }
 .bx-price small { font-size: 17px; font-weight: 700; margin-right: 6px; }
 .bx-asset small, .bx-pay small { color: var(--bx-dim); font-size: 11px; }
 .bx-amt input::placeholder { color: var(--bx-text); font-weight: 600; }
+/* P2P: настоящий график D-коина, номер ордера, жалоба, подсказки цены */
+.bx-chartbox { margin: 0 0 14px; }
+.bx-chartbox .bx-tick-row { display: flex; align-items: center; gap: 8px; margin: 0 2px 8px; font-size: 16px; }
+.bx-chartbox .bx-tick-price { margin-left: auto; font-size: 20px; }
+.bx-chartbox .dc-chg { font-weight: 800; font-size: 14px; padding: 4px 9px; border-radius: 8px; }
+.bx-chartbox .dc-chg.up { background: #13281d; color: var(--bx-green); }
+.bx-chartbox .dc-chg.down { background: #2d1416; color: var(--bx-red); }
+.bx-fast { display: inline-flex; align-items: center; gap: 4px; }
+.bx-num { margin-left: auto; font-family: var(--font-mono); font-weight: 700; font-size: 14px; color: var(--bx-gold);
+  background: #2b2312; padding: 3px 8px; border-radius: 6px; letter-spacing: .02em; user-select: all; }
+.bx-state svg { flex: none; }
+.bx-complain { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px;
+  text-decoration: none; margin-top: 4px; }
+.bx-unit { color: var(--bx-dim); padding: 0 14px; font-weight: 700; }
+.bx-hints { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bx-hints button { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; min-height: 52px; padding: 8px 12px;
+  background: var(--bx-chip); border: 1.5px solid transparent; border-radius: 12px; color: var(--bx-text); font: inherit; cursor: pointer;
+  text-align: left; transition: border-color .15s; }
+.bx-hints button:hover, .bx-hints button:focus-visible { border-color: var(--bx-gold); outline: none; }
+.bx-hints button[disabled] { opacity: .45; cursor: default; }
+.bx-hints span { color: var(--bx-dim); font-size: 12px; }
+.bx-hints b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.bx-reprice .bx-in button { white-space: nowrap; }
+.bx-new { gap: 14px; }

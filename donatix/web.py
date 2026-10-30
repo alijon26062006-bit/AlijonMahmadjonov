@@ -1937,23 +1937,13 @@ def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_con
 def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str = "", user=Depends(panel_user),
               conn=Depends(get_conn), config: Config = Depends(get_config)):
     """P2P в стиле бирж: Покупка / Продажа, фильтр «Сумма», сортировка; внизу — P2P, Ордера, Объявления, Профиль."""
-    from . import dcoin, fx, geo, p2p
+    from . import dcoin, p2p
     p2p.expire(conn)   # просроченные ордера — отменить и разморозить до показа
     tab = {"mine": "ads"}.get(tab, tab)
     tab = tab if tab in ("buy", "sell", "orders", "ads", "profile") else "buy"
     sort = sort if sort in ("price", "deals") else "price"
-    amount_usd = None
-    if amt.strip():   # «Сумма» — в валюте человека, в объявлениях — доллары
-        try:
-            value = float(amt.replace(" ", "").replace(",", "."))
-            cur, _ = fx.choose(geo.country(config, _ip(request)), request.cookies.get("dx_cur", ""))
-            rate = fx.rate(config, cur) if cur != "USD" else 1
-            if cur == "TJS":
-                from . import payments
-                rate = payments.settings(conn, config)["tjs_rate"]
-            amount_usd = value / float(rate) if rate else value
-        except (ValueError, ZeroDivisionError):
-            amount_usd = None
+    value = _num(amt)   # «Сумма» — в валюте человека, в объявлениях — доллары
+    amount_usd = value / _per_usd(request, conn, config) if value is not None else None
     return render(request, "panel/p2p.html", {
         "user": user, "tab": tab, "sort": sort, "amt": amt, "d": dcoin.summary(conn, user["id"]),
         # «Покупка» — объявления продавцов, «Продажа» — объявления покупателей
@@ -1961,8 +1951,34 @@ def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str 
         if tab in ("buy", "sell") else [],
         "mine": p2p.mine(conn, user["id"]), "orders": p2p.orders(conn, user["id"]),
         "prof": p2p.profile(conn, user["id"]), "order_min": p2p.ORDER_MINUTES,
+        "tfs": list(dcoin.TIMEFRAMES), "best": p2p.best_prices(conn, user["id"]),
+        "free_d": p2p.free_coins(conn, user["id"]) / dcoin.UNIT, "bal_usd": user["balance_micro"] / 10_000,
         "free_text": dcoin.fmt_d(p2p.free_coins(conn, user["id"])), "last": p2p.last_price_usd(conn),
         "pmin": p2p.MIN_PCT, "pmax": p2p.MAX_PCT, "per": p2p.SHOW_PER})
+
+
+def _num(raw: str) -> float | None:
+    try:
+        v = float((raw or "").replace(" ", "").replace(",", "."))
+    except ValueError:
+        return None
+    return v if v > 0 else None
+
+
+def _per_usd(request: Request, conn, config: Config) -> float:
+    """Сколько единиц выбранной валюты человека за $1 (сомони — по курсу оплат)."""
+    from . import fx, geo, payments
+    cur, _ = fx.choose(geo.country(config, _ip(request)), request.cookies.get("dx_cur", ""))
+    if cur == "TJS":
+        return float(payments.settings(conn, config)["tjs_rate"])
+    return float(fx.rate(config, cur) or 1) if cur != "USD" else 1.0
+
+
+def _price_m(request: Request, conn, config: Config, raw: str) -> int:
+    """Цена за 1 D, введённая человеком в своей валюте → микро-доллары за 1 000 000 D."""
+    from . import p2p
+    v = _num(raw)
+    return int(round(v / _per_usd(request, conn, config) * 10_000 * p2p.PRICE_SCALE)) if v else 0
 
 
 def _d_units(raw: str) -> int:
@@ -1974,11 +1990,13 @@ def _d_units(raw: str) -> int:
 
 
 @router.post("/panel/p2p/ad", dependencies=[Depends(check_csrf)])
-def panel_p2p_ad(request: Request, side: str = Form(""), pct: int = Form(100), amount: str = Form(""),
-                 min_amount: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_p2p_ad(request: Request, side: str = Form(""), price: str = Form(""), amount: str = Form(""),
+                 min_amount: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
     from . import p2p
     try:
-        ad_id = p2p.create_ad(conn, user["id"], side, pct, _d_units(amount), _d_units(min_amount))
+        ad_id = p2p.create_ad(conn, user["id"], side, _price_m(request, conn, config, price), _d_units(amount),
+                              _d_units(min_amount))
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/p2p?tab=ads")
@@ -1989,20 +2007,20 @@ def panel_p2p_ad(request: Request, side: str = Form(""), pct: int = Form(100), a
 @router.post("/panel/p2p/{ad_id}/take", dependencies=[Depends(check_csrf)])
 def panel_p2p_take(ad_id: int, request: Request, amount: str = Form(""), user=Depends(panel_user),
                    conn=Depends(get_conn), config: Config = Depends(get_config)):
-    """Открыть ордер: у обоих всё замораживается, владелец объявления подтверждает за 15 минут."""
+    """Сделка сразу, без подтверждений: монеты и деньги переходят автоматически, ордер с номером сохраняется."""
     from . import dcoin, p2p
     from .notify import notify
     back = request.headers.get("referer") or "/panel/p2p"
     try:
-        oid = p2p.open_order(conn, user["id"], ad_id, _d_units(amount))
+        res = p2p.execute(conn, user["id"], ad_id, _d_units(amount))
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/p2p" + ("?tab=sell" if "tab=sell" in back else ""))
-    o = conn.execute("SELECT * FROM p2p_orders WHERE id = ?", (oid,)).fetchone()
-    what = "покупает" if o["side"] == "sell" else "продаёт вам"
-    notify(conn, config, o["owner_id"], f"🟡 P2P: новый ордер #{oid} — {user['login']} {what} {dcoin.fmt_d(o['units'])} D. "
-           f"Подтвердите за {p2p.ORDER_MINUTES} минут, иначе ордер отменится сам.", "/panel/p2p?tab=orders")
-    flash(request, f"Ордер #{oid} открыт — всё заморожено. Ждём подтверждения: до {p2p.ORDER_MINUTES} минут.")
+    o = conn.execute("SELECT * FROM p2p_orders WHERE id = ?", (res["id"],)).fetchone()
+    i_buy = o["side"] == "sell"
+    notify(conn, config, o["owner_id"], f"✅ P2P {res['number']}: {'продано' if i_buy else 'куплено'} "
+           f"{dcoin.fmt_d(o['units'])} D по вашему объявлению.", "/panel/p2p?tab=orders")
+    flash(request, f"✅ {'Куплено' if i_buy else 'Продано'} {dcoin.fmt_d(o['units'])} D · ордер {res['number']}.")
     return _redirect("/panel/p2p?tab=orders")
 
 
@@ -2028,13 +2046,13 @@ def panel_p2p_order(order_id: int, action: str, request: Request, user=Depends(p
 
 
 @router.post("/panel/p2p/{ad_id}/price", dependencies=[Depends(check_csrf)])
-def panel_p2p_price(ad_id: int, request: Request, pct: int = Form(100), user=Depends(panel_user),
-                    conn=Depends(get_conn)):
-    """Владелец меняет цену объявления — % к графику."""
+def panel_p2p_price(ad_id: int, request: Request, price: str = Form(""), user=Depends(panel_user),
+                    conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Владелец меняет цену своего объявления."""
     from . import p2p
     try:
-        p2p.set_pct(conn, user["id"], ad_id, pct)
-        flash(request, f"Цена объявления #{ad_id} сохранена: {pct - 100:+d}% к рынку.")
+        p2p.set_price(conn, user["id"], ad_id, _price_m(request, conn, config, price))
+        flash(request, f"Цена объявления #{ad_id} сохранена.")
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
     return _redirect("/panel/p2p?tab=ads")
