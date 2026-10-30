@@ -3226,3 +3226,13 @@ body:has(.bx) { background: #0b0b0e; }
 .bx-repct input[type=range] { width: 100%; accent-color: var(--bx-gold); }
 .bx-repct .bx-ghost, .bx-ad > form > .bx-ghost { width: 100%; }
 .bx-ad.top { padding-top: 34px; }
+/* P2P: компактная цена с графиком сверху и цена объявления «с. 0,000483», как на биржах */
+.bx-tick { background: var(--bx-card); border-radius: 16px; padding: 12px 14px 10px; margin: 0 0 14px; }
+.bx-tick-row { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.bx-tick-price { margin-left: auto; font-weight: 800; font-size: 18px; }
+.bx-tick canvas { display: block; width: 100%; height: 110px; margin-top: 8px; }
+.bx-tick .bx-tfs { margin-top: 6px; }
+.bx-tick .bx-tfs button { padding: 5px 0; font-size: 13px; }
+.bx-price small { font-size: 17px; font-weight: 700; margin-right: 6px; }
+.bx-asset small, .bx-pay small { color: var(--bx-dim); font-size: 11px; }
+.bx-amt input::placeholder { color: var(--bx-text); font-weight: 600; }

@@ -2034,7 +2034,7 @@ def panel_p2p_price(ad_id: int, request: Request, pct: int = Form(100), user=Dep
     from . import p2p
     try:
         p2p.set_pct(conn, user["id"], ad_id, pct)
-        flash(request, f"Цена объявления #{ad_id} — {pct - 100:+d}% к графику.")
+        flash(request, f"Цена объявления #{ad_id} сохранена: {pct - 100:+d}% к рынку.")
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
     return _redirect("/panel/p2p?tab=ads")

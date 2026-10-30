@@ -205,6 +205,19 @@ def _dprice(ctx, usd: float) -> str:
 templates.env.globals["dprice"] = _dprice
 
 
+@pass_context
+def _dprice_parts(ctx, usd: float) -> tuple[str, str]:
+    """Та же цена, но отдельно знак и число с запятой: («с.», «0,000483») — крупно, как на P2P бирж."""
+    text = _dprice(ctx, usd)
+    if text.startswith("$"):
+        return "$", text[1:].replace(".", ",")
+    num, _, sign = text.partition(" ")
+    return sign, num.replace(".", ",")
+
+
+templates.env.globals["dprice_parts"] = _dprice_parts
+
+
 def _asset_version() -> str:
     """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
     import hashlib

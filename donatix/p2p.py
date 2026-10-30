@@ -88,7 +88,7 @@ def create_ad(conn: sqlite3.Connection, user_id: int, side: str, pct: int, units
     if side not in SIDES:
         raise P2PError("Выберите: продаю или покупаю.")
     if not MIN_PCT <= pct <= MAX_PCT:
-        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% цены копилки.")
+        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% рыночной.")
     if units <= 0:
         raise P2PError("Сколько D? Укажите количество.")
     price_m = ref_price_m(conn) * pct // 100
@@ -296,7 +296,7 @@ def cancel(conn: sqlite3.Connection, user_id: int, ad_id: int) -> None:
 def set_pct(conn: sqlite3.Connection, user_id: int, ad_id: int, pct: int) -> None:
     """Владелец меняет цену своего объявления: % к графику. Открытые ордера идут по своей цене."""
     if not MIN_PCT <= pct <= MAX_PCT:
-        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% к графику.")
+        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% рыночной.")
     cur = conn.execute("UPDATE p2p_ads SET pct = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status = 'open'",
                        (pct, db.now(), ad_id, user_id))
     if not cur.rowcount:

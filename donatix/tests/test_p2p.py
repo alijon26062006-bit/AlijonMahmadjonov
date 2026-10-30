@@ -141,7 +141,7 @@ def test_pages_order_flow(app, conn, market):
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
     page = b.get("/panel/p2p").text
-    assert "sel***" in page and "Открыть ордер" in page and "bx-canvas" in page
+    assert "sel***" in page and "Быстрое получение" in page and "bx-canvas" in page and "покупают" not in page
     ad = conn.execute("SELECT id FROM p2p_ads").fetchone()[0]
     r = b.post(f"/panel/p2p/{ad}/take", data={"csrf": csrf_of(page), "amount": "40"})
     assert "заморожено" in r.text and "Ждём подтверждения" in r.text and "bx-timer" in r.text
