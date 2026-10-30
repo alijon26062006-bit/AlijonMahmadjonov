@@ -391,3 +391,23 @@ def test_earning_closes_at_deadline(conn, config):
     sitecfg.save(conn, config, {"dcoin_earn_until": ""})                           # без срока — снова копятся
     _buy(conn, uid, 10_000)
     assert dcoin.balance(conn, uid) > before
+
+
+def test_running_chart_lifted_once_to_0005_somoni(conn, monkeypatch):
+    """Уже работающий график: цена один раз поднимается к 0.0005 с. за 1 D, история — тем же коэффициентом."""
+    uid = _user(conn)
+    db.set_setting(conn, "dcoin.retarget_0005", "skip")                  # как на сервере до обновления
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.000002)                   # старая стартовая цена
+    for total in (30_000, 50_000, 40_000):
+        _buy(conn, uid, total)
+    before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    db.set_setting(conn, "pay.tjs_rate", "10")
+    conn.execute("DELETE FROM settings WHERE key = 'dcoin.retarget_0005'")
+    p = dcoin.price(conn)
+    real = dcoin.price_of(dcoin.state(conn)["pool"], dcoin.state(conn)["supply"])
+    assert abs(p - min(0.0005 / 10, real)) / p < 0.01                     # 0.0005 с. (или «настоящая», если меньше)
+    after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    factor = after[-1] / before[-1]
+    assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)
+    assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
+    assert dcoin.price(conn) == p                                          # второй раз не двигает

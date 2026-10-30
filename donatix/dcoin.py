@@ -122,12 +122,13 @@ def fmt_d(units: int) -> str:
 
 # ── Копилка и монеты ────────────────────────────────────────────
 # Старт почти с нуля: у сайта есть запас монет, которых нет ни у кого на руках. Цена считается на
-# все монеты вместе с запасом, и первая цена — не выше START_PRICE (≈ 0.0000218 с.). Каждая покупка двигает
+# все монеты вместе с запасом, и первая цена — не выше START_PRICE (≈ 0.0005 с.). Каждая покупка двигает
 # цену через запас сайта: больше предыдущей — вверх, меньше — вниз, от MIN_MOVE до MAX_STEP, плюс
 # небольшой общий рост DRIFT. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
 # ни добавляли, каждый получит не больше своей доли копилки.
 # Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
-START_PRICE = 0.000002            # $ за 1 D на старте (≈ 0.0000218 с.) — коротко и видно каждое движение
+START_PRICE = 0.000046            # $ за 1 D на старте (≈ 0.0005 с.) — коротко и видно каждое движение
+START_TJS = 0.0005                # та же стартовая цена в сомони: к ней один раз подняли уже работающий график
 RESERVE0 = 1_000_000_000 * UNIT   # от этого считается предел запаса
 # Шаг цены — по проценту разницы с предыдущей покупкой. Падение чуть меньше роста, и каждая покупка
 # добавляет немного вверх: при обычных продажах график в целом растёт, без обвалов.
@@ -153,7 +154,7 @@ def _launch(conn: sqlite3.Connection) -> None:
 def _start_reserve(pool: int, coins: int) -> int:
     """Сколько запаса нужно, чтобы цена была START_PRICE (если копилка уже больше — 0)."""
     per_unit = START_PRICE * 10_000 / UNIT             # микро-доллары за сотую долю монеты
-    return max(0, int(pool / per_unit) - coins) if pool > 0 else 0
+    return max(0, math.ceil(pool / per_unit) - coins) if pool > 0 else 0   # вверх — цена не выше стартовой
 
 
 def _rebase(conn: sqlite3.Connection) -> None:
@@ -180,9 +181,38 @@ def _rebase(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE dcoin_points SET reserve = ? WHERE id = ?", (reserve, row["id"]))
 
 
+def _retarget(conn: sqlite3.Connection) -> None:
+    """Один раз: цена уже работающего графика — к START_TJS (0.0005 с. за 1 D). Вся история умножается на один
+    коэффициент — рост и падения на графике те же. Выше «настоящей» цены (копилка ÷ монеты людей) — никогда,
+    вниз — не двигаем. Новая база сразу стартует с этой цены (START_PRICE)."""
+    if db.get_setting(conn, "dcoin.retarget_0005"):
+        return
+    db.set_setting(conn, "dcoin.retarget_0005", db.now())
+    row = conn.execute("SELECT id, pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None or int(row["supply"]) <= 0 or int(row["pool"]) <= 0:
+        return
+    pool, supply = int(row["pool"]), int(row["supply"])
+    now_price = price_of(pool, supply, int(row["reserve"]))
+    try:
+        rate = float(db.get_setting(conn, "pay.tjs_rate") or 10.9)   # курс оплат в сомони
+    except ValueError:
+        rate = 10.9
+    target = min(START_TJS / rate, price_of(pool, supply, 0))
+    if now_price <= 0 or target <= now_price:
+        return
+    per_unit = target * 10_000 / UNIT
+    reserve = max(0, int(pool / per_unit) - supply)
+    factor = price_of(pool, supply, reserve) / now_price
+    conn.execute("UPDATE dcoin_points SET price = price * ?", (factor,))
+    conn.execute("UPDATE dcoin_points SET reserve = ? WHERE id = ?", (reserve, row["id"]))
+    from . import cache
+    cache.clear("dcoin:")
+
+
 def state(conn: sqlite3.Connection) -> dict[str, int]:
     _launch(conn)
     _rebase(conn)
+    _retarget(conn)
     row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
         return {"pool": 0, "supply": 0, "reserve": 0}
