@@ -1,106 +1,150 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon %}
+{% from "_cur_pick.html" import cur_button with context %}
 {% block title %}P2P D-коинов — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero">
-  <h1>P2P D-коинов</h1>
-  <p>Покупайте и продавайте D-коины другим покупателям по своей цене. Расчёт — балансом Donatix, сделка мгновенная: сайт держит монеты и деньги до сделки, обмануть нельзя. Комиссии нет.</p>
-</section>
+{# Экран в стиле P2P бирж: свой тёмный фон, своя шапка и своё нижнее меню (стили живут только на этой странице) #}
+<style>
+  @media (max-width: 899px) { header.top, .tabbar { display: none !important; } }
+</style>
+<div class="bx">
+  <div class="bx-bg" aria-hidden="true"></div>
 
-<section class="p2p-stats">
-  <div class="card"><span class="muted small">Цена копилки, 1 D</span><b>{{ dprice(d.price) }}</b></div>
-  <div class="card"><span class="muted small">Последняя сделка</span><b>{{ dprice(last) if last else '—' }}</b></div>
-  <div class="card"><span class="muted small">У вас свободно</span><b>{{ free_text }} D</b></div>
-  <div class="card"><span class="muted small">Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
-</section>
-
-<nav class="p2p-tabs" aria-label="P2P">
-  <a href="/panel/p2p?tab=buy" class="{{ 'on' if tab == 'buy' }}">Купить D</a>
-  <a href="/panel/p2p?tab=sell" class="{{ 'on' if tab == 'sell' }}">Продать D</a>
-  <a href="/panel/p2p?tab=mine" class="{{ 'on' if tab == 'mine' }}">Мои объявления</a>
-</nav>
-
-{% if not d.open %}
-<div class="card dc-lock">{{ icon('clock', 20) }}<span>P2P откроется вместе с обменом — <b>{{ d.opens | dt }}</b>.</span></div>
-{% endif %}
-
-{% if tab != 'mine' %}
-<p class="muted small" style="margin:4px 2px 10px">{{ 'Объявления продавцов — сначала самые дешёвые.' if tab == 'buy' else 'Объявления покупателей — сначала те, кто платит больше.' }}</p>
-<div class="list p2p-book">
-  {% for a in ads %}
-  <div class="card p2p-ad">
-    <div class="p2p-ad-head">
-      <div class="grow"><b>{{ a.who }}</b> <span class="muted small">· сделок: {{ a.deals }}</span></div>
-      <span class="badge {{ 'ok' if a.pct <= 100 else 'warn' }}">{{ a.pct }}% копилки</span>
-    </div>
-    <div class="p2p-ad-body">
-      <div><span class="muted small">Цена 1 D</span><b class="p2p-price">{{ dprice(a.price_usd) }}</b></div>
-      <div><span class="muted small">{{ 'Продаёт' if a.side == 'sell' else 'Покупает' }}</span><b>{{ a.remaining_text }} D</b>
-        <small class="muted">≈ {{ dprice(a.total_usd) }}{{ ' · мин. ' ~ a.min_text ~ ' D' if a.min_text }}</small></div>
-    </div>
-    {% if a.user_id != user.id %}
-    <form method="post" action="/panel/p2p/{{ a.id }}/take" class="p2p-take" data-price="{{ a.price_usd }}">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input name="amount" inputmode="decimal" placeholder="Сколько D" autocomplete="off" aria-label="Сколько D" required>
-      <button type="button" class="btn soft" data-all="{{ a.remaining / 100 }}">Все</button>
-      <button class="btn {{ 'primary' if tab == 'buy' else 'danger' }}">{{ 'Купить' if tab == 'buy' else 'Продать' }}</button>
-      <small class="muted p2p-sum" aria-live="polite"></small>
-    </form>
-    {% else %}<p class="muted small" style="margin:8px 0 0">Это ваше объявление</p>{% endif %}
+  <div class="bx-top">
+    <a class="bx-back" href="/panel/dcoin" aria-label="Назад к D-коину">{{ icon('arrow-left', 26) }}</a>
+    <div class="bx-title"><span class="bx-dim">D-коин</span><b>P2P</b></div>
+    {{ cur_button('bx-cur') }}
   </div>
+
+  {% if not d.open %}
+  <div class="bx-warn">{{ icon('alert', 20) }}<span>P2P откроется вместе с обменом — <b>{{ d.opens | dt }}</b>. Пока объявления только смотреть.</span></div>
+  {% endif %}
+  <div class="bx-note">📣 Сделки только внутри Donatix: сайт держит монеты и деньги до сделки — обмануть нельзя. Комиссии нет.</div>
+
+  {% if tab in ('buy', 'sell') %}
+  <div class="bx-seg" role="tablist">
+    <a role="tab" href="/panel/p2p?tab=buy&sort={{ sort }}" class="{{ 'on' if tab == 'buy' }}">Покупка</a>
+    <a role="tab" href="/panel/p2p?tab=sell&sort={{ sort }}" class="{{ 'on' if tab == 'sell' }}">Продажа</a>
+  </div>
+
+  <form class="bx-filters" method="get" action="/panel/p2p">
+    <input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="sort" value="{{ sort }}">
+    <span class="bx-asset"><i class="bx-coin">D</i>D-коин</span>
+    <label class="bx-amt"><span>Сумма</span><input name="amt" value="{{ amt }}" inputmode="decimal" placeholder="{{ cur_code }}" aria-label="Сумма в {{ cur_code }}"></label>
+    <span class="bx-pay">Баланс Donatix</span>
+    <button class="bx-filter" aria-label="Применить фильтр">{{ icon('search', 20) }}</button>
+  </form>
+
+  <div class="bx-sorts">
+    <a href="/panel/p2p?tab={{ tab }}&sort=price&amt={{ amt }}" class="{{ 'on' if sort == 'price' }}">Цена ({{ 'от низкой к высокой' if tab == 'buy' else 'от высокой к низкой' }})</a>
+    <a href="/panel/p2p?tab={{ tab }}&sort=deals&amt={{ amt }}" class="{{ 'on' if sort == 'deals' }}">Количество завершённых сделок</a>
+  </div>
+
+  <div class="bx-list">
+    {% for a in ads %}
+    <article class="bx-ad{{ ' top' if a.top }}">
+      {% if a.top %}<span class="bx-rec">Рекомендации</span>{% endif %}
+      <div class="bx-who">
+        <span class="bx-ava c{{ a.color }}">{{ a.letter }}<i></i></span>
+        <b>{{ a.who }}</b>
+        <span class="bx-orders">{{ a.deals }} ордеров (100%)</span>
+      </div>
+      <div class="bx-tags"><span class="bx-fast">⚡ Мгновенно</span></div>
+      <div class="bx-price">{{ dprice(a.price_usd * per) }}<em>за 1M D</em></div>
+      <div class="bx-row"><span>Лимиты</span><b>{% if a.min_usd %}{{ dprice(a.min_usd) }} – {{ dprice(a.max_usd) }}{% else %}до {{ dprice(a.max_usd) }}{% endif %}</b></div>
+      <div class="bx-row"><span>Количество</span><b>{{ a.remaining_text }} D</b></div>
+      <div class="bx-method">Баланс Donatix</div>
+      {% if a.user_id != user.id %}
+      <button type="button" class="bx-go {{ 'buy' if tab == 'buy' else 'sell' }}" data-open="bx-f{{ a.id }}">{{ 'Покупка' if tab == 'buy' else 'Продажа' }}</button>
+      <form id="bx-f{{ a.id }}" class="bx-take" method="post" action="/panel/p2p/{{ a.id }}/take" data-price="{{ a.price_usd }}" hidden>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label><span>Количество, D</span>
+          <div class="bx-in"><input name="amount" inputmode="decimal" placeholder="{{ a.min_text or '0' }}" autocomplete="off" required>
+            <button type="button" data-all="{{ a.remaining / 100 }}">Все</button></div></label>
+        <div class="bx-sum">Итого: <b>—</b></div>
+        <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">{{ 'Купить D-коины' if tab == 'buy' else 'Продать D-коины' }}</button>
+        <button type="button" class="bx-ghost" data-open="bx-f{{ a.id }}">Отмена</button>
+      </form>
+      {% else %}<span class="bx-mine">Ваше объявление</span>{% endif %}
+    </article>
+    {% else %}
+    <div class="bx-empty">{{ 'Нет объявлений на такую сумму.' if amt else 'Пока объявлений нет.' }}
+      <a href="/panel/p2p?tab=ads">Разместите своё</a></div>
+    {% endfor %}
+  </div>
+
+  {% elif tab == 'orders' %}
+  <h2 class="bx-h">Ордера</h2>
+  <div class="bx-list">
+    {% for t in trades %}
+    <article class="bx-ad">
+      <div class="bx-who"><b class="{{ 'g' if t.bought else 'r' }}">{{ 'Покупка' if t.bought else 'Продажа' }} D-коина</b>
+        <span class="bx-orders">✅ Завершён</span></div>
+      <div class="bx-row"><span>Количество</span><b>{{ t.units_text }} D</b></div>
+      <div class="bx-row"><span>Сумма</span><b>{{ dprice(t.total_usd) }}</b></div>
+      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(t.price_usd * per) }}</b></div>
+      <div class="bx-row"><span>Время</span><b>{{ t.created_at | dt }}</b></div>
+    </article>
+    {% else %}<div class="bx-empty">Ордеров пока нет. <a href="/panel/p2p">Купите или продайте D-коины</a></div>{% endfor %}
+  </div>
+
+  {% elif tab == 'ads' %}
+  <h2 class="bx-h">Мои объявления</h2>
+  <form class="bx-ad bx-new" method="post" action="/panel/p2p/ad" data-ref="{{ d.price * per }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="bx-seg small" role="radiogroup">
+      <label><input type="radio" name="side" value="sell" checked><span>Продаю D</span></label>
+      <label><input type="radio" name="side" value="buy"><span>Покупаю D</span></label>
+    </div>
+    <label class="bx-lbl" for="p2p-pct">Цена: <b id="p2p-pct-v">100</b>% от цены копилки → <b id="p2p-price" class="g">{{ dprice(d.price * per) }}</b> за 1M D</label>
+    <input id="p2p-pct" type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="100" step="1">
+    <label class="bx-lbl"><span>Количество, D <small class="bx-dim">· свободно {{ free_text }}</small></span>
+      <div class="bx-in"><input name="amount" inputmode="decimal" placeholder="{{ free_text }}" autocomplete="off" required></div></label>
+    <label class="bx-lbl"><span>Минимум за сделку, D <small class="bx-dim">· необязательно</small></span>
+      <div class="bx-in"><input name="min_amount" inputmode="decimal" placeholder="0" autocomplete="off"></div></label>
+    <p class="bx-dim small">«Продаю» — монеты сразу уходят в объявление. «Покупаю» — сумма сразу резервируется с баланса. Закроете — остаток вернётся.</p>
+    <button class="bx-go wide buy">Разместить объявление</button>
+  </form>
+  <div class="bx-list">
+    {% for a in mine %}
+    <article class="bx-ad">
+      <div class="bx-who"><b class="{{ 'r' if a.side == 'sell' else 'g' }}">#{{ a.id }} · {{ 'Продаю' if a.side == 'sell' else 'Покупаю' }}</b>
+        <span class="bx-orders">{{ {'open': '🟢 Открыто', 'done': '✅ Выполнено', 'cancelled': 'Закрыто'}[a.status] }}</span></div>
+      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(a.price_usd * per) }} ({{ a.pct }}%)</b></div>
+      <div class="bx-row"><span>Осталось</span><b>{{ a.remaining_text }} D</b></div>
+      {% if a.status == 'open' %}
+      <form method="post" action="/panel/p2p/{{ a.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="bx-ghost">Закрыть и вернуть остаток</button></form>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
   {% else %}
-  <div class="card empty">Пока объявлений нет. <a href="/panel/p2p?tab=mine">Разместите первое</a> — {{ 'продайте свои D-коины' if tab == 'buy' else 'купите D-коины по своей цене' }}.</div>
-  {% endfor %}
-</div>
-{% else %}
-<form class="card p2p-new" method="post" action="/panel/p2p/ad" data-ref="{{ d.price }}">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h3 style="margin-top:0">Новое объявление</h3>
-  <div class="p2p-side" role="radiogroup">
-    <label><input type="radio" name="side" value="sell" checked><span>Продаю D</span></label>
-    <label><input type="radio" name="side" value="buy"><span>Покупаю D</span></label>
+  <div class="bx-prof">
+    <span class="bx-ava big c{{ user.id % 6 }}">{{ (user.login or '?')[:1] | upper }}<i></i></span>
+    <b>{{ user.login }}</b>
+    <span class="bx-dim">{{ prof.deals }} ордеров (100%)</span>
   </div>
-  <label for="p2p-pct">Цена: <b id="p2p-pct-v">100</b>% от цены копилки → <b id="p2p-price">{{ dprice(d.price) }}</b> за 1 D</label>
-  <input id="p2p-pct" type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="100" step="1">
-  <div class="grid two" style="gap:12px">
-    <div><label for="p2p-amount">Сколько D</label>
-      <input id="p2p-amount" name="amount" inputmode="decimal" placeholder="{{ free_text }}" autocomplete="off" required></div>
-    <div><label for="p2p-min">Минимум за сделку <span class="muted">— необязательно</span></label>
-      <input id="p2p-min" name="min_amount" inputmode="decimal" placeholder="0" autocomplete="off"></div>
+  <div class="bx-grid">
+    <div><span>Куплено</span><b class="g">{{ prof.bought }} D</b></div>
+    <div><span>Продано</span><b class="r">{{ prof.sold }} D</b></div>
+    <div><span>Оборот</span><b>{{ dprice(prof.volume_usd) }}</b></div>
+    <div><span>Открытых объявлений</span><b>{{ prof.open_ads }}</b></div>
+    <div><span>Свободно D-коинов</span><b>{{ free_text }} D</b></div>
+    <div><span>Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
+    <div><span>Цена копилки, 1M D</span><b>{{ dprice(d.price * per) }}</b></div>
+    <div><span>Последняя сделка, 1M D</span><b>{{ dprice(last * per) if last else '—' }}</b></div>
   </div>
-  <p class="hint">«Продаю» — монеты сразу уходят в объявление. «Покупаю» — сумма сразу резервируется с баланса.
-    Закроете объявление — остаток вернётся. Можно продать только свободные монеты (не за заказы, которые ещё выполняются).</p>
-  <button class="btn primary lg block">Разместить</button>
-</form>
+  {% endif %}
 
-<div class="section-title"><h2>Мои объявления</h2></div>
-<div class="list">
-  {% for a in mine %}
-  <div class="card p2p-ad">
-    <div class="p2p-ad-head">
-      <div class="grow"><b>#{{ a.id }} · {{ 'Продаю' if a.side == 'sell' else 'Покупаю' }}</b>
-        <span class="muted small">· {{ dprice(a.price_usd) }} за 1 D ({{ a.pct }}%)</span></div>
-      <span class="badge {{ 'ok' if a.status == 'open' else '' }}">{{ {'open': 'открыто', 'done': 'выполнено', 'cancelled': 'закрыто'}[a.status] }}</span>
-    </div>
-    <div class="muted small">Осталось: {{ a.remaining_text }} D</div>
-    {% if a.status == 'open' %}
-    <form method="post" action="/panel/p2p/{{ a.id }}/cancel" style="margin-top:8px"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="btn sm">Закрыть и вернуть остаток</button></form>
-    {% endif %}
-  </div>
-  {% else %}<div class="card empty">Объявлений пока нет.</div>{% endfor %}
+  <nav class="bx-nav" aria-label="P2P">
+    <a href="/panel/p2p" class="{{ 'on' if tab in ('buy', 'sell') }}">{{ icon('home', 24) }}<span>P2P</span></a>
+    <a href="/panel/p2p?tab=orders" class="{{ 'on' if tab == 'orders' }}">{{ icon('book', 24) }}<span>Ордера</span></a>
+    <a href="/panel/p2p?tab=ads" class="{{ 'on' if tab == 'ads' }}">{{ icon('chart', 24) }}<span>Объявления</span></a>
+    <a href="/panel/p2p?tab=profile" class="{{ 'on' if tab == 'profile' }}">{{ icon('user', 24) }}<span>Профиль</span></a>
+  </nav>
 </div>
-{% endif %}
-
-{% if trades %}
-<div class="section-title"><h2>Мои сделки</h2></div>
-<div class="card list-plain">
-  {% for t in trades %}
-  <div class="p2p-trade"><span>{{ '🟢 Купил' if t.bought else '🔴 Продал' }} {{ t.units_text }} D</span>
-    <b>{{ dprice(t.total_usd) }}</b><small class="muted">{{ t.created_at | dt }}</small></div>
-  {% endfor %}
-</div>
-{% endif %}
 
 <script data-soft>
 (function () {
@@ -111,14 +155,22 @@
   }
   var rate = {{ (cur_rate or 0) | float | tojson }}, sym = {{ (" с." if cur_code == 'TJS' else (" " ~ cur_sym if cur_rate else "")) | tojson }};
   function cur(usd) { return rate ? fmt(usd * rate) + sym : "$" + fmt(usd); }
-  document.querySelectorAll(".p2p-take").forEach(function (f) {
-    var inp = f.querySelector("input[name=amount]"), out = f.querySelector(".p2p-sum"), price = +f.dataset.price;
-    function upd() { var n = parseFloat((inp.value || "").replace(",", ".")); out.textContent = n > 0 ? "Итого: " + cur(n * price) : ""; }
+  document.querySelectorAll(".bx [data-open]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var f = document.getElementById(b.dataset.open); if (!f) return;
+      f.hidden = !f.hidden;
+      var t = f.closest(".bx-ad").querySelector(".bx-go:not(.wide)"); if (t) t.classList.toggle("open", !f.hidden);
+      if (!f.hidden) { var i = f.querySelector("input[name=amount]"); if (i) i.focus(); }
+    });
+  });
+  document.querySelectorAll(".bx-take").forEach(function (f) {
+    var inp = f.querySelector("input[name=amount]"), out = f.querySelector(".bx-sum b"), price = +f.dataset.price;
+    function upd() { var n = parseFloat((inp.value || "").replace(",", ".")); out.textContent = n > 0 ? cur(n * price) : "—"; }
     inp.addEventListener("input", upd);
     var all = f.querySelector("[data-all]");
     if (all) all.addEventListener("click", function () { inp.value = all.dataset.all; upd(); });
   });
-  var form = document.querySelector(".p2p-new");
+  var form = document.querySelector(".bx-new");
   if (form) {
     var ref = +form.dataset.ref, pct = form.querySelector("#p2p-pct");
     var upd = function () {

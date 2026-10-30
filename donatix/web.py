@@ -1934,16 +1934,34 @@ def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_con
 # ── P2P D-коинов ─────────────────────────────────────────────
 
 @router.get("/panel/p2p")
-def panel_p2p(request: Request, tab: str = "buy", user=Depends(panel_user), conn=Depends(get_conn)):
-    from . import dcoin, p2p
-    tab = tab if tab in ("buy", "sell", "mine") else "buy"
+def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str = "", user=Depends(panel_user),
+              conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """P2P в стиле бирж: Покупка / Продажа, фильтр «Сумма», сортировка; внизу — P2P, Ордера, Объявления, Профиль."""
+    from . import dcoin, fx, geo, p2p
+    tab = {"mine": "ads"}.get(tab, tab)
+    tab = tab if tab in ("buy", "sell", "orders", "ads", "profile") else "buy"
+    sort = sort if sort in ("price", "deals") else "price"
+    amount_usd = None
+    if amt.strip():   # «Сумма» — в валюте человека, в объявлениях — доллары
+        try:
+            value = float(amt.replace(" ", "").replace(",", "."))
+            cur, _ = fx.choose(geo.country(config, _ip(request)), request.cookies.get("dx_cur", ""))
+            rate = fx.rate(config, cur) if cur != "USD" else 1
+            if cur == "TJS":
+                from . import payments
+                rate = payments.settings(conn, config)["tjs_rate"]
+            amount_usd = value / float(rate) if rate else value
+        except (ValueError, ZeroDivisionError):
+            amount_usd = None
     return render(request, "panel/p2p.html", {
-        "user": user, "tab": tab, "d": dcoin.summary(conn, user["id"]),
-        # «Купить D» — объявления продавцов, «Продать D» — объявления покупателей
-        "ads": p2p.book(conn, "sell" if tab == "buy" else "buy") if tab != "mine" else [],
+        "user": user, "tab": tab, "sort": sort, "amt": amt, "d": dcoin.summary(conn, user["id"]),
+        # «Покупка» — объявления продавцов, «Продажа» — объявления покупателей
+        "ads": p2p.book(conn, "sell" if tab == "buy" else "buy", sort=sort, amount_usd=amount_usd)
+        if tab in ("buy", "sell") else [],
         "mine": p2p.mine(conn, user["id"]), "trades": p2p.trades(conn, user["id"]),
+        "prof": p2p.profile(conn, user["id"]),
         "free_text": dcoin.fmt_d(p2p.free_coins(conn, user["id"])), "last": p2p.last_price_usd(conn),
-        "pmin": p2p.MIN_PCT, "pmax": p2p.MAX_PCT})
+        "pmin": p2p.MIN_PCT, "pmax": p2p.MAX_PCT, "per": p2p.SHOW_PER})
 
 
 def _d_units(raw: str) -> int:
@@ -1962,9 +1980,9 @@ def panel_p2p_ad(request: Request, side: str = Form(""), pct: int = Form(100), a
         ad_id = p2p.create_ad(conn, user["id"], side, pct, _d_units(amount), _d_units(min_amount))
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
-        return _redirect("/panel/p2p?tab=mine")
+        return _redirect("/panel/p2p?tab=ads")
     flash(request, f"Объявление #{ad_id} размещено — его видят все покупатели.")
-    return _redirect("/panel/p2p?tab=mine")
+    return _redirect("/panel/p2p?tab=ads")
 
 
 @router.post("/panel/p2p/{ad_id}/take", dependencies=[Depends(check_csrf)])
@@ -1990,7 +2008,7 @@ def panel_p2p_cancel(ad_id: int, request: Request, user=Depends(panel_user), con
         flash(request, f"Объявление #{ad_id} закрыто — остаток вернулся вам.")
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
-    return _redirect("/panel/p2p?tab=mine")
+    return _redirect("/panel/p2p?tab=ads")
 
 
 @router.get("/panel/data/dcoin")

@@ -101,9 +101,28 @@ def test_page_create_and_take(app, conn, market):
     b = TestClient(app)
     token_b = web_login(b, "buyer@example.com", "password123")
     page = b.get("/panel/p2p").text
-    assert "sel***" in page and "105% копилки" in page
+    assert "sel***" in page and "Мгновенно" in page and "Покупка" in page
     ad = conn.execute("SELECT id FROM p2p_ads").fetchone()[0]
     r = b.post(f"/panel/p2p/{ad}/take", data={"csrf": csrf_of(page), "amount": "40"})
     assert "Куплено 40.00 D" in r.text
     assert dcoin.balance(conn, buyer) == 40 * dcoin.UNIT
     assert token_b
+
+
+def test_book_sort_amount_filter_and_tabs(app, conn, market):
+    seller, buyer = market
+    other = _user(conn, "third")
+    for _ in range(3):
+        _buy(conn, other, 100_000, cost=50_000)
+    cheap = p2p.create_ad(conn, other, "sell", 90, 100 * dcoin.UNIT)
+    pricey = p2p.create_ad(conn, seller, "sell", 120, 300 * dcoin.UNIT)
+    p2p.take(conn, buyer, pricey, 10 * dcoin.UNIT)                      # у продавца есть сделка
+    assert [a["id"] for a in p2p.book(conn, "sell")] == [cheap, pricey]   # по цене: сначала дешёвые
+    by_deals = p2p.book(conn, "sell", sort="deals")
+    assert by_deals[0]["id"] == pricey and by_deals[0].get("top")          # «Рекомендации» — больше сделок
+    big = p2p.book(conn, "sell")[1]["max_usd"]
+    assert [a["id"] for a in p2p.book(conn, "sell", amount_usd=big)] == [pricey]   # фильтр «Сумма»
+    b = TestClient(app)
+    web_login(b, "buyer@example.com", "password123")
+    for tab, text in (("orders", "Покупка D-коина"), ("profile", "ордеров (100%)"), ("ads", "Разместить объявление")):
+        assert text in b.get(f"/panel/p2p?tab={tab}").text

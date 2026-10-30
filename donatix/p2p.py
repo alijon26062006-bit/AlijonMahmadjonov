@@ -25,6 +25,7 @@ PRICE_SCALE = 1_000_000          # цена в объявлении — микр
 MIN_PCT, MAX_PCT = 80, 150       # цена от 80% до 150% цены копилки
 MAX_ADS = 5                      # открытых объявлений на одного
 SIDES = ("sell", "buy")
+SHOW_PER = 1_000_000             # на экране цена — за 1 000 000 D (за 1 D — слишком много нулей)
 
 
 class P2PError(Exception):
@@ -166,14 +167,41 @@ def _view(r: sqlite3.Row) -> dict[str, Any]:
             "created_at": r["created_at"]}
 
 
-def book(conn: sqlite3.Connection, side: str, limit: int = 50) -> list[dict[str, Any]]:
-    """Открытые объявления: продающие — сначала дешёвые, покупающие — сначала дорогие."""
+def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "price",
+         amount_usd: float | None = None) -> list[dict[str, Any]]:
+    """Открытые объявления: продающие — сначала дешёвые, покупающие — сначала дорогие (или по числу сделок).
+    amount_usd — фильтр «Сумма»: только объявления, где такую сумму можно провести одной сделкой."""
     order = "price_m ASC" if side == "sell" else "price_m DESC"
+    if sort == "deals":
+        order = "deals DESC, " + order
     rows = conn.execute(
         "SELECT a.*, u.login, (SELECT COUNT(*) FROM p2p_trades t WHERE t.buyer_id = a.user_id OR t.seller_id = a.user_id) "
         f"AS deals FROM p2p_ads a JOIN users u ON u.id = a.user_id WHERE a.status = 'open' AND a.side = ? "
         f"AND a.remaining > 0 ORDER BY {order}, a.id LIMIT ?", (side, limit)).fetchall()
-    return [{**_view(r), "who": _mask(r["login"]), "deals": r["deals"], "user_id": r["user_id"]} for r in rows]
+    out = []
+    for r in rows:
+        v = {**_view(r), "who": _mask(r["login"]), "deals": r["deals"], "user_id": r["user_id"],
+             "letter": (r["login"] or "?")[:1].upper(), "color": r["user_id"] % 6,
+             "min_usd": cost(min(r["min_units"], r["remaining"]) or r["remaining"], r["price_m"]) / 10_000
+             if r["min_units"] else 0.0, "max_usd": cost(r["remaining"], r["price_m"]) / 10_000}
+        if amount_usd is not None and not (v["min_usd"] <= amount_usd <= v["max_usd"]):
+            continue
+        out.append(v)
+    if out:   # «Рекомендации» — у кого больше всего сделок
+        best = max(out, key=lambda v: v["deals"])
+        best["top"] = best["deals"] > 0
+    return out
+
+
+def profile(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+    """Мой P2P-профиль: сделки, сколько купил и продал, оборот."""
+    r = conn.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN buyer_id = ? THEN units END), 0) AS bought, "
+        "COALESCE(SUM(CASE WHEN seller_id = ? THEN units END), 0) AS sold, COALESCE(SUM(total_micro), 0) AS volume "
+        "FROM p2p_trades WHERE buyer_id = ? OR seller_id = ?", (user_id, user_id, user_id, user_id)).fetchone()
+    ads = conn.execute("SELECT COUNT(*) FROM p2p_ads WHERE user_id = ? AND status = 'open'", (user_id,)).fetchone()[0]
+    return {"deals": r["n"], "bought": dcoin.fmt_d(r["bought"]), "sold": dcoin.fmt_d(r["sold"]),
+            "volume_usd": r["volume"] / 10_000, "open_ads": ads}
 
 
 def mine(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict[str, Any]]:
