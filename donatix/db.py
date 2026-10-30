@@ -669,6 +669,23 @@ CREATE TABLE IF NOT EXISTS p2p_ads (
     updated_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS p2p_ads_book ON p2p_ads(status, side, price_m);
+CREATE TABLE IF NOT EXISTS p2p_orders (
+    id          INTEGER PRIMARY KEY,
+    ad_id       INTEGER NOT NULL,
+    owner_id    INTEGER NOT NULL,           -- владелец объявления — подтверждает
+    taker_id    INTEGER NOT NULL,           -- открыл ордер
+    side        TEXT NOT NULL,              -- сторона объявления: sell | buy
+    units       INTEGER NOT NULL,           -- D (сотые доли) — заморожены в ордере
+    price_m     INTEGER NOT NULL,
+    total_micro INTEGER NOT NULL,           -- деньги — заморожены в ордере
+    status      TEXT NOT NULL,              -- pending | done | cancelled | expired
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS p2p_orders_open ON p2p_orders(status, expires_at);
+CREATE INDEX IF NOT EXISTS p2p_orders_owner ON p2p_orders(owner_id, id);
+CREATE INDEX IF NOT EXISTS p2p_orders_taker ON p2p_orders(taker_id, id);
 CREATE TABLE IF NOT EXISTS p2p_trades (
     id          INTEGER PRIMARY KEY,
     ad_id       INTEGER NOT NULL,

@@ -62,7 +62,8 @@
           <div class="bx-in"><input name="amount" inputmode="decimal" placeholder="{{ a.min_text or '0' }}" autocomplete="off" required>
             <button type="button" data-all="{{ a.remaining / 100 }}">Все</button></div></label>
         <div class="bx-sum">Итого: <b>—</b></div>
-        <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">{{ 'Купить D-коины' if tab == 'buy' else 'Продать D-коины' }}</button>
+        <p class="bx-dim small" style="margin:0">❄️ {{ 'Деньги' if tab == 'buy' else 'Монеты' }} заморозятся, владелец объявления подтвердит за {{ order_min }} минут — иначе всё вернётся само.</p>
+        <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">{{ 'Открыть ордер на покупку' if tab == 'buy' else 'Открыть ордер на продажу' }}</button>
         <button type="button" class="bx-ghost" data-open="bx-f{{ a.id }}">Отмена</button>
       </form>
       {% else %}<span class="bx-mine">Ваше объявление</span>{% endif %}
@@ -75,15 +76,38 @@
 
   {% elif tab == 'orders' %}
   <h2 class="bx-h">Ордера</h2>
+  <p class="bx-note">Пока ордер открыт, монеты и деньги обеих сторон <b>заморожены</b> — их никто не возьмёт.
+    Владелец объявления подтверждает за {{ order_min }} минут, иначе ордер отменяется сам и всё размораживается.</p>
   <div class="bx-list">
-    {% for t in trades %}
-    <article class="bx-ad">
-      <div class="bx-who"><b class="{{ 'g' if t.bought else 'r' }}">{{ 'Покупка' if t.bought else 'Продажа' }} D-коина</b>
-        <span class="bx-orders">✅ Завершён</span></div>
-      <div class="bx-row"><span>Количество</span><b>{{ t.units_text }} D</b></div>
-      <div class="bx-row"><span>Сумма</span><b>{{ dprice(t.total_usd) }}</b></div>
-      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(t.price_usd * per) }}</b></div>
-      <div class="bx-row"><span>Время</span><b>{{ t.created_at | dt }}</b></div>
+    {% for o in orders %}
+    <article class="bx-ad bx-order {{ o.status }}">
+      <div class="bx-who"><b class="{{ 'g' if o.buying else 'r' }}">{{ 'Покупка' if o.buying else 'Продажа' }} D-коина</b>
+        <span class="bx-orders">#{{ o.id }}</span></div>
+      {% if o.status == 'pending' %}
+      <div class="bx-state wait">⏳ {{ 'Подтвердите ордер' if o.owner else 'Ждём подтверждения' }}
+        <b class="bx-timer" data-left="{{ o.left }}">{{ '%02d:%02d' % (o.left // 60, o.left % 60) }}</b></div>
+      <div class="bx-frozen">❄️ Заморожено: {{ o.units_text }} D и {{ dprice(o.total_usd) }}</div>
+      {% else %}
+      <div class="bx-state {{ o.status }}">{{ {'done': '✅ Завершён', 'cancelled': '❌ Отменён', 'expired': '⌛ Время вышло — отменён'}[o.status] }}</div>
+      {% endif %}
+      <div class="bx-row"><span>{{ 'Продавец' if o.buying else 'Покупатель' }}</span><b>{{ o.other }}</b></div>
+      <div class="bx-row"><span>Количество</span><b>{{ o.units_text }} D</b></div>
+      <div class="bx-row"><span>Сумма</span><b>{{ dprice(o.total_usd) }}</b></div>
+      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(o.price_usd * per) }}</b></div>
+      <div class="bx-row"><span>Открыт</span><b>{{ o.created_at | dt }}</b></div>
+      {% if o.status == 'pending' %}
+      <div class="bx-acts">
+        {% if o.owner %}
+        <form method="post" action="/panel/p2p/order/{{ o.id }}/confirm"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="bx-go wide buy">Подтвердить</button></form>
+        <form method="post" action="/panel/p2p/order/{{ o.id }}/cancel" onsubmit="return confirm('Отклонить ордер? Всё разморозится.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="bx-ghost">Отклонить</button></form>
+        {% else %}
+        <form method="post" action="/panel/p2p/order/{{ o.id }}/cancel" onsubmit="return confirm('Отменить ордер? Всё разморозится.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="bx-ghost">Отменить ордер</button></form>
+        {% endif %}
+      </div>
+      {% endif %}
     </article>
     {% else %}<div class="bx-empty">Ордеров пока нет. <a href="/panel/p2p">Купите или продайте D-коины</a></div>{% endfor %}
   </div>
@@ -132,6 +156,8 @@
     <div><span>Оборот</span><b>{{ dprice(prof.volume_usd) }}</b></div>
     <div><span>Открытых объявлений</span><b>{{ prof.open_ads }}</b></div>
     <div><span>Свободно D-коинов</span><b>{{ free_text }} D</b></div>
+    <div><span>❄️ Заморожено D</span><b>{{ prof.frozen_coins }} D</b></div>
+    <div><span>❄️ Заморожено денег</span><b>{{ dprice(prof.frozen_usd) }}</b></div>
     <div><span>Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
     <div><span>Цена копилки, 1M D</span><b>{{ dprice(d.price * per) }}</b></div>
     <div><span>Последняя сделка, 1M D</span><b>{{ dprice(last * per) if last else '—' }}</b></div>
@@ -170,6 +196,19 @@
     var all = f.querySelector("[data-all]");
     if (all) all.addEventListener("click", function () { inp.value = all.dataset.all; upd(); });
   });
+  // Таймеры ордеров: каждую секунду, на нуле — обновить страницу (ордер отменится и всё разморозится)
+  var timers = document.querySelectorAll(".bx-timer[data-left]"), t0 = Date.now(), tm = null;
+  function tick() {
+    var gone = (Date.now() - t0) / 1000, reload = false;
+    timers.forEach(function (el) {
+      var s = Math.max(0, Math.round(+el.dataset.left - gone));
+      el.textContent = ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + s % 60).slice(-2);
+      if (!s) reload = true;
+    });
+    if (reload) { location.href = "/panel/p2p?tab=orders"; return; }
+    tm = setTimeout(tick, 1000);
+  }
+  if (timers.length) { tick(); if (window.dxOnLeave) dxOnLeave(function () { clearTimeout(tm); }); }
   var form = document.querySelector(".bx-new");
   if (form) {
     var ref = +form.dataset.ref, pct = form.querySelector("#p2p-pct");

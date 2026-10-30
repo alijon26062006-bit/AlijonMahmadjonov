@@ -3157,6 +3157,14 @@ body:has(.bx) { background: #0b0b0e; }
 .bx-in button { background: none; border: 0; color: var(--bx-gold); font-weight: 700; padding: 0 14px; cursor: pointer; }
 .bx-sum { color: var(--bx-dim); } .bx-sum b { color: var(--bx-text); }
 .bx-mine { color: var(--bx-dim); font-size: 14px; }
+.bx-state { display: flex; align-items: center; gap: 8px; font-weight: 700; padding: 10px 12px; border-radius: 10px; background: var(--bx-chip); }
+.bx-state.wait { background: #3a2a0e; color: #f3d48a; }
+.bx-state.done { background: #13281d; color: var(--bx-green); }
+.bx-state.cancelled, .bx-state.expired { color: var(--bx-dim); }
+.bx-timer { margin-left: auto; font-size: 20px; color: var(--bx-gold); font-variant-numeric: tabular-nums; }
+.bx-frozen { color: #9fd3ff; font-size: 14px; }
+.bx-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.bx-acts .bx-ghost { width: 100%; }
 .bx-empty { color: var(--bx-dim); text-align: center; padding: 40px 10px; } .bx-empty a { color: var(--bx-gold); }
 .bx-h { font-size: 22px; margin: 6px 2px 12px; color: var(--bx-text); }
 .bx-new { background: var(--bx-card); border-radius: 14px; padding: 16px; border: 0; margin-bottom: 8px; }

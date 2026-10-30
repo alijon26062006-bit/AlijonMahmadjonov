@@ -1938,6 +1938,7 @@ def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str 
               conn=Depends(get_conn), config: Config = Depends(get_config)):
     """P2P в стиле бирж: Покупка / Продажа, фильтр «Сумма», сортировка; внизу — P2P, Ордера, Объявления, Профиль."""
     from . import dcoin, fx, geo, p2p
+    p2p.expire(conn)   # просроченные ордера — отменить и разморозить до показа
     tab = {"mine": "ads"}.get(tab, tab)
     tab = tab if tab in ("buy", "sell", "orders", "ads", "profile") else "buy"
     sort = sort if sort in ("price", "deals") else "price"
@@ -1958,8 +1959,8 @@ def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str 
         # «Покупка» — объявления продавцов, «Продажа» — объявления покупателей
         "ads": p2p.book(conn, "sell" if tab == "buy" else "buy", sort=sort, amount_usd=amount_usd)
         if tab in ("buy", "sell") else [],
-        "mine": p2p.mine(conn, user["id"]), "trades": p2p.trades(conn, user["id"]),
-        "prof": p2p.profile(conn, user["id"]),
+        "mine": p2p.mine(conn, user["id"]), "orders": p2p.orders(conn, user["id"]),
+        "prof": p2p.profile(conn, user["id"]), "order_min": p2p.ORDER_MINUTES,
         "free_text": dcoin.fmt_d(p2p.free_coins(conn, user["id"])), "last": p2p.last_price_usd(conn),
         "pmin": p2p.MIN_PCT, "pmax": p2p.MAX_PCT, "per": p2p.SHOW_PER})
 
@@ -1987,17 +1988,43 @@ def panel_p2p_ad(request: Request, side: str = Form(""), pct: int = Form(100), a
 
 @router.post("/panel/p2p/{ad_id}/take", dependencies=[Depends(check_csrf)])
 def panel_p2p_take(ad_id: int, request: Request, amount: str = Form(""), user=Depends(panel_user),
-                   conn=Depends(get_conn)):
+                   conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Открыть ордер: у обоих всё замораживается, владелец объявления подтверждает за 15 минут."""
     from . import dcoin, p2p
+    from .notify import notify
     back = request.headers.get("referer") or "/panel/p2p"
     try:
-        res = p2p.take(conn, user["id"], ad_id, _d_units(amount))
+        oid = p2p.open_order(conn, user["id"], ad_id, _d_units(amount))
     except p2p.P2PError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/p2p" + ("?tab=sell" if "tab=sell" in back else ""))
-    word = "Куплено" if res["side"] == "buy" else "Продано"
-    flash(request, f"✅ {word} {dcoin.fmt_d(res['units'])} D за ${res['total'] / 10_000:.4f}.")
-    return _redirect("/panel/p2p" + ("?tab=sell" if res["side"] == "sell" else ""))
+    o = conn.execute("SELECT * FROM p2p_orders WHERE id = ?", (oid,)).fetchone()
+    what = "покупает" if o["side"] == "sell" else "продаёт вам"
+    notify(conn, config, o["owner_id"], f"🟡 P2P: новый ордер #{oid} — {user['login']} {what} {dcoin.fmt_d(o['units'])} D. "
+           f"Подтвердите за {p2p.ORDER_MINUTES} минут, иначе ордер отменится сам.", "/panel/p2p?tab=orders")
+    flash(request, f"Ордер #{oid} открыт — всё заморожено. Ждём подтверждения: до {p2p.ORDER_MINUTES} минут.")
+    return _redirect("/panel/p2p?tab=orders")
+
+
+@router.post("/panel/p2p/order/{order_id}/{action}", dependencies=[Depends(check_csrf)])
+def panel_p2p_order(order_id: int, action: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
+    from . import dcoin, p2p
+    from .notify import notify
+    try:
+        if action == "confirm":
+            res = p2p.confirm(conn, user["id"], order_id)
+            notify(conn, config, res["taker"], f"✅ P2P: ордер #{order_id} подтверждён — {dcoin.fmt_d(res['units'])} D.",
+                   "/panel/p2p?tab=orders")
+            flash(request, f"✅ Ордер #{order_id} подтверждён — сделка завершена.")
+        elif action == "cancel":
+            o = p2p.cancel_order(conn, user["id"], order_id)
+            other = o["taker_id"] if o["owner_id"] == user["id"] else o["owner_id"]
+            notify(conn, config, other, f"❌ P2P: ордер #{order_id} отменён — всё разморожено.", "/panel/p2p?tab=orders")
+            flash(request, f"Ордер #{order_id} отменён — всё разморожено.")
+    except p2p.P2PError as exc:
+        flash(request, str(exc), "error")
+    return _redirect("/panel/p2p?tab=orders")
 
 
 @router.post("/panel/p2p/{ad_id}/cancel", dependencies=[Depends(check_csrf)])

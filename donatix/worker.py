@@ -158,6 +158,11 @@ class Worker:
                 except Exception:
                     log.exception("утренний отчёт")
                 try:
+                    from . import p2p
+                    p2p.expire(conn)   # P2P: ордер не подтвердили за 15 минут — отменить и разморозить
+                except Exception:
+                    log.exception("P2P: просроченные ордера")
+                try:
                     from . import contest
                     contest.settle(conn, self.config)   # воскресенье 20:00 — призы конкурса рефералов
                 except Exception:
