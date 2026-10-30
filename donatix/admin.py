@@ -736,6 +736,8 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
         "binance_ready": bool(config.binance_pay_key and config.binance_pay_secret),
         "bybit_ready": bool(config.bybit_key and config.bybit_secret),
         "dcbank_ready": bool(config.tg_api_id and config.tg_api_hash and config.bank_bot),
+        "smartpay_ready": bool(config.smartpay_key), "smartpay_hook": bool(config.smartpay_hook_token and config.smartpay_hook_secret),
+        "smartpay_mode": config.smartpay_mode,
         "dc_videos": {k: _video_view(conn, config, k) for k in ("site", "bot")},
         "receipt_max_age_h": db.get_setting(conn, "pay.receipt_max_age_h") or "24",
         "rate": _rate_status(conn, config),
@@ -746,6 +748,19 @@ def _rate_status(conn, config: Config) -> dict:
     from . import rates
     rates.refresh(conn, config, rates.WORKER_SECONDS)
     return rates.status(conn, config)
+
+
+@router.post("/pay-settings/smartpay-check", dependencies=[Depends(check_csrf)])
+def pay_settings_smartpay_check(request: Request, admin=Depends(admin_user), config: Config = Depends(get_config)):
+    """Кнопка «Проверить SmartPay»: ключ принят — UUID мерчанта, нет — причина."""
+    from . import smartpay
+    try:
+        flash(request, f"✅ SmartPay: ключ работает, мерчант {smartpay.health(config)}"
+              + ("" if smartpay.hook_ready(config) else ". ⚠️ Нет токена/секрета webhook — оплаты не зачислятся."),
+              "ok" if smartpay.hook_ready(config) else "warn")
+    except smartpay.SmartPayError as exc:
+        flash(request, f"❌ SmartPay: {exc}", "error")
+    return _back("/admin/pay-settings#smartpay")
 
 
 @router.post("/pay-settings", dependencies=[Depends(check_csrf)])

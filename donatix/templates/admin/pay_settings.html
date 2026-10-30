@@ -63,6 +63,7 @@
           <option value="trc20" {{ 'selected' if m.auto == 'trc20' }}>Свой кошелёк TRC20 (Trust Wallet, TronLink) — адрес T… в реквизитах</option>
           
           <option value="dcbank" {{ 'selected' if m.auto == 'dcbank' }}>Душанбе Сити — сайт сам видит перевод по уведомлению банка (номер карты в реквизитах{{ '' if dcbank_ready else ', сначала подключите юзербот' }})</option>
+          <option value="smartpay" {{ 'selected' if m.auto == 'smartpay' }}>SmartPay — любой банк Таджикистана, баланс пополняется сам{{ '' if smartpay_ready else ' — сначала ключ SmartPay на сервере' }}</option>
           <option value="binance" {{ 'selected' if m.auto == 'binance' }}>Binance Pay{{ '' if binance_ready else ' — сначала добавьте ключи мерчанта' }}</option>
         </select>
       </div>
@@ -93,6 +94,15 @@
   </div>
   <button class="btn primary lg block save-bar">Сохранить</button>
 </form>
+
+<section class="card" id="smartpay" style="margin-top:18px">
+  <h3>SmartPay — оплата из любого банка Таджикистана</h3>
+  <p class="muted small">Ключ: {{ '✅ задан' if smartpay_ready else '❌ нет' }} · режим: <b>{{ 'тест (sandbox)' if smartpay_mode == 'sandbox' else 'боевой' }}</b> ·
+    webhook: {{ '✅ защищён (токен + подпись)' if smartpay_hook else '❌ нет токена/секрета — оплаты не зачислятся' }}</p>
+  <p class="muted small">Адрес webhook для кабинета SmartPay: <code>{{ base_url }}/pay/smartpay/webhook</code></p>
+  <form method="post" action="/admin/pay-settings/smartpay-check"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn">Проверить SmartPay</button></form>
+</section>
 
 <section class="card dcv-admin" id="dc-video" style="margin-top:20px">
   <h3>🎬 Видео-инструкция «Душанбе Сити · авто»</h3>

@@ -2204,8 +2204,16 @@ class ShopBot:
         rows = [[(tr(lang, "cancel"), "x", "danger")]]
         if p["auto_kind"]:
             if view["pay_url"]:
-                label = "🏙 Оплатить в «Душанбе Сити»" if p["auto_kind"] == "dcbank" else "💳 Binance Pay"
+                label = {"dcbank": "🏙 Оплатить в «Душанбе Сити»", "smartpay": "💳 Оплатить по ссылке / QR"}.get(
+                    p["auto_kind"], "💳 Binance Pay")
                 rows.insert(0, [(label, None, view["pay_url"])])
+            if p["auto_kind"] == "smartpay":   # кнопки банков: сразу в приложение банка с суммой
+                from . import smartpay
+                sig, base = smartpay.sign_link(self.config, pid), self.config.base_url.rstrip("/")
+                bank_btns = [(f"🏦 {b['name']}", None, f"{base}/pay/smartpay/{pid}/bank/{b['id']}?s={sig}")
+                             for b in smartpay.banks(conn, self.config)]
+                for i in range(0, len(bank_btns), 2):
+                    rows.insert(i // 2, bank_btns[i:i + 2])
             if p["auto_kind"] == "dcbank":
                 from . import dcvideo
                 if dcvideo.get(conn, "bot"):

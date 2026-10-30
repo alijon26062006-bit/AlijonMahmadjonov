@@ -1580,9 +1580,15 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
         dc = {"video": video, "video_src": dcvideo.src(config, video) if video else "",
               "title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
               "card": " ".join(account[i:i + 4] for i in range(0, len(account), 4)), "holder": holder[:60]}
+    sp = None
+    if row["auto_kind"] == "smartpay":   # кнопки банков (телефон) и ссылка на оплату / QR (компьютер)
+        from . import smartpay
+        sp = {"banks": smartpay.banks(conn, config), "sig": smartpay.sign_link(config, payment_id),
+              "left": max(0, smartpay.LIFETIME - int(age))}
     from . import quickbuy
     return render(request, "panel/auto_pay.html", {
-        "user": user, "p": payments.public(conn, config, row), "dc": dc, "buy": quickbuy.describe(conn, payment_id),
+        "user": user, "p": payments.public(conn, config, row), "dc": dc, "sp": sp,
+        "buy": quickbuy.describe(conn, payment_id),
         "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
         "receipt_wait": max(1, int(wait - age)),
         "pay_left": cryptopay.seconds_left(row["created_at"]) if row["auto_kind"] in ("trc20", "bybit") else 0})
@@ -1685,6 +1691,37 @@ async def binance_webhook(request: Request, conn=Depends(get_conn), config: Conf
     if row:
         cryptopay.check_binance(conn, config, only_id=row["id"])
     return JSONResponse({"returnCode": "SUCCESS", "returnMessage": None})
+
+
+@router.post("/pay/smartpay/webhook")
+async def smartpay_webhook(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Уведомление SmartPay об оплате: токен X-Api-Token + подпись HMAC, сумма в дирамах, одно зачисление."""
+    from . import smartpay
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return JSONResponse({"status": "bad request"}, status_code=400)
+    res = smartpay.handle_webhook(conn, config, request.headers.get("x-api-token", ""), body)
+    if res["status"] == "forbidden":
+        return JSONResponse({"status": "forbidden"}, status_code=403)
+    return JSONResponse({"status": "ok" if res["status"] in ("ok", "duplicate") else res["status"]})
+
+
+@router.get("/pay/smartpay/{payment_id}/bank/{bank_id}")
+def smartpay_bank(payment_id: int, bank_id: int, request: Request, s: str = "", conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    """Кнопка банка: инвойс с диплинком и сразу в приложение банка. Ссылка подписана — работает и из бота."""
+    from . import smartpay
+    if not smartpay.check_link(config, payment_id, s):
+        return _redirect("/panel/balance")
+    try:
+        url = smartpay.bank_link(conn, config, payment_id, bank_id)
+    except smartpay.SmartPayError as exc:
+        flash(request, str(exc), "error")
+        return _redirect(f"/panel/balance/{payment_id}/pay")
+    return RedirectResponse(url, status_code=303)
 
 
 @router.get("/currency/{code}")

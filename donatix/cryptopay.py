@@ -444,6 +444,8 @@ def check_all(conn: sqlite3.Connection, config: Config, min_interval: float = 20
         _last_check = time.monotonic()
         done = check_trc20(conn, config) + check_bybit(conn, config) + check_binance(conn, config)
         expire(conn)   # сначала проверили поступления — потом закрываем просроченные
+        from . import smartpay
+        smartpay.expire(conn)   # SmartPay: инвойс не оплачен за 30 минут
         return done
     finally:
         _lock.release()

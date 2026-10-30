@@ -191,7 +191,10 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
         icon = str(m.get("icon") or "")
         icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
         auto = str(m.get("auto") or "")
-        auto = auto if auto in ("trc20", "binance", "bybit", "dcbank") else ""
+        auto = auto if auto in ("trc20", "binance", "bybit", "dcbank", "smartpay") else ""
+        if auto == "smartpay":   # любой банк Таджикистана, сумма в сомони
+            currency, network = "TJS", ""
+            details = details or "Оплата из любого банка Таджикистана"
         if auto == "dcbank":
             from .dcbank import account_of
             currency, network = "TJS", ""
@@ -276,6 +279,17 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
         if dcbank.ready(config):   # без юзербота — обычная заявка с чеком
             dcbank.start(conn, config, payment_id, method)
         return
+    if method["auto"] == "smartpay":
+        from . import smartpay
+        if not smartpay.ready(config):   # ключа нет — обычная заявка с чеком
+            return
+        try:
+            smartpay.start(conn, config, payment_id)
+        except smartpay.SmartPayError as exc:
+            conn.execute("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? WHERE id = ?",
+                         (str(exc)[:300], db.now(), payment_id))
+            raise PaymentError(str(exc)) from None
+        return
     try:
         cryptopay.start(conn, config, payment_id, method)
     except cryptopay.CryptoPayError as exc:
@@ -284,14 +298,24 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
         raise PaymentError(str(exc)) from None
 
 
+def _auto_live(m: dict[str, Any], config: Config) -> str:
+    """Автозачисление способа, если оно сейчас работает: «Душанбе Сити» — при юзерботе, SmartPay — при ключе.
+    Иначе "" — обычный перевод с чеком."""
+    auto = m.get("auto") or ""
+    if auto == "dcbank":
+        from .dcbank import ready
+        return auto if ready(config) else ""
+    if auto == "smartpay":
+        from .smartpay import ready as sp_ready
+        return auto if sp_ready(config) else ""
+    return auto
+
+
 def is_auto(conn: sqlite3.Connection, config: Config, code: str) -> bool:
-    """Способ с автоплатежом (крипта, «Душанбе Сити»): чек не нужен, поступление проверяется само.
-    «Душанбе Сити» — только когда юзербот настроен, иначе это обычный перевод с чеком."""
-    from .dcbank import ready
+    """Способ с автоплатежом (крипта, «Душанбе Сити», SmartPay): чек не нужен, поступление проверяется само."""
     conf = settings(conn, config)
     code = resolve(conf, code)
-    return any(m["code"] == code and m.get("auto") and (m["auto"] != "dcbank" or ready(config))
-               for m in conf["all_methods"])
+    return any(m["code"] == code and _auto_live(m, config) for m in conf["all_methods"])
 
 
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
@@ -302,11 +326,10 @@ def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
 
 
 def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
-    from .dcbank import ready
     conf = settings(conn, config)
     return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"],
              "icon_url": f"{config.base_url}/pay-icons/{m['icon']}" if m.get("icon") else "",
-             "auto": (m.get("auto") or "") if m.get("auto") != "dcbank" or ready(config) else "",
+             "auto": _auto_live(m, config),
              "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
              "network_note": network_note(m["network"]), "net_short": NET_SHORT.get(m["network"], ""),
              "min_usd": m.get("min_usd", ""), "max_usd": m.get("max_usd", "")}
@@ -828,5 +851,7 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
                       if p["auto_kind"] == "binance" else
                       f"Переведите ровно {p['pay_amount']} сомони — с копейками. По ним мы узнаём ваш перевод: "
                       "баланс пополнится сам за минуту, чек не нужен."
-                      if p["auto_kind"] == "dcbank" else ""),
+                      if p["auto_kind"] == "dcbank" else
+                      "Нажмите «Оплатить» и выберите свой банк — баланс пополнится сам, чек не нужен."
+                      if p["auto_kind"] == "smartpay" else ""),
     }

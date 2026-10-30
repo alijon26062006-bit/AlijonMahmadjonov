@@ -173,6 +173,11 @@ class Config:
     # Bybit: ключ API вашего аккаунта «только чтение» (Wallet/Asset) — видеть входящие USDT
     bybit_key: str = ""
     bybit_secret: str = ""
+    # SmartPay (smartpay.tj): оплата из любого банка Таджикистана; ключ API, режим и защита webhook
+    smartpay_key: str = ""
+    smartpay_mode: str = "production"
+    smartpay_hook_token: str = ""
+    smartpay_hook_secret: str = ""
     # Автоплатёж «Душанбе Сити»: юзербот читает уведомления банковского бота в Telegram владельца.
     # api_id/api_hash — с my.telegram.org; bank_bot — юзернейм или id бота банка; bank_card — последние
     # 4 цифры карты (уведомления по другим картам не трогаем). Файл сеанса — полный доступ к Telegram.
@@ -253,6 +258,10 @@ class Config:
             trongrid_key=_env("DONATIX_TRONGRID_KEY"),
             bybit_key=_env("DONATIX_BYBIT_KEY"),
             bybit_secret=_env("DONATIX_BYBIT_SECRET"),
+            smartpay_key=_env("DONATIX_SMARTPAY_KEY"),
+            smartpay_mode="sandbox" if _env("DONATIX_SMARTPAY_MODE").lower() == "sandbox" else "production",
+            smartpay_hook_token=_env("DONATIX_SMARTPAY_HOOK_TOKEN"),
+            smartpay_hook_secret=_env("DONATIX_SMARTPAY_HOOK_SECRET"),
             tg_api_id=int(_env("DONATIX_TG_API_ID") or 0) if _env("DONATIX_TG_API_ID").isdigit() else 0,
             tg_api_hash=_env("DONATIX_TG_API_HASH"),
             bank_bot=_env("DONATIX_BANK_BOT").lstrip("@"),
