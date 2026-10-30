@@ -57,7 +57,9 @@
 
   <section class="card dc-ex">
     <h3>Обменять на баланс</h3>
-    <p class="muted small">D-коины — бонусные: их нельзя купить или вывести на карту, только обменять на баланс Donatix.</p>
+    <p class="muted small">D-коины — бонусные: их нельзя вывести на карту, только обменять на баланс Donatix
+      или продать другим покупателям в <a href="/panel/p2p">P2P</a>.</p>
+    <a class="btn soft block" href="/panel/p2p" style="margin:6px 0 10px">{{ icon('swap', 18) }}P2P: купить и продать D по своей цене</a>
     {% if d.open %}
     <form method="post" action="/panel/dcoin/exchange" class="dc-ex-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">

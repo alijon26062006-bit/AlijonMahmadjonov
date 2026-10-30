@@ -654,6 +654,33 @@ CREATE TABLE IF NOT EXISTS bot_tour (
     banned       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS bot_tour_inviter ON bot_tour(inviter_tg, joined_at);
+-- P2P D-коинов (p2p.py): объявления «продаю/покупаю» и сделки; монеты и деньги в резерве у сайта
+CREATE TABLE IF NOT EXISTS p2p_ads (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    side         TEXT NOT NULL,              -- sell — продаю D, buy — покупаю D
+    price_m      INTEGER NOT NULL,           -- микро-доллары за 1 000 000 D
+    pct          INTEGER NOT NULL,           -- % от цены копилки при создании
+    remaining    INTEGER NOT NULL,           -- сколько D (сотые доли) ещё в объявлении
+    min_units    INTEGER NOT NULL DEFAULT 0, -- минимум за одну сделку
+    locked_micro INTEGER NOT NULL DEFAULT 0, -- «покупаю»: деньги в резерве
+    status       TEXT NOT NULL,              -- open | done | cancelled
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS p2p_ads_book ON p2p_ads(status, side, price_m);
+CREATE TABLE IF NOT EXISTS p2p_trades (
+    id          INTEGER PRIMARY KEY,
+    ad_id       INTEGER NOT NULL,
+    buyer_id    INTEGER NOT NULL,
+    seller_id   INTEGER NOT NULL,
+    units       INTEGER NOT NULL,
+    price_m     INTEGER NOT NULL,
+    total_micro INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS p2p_trades_buyer ON p2p_trades(buyer_id, id);
+CREATE INDEX IF NOT EXISTS p2p_trades_seller ON p2p_trades(seller_id, id);
 -- Условия для ботов партнёров (botterms.py): какой бот на какую рассылку что ответил
 CREATE TABLE IF NOT EXISTS bot_terms (
     bot_id      INTEGER NOT NULL,

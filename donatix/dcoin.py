@@ -442,7 +442,7 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
             raise ExchangeError("Столько D-коинов у вас нет." if units > (int(row["dcoin"]) if row else 0)
                                 else "Часть монет ждёт выполнения заказов — их можно обменять позже.")
         last = conn.execute("SELECT created_at FROM dcoin_ledger WHERE user_id = ? AND amount < 0 "
-                            "ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()
+                            "AND reason NOT LIKE 'P2P:%' ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()   # P2P — не обмен
         if last and now - _parse(last["created_at"]) < timedelta(hours=24):
             raise ExchangeError("Обменивать можно раз в сутки.")
         s = state(conn)

@@ -1931,6 +1931,68 @@ def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_con
     })
 
 
+# ── P2P D-коинов ─────────────────────────────────────────────
+
+@router.get("/panel/p2p")
+def panel_p2p(request: Request, tab: str = "buy", user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import dcoin, p2p
+    tab = tab if tab in ("buy", "sell", "mine") else "buy"
+    return render(request, "panel/p2p.html", {
+        "user": user, "tab": tab, "d": dcoin.summary(conn, user["id"]),
+        # «Купить D» — объявления продавцов, «Продать D» — объявления покупателей
+        "ads": p2p.book(conn, "sell" if tab == "buy" else "buy") if tab != "mine" else [],
+        "mine": p2p.mine(conn, user["id"]), "trades": p2p.trades(conn, user["id"]),
+        "free_text": dcoin.fmt_d(p2p.free_coins(conn, user["id"])), "last": p2p.last_price_usd(conn),
+        "pmin": p2p.MIN_PCT, "pmax": p2p.MAX_PCT})
+
+
+def _d_units(raw: str) -> int:
+    from . import dcoin
+    try:
+        return int(round(float((raw or "").replace(" ", "").replace(",", ".")) * dcoin.UNIT))
+    except ValueError:
+        return 0
+
+
+@router.post("/panel/p2p/ad", dependencies=[Depends(check_csrf)])
+def panel_p2p_ad(request: Request, side: str = Form(""), pct: int = Form(100), amount: str = Form(""),
+                 min_amount: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import p2p
+    try:
+        ad_id = p2p.create_ad(conn, user["id"], side, pct, _d_units(amount), _d_units(min_amount))
+    except p2p.P2PError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/p2p?tab=mine")
+    flash(request, f"Объявление #{ad_id} размещено — его видят все покупатели.")
+    return _redirect("/panel/p2p?tab=mine")
+
+
+@router.post("/panel/p2p/{ad_id}/take", dependencies=[Depends(check_csrf)])
+def panel_p2p_take(ad_id: int, request: Request, amount: str = Form(""), user=Depends(panel_user),
+                   conn=Depends(get_conn)):
+    from . import dcoin, p2p
+    back = request.headers.get("referer") or "/panel/p2p"
+    try:
+        res = p2p.take(conn, user["id"], ad_id, _d_units(amount))
+    except p2p.P2PError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/p2p" + ("?tab=sell" if "tab=sell" in back else ""))
+    word = "Куплено" if res["side"] == "buy" else "Продано"
+    flash(request, f"✅ {word} {dcoin.fmt_d(res['units'])} D за ${res['total'] / 10_000:.4f}.")
+    return _redirect("/panel/p2p" + ("?tab=sell" if res["side"] == "sell" else ""))
+
+
+@router.post("/panel/p2p/{ad_id}/cancel", dependencies=[Depends(check_csrf)])
+def panel_p2p_cancel(ad_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import p2p
+    try:
+        p2p.cancel(conn, user["id"], ad_id)
+        flash(request, f"Объявление #{ad_id} закрыто — остаток вернулся вам.")
+    except p2p.P2PError as exc:
+        flash(request, str(exc), "error")
+    return _redirect("/panel/p2p?tab=mine")
+
+
 @router.get("/panel/data/dcoin")
 def panel_dcoin_data(tf: str = "1m", n: int = 80, user=Depends(panel_user), conn=Depends(get_conn)):
     """Свечи и цифры для живого графика — страница спрашивает каждые несколько секунд."""

@@ -1,0 +1,132 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}P2P D-коинов — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <h1>P2P D-коинов</h1>
+  <p>Покупайте и продавайте D-коины другим покупателям по своей цене. Расчёт — балансом Donatix, сделка мгновенная: сайт держит монеты и деньги до сделки, обмануть нельзя. Комиссии нет.</p>
+</section>
+
+<section class="p2p-stats">
+  <div class="card"><span class="muted small">Цена копилки, 1 D</span><b>{{ dprice(d.price) }}</b></div>
+  <div class="card"><span class="muted small">Последняя сделка</span><b>{{ dprice(last) if last else '—' }}</b></div>
+  <div class="card"><span class="muted small">У вас свободно</span><b>{{ free_text }} D</b></div>
+  <div class="card"><span class="muted small">Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
+</section>
+
+<nav class="p2p-tabs" aria-label="P2P">
+  <a href="/panel/p2p?tab=buy" class="{{ 'on' if tab == 'buy' }}">Купить D</a>
+  <a href="/panel/p2p?tab=sell" class="{{ 'on' if tab == 'sell' }}">Продать D</a>
+  <a href="/panel/p2p?tab=mine" class="{{ 'on' if tab == 'mine' }}">Мои объявления</a>
+</nav>
+
+{% if not d.open %}
+<div class="card dc-lock">{{ icon('clock', 20) }}<span>P2P откроется вместе с обменом — <b>{{ d.opens | dt }}</b>.</span></div>
+{% endif %}
+
+{% if tab != 'mine' %}
+<p class="muted small" style="margin:4px 2px 10px">{{ 'Объявления продавцов — сначала самые дешёвые.' if tab == 'buy' else 'Объявления покупателей — сначала те, кто платит больше.' }}</p>
+<div class="list p2p-book">
+  {% for a in ads %}
+  <div class="card p2p-ad">
+    <div class="p2p-ad-head">
+      <div class="grow"><b>{{ a.who }}</b> <span class="muted small">· сделок: {{ a.deals }}</span></div>
+      <span class="badge {{ 'ok' if a.pct <= 100 else 'warn' }}">{{ a.pct }}% копилки</span>
+    </div>
+    <div class="p2p-ad-body">
+      <div><span class="muted small">Цена 1 D</span><b class="p2p-price">{{ dprice(a.price_usd) }}</b></div>
+      <div><span class="muted small">{{ 'Продаёт' if a.side == 'sell' else 'Покупает' }}</span><b>{{ a.remaining_text }} D</b>
+        <small class="muted">≈ {{ dprice(a.total_usd) }}{{ ' · мин. ' ~ a.min_text ~ ' D' if a.min_text }}</small></div>
+    </div>
+    {% if a.user_id != user.id %}
+    <form method="post" action="/panel/p2p/{{ a.id }}/take" class="p2p-take" data-price="{{ a.price_usd }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input name="amount" inputmode="decimal" placeholder="Сколько D" autocomplete="off" aria-label="Сколько D" required>
+      <button type="button" class="btn soft" data-all="{{ a.remaining / 100 }}">Все</button>
+      <button class="btn {{ 'primary' if tab == 'buy' else 'danger' }}">{{ 'Купить' if tab == 'buy' else 'Продать' }}</button>
+      <small class="muted p2p-sum" aria-live="polite"></small>
+    </form>
+    {% else %}<p class="muted small" style="margin:8px 0 0">Это ваше объявление</p>{% endif %}
+  </div>
+  {% else %}
+  <div class="card empty">Пока объявлений нет. <a href="/panel/p2p?tab=mine">Разместите первое</a> — {{ 'продайте свои D-коины' if tab == 'buy' else 'купите D-коины по своей цене' }}.</div>
+  {% endfor %}
+</div>
+{% else %}
+<form class="card p2p-new" method="post" action="/panel/p2p/ad" data-ref="{{ d.price }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3 style="margin-top:0">Новое объявление</h3>
+  <div class="p2p-side" role="radiogroup">
+    <label><input type="radio" name="side" value="sell" checked><span>Продаю D</span></label>
+    <label><input type="radio" name="side" value="buy"><span>Покупаю D</span></label>
+  </div>
+  <label for="p2p-pct">Цена: <b id="p2p-pct-v">100</b>% от цены копилки → <b id="p2p-price">{{ dprice(d.price) }}</b> за 1 D</label>
+  <input id="p2p-pct" type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="100" step="1">
+  <div class="grid two" style="gap:12px">
+    <div><label for="p2p-amount">Сколько D</label>
+      <input id="p2p-amount" name="amount" inputmode="decimal" placeholder="{{ free_text }}" autocomplete="off" required></div>
+    <div><label for="p2p-min">Минимум за сделку <span class="muted">— необязательно</span></label>
+      <input id="p2p-min" name="min_amount" inputmode="decimal" placeholder="0" autocomplete="off"></div>
+  </div>
+  <p class="hint">«Продаю» — монеты сразу уходят в объявление. «Покупаю» — сумма сразу резервируется с баланса.
+    Закроете объявление — остаток вернётся. Можно продать только свободные монеты (не за заказы, которые ещё выполняются).</p>
+  <button class="btn primary lg block">Разместить</button>
+</form>
+
+<div class="section-title"><h2>Мои объявления</h2></div>
+<div class="list">
+  {% for a in mine %}
+  <div class="card p2p-ad">
+    <div class="p2p-ad-head">
+      <div class="grow"><b>#{{ a.id }} · {{ 'Продаю' if a.side == 'sell' else 'Покупаю' }}</b>
+        <span class="muted small">· {{ dprice(a.price_usd) }} за 1 D ({{ a.pct }}%)</span></div>
+      <span class="badge {{ 'ok' if a.status == 'open' else '' }}">{{ {'open': 'открыто', 'done': 'выполнено', 'cancelled': 'закрыто'}[a.status] }}</span>
+    </div>
+    <div class="muted small">Осталось: {{ a.remaining_text }} D</div>
+    {% if a.status == 'open' %}
+    <form method="post" action="/panel/p2p/{{ a.id }}/cancel" style="margin-top:8px"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn sm">Закрыть и вернуть остаток</button></form>
+    {% endif %}
+  </div>
+  {% else %}<div class="card empty">Объявлений пока нет.</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if trades %}
+<div class="section-title"><h2>Мои сделки</h2></div>
+<div class="card list-plain">
+  {% for t in trades %}
+  <div class="p2p-trade"><span>{{ '🟢 Купил' if t.bought else '🔴 Продал' }} {{ t.units_text }} D</span>
+    <b>{{ dprice(t.total_usd) }}</b><small class="muted">{{ t.created_at | dt }}</small></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script data-soft>
+(function () {
+  function fmt(v) {
+    if (!(v > 0)) return "0";
+    var p = Math.max(2, Math.min(12, 2 - Math.floor(Math.log10(v))));
+    return v.toFixed(p);
+  }
+  var rate = {{ (cur_rate or 0) | float | tojson }}, sym = {{ (" с." if cur_code == 'TJS' else (" " ~ cur_sym if cur_rate else "")) | tojson }};
+  function cur(usd) { return rate ? fmt(usd * rate) + sym : "$" + fmt(usd); }
+  document.querySelectorAll(".p2p-take").forEach(function (f) {
+    var inp = f.querySelector("input[name=amount]"), out = f.querySelector(".p2p-sum"), price = +f.dataset.price;
+    function upd() { var n = parseFloat((inp.value || "").replace(",", ".")); out.textContent = n > 0 ? "Итого: " + cur(n * price) : ""; }
+    inp.addEventListener("input", upd);
+    var all = f.querySelector("[data-all]");
+    if (all) all.addEventListener("click", function () { inp.value = all.dataset.all; upd(); });
+  });
+  var form = document.querySelector(".p2p-new");
+  if (form) {
+    var ref = +form.dataset.ref, pct = form.querySelector("#p2p-pct");
+    var upd = function () {
+      document.getElementById("p2p-pct-v").textContent = pct.value;
+      document.getElementById("p2p-price").textContent = cur(ref * pct.value / 100);
+    };
+    pct.addEventListener("input", upd); upd();
+  }
+})();
+</script>
+{% endblock %}
