@@ -30,7 +30,7 @@ MAX_ADS = 5                      # открытых объявлений на о
 SIDES = ("sell", "buy")
 ORDER_MINUTES = 15               # столько ждём подтверждения владельца объявления, потом ордер отменяется сам
 MAX_PENDING = 3                  # открытых ордеров на одного
-SHOW_PER = 1_000_000             # на экране цена — за 1 000 000 D (за 1 D — слишком много нулей)
+SHOW_PER = 1                     # на экране цена — за 1 D (с 0.0005 с. — читается без лишних нулей)
 
 
 class P2PError(Exception):
@@ -40,6 +40,18 @@ class P2PError(Exception):
 def ref_price_m(conn: sqlite3.Connection) -> int:
     """Цена копилки: микро-доллары за 1 000 000 D."""
     return int(round(dcoin.price(conn) * 10_000 * PRICE_SCALE))
+
+
+def live_price_m(ref_m: int, pct: int) -> int:
+    """Цена объявления сейчас: график (цена копилки) × процент владельца — двигается вместе с графиком."""
+    return ref_m * pct // 100
+
+
+def available(ad: sqlite3.Row, price_m: int) -> int:
+    """Сколько D можно взять сейчас: «покупаю» — не больше, чем покрывает резерв при сегодняшней цене."""
+    if ad["side"] == "buy" and price_m > 0:
+        return min(ad["remaining"], ad["locked_micro"] * dcoin.UNIT * PRICE_SCALE // price_m)
+    return ad["remaining"]
 
 
 def cost(units: int, price_m: int) -> int:
@@ -123,11 +135,13 @@ def open_order(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -
             raise P2PError("Объявление уже закрыто.")
         if ad["user_id"] == user_id:
             raise P2PError("Это ваше объявление.")
-        if units <= 0 or units > ad["remaining"]:
-            raise P2PError(f"Доступно {dcoin.fmt_d(ad['remaining'])} D.")
-        if units < ad["min_units"] and units != ad["remaining"]:
+        price_m = live_price_m(ref_price_m(conn), ad["pct"])   # цена — по графику прямо сейчас
+        can = available(ad, price_m)
+        if units <= 0 or units > can:
+            raise P2PError(f"Доступно {dcoin.fmt_d(can)} D.")
+        if units < ad["min_units"] and units != can:
             raise P2PError(f"Минимум в этом объявлении — {dcoin.fmt_d(ad['min_units'])} D.")
-        total = cost(units, ad["price_m"])
+        total = cost(units, price_m)
         if total <= 0:
             raise P2PError("Слишком маленькая сделка — возьмите больше D.")
         busy = conn.execute("SELECT COUNT(*) FROM p2p_orders WHERE taker_id = ? AND status = 'pending'",
@@ -137,7 +151,7 @@ def open_order(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -
         now = _now_dt()
         cur = conn.execute("INSERT INTO p2p_orders (ad_id, owner_id, taker_id, side, units, price_m, total_micro, status, "
                            "created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-                           (ad_id, ad["user_id"], user_id, ad["side"], units, ad["price_m"], total, _iso(now),
+                           (ad_id, ad["user_id"], user_id, ad["side"], units, price_m, total, _iso(now),
                             _iso(now + timedelta(minutes=ORDER_MINUTES))))
         oid = int(cur.lastrowid)
         if ad["side"] == "sell":   # я покупаю: мои деньги замораживаются, монеты продавца уже в объявлении
@@ -279,16 +293,28 @@ def cancel(conn: sqlite3.Connection, user_id: int, ad_id: int) -> None:
                      (db.now(), ad_id))
 
 
+def set_pct(conn: sqlite3.Connection, user_id: int, ad_id: int, pct: int) -> None:
+    """Владелец меняет цену своего объявления: % к графику. Открытые ордера идут по своей цене."""
+    if not MIN_PCT <= pct <= MAX_PCT:
+        raise P2PError(f"Цена — от {MIN_PCT}% до {MAX_PCT}% к графику.")
+    cur = conn.execute("UPDATE p2p_ads SET pct = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status = 'open'",
+                       (pct, db.now(), ad_id, user_id))
+    if not cur.rowcount:
+        raise P2PError("Объявление уже закрыто.")
+
+
 def _mask(login: str) -> str:
     login = login or "user"
     return login[:3] + "***" if len(login) > 3 else login[:1] + "***"
 
 
-def _view(r: sqlite3.Row) -> dict[str, Any]:
-    return {"id": r["id"], "side": r["side"], "pct": r["pct"], "price_usd": r["price_m"] / 10_000 / PRICE_SCALE,
-            "remaining": r["remaining"], "remaining_text": dcoin.fmt_d(r["remaining"]),
+def _view(r: sqlite3.Row, ref_m: int) -> dict[str, Any]:
+    price_m = live_price_m(ref_m, r["pct"])
+    can = available(r, price_m) if r["status"] == "open" else r["remaining"]
+    return {"id": r["id"], "side": r["side"], "pct": r["pct"], "price_usd": price_m / 10_000 / PRICE_SCALE,
+            "remaining": can, "remaining_text": dcoin.fmt_d(can), "price_m": price_m,
             "min_text": dcoin.fmt_d(r["min_units"]) if r["min_units"] else "",
-            "total_usd": cost(r["remaining"], r["price_m"]) / 10_000, "status": r["status"],
+            "total_usd": cost(can, price_m) / 10_000, "status": r["status"],
             "created_at": r["created_at"]}
 
 
@@ -296,7 +322,7 @@ def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "pric
          amount_usd: float | None = None) -> list[dict[str, Any]]:
     """Открытые объявления: продающие — сначала дешёвые, покупающие — сначала дорогие (или по числу сделок).
     amount_usd — фильтр «Сумма»: только объявления, где такую сумму можно провести одной сделкой."""
-    order = "price_m ASC" if side == "sell" else "price_m DESC"
+    order = "pct ASC" if side == "sell" else "pct DESC"   # у всех одна база — график, разница только в %
     if sort == "deals":
         order = "deals DESC, " + order
     rows = conn.execute(
@@ -305,13 +331,16 @@ def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "pric
         "(SELECT COUNT(*) FROM p2p_orders o WHERE o.owner_id = a.user_id AND o.status = 'done') AS ok "
         f"FROM p2p_ads a JOIN users u ON u.id = a.user_id WHERE a.status = 'open' AND a.side = ? "
         f"AND a.remaining > 0 ORDER BY {order}, a.id LIMIT ?", (side, limit)).fetchall()
-    out = []
+    out, ref = [], ref_price_m(conn)
     for r in rows:
-        v = {**_view(r), "who": _mask(r["login"]), "deals": r["deals"], "user_id": r["user_id"],
+        v = {**_view(r, ref), "who": _mask(r["login"]), "deals": r["deals"], "user_id": r["user_id"],
              "letter": (r["login"] or "?")[:1].upper(), "color": r["user_id"] % 6,
              "rate": round(100 * r["ok"] / r["ended"]) if r["ended"] else 100,
-             "min_usd": cost(min(r["min_units"], r["remaining"]) or r["remaining"], r["price_m"]) / 10_000
-             if r["min_units"] else 0.0, "max_usd": cost(r["remaining"], r["price_m"]) / 10_000}
+             "diff": r["pct"] - 100}
+        v["min_usd"] = cost(min(r["min_units"], v["remaining"]), v["price_m"]) / 10_000 if r["min_units"] else 0.0
+        v["max_usd"] = v["total_usd"]
+        if v["remaining"] <= 0:
+            continue
         if amount_usd is not None and not (v["min_usd"] <= amount_usd <= v["max_usd"]):
             continue
         out.append(v)
@@ -337,14 +366,15 @@ def profile(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
         "SELECT COALESCE((SELECT SUM(locked_micro) FROM p2p_ads WHERE user_id = ? AND status = 'open' AND side = 'buy'), 0)"
         " + COALESCE((SELECT SUM(total_micro) FROM p2p_orders WHERE status = 'pending' AND ((owner_id = ? AND side = 'buy')"
         " OR (taker_id = ? AND side = 'sell'))), 0)", (user_id, user_id, user_id)).fetchone()[0]
-    return {"frozen_coins": dcoin.fmt_d(coins), "frozen_usd": money / 10_000,"deals": r["n"], "bought": dcoin.fmt_d(r["bought"]), "sold": dcoin.fmt_d(r["sold"]),
+    return {"frozen_coins": dcoin.fmt_d(coins), "frozen_usd": money / 10_000, "deals": r["n"], "bought": dcoin.fmt_d(r["bought"]), "sold": dcoin.fmt_d(r["sold"]),
             "volume_usd": r["volume"] / 10_000, "open_ads": ads}
 
 
 def mine(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict[str, Any]]:
     rows = conn.execute("SELECT * FROM p2p_ads WHERE user_id = ? ORDER BY (status = 'open') DESC, id DESC LIMIT ?",
                         (user_id, limit)).fetchall()
-    return [_view(r) for r in rows]
+    ref = ref_price_m(conn)
+    return [_view(r, ref) for r in rows]
 
 
 def trades(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict[str, Any]]:

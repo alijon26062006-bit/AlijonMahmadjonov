@@ -2027,6 +2027,19 @@ def panel_p2p_order(order_id: int, action: str, request: Request, user=Depends(p
     return _redirect("/panel/p2p?tab=orders")
 
 
+@router.post("/panel/p2p/{ad_id}/price", dependencies=[Depends(check_csrf)])
+def panel_p2p_price(ad_id: int, request: Request, pct: int = Form(100), user=Depends(panel_user),
+                    conn=Depends(get_conn)):
+    """Владелец меняет цену объявления — % к графику."""
+    from . import p2p
+    try:
+        p2p.set_pct(conn, user["id"], ad_id, pct)
+        flash(request, f"Цена объявления #{ad_id} — {pct - 100:+d}% к графику.")
+    except p2p.P2PError as exc:
+        flash(request, str(exc), "error")
+    return _redirect("/panel/p2p?tab=ads")
+
+
 @router.post("/panel/p2p/{ad_id}/cancel", dependencies=[Depends(check_csrf)])
 def panel_p2p_cancel(ad_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     from . import p2p

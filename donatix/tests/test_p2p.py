@@ -141,7 +141,7 @@ def test_pages_order_flow(app, conn, market):
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
     page = b.get("/panel/p2p").text
-    assert "sel***" in page and "Открыть ордер на покупку" in page
+    assert "sel***" in page and "Открыть ордер" in page and "bx-canvas" in page
     ad = conn.execute("SELECT id FROM p2p_ads").fetchone()[0]
     r = b.post(f"/panel/p2p/{ad}/take", data={"csrf": csrf_of(page), "amount": "40"})
     assert "заморожено" in r.text and "Ждём подтверждения" in r.text and "bx-timer" in r.text
@@ -170,5 +170,22 @@ def test_book_sort_amount_filter_and_tabs(app, conn, market):
     assert [a["id"] for a in p2p.book(conn, "sell", amount_usd=big)] == [pricey]   # фильтр «Сумма»
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
-    for tab, text in (("orders", "Покупка D-коина"), ("profile", "ордеров (100%)"), ("ads", "Разместить объявление")):
+    for tab, text in (("orders", "Покупка 10.00 D"), ("profile", "Заморожено D"), ("ads", "Разместить объявление")):
         assert text in b.get(f"/panel/p2p?tab={tab}").text
+
+
+def test_price_follows_chart_and_owner_changes_it(conn, market, monkeypatch):
+    seller, buyer = market
+    ad = p2p.create_ad(conn, seller, "sell", 105, 200 * dcoin.UNIT)
+    base = p2p.book(conn, "sell")[0]
+    assert base["diff"] == 5
+    monkeypatch.setattr(p2p, "ref_price_m", lambda c: p2p.PRICE_SCALE * 2)   # график вырос
+    up = p2p.book(conn, "sell")[0]
+    assert up["price_m"] == p2p.PRICE_SCALE * 2 * 105 // 100                 # цена объявления — за графиком
+    p2p.set_pct(conn, seller, ad, 98)                                          # владелец поменял цену
+    assert p2p.book(conn, "sell")[0]["diff"] == -2
+    with pytest.raises(p2p.P2PError):
+        p2p.set_pct(conn, buyer, ad, 90)                                       # чужое не поменять
+    oid = p2p.open_order(conn, buyer, ad, 10 * dcoin.UNIT)
+    o = conn.execute("SELECT price_m FROM p2p_orders WHERE id = ?", (oid,)).fetchone()
+    assert o["price_m"] == p2p.PRICE_SCALE * 2 * 98 // 100                    # ордер — по цене в момент открытия

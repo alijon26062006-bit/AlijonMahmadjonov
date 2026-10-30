@@ -3,70 +3,97 @@
 {% from "_cur_pick.html" import cur_button with context %}
 {% block title %}P2P D-коинов — {{ site_name }}{% endblock %}
 {% block content %}
-{# Экран в стиле P2P бирж: свой тёмный фон, своя шапка и своё нижнее меню (стили живут только на этой странице) #}
+{# Экран-приложение: свой тёмный фон, своя шапка и своё нижнее меню (стили живут только на этой странице) #}
 <style>
   @media (max-width: 899px) { header.top, .tabbar { display: none !important; } }
 </style>
-<div class="bx">
+<div class="bx" data-cur="{{ cur_code }}">
   <div class="bx-bg" aria-hidden="true"></div>
 
   <div class="bx-top">
     <a class="bx-back" href="/panel/dcoin" aria-label="Назад к D-коину">{{ icon('arrow-left', 26) }}</a>
-    <div class="bx-title"><span class="bx-dim">D-коин</span><b>P2P</b></div>
+    <div class="bx-title"><b>P2P</b><span class="bx-dim">D-коин</span></div>
     {{ cur_button('bx-cur') }}
   </div>
 
   {% if not d.open %}
-  <div class="bx-warn">{{ icon('alert', 20) }}<span>P2P откроется вместе с обменом — <b>{{ d.opens | dt }}</b>. Пока объявления только смотреть.</span></div>
+  <div class="bx-warn">{{ icon('alert', 20) }}<span>P2P откроется вместе с обменом — <b>{{ d.opens | dt }}</b>. Пока только смотреть.</span></div>
   {% endif %}
-  <div class="bx-note">📣 Сделки только внутри Donatix: сайт держит монеты и деньги до сделки — обмануть нельзя. Комиссии нет.</div>
 
   {% if tab in ('buy', 'sell') %}
-  <div class="bx-seg" role="tablist">
-    <a role="tab" href="/panel/p2p?tab=buy&sort={{ sort }}" class="{{ 'on' if tab == 'buy' }}">Покупка</a>
-    <a role="tab" href="/panel/p2p?tab=sell&sort={{ sort }}" class="{{ 'on' if tab == 'sell' }}">Продажа</a>
-  </div>
+  {# ── Рынок: цена и живой график ── #}
+  <section class="bx-market">
+    <div class="bx-mk-head">
+      <i class="bx-coin lg">D</i>
+      <div class="grow"><b>D-коин</b><small class="bx-dim">цена 1 D</small></div>
+      <span class="bx-chg {{ 'up' if d.change >= 0 else 'down' }}" id="bx-chg">{{ '+' if d.change >= 0 }}{{ d.change }}%</span>
+    </div>
+    <div class="bx-mk-price" id="bx-price">{{ dprice(d.price) }}</div>
+    <p class="bx-mk-hint">📈 Цена растёт, когда люди покупают в магазине. Объявления P2P идут <b>по графику ± свой %</b>.</p>
+    <div class="bx-chart">
+      <canvas id="bx-canvas" aria-label="График цены D-коина"></canvas>
+      <div class="bx-tfs" role="tablist">
+        {% for tf in ('1m', '5m', '1h', '1d') %}<button type="button" data-tf="{{ tf }}" class="{{ 'on' if tf == '5m' }}">{{ tf }}</button>{% endfor %}
+      </div>
+    </div>
+    <div class="bx-mk-btns">
+      <a class="bx-big buy{{ ' on' if tab == 'buy' }}" href="/panel/p2p?tab=buy#ads">Купить D</a>
+      <a class="bx-big sell{{ ' on' if tab == 'sell' }}" href="/panel/p2p?tab=sell#ads">Продать D</a>
+    </div>
+  </section>
 
-  <form class="bx-filters" method="get" action="/panel/p2p">
+  {# ── Как это работает — 3 шага ── #}
+  <ol class="bx-steps">
+    <li><b>1</b><span>Выберите объявление</span></li>
+    <li><b>2</b><span>Откройте ордер — всё ❄️ заморожено</span></li>
+    <li><b>3</b><span>Подтверждение — D у покупателя, деньги у продавца</span></li>
+  </ol>
+
+  <div class="bx-bar" id="ads">
+    <div class="bx-seg" role="tablist">
+      <a role="tab" href="/panel/p2p?tab=buy&sort={{ sort }}#ads" class="{{ 'on' if tab == 'buy' }}">Покупка</a>
+      <a role="tab" href="/panel/p2p?tab=sell&sort={{ sort }}#ads" class="{{ 'on' if tab == 'sell' }}">Продажа</a>
+    </div>
+    <a class="bx-sort" href="/panel/p2p?tab={{ tab }}&sort={{ 'deals' if sort == 'price' else 'price' }}&amt={{ amt }}#ads">
+      {{ icon('swap', 16) }}{{ 'По цене' if sort == 'price' else 'По сделкам' }}</a>
+  </div>
+  <form class="bx-search" method="get" action="/panel/p2p#ads">
     <input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="sort" value="{{ sort }}">
-    <span class="bx-asset"><i class="bx-coin">D</i>D-коин</span>
-    <label class="bx-amt"><span>Сумма</span><input name="amt" value="{{ amt }}" inputmode="decimal" placeholder="{{ cur_code }}" aria-label="Сумма в {{ cur_code }}"></label>
-    <span class="bx-pay">Баланс Donatix</span>
-    <button class="bx-filter" aria-label="Применить фильтр">{{ icon('search', 20) }}</button>
+    {{ icon('search', 18) }}<input name="amt" value="{{ amt }}" inputmode="decimal" placeholder="Сумма сделки, {{ cur_code }}" aria-label="Сумма сделки">
+    {% if amt %}<a href="/panel/p2p?tab={{ tab }}&sort={{ sort }}#ads" aria-label="Сбросить">✕</a>{% endif %}
   </form>
-
-  <div class="bx-sorts">
-    <a href="/panel/p2p?tab={{ tab }}&sort=price&amt={{ amt }}" class="{{ 'on' if sort == 'price' }}">Цена ({{ 'от низкой к высокой' if tab == 'buy' else 'от высокой к низкой' }})</a>
-    <a href="/panel/p2p?tab={{ tab }}&sort=deals&amt={{ amt }}" class="{{ 'on' if sort == 'deals' }}">Количество завершённых сделок</a>
-  </div>
 
   <div class="bx-list">
     {% for a in ads %}
     <article class="bx-ad{{ ' top' if a.top }}">
-      {% if a.top %}<span class="bx-rec">Рекомендации</span>{% endif %}
+      {% if a.top %}<span class="bx-rec">⭐ Надёжный</span>{% endif %}
       <div class="bx-who">
         <span class="bx-ava c{{ a.color }}">{{ a.letter }}<i></i></span>
         <b>{{ a.who }}</b>
-        <span class="bx-orders">{{ a.deals }} ордеров (100%)</span>
+        <span class="bx-orders">{{ a.deals }} сделок · {{ a.rate }}%</span>
       </div>
-      <div class="bx-tags"><span class="bx-fast">⚡ Мгновенно</span></div>
-      <div class="bx-price">{{ dprice(a.price_usd * per) }}<em>за 1M D</em></div>
-      <div class="bx-row"><span>Лимиты</span><b>{% if a.min_usd %}{{ dprice(a.min_usd) }} – {{ dprice(a.max_usd) }}{% else %}до {{ dprice(a.max_usd) }}{% endif %}</b></div>
-      <div class="bx-row"><span>Количество</span><b>{{ a.remaining_text }} D</b></div>
-      <div class="bx-method">Баланс Donatix</div>
+      <div class="bx-price-row">
+        <div class="bx-price">{{ dprice(a.price_usd) }}<em>за 1 D</em></div>
+        <span class="bx-diff {{ 'even' if a.diff == 0 else ('cheap' if (a.diff < 0) == (tab == 'buy') else 'dear') }}">
+          {{ 'как график' if a.diff == 0 else ('%+d%% к графику' % a.diff) }}</span>
+      </div>
+      <div class="bx-meta">
+        <span>{{ 'Продаёт' if a.side == 'sell' else 'Покупает' }} <b>{{ a.remaining_text }} D</b></span>
+        <span>{% if a.min_usd %}{{ dprice(a.min_usd) }} – {% else %}до {% endif %}<b>{{ dprice(a.max_usd) }}</b></span>
+      </div>
       {% if a.user_id != user.id %}
-      <button type="button" class="bx-go {{ 'buy' if tab == 'buy' else 'sell' }}" data-open="bx-f{{ a.id }}">{{ 'Покупка' if tab == 'buy' else 'Продажа' }}</button>
+      <button type="button" class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}" data-open="bx-f{{ a.id }}">{{ 'Купить' if tab == 'buy' else 'Продать' }}</button>
       <form id="bx-f{{ a.id }}" class="bx-take" method="post" action="/panel/p2p/{{ a.id }}/take" data-price="{{ a.price_usd }}" hidden>
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <label><span>Количество, D</span>
+        <label><span>Сколько D {{ 'купить' if tab == 'buy' else 'продать' }}?</span>
           <div class="bx-in"><input name="amount" inputmode="decimal" placeholder="{{ a.min_text or '0' }}" autocomplete="off" required>
             <button type="button" data-all="{{ a.remaining / 100 }}">Все</button></div></label>
-        <div class="bx-sum">Итого: <b>—</b></div>
-        <p class="bx-dim small" style="margin:0">❄️ {{ 'Деньги' if tab == 'buy' else 'Монеты' }} заморозятся, владелец объявления подтвердит за {{ order_min }} минут — иначе всё вернётся само.</p>
-        <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">{{ 'Открыть ордер на покупку' if tab == 'buy' else 'Открыть ордер на продажу' }}</button>
+        <div class="bx-sum">{{ 'Вы заплатите' if tab == 'buy' else 'Вы получите' }}: <b>—</b></div>
+        <p class="bx-dim small" style="margin:0">❄️ {{ 'Деньги' if tab == 'buy' else 'Монеты' }} заморозятся, продавец подтвердит за {{ order_min }} минут — иначе всё вернётся само.</p>
+        <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">Открыть ордер</button>
         <button type="button" class="bx-ghost" data-open="bx-f{{ a.id }}">Отмена</button>
       </form>
-      {% else %}<span class="bx-mine">Ваше объявление</span>{% endif %}
+      {% else %}<span class="bx-mine">Это ваше объявление</span>{% endif %}
     </article>
     {% else %}
     <div class="bx-empty">{{ 'Нет объявлений на такую сумму.' if amt else 'Пока объявлений нет.' }}
@@ -76,12 +103,12 @@
 
   {% elif tab == 'orders' %}
   <h2 class="bx-h">Ордера</h2>
-  <p class="bx-note">Пока ордер открыт, монеты и деньги обеих сторон <b>заморожены</b> — их никто не возьмёт.
+  <p class="bx-note">Пока ордер открыт, монеты и деньги обеих сторон <b>❄️ заморожены</b>.
     Владелец объявления подтверждает за {{ order_min }} минут, иначе ордер отменяется сам и всё размораживается.</p>
   <div class="bx-list">
     {% for o in orders %}
     <article class="bx-ad bx-order {{ o.status }}">
-      <div class="bx-who"><b class="{{ 'g' if o.buying else 'r' }}">{{ 'Покупка' if o.buying else 'Продажа' }} D-коина</b>
+      <div class="bx-who"><b class="{{ 'g' if o.buying else 'r' }}">{{ 'Покупка' if o.buying else 'Продажа' }} {{ o.units_text }} D</b>
         <span class="bx-orders">#{{ o.id }}</span></div>
       {% if o.status == 'pending' %}
       <div class="bx-state wait">⏳ {{ 'Подтвердите ордер' if o.owner else 'Ждём подтверждения' }}
@@ -91,9 +118,8 @@
       <div class="bx-state {{ o.status }}">{{ {'done': '✅ Завершён', 'cancelled': '❌ Отменён', 'expired': '⌛ Время вышло — отменён'}[o.status] }}</div>
       {% endif %}
       <div class="bx-row"><span>{{ 'Продавец' if o.buying else 'Покупатель' }}</span><b>{{ o.other }}</b></div>
-      <div class="bx-row"><span>Количество</span><b>{{ o.units_text }} D</b></div>
       <div class="bx-row"><span>Сумма</span><b>{{ dprice(o.total_usd) }}</b></div>
-      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(o.price_usd * per) }}</b></div>
+      <div class="bx-row"><span>Цена 1 D</span><b>{{ dprice(o.price_usd) }}</b></div>
       <div class="bx-row"><span>Открыт</span><b>{{ o.created_at | dt }}</b></div>
       {% if o.status == 'pending' %}
       <div class="bx-acts">
@@ -113,30 +139,43 @@
   </div>
 
   {% elif tab == 'ads' %}
-  <h2 class="bx-h">Мои объявления</h2>
-  <form class="bx-ad bx-new" method="post" action="/panel/p2p/ad" data-ref="{{ d.price * per }}">
+  <h2 class="bx-h">Новое объявление</h2>
+  <form class="bx-ad bx-new" method="post" action="/panel/p2p/ad" data-ref="{{ d.price }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="bx-seg small" role="radiogroup">
       <label><input type="radio" name="side" value="sell" checked><span>Продаю D</span></label>
       <label><input type="radio" name="side" value="buy"><span>Покупаю D</span></label>
     </div>
-    <label class="bx-lbl" for="p2p-pct">Цена: <b id="p2p-pct-v">100</b>% от цены копилки → <b id="p2p-price" class="g">{{ dprice(d.price * per) }}</b> за 1M D</label>
-    <input id="p2p-pct" type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="100" step="1">
-    <label class="bx-lbl"><span>Количество, D <small class="bx-dim">· свободно {{ free_text }}</small></span>
+    <div class="bx-pricebox">
+      <span class="bx-dim">Ваша цена за 1 D</span>
+      <b id="p2p-price">{{ dprice(d.price) }}</b>
+      <span class="bx-diff even" id="p2p-diff">как график</span>
+    </div>
+    <input id="p2p-pct" type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="100" step="1" aria-label="Цена к графику, %">
+    <div class="bx-scale"><span>дешевле −{{ 100 - pmin }}%</span><span>как график</span><span>дороже +{{ pmax - 100 }}%</span></div>
+    <p class="bx-dim small" style="margin:0">Цена идёт <b>за графиком</b>: растёт график — растёт и ваша цена. Поменять % можно в любой момент.</p>
+    <label class="bx-lbl"><span>Сколько D <small class="bx-dim">· свободно {{ free_text }}</small></span>
       <div class="bx-in"><input name="amount" inputmode="decimal" placeholder="{{ free_text }}" autocomplete="off" required></div></label>
     <label class="bx-lbl"><span>Минимум за сделку, D <small class="bx-dim">· необязательно</small></span>
       <div class="bx-in"><input name="min_amount" inputmode="decimal" placeholder="0" autocomplete="off"></div></label>
-    <p class="bx-dim small">«Продаю» — монеты сразу уходят в объявление. «Покупаю» — сумма сразу резервируется с баланса. Закроете — остаток вернётся.</p>
     <button class="bx-go wide buy">Разместить объявление</button>
   </form>
+
+  {% if mine %}<h2 class="bx-h">Мои объявления</h2>{% endif %}
   <div class="bx-list">
     {% for a in mine %}
     <article class="bx-ad">
-      <div class="bx-who"><b class="{{ 'r' if a.side == 'sell' else 'g' }}">#{{ a.id }} · {{ 'Продаю' if a.side == 'sell' else 'Покупаю' }}</b>
+      <div class="bx-who"><b class="{{ 'r' if a.side == 'sell' else 'g' }}">{{ 'Продаю' if a.side == 'sell' else 'Покупаю' }} · #{{ a.id }}</b>
         <span class="bx-orders">{{ {'open': '🟢 Открыто', 'done': '✅ Выполнено', 'cancelled': 'Закрыто'}[a.status] }}</span></div>
-      <div class="bx-row"><span>Цена за 1M D</span><b>{{ dprice(a.price_usd * per) }} ({{ a.pct }}%)</b></div>
-      <div class="bx-row"><span>Осталось</span><b>{{ a.remaining_text }} D</b></div>
+      <div class="bx-price-row"><div class="bx-price">{{ dprice(a.price_usd) }}<em>за 1 D</em></div>
+        <span class="bx-diff even">{{ 'как график' if a.pct == 100 else ('%+d%% к графику' % (a.pct - 100)) }}</span></div>
+      <div class="bx-meta"><span>Осталось <b>{{ a.remaining_text }} D</b></span></div>
       {% if a.status == 'open' %}
+      <form class="bx-repct" method="post" action="/panel/p2p/{{ a.id }}/price">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="range" name="pct" min="{{ pmin }}" max="{{ pmax }}" value="{{ a.pct }}" step="1" aria-label="Новая цена, % к графику">
+        <button class="bx-ghost">Сохранить цену <b data-v>{{ '%+d' % (a.pct - 100) }}</b>%</button>
+      </form>
       <form method="post" action="/panel/p2p/{{ a.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="bx-ghost">Закрыть и вернуть остаток</button></form>
       {% endif %}
@@ -148,7 +187,7 @@
   <div class="bx-prof">
     <span class="bx-ava big c{{ user.id % 6 }}">{{ (user.login or '?')[:1] | upper }}<i></i></span>
     <b>{{ user.login }}</b>
-    <span class="bx-dim">{{ prof.deals }} ордеров (100%)</span>
+    <span class="bx-dim">{{ prof.deals }} сделок</span>
   </div>
   <div class="bx-grid">
     <div><span>Куплено</span><b class="g">{{ prof.bought }} D</b></div>
@@ -156,18 +195,18 @@
     <div><span>Оборот</span><b>{{ dprice(prof.volume_usd) }}</b></div>
     <div><span>Открытых объявлений</span><b>{{ prof.open_ads }}</b></div>
     <div><span>Свободно D-коинов</span><b>{{ free_text }} D</b></div>
+    <div><span>Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
     <div><span>❄️ Заморожено D</span><b>{{ prof.frozen_coins }} D</b></div>
     <div><span>❄️ Заморожено денег</span><b>{{ dprice(prof.frozen_usd) }}</b></div>
-    <div><span>Баланс</span><b>{{ money(user.balance_micro) }}</b></div>
-    <div><span>Цена копилки, 1M D</span><b>{{ dprice(d.price * per) }}</b></div>
-    <div><span>Последняя сделка, 1M D</span><b>{{ dprice(last * per) if last else '—' }}</b></div>
+    <div><span>Цена 1 D по графику</span><b>{{ dprice(d.price) }}</b></div>
+    <div><span>Последняя сделка, 1 D</span><b>{{ dprice(last) if last else '—' }}</b></div>
   </div>
   {% endif %}
 
   <nav class="bx-nav" aria-label="P2P">
-    <a href="/panel/p2p" class="{{ 'on' if tab in ('buy', 'sell') }}">{{ icon('home', 24) }}<span>P2P</span></a>
+    <a href="/panel/p2p" class="{{ 'on' if tab in ('buy', 'sell') }}">{{ icon('home', 24) }}<span>Рынок</span></a>
     <a href="/panel/p2p?tab=orders" class="{{ 'on' if tab == 'orders' }}">{{ icon('book', 24) }}<span>Ордера</span></a>
-    <a href="/panel/p2p?tab=ads" class="{{ 'on' if tab == 'ads' }}">{{ icon('chart', 24) }}<span>Объявления</span></a>
+    <a href="/panel/p2p?tab=ads" class="{{ 'on' if tab == 'ads' }}">{{ icon('plus', 24) }}<span>Объявление</span></a>
     <a href="/panel/p2p?tab=profile" class="{{ 'on' if tab == 'profile' }}">{{ icon('user', 24) }}<span>Профиль</span></a>
   </nav>
 </div>
@@ -181,11 +220,60 @@
   }
   var rate = {{ (cur_rate or 0) | float | tojson }}, sym = {{ (" с." if cur_code == 'TJS' else (" " ~ cur_sym if cur_rate else "")) | tojson }};
   function cur(usd) { return rate ? fmt(usd * rate) + sym : "$" + fmt(usd); }
+  var timers = [];
+  if (window.dxOnLeave) dxOnLeave(function () { timers.forEach(clearTimeout); timers = []; });
+
+  // ── Живой график: свечи, обновление каждые 5 секунд ──
+  var cv = document.getElementById("bx-canvas"), tf = "5m";
+  function draw(c) {
+    if (!cv || !c.length) return;
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    var g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+    var hi = -Infinity, lo = Infinity;
+    c.forEach(function (k) { hi = Math.max(hi, k[2]); lo = Math.min(lo, k[3]); });
+    if (hi === lo) { hi *= 1.001; lo *= 0.999; }
+    var pad = 10, y = function (v) { return pad + (hi - v) / (hi - lo) * (h - pad * 2); };
+    var bw = w / c.length;
+    c.forEach(function (k, i) {
+      var x = i * bw + bw / 2, up = k[4] >= k[1];
+      g.strokeStyle = g.fillStyle = up ? "#20b26c" : "#ef454a";
+      g.beginPath(); g.moveTo(x, y(k[2])); g.lineTo(x, y(k[3])); g.lineWidth = 1; g.stroke();
+      var top = y(Math.max(k[1], k[4])), bot = y(Math.min(k[1], k[4]));
+      g.fillRect(x - bw * 0.35, top, bw * 0.7, Math.max(1.5, bot - top));
+    });
+    var ly = y(c[c.length - 1][4]);
+    g.setLineDash([4, 4]); g.strokeStyle = "rgba(247,166,0,.7)"; g.beginPath(); g.moveTo(0, ly); g.lineTo(w, ly); g.stroke();
+    g.setLineDash([]);
+  }
+  function load() {
+    if (!cv || !document.body.contains(cv)) return;
+    fetch("/panel/data/dcoin?tf=" + tf + "&n=48", {credentials: "same-origin"}).then(function (r) { return r.json(); })
+      .then(function (d) {
+        draw(d.candles || []);
+        var p = document.getElementById("bx-price"); if (p && d.price) p.textContent = cur(d.price);
+        var ch = document.getElementById("bx-chg");
+        if (ch && d.change != null) { ch.textContent = (d.change >= 0 ? "+" : "") + d.change + "%"; ch.className = "bx-chg " + (d.change >= 0 ? "up" : "down"); }
+      }).catch(function () {})
+      .then(function () { timers.push(setTimeout(load, 5000)); });
+  }
+  if (cv) {
+    document.querySelectorAll(".bx-tfs button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        tf = b.dataset.tf;
+        document.querySelectorAll(".bx-tfs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        timers.forEach(clearTimeout); timers = []; load();
+      });
+    });
+    load();
+  }
+
+  // ── Открыть форму ордера ──
   document.querySelectorAll(".bx [data-open]").forEach(function (b) {
     b.addEventListener("click", function () {
       var f = document.getElementById(b.dataset.open); if (!f) return;
       f.hidden = !f.hidden;
-      var t = f.closest(".bx-ad").querySelector(".bx-go:not(.wide)"); if (t) t.classList.toggle("open", !f.hidden);
+      var t = f.closest(".bx-ad").querySelector(".bx-go[data-open]"); if (t) t.classList.toggle("open", !f.hidden);
       if (!f.hidden) { var i = f.querySelector("input[name=amount]"); if (i) i.focus(); }
     });
   });
@@ -196,28 +284,37 @@
     var all = f.querySelector("[data-all]");
     if (all) all.addEventListener("click", function () { inp.value = all.dataset.all; upd(); });
   });
-  // Таймеры ордеров: каждую секунду, на нуле — обновить страницу (ордер отменится и всё разморозится)
-  var timers = document.querySelectorAll(".bx-timer[data-left]"), t0 = Date.now(), tm = null;
+
+  // ── Таймеры ордеров: на нуле — обновить (ордер отменится, всё разморозится) ──
+  var tms = document.querySelectorAll(".bx-timer[data-left]"), t0 = Date.now();
   function tick() {
     var gone = (Date.now() - t0) / 1000, reload = false;
-    timers.forEach(function (el) {
+    tms.forEach(function (el) {
       var s = Math.max(0, Math.round(+el.dataset.left - gone));
       el.textContent = ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + s % 60).slice(-2);
       if (!s) reload = true;
     });
     if (reload) { location.href = "/panel/p2p?tab=orders"; return; }
-    tm = setTimeout(tick, 1000);
+    timers.push(setTimeout(tick, 1000));
   }
-  if (timers.length) { tick(); if (window.dxOnLeave) dxOnLeave(function () { clearTimeout(tm); }); }
+  if (tms.length) tick();
+
+  // ── Цена объявления: % к графику → цена и подпись ──
   var form = document.querySelector(".bx-new");
   if (form) {
-    var ref = +form.dataset.ref, pct = form.querySelector("#p2p-pct");
+    var ref = +form.dataset.ref, pct = form.querySelector("#p2p-pct"), dEl = document.getElementById("p2p-diff");
     var upd = function () {
-      document.getElementById("p2p-pct-v").textContent = pct.value;
-      document.getElementById("p2p-price").textContent = cur(ref * pct.value / 100);
+      var p = +pct.value;
+      document.getElementById("p2p-price").textContent = cur(ref * p / 100);
+      dEl.textContent = p === 100 ? "как график" : (p > 100 ? "+" : "") + (p - 100) + "% к графику";
+      dEl.className = "bx-diff " + (p === 100 ? "even" : (p < 100 ? "cheap" : "dear"));
     };
     pct.addEventListener("input", upd); upd();
   }
+  document.querySelectorAll(".bx-repct").forEach(function (f) {
+    var r = f.querySelector("input[type=range]"), v = f.querySelector("[data-v]");
+    r.addEventListener("input", function () { var p = +r.value; v.textContent = (p >= 100 ? "+" : "") + (p - 100); });
+  });
 })();
 </script>
 {% endblock %}
