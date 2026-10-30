@@ -1,16 +1,15 @@
 """SmartPay (smartpay.tj): оплата из любого банка Таджикистана — баланс пополняется сам, чек не нужен.
 
 Как идёт оплата:
-  1. Клиент создаёт заявку способом с автозачислением «SmartPay» — сайт создаёт инвойс
-     (POST /merchant/invoices, order_id = «dx<номер заявки>») и получает payment_link: страница оплаты / QR.
-  2. На телефоне — кнопки банков (GET /merchant/banks, кешируем на сутки): нажал свой банк — сайт создаёт
-     инвойс с deeplink_bank_id (order_id = «dx<номер>-b<банк>») и сразу открывает приложение банка.
-  3. После оплаты SmartPay присылает webhook на /pay/smartpay/webhook. Опроса статуса у SmartPay нет —
+  1. Клиент выбирает «SmartPay» и сумму — сайт создаёт инвойс (POST /merchant/invoices,
+     order_id = «dx<номер заявки>») и сразу открывает payment_link: страницу SmartPay, где клиент выбирает
+     любой банк Таджикистана. После оплаты SmartPay возвращает его на наш сайт (return_url).
+  2. После оплаты SmartPay присылает webhook на /pay/smartpay/webhook. Опроса статуса у SmartPay нет —
      только webhook. Ему верим, только если совпали ОБЕ проверки: заголовок X-Api-Token (64 hex из настроек
      webhook) и подпись HMAC-SHA256 «payment_date|amount|order_id|bank_id|invoice_uuid» секретом webhook.
      Сумма приходит в дирамах и должна ровно совпасть с заявкой. Один платёж — одно зачисление
      (payments.confirm закрывает заявку один раз, payment_id пишется в ext_id — он уникален).
-  4. Не оплатили за время жизни инвойса — заявка закрывается сама.
+  3. Не оплатили за время жизни инвойса — заявка закрывается сама.
 
 Ключи — только в .env сервера: DONATIX_SMARTPAY_KEY (x-app-token), DONATIX_SMARTPAY_MODE (sandbox|production),
 DONATIX_SMARTPAY_HOOK_TOKEN (X-Api-Token webhook), DONATIX_SMARTPAY_HOOK_SECRET (секрет подписи).
@@ -20,11 +19,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import logging
 import re
 import sqlite3
-import time
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_DOWN, Decimal
 from typing import Any
@@ -40,12 +37,8 @@ KIND = "smartpay"
 BASES = {"sandbox": "https://sandbox.smartpay.tj/api/merchant", "production": "https://ecomm.smartpay.tj/api/merchant"}
 LIFETIME = 1800                    # инвойс живёт 30 минут
 MIN_TJS = Decimal("2")             # меньше SmartPay не принимает
-BANKS_TTL = 86400                  # список банков — раз в сутки
 EXPIRED_NOTE = "SmartPay: время оплаты вышло"
-# Если SmartPay не ответил списком — кнопки по документации (DEEPLINK_BANK_ID)
-DEFAULT_BANKS = [(8, "Алиф Банк"), (9, "Эсхата"), (2, "Амонатбонк"), (11, "Хумо"), (7, "CBT / Фаврӣ"),
-                 (4, "ICB"), (10, "Арванд"), (13, "ССБ"), (15, "Vasl Pay"), (21, "IBT")]
-ORDER_RE = re.compile(r"^dx(\d+)(?:-b\d+)?$")
+ORDER_RE = re.compile(r"^dx(\d+)$")
 
 
 class SmartPayError(Exception):
@@ -99,38 +92,16 @@ def health(config: Config) -> str:
     return uuid
 
 
-def banks(conn: sqlite3.Connection, config: Config) -> list[dict[str, Any]]:
-    """Банки для кнопок (id, название). Кеш на сутки; не вышло — список из документации."""
-    try:
-        cached = json.loads(db.get_setting(conn, "smartpay.banks") or "{}")
-    except ValueError:
-        cached = {}
-    if cached.get("at", 0) > time.time() - BANKS_TTL and cached.get("banks"):
-        return cached["banks"]
-    out: list[dict[str, Any]] = []
-    if ready(config):
-        try:
-            for b in _call(config, "GET", "/banks").get("banks") or []:
-                if isinstance(b, dict) and str(b.get("id", "")).isdigit() and b.get("name"):
-                    out.append({"id": int(b["id"]), "name": str(b["name"])[:40]})
-        except SmartPayError as exc:
-            log.warning("SmartPay: список банков: %s", exc)
-    if out:
-        db.set_setting(conn, "smartpay.banks", json.dumps({"at": time.time(), "banks": out}, ensure_ascii=False))
-        return out
-    return [{"id": i, "name": n} for i, n in DEFAULT_BANKS]
-
-
-def order_id(payment_id: int, bank_id: int | None = None) -> str:
-    """Наш номер заказа в SmartPay: dx1234 (ссылка/QR) или dx1234-b8 (сразу в приложение банка)."""
-    return f"dx{payment_id}" + (f"-b{bank_id}" if bank_id else "")
+def order_id(payment_id: int) -> str:
+    """Наш номер заказа в SmartPay: dx1234."""
+    return f"dx{payment_id}"
 
 
 def _amount(p: sqlite3.Row) -> Decimal:
     return Decimal(p["pay_amount"]).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
 
 
-def create(conn: sqlite3.Connection, config: Config, payment_id: int, bank_id: int | None = None) -> dict[str, str]:
+def create(conn: sqlite3.Connection, config: Config, payment_id: int) -> dict[str, str]:
     """Инвойс на заявку. Повторный запрос с тем же order_id вернёт тот же инвойс (идемпотентность SmartPay)."""
     p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     if p is None:
@@ -139,43 +110,22 @@ def create(conn: sqlite3.Connection, config: Config, payment_id: int, bank_id: i
     if amount < MIN_TJS:
         raise SmartPayError(f"Через SmartPay — от {MIN_TJS} сомони.")
     body: dict[str, Any] = {
-        "order_id": order_id(payment_id, bank_id), "amount": float(amount),
+        "order_id": order_id(payment_id), "amount": float(amount),
         "description": f"Пополнение баланса {config.site_name} #{payment_id}", "lifetime": LIFETIME,
         "return_url": f"{config.base_url.rstrip('/')}/panel/balance/{payment_id}/pay",
     }
-    if bank_id:
-        body["deeplink_bank_id"] = int(bank_id)
     data = _call(config, "POST", "/invoices", body)
     if data.get("result") != 200 or not data.get("payment_link"):
         log.warning("SmartPay: инвойс для #%s не создан: %s", payment_id, data.get("message"))
         raise SmartPayError(str(data.get("message") or "SmartPay не создал счёт — попробуйте ещё раз.")[:200])
-    return {"payment_link": str(data["payment_link"]), "deeplink_url": str(data.get("deeplink_url") or ""),
-            "invoice_uuid": str(data.get("invoice_uuid") or ""), "smartpay_id": str(data.get("smartpay_id") or "")}
+    return {"payment_link": str(data["payment_link"]), "invoice_uuid": str(data.get("invoice_uuid") or ""), "smartpay_id": str(data.get("smartpay_id") or "")}
 
 
 def start(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
-    """Сразу после создания заявки: инвойс и ссылка на оплату (страница SmartPay / QR)."""
+    """Сразу после создания заявки: инвойс и ссылка на страницу оплаты SmartPay (все банки)."""
     inv = create(conn, config, payment_id)
     conn.execute("UPDATE payments SET auto_kind = ?, pay_url = ?, pay_memo = ? WHERE id = ?",
                  (KIND, inv["payment_link"], inv["smartpay_id"] or None, payment_id))
-
-
-def bank_link(conn: sqlite3.Connection, config: Config, payment_id: int, bank_id: int) -> str:
-    """Кнопка банка: инвойс с диплинком — ссылка, которая открывает приложение банка с суммой."""
-    p = conn.execute("SELECT status, auto_kind FROM payments WHERE id = ?", (payment_id,)).fetchone()
-    if p is None or p["status"] != "pending" or p["auto_kind"] != KIND:
-        raise SmartPayError("Заявка уже закрыта — создайте новую.")
-    inv = create(conn, config, payment_id, bank_id)
-    return inv["deeplink_url"] or inv["payment_link"]
-
-
-def sign_link(config: Config, payment_id: int) -> str:
-    """Подпись для ссылок кнопок банков: открываются и из бота/мини-приложения, где нет входа на сайт."""
-    return hmac.new(config.secret_key.encode(), f"smartpay:{payment_id}".encode(), hashlib.sha256).hexdigest()[:24]
-
-
-def check_link(config: Config, payment_id: int, sig: str) -> bool:
-    return hmac.compare_digest(sign_link(config, payment_id), sig or "")
 
 
 # ── webhook ──────────────────────────────────────────────────

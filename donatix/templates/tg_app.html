@@ -581,6 +581,7 @@ async function topupGo(btn) {
   if (!r.ok) { toast(r.error || "Хато", "err"); return; }
   if (r.done) { toast(r.message, "ok"); go("home"); return; }
   P.pay = r.pay; P.showReceipt = false; render(); startPoll();
+  if (r.pay.auto === "smartpay" && r.pay.pay_url) { tg && tg.openLink ? tg.openLink(r.pay.pay_url) : window.open(r.pay.pay_url); }
 }
 async function sendLateReceipt(btn) {
   const f = document.getElementById("trc2"); if (!f || !f.files[0]) { toast(t("receipt"), "err"); return; }

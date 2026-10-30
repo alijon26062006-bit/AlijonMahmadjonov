@@ -1581,10 +1581,9 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
               "title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
               "card": " ".join(account[i:i + 4] for i in range(0, len(account), 4)), "holder": holder[:60]}
     sp = None
-    if row["auto_kind"] == "smartpay":   # кнопки банков (телефон) и ссылка на оплату / QR (компьютер)
+    if row["auto_kind"] == "smartpay":   # вернулся, не оплатив, — снова кнопка на страницу SmartPay
         from . import smartpay
-        sp = {"banks": smartpay.banks(conn, config), "sig": smartpay.sign_link(config, payment_id),
-              "left": max(0, smartpay.LIFETIME - int(age))}
+        sp = {"left": max(0, smartpay.LIFETIME - int(age))}
     from . import quickbuy
     return render(request, "panel/auto_pay.html", {
         "user": user, "p": payments.public(conn, config, row), "dc": dc, "sp": sp,
@@ -1709,21 +1708,6 @@ async def smartpay_webhook(request: Request, conn=Depends(get_conn), config: Con
     return JSONResponse({"status": "ok" if res["status"] in ("ok", "duplicate") else res["status"]})
 
 
-@router.get("/pay/smartpay/{payment_id}/bank/{bank_id}")
-def smartpay_bank(payment_id: int, bank_id: int, request: Request, s: str = "", conn=Depends(get_conn),
-                  config: Config = Depends(get_config)):
-    """Кнопка банка: инвойс с диплинком и сразу в приложение банка. Ссылка подписана — работает и из бота."""
-    from . import smartpay
-    if not smartpay.check_link(config, payment_id, s):
-        return _redirect("/panel/balance")
-    try:
-        url = smartpay.bank_link(conn, config, payment_id, bank_id)
-    except smartpay.SmartPayError as exc:
-        flash(request, str(exc), "error")
-        return _redirect(f"/panel/balance/{payment_id}/pay")
-    return RedirectResponse(url, status_code=303)
-
-
 @router.get("/currency/{code}")
 def set_currency(code: str, request: Request, next: str = ""):
     """Выбор валюты показа: сомони, доллар или валюта СНГ. Только показ сумм, запоминается в браузере на год.
@@ -1803,6 +1787,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     if intent is not None:
         request.session.pop("buy_intent", None)
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    if row["auto_kind"] == "smartpay" and row["pay_url"]:
+        return RedirectResponse(row["pay_url"], status_code=303)   # сразу страница SmartPay: там все банки
     if row["auto_kind"]:
         return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
     send_receipt(conn, config, pid)

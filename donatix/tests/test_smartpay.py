@@ -1,4 +1,4 @@
-"""SmartPay: инвойс и кнопки банков, webhook — только с токеном и подписью, точная сумма, одно зачисление."""
+"""SmartPay: инвойс и сразу страница оплаты со всеми банками, webhook — только с токеном и подписью, точная сумма, одно зачисление."""
 
 import pytest
 from conftest import balance, csrf_of, web_login
@@ -22,16 +22,12 @@ def sp(config, conn, monkeypatch):
         calls.append((method, path, body))
         if path == "/health":
             return {"merchant_unit_uuid": "m-uuid-1"}
-        if path == "/banks":
-            return {"banks": [{"id": 8, "name": "Алиф Банк"}, {"id": 9, "name": "Эсхата"}]}
         if path == "/invoices":
             if body["amount"] < 2:
                 raise smartpay.SmartPayError("Минимальная сумма инвойса должна быть 2 сомони")
-            link = {"payment_link": f"https://smartpay.tj/invoice/{body['order_id']}"}
-            if body.get("deeplink_bank_id"):
-                link["deeplink_url"] = f"https://bank{body['deeplink_bank_id']}.go.link/{body['order_id']}"
             return {"result": 200, "message": "Инвойс создан", "invoice_uuid": "inv-" + body["order_id"],
-                    "order_id": body["order_id"], "smartpay_id": "003000000125", **link}
+                    "order_id": body["order_id"], "smartpay_id": "003000000125",
+                    "payment_link": f"https://smartpay.tj/invoice/{body['order_id']}"}
         raise AssertionError(path)
 
     monkeypatch.setattr(smartpay, "_call", fake_call)
@@ -51,29 +47,26 @@ def _pay(c, token, tjs="100"):
 
 def _hook(payment_id, amount_diram, **over):
     body = {"payment_date": "2026-03-05T03:31:51.879779", "amount": amount_diram,
-            "order_id": f"dx{payment_id}-b8", "bank_id": 8, "invoice_number": "001-000042",
-            "invoice_uuid": f"inv-dx{payment_id}-b8", "payment_id": 78901, "bank": "Алиф Банк"}
+            "order_id": f"dx{payment_id}", "bank_id": 8, "invoice_number": "001-000042",
+            "invoice_uuid": f"inv-dx{payment_id}", "payment_id": 78901, "bank": "Алиф Банк"}
     body.update(over)
     body["signature"] = smartpay.signature(SECRET, body)
     return body
 
 
-def test_invoice_banks_and_bank_deeplink(app, conn, sp):
+def test_amount_opens_smartpay_page_with_all_banks(app, conn, sp):
     uid, c, token = _client(app, conn)
     r = _pay(c, token)
-    assert r.status_code == 303
     p = conn.execute("SELECT * FROM payments").fetchone()
-    assert p["auto_kind"] == "smartpay" and p["pay_url"] == f"https://smartpay.tj/invoice/dx{p['id']}"
+    link = f"https://smartpay.tj/invoice/dx{p['id']}"
+    assert p["auto_kind"] == "smartpay" and p["pay_url"] == link
+    assert r.status_code == 303 and r.headers["location"] == link       # сразу страница SmartPay — там все банки
     body = next(b for m, path, b in sp.calls if path == "/invoices")
     assert body["order_id"] == f"dx{p['id']}" and body["amount"] == 100.0 and body["lifetime"] == 1800
-    page = c.get(f"/panel/balance/{p['id']}/pay").text
-    sig = smartpay.sign_link(sp, p["id"])
-    assert "Алиф Банк" in page and "Эсхата" in page and f"/pay/smartpay/{p['id']}/bank/8?s={sig}" in page
-    assert "Оплатить по ссылке / QR" in page
-    r = TestClient(app).get(f"/pay/smartpay/{p['id']}/bank/8?s={sig}", follow_redirects=False)   # без входа — из бота
-    assert r.status_code == 303 and r.headers["location"] == f"https://bank8.go.link/dx{p['id']}-b8"
-    bad = TestClient(app).get(f"/pay/smartpay/{p['id']}/bank/8?s=wrong", follow_redirects=False)
-    assert bad.headers["location"] == "/panel/balance"
+    assert "deeplink_bank_id" not in body
+    assert body["return_url"].endswith(f"/panel/balance/{p['id']}/pay")
+    page = c.get(f"/panel/balance/{p['id']}/pay").text                  # вернулся с SmartPay — кнопка ещё раз
+    assert link in page and "Оплатить" in page
 
 
 def test_webhook_credits_once_only_with_token_and_signature(app, conn, sp):

@@ -41,16 +41,6 @@
   .cp-info small { color: var(--muted); font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .cp-info b { font-weight: 600; }
   .cp-done { margin: 0 0 14px; font-size: 1rem; }
-  .sp-banks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .sp-bank { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border: 1.5px solid var(--line);
-    border-radius: 14px; background: var(--surface); color: var(--text); font-weight: 700; text-decoration: none; transition: border-color .15s; }
-  .sp-bank:hover, .sp-bank:focus-visible { border-color: var(--accent); outline: none; }
-  .sp-mono { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
-  .sp-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: .85rem; }
-  .sp-or::before, .sp-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-  @media (min-width: 900px) { .sp-banks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (hover: hover) and (pointer: fine) { .sp-qr { display: grid; } }
-  @media (hover: none) { .sp-qr { display: none; } }
 </style>
 {% if dc and p.status == 'pending' %}
 <div class="dcp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
@@ -235,18 +225,9 @@
   {% elif p.auto == 'binance' %}
   <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">Оплатить в Binance</a>
   {% elif p.auto == 'smartpay' and sp %}
-  <div class="sp-pay">
-    <div class="ap-label" style="margin-top:14px">Выберите свой банк — откроется приложение с этой суммой</div>
-    <div class="sp-banks">
-      {% for b in sp.banks %}<a class="sp-bank" href="/pay/smartpay/{{ p.id }}/bank/{{ b.id }}?s={{ sp.sig }}" rel="nofollow">
-        <span class="sp-mono" aria-hidden="true">{{ b.name[:1] }}</span><span>{{ b.name }}</span></a>{% endfor %}
-    </div>
-    <div class="sp-or"><span>или</span></div>
-    <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener">{{ icon('card', 18) }}Оплатить по ссылке / QR</a>
-    <div class="ap-qr sp-qr">{{ p.pay_url | qr_svg }}<small>С компьютера — отсканируйте телефоном</small></div>
-    <p class="hint">Любой банк Таджикистана. Чек не нужен — баланс пополнится сам сразу после оплаты.
-      Ссылка действует {{ (sp.left // 60) or 1 }} мин.</p>
-  </div>
+  <a class="btn primary block lg" href="{{ p.pay_url }}" style="margin-top:14px">{{ icon('card', 18) }}Оплатить</a>
+  <p class="hint">Откроется страница SmartPay — выберите любой банк Таджикистана. Чек не нужен: баланс пополнится сам
+    сразу после оплаты. Ссылка действует {{ (sp.left // 60) or 1 }} мин.</p>
   {% endif %}
 
   <div class="ap-wait"><span class="spinner"></span> Ждём поступление — страница обновится сама.</div>
