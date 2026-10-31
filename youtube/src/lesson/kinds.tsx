@@ -256,7 +256,7 @@ export const CodeKind: React.FC<P> = ({d}) => {
 };
 
 // ================================================================ переменные — коробки в памяти
-// ops: [ключ, 'new' | 'set' | 'print', имя коробки, значение (для print — что на экране), строка кода]
+// ops: [ключ, 'new' | 'set' | 'print', имя коробки, значение (для print — что на экране), строка кода, тип]
 const valColor = (v: string) => (/^["']/.test(v) ? '#CE9178' : '#B5CEA8');
 const BOX_W = 400;
 const BOX_GAP = 70;
@@ -267,7 +267,7 @@ export const MemoryKind: React.FC<P> = ({d, brand}) => {
   const p = d.params;
   const ops = (p.ops as any[])
     .filter((o) => has(d, o[0]))
-    .map((o) => ({k: o[0] as string, t: ev(d, o[0]), op: o[1] as string, box: o[2] as string, value: o[3] as string, code: o[4] as string | undefined}))
+    .map((o) => ({k: o[0] as string, t: ev(d, o[0]), op: o[1] as string, box: o[2] as string, value: o[3] as string, code: o[4] as string | undefined, type: o[5] as string | undefined}))
     .sort((a, b) => a.t - b.t);
   const past = ops.filter((o) => o.t <= sec);
   const code = [...past].reverse().find((o) => o.code);
@@ -297,7 +297,7 @@ export const MemoryKind: React.FC<P> = ({d, brand}) => {
         const reading = prints.some((o) => o.box === name && sec < o.t + 1.4);
         const col = reading ? theme.accent2 : theme.accent;
         return (
-          <div key={name} style={{position: 'absolute', left: x0 + i * (BOX_W + BOX_GAP), top: 400, width: BOX_W, opacity: appear, translate: `0 ${(1 - appear) * 40}px`}}>
+          <div key={name} style={{position: 'absolute', left: x0 + i * (BOX_W + BOX_GAP), top: 370, width: BOX_W, opacity: appear, translate: `0 ${(1 - appear) * 40}px`}}>
             <div style={{display: 'inline-block', marginLeft: 26, padding: '8px 24px', borderRadius: '12px 12px 0 0', background: col, fontFamily: fonts.mono, fontWeight: 700, fontSize: 34, color: '#0B0F17'}}>{name}</div>
             <div style={{position: 'relative', height: 240, borderRadius: 24, overflow: 'hidden', border: `3px solid ${col}`, background: 'linear-gradient(160deg, rgba(76,141,255,0.10), rgba(15,20,32,0.9))', boxShadow: reading ? '0 0 70px rgba(34,211,238,0.45)' : '0 30px 80px rgba(0,0,0,0.35)'}}>
               {prev && kIn < 1 ? (
@@ -305,6 +305,13 @@ export const MemoryKind: React.FC<P> = ({d, brand}) => {
               ) : null}
               <div style={{...center, color: valColor(cur.value), opacity: kIn, translate: `0 ${(1 - kIn) * -150}px`}}>{cur.value}</div>
             </div>
+            {cur.type ? (
+              <div style={{marginTop: 16, display: 'flex', justifyContent: 'center', opacity: kIn}}>
+                <div style={{padding: '8px 22px', borderRadius: 999, background: 'rgba(34,211,238,0.12)', border: `2px solid ${theme.accent2}`, fontFamily: fonts.body, fontWeight: 800, fontSize: 26, color: theme.text}}>
+                  {cur.type}
+                </div>
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -318,7 +325,7 @@ export const MemoryKind: React.FC<P> = ({d, brand}) => {
           ))}
         </div>
       ) : null}
-      <Explains d={d} x={1000} y={760} w={760} />
+      <Explains d={d} x={1000} y={790} w={760} />
       {p.chapter ? <ChapterTag step={p.chapter[0]} title={p.chapter[1]} /> : null}
       <Brand text={brand} />
     </AbsoluteFill>

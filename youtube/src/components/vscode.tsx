@@ -141,13 +141,13 @@ export const VSCodeWindow: React.FC<{
 /** Строка кода с простой подсветкой Python. */
 export const CodeLine: React.FC<{text: string; n: number; noNum?: boolean}> = ({text, n, noNum}) => {
   const parts: React.ReactNode[] = [];
-  const re = /(#.*$)|("[^"]*"?|'[^']*'?)|(\b(?:print|input|exit)\b)|(\b(?:sep|end)(?==))|(\b\d+(?:\.\d+)?\b)/g;
+  const re = /(#.*$)|("[^"]*"?|'[^']*'?)|(\b(?:print|input|exit|type|int|float|str|bool|len)\b)|(\b(?:sep|end)(?==))|(\b\d+(?:\.\d+)?\b)|(\b(?:True|False|None)\b)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(<span key={i++}>{text.slice(last, m.index)}</span>);
-    const col = m[1] ? '#6A9955' : m[2] ? '#CE9178' : m[3] ? '#DCDCAA' : m[4] ? '#9CDCFE' : '#B5CEA8';
+    const col = m[1] ? '#6A9955' : m[2] ? '#CE9178' : m[3] ? '#DCDCAA' : m[4] ? '#9CDCFE' : m[5] ? '#B5CEA8' : '#569CD6';
     parts.push(
       <span key={i++} style={{color: col}}>
         {m[0]}
