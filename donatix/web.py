@@ -104,7 +104,7 @@ FAQ = [
 
 BOT_FAQ = [
     ("Что такое конструктор ботов?", "Это ваш собственный Telegram-бот-магазин. Клиенты покупают у вас алмазы "
-                                     "FF, UC для PUBG Mobile, Telegram Stars и Premium, а заказы "
+                                     "FF, UC для PUBG Mobile, карты и ключи, а заказы "
                                      "выполняются автоматически с вашего баланса Donatix."),
     ("Сколько стоит конструктор?", "Подключение бесплатное. Вы платите только за проданные товары по нашей "
                                    "цене, а наценку в боте ставите сами — разница ваш заработок."),
@@ -166,7 +166,7 @@ def web_manifest(config: Config = Depends(get_config)):
                                    ("maskable-512.png", "512x512", "maskable"))]
     body = {
         "id": "/panel", "name": config.site_name, "short_name": config.site_name,
-        "description": "Алмазы, UC, Telegram Stars, Steam — пополнение за секунды",
+        "description": "Алмазы, UC, Steam — пополнение за секунды",
         "lang": "ru", "dir": "ltr", "start_url": "/panel?source=app", "scope": "/",
         "display": "standalone", "display_override": ["standalone", "minimal-ui"], "orientation": "portrait",
         "background_color": "#0e1016", "theme_color": "#4338ca", "categories": ["shopping", "games"],
@@ -1031,6 +1031,9 @@ def panel_catalog(
     user=Depends(viewer), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
     kind, category, region, q = kind[:32], category[:64], region[:16], q[:100]   # длинные строки — мусор в кэше
+    if catalog.OFF_KINDS and kind in ("telegram", *catalog.OFF_KINDS):   # Stars и Premium недоступны у поставщика
+        flash(request, "Telegram Stars и Premium сейчас недоступны.", "error")
+        return _redirect("/panel/catalog")
     if kind == "telegram":
         return render(request, "panel/telegram.html",
                       _telegram_ctx(conn, config, user, request.query_params.get("tab", "")))
@@ -1100,6 +1103,9 @@ def _telegram_ctx(conn, config: Config, user, tab: str, **extra) -> dict:
 @router.post("/panel/telegram", dependencies=[Depends(check_csrf)])
 def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depends(viewer),
                        conn=Depends(get_conn), config: Config = Depends(get_config)):
+    if catalog.OFF_KINDS:   # Stars и Premium недоступны у поставщика — не продаём
+        flash(request, "Telegram Stars и Premium сейчас недоступны.", "error")
+        return _redirect("/panel/catalog")
     p = catalog.get_product(conn, str(form.get("product_id", "")))
     tab = "premium" if p and p["kind"] == "telegram_premium" else "stars"
     username = str(form.get("field_telegram_username", "")).strip()

@@ -114,3 +114,10 @@ def _not_friday_break(monkeypatch):
     from donatix import jumuah
     real = jumuah.closed
     monkeypatch.setattr(jumuah, "closed", lambda config, now=None: real(config, now) if now else False)
+
+
+@pytest.fixture(autouse=True)
+def _tg_kinds_on(monkeypatch):
+    """В проекте Telegram Stars/Premium выключены (catalog.OFF_KINDS); старые тесты берут их как обычный товар."""
+    from donatix import catalog
+    monkeypatch.setattr(catalog, "OFF_KINDS", ())

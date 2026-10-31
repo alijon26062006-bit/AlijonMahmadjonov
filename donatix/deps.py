@@ -20,6 +20,14 @@ from .suppliers import KIND_TITLES
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
 
+
+def _tg_off() -> bool:
+    from . import catalog
+    return bool(catalog.OFF_KINDS)   # Telegram Stars / Premium недоступны — ссылок на них нет
+
+
+templates.env.globals["tg_off"] = _tg_off
+
 _static_v: dict[str, str] = {}
 
 

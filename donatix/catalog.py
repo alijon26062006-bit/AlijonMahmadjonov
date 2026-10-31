@@ -39,6 +39,13 @@ _UPSERT = """
 """
 
 
+# Telegram Stars и Premium у поставщика недоступны — на сайте, в ботах, мини-приложении и API их нет нигде
+OFF_KINDS: tuple[str, ...] = ("telegram_stars", "telegram_premium")
+
+
+def _off_sql() -> str:
+    return " AND kind NOT IN (%s)" % ",".join(f"'{k}'" for k in OFF_KINDS) if OFF_KINDS else ""
+
 MAX_DISABLE_SHARE = 0.3   # больше 30% каталога «пропало» за одну загрузку — это сбой, а не изменения
 
 
@@ -62,6 +69,8 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
             batch.clear()
 
     for p in supplier.fetch_catalog():
+        if p.kind in OFF_KINDS:
+            continue
         seen.add(p.id)
         if progress:
             progress(len(seen), p.category_name)
@@ -72,7 +81,8 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
         if len(batch) >= 300:
             write()
     write()
-    disabled = 0
+    disabled = conn.execute("UPDATE products SET active = 0 WHERE active = 1 AND kind IN (%s)"
+                            % ",".join("?" * len(OFF_KINDS)), OFF_KINDS).rowcount if OFF_KINDS else 0
     if seen:
         # Все пришедшие товары получили updated_at = started; остальные — пропали у поставщика.
         # (Не «id NOT IN (…тысячи id…)»: старые SQLite не принимают больше 999 параметров.)
@@ -125,7 +135,7 @@ def load_product(row: sqlite3.Row) -> dict[str, Any]:
 def get_product(conn: sqlite3.Connection, product_id: str, *, for_sale: bool = True) -> dict[str, Any] | None:
     sql = "SELECT * FROM products WHERE id = ?"
     if for_sale:
-        sql += " AND active = 1 AND hidden = 0"
+        sql += " AND active = 1 AND hidden = 0" + _off_sql()
     row = conn.execute(sql, (product_id,)).fetchone()
     return load_product(row) if row else None
 
@@ -134,7 +144,7 @@ def list_products(
     conn: sqlite3.Connection, *, kind: str = "", q: str = "", category_id: str = "", region: str = "",
     include_hidden: bool = False, limit: int = 500, offset: int = 0,
 ) -> list[dict[str, Any]]:
-    sql = "SELECT * FROM products WHERE active = 1"
+    sql = "SELECT * FROM products WHERE active = 1" + _off_sql()
     args: list[Any] = []
     if not include_hidden:
         sql += " AND hidden = 0"
@@ -163,7 +173,7 @@ def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sq
     """Игры и сервисы: одна строка на категорию, с обложкой и списком регионов."""
     sql = ("SELECT kind, category_id, category_name, COUNT(*) AS n, MIN(CAST(base_price AS REAL)) AS from_price, "
            "MAX(image_url) AS image_url, GROUP_CONCAT(DISTINCT region) AS regions "
-           "FROM products WHERE active = 1 AND hidden = 0")
+           "FROM products WHERE active = 1 AND hidden = 0" + _off_sql())
     args: list[Any] = []
     if kind:
         sql += " AND kind = ?"

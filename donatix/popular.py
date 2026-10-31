@@ -82,7 +82,8 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         else:
             found.setdefault(key, entry)
     out = [found[k] for k in ("ff_cis", "ff_id", "pubg", "standoff2", "coc") if k in found]
-    if conn.execute("SELECT 1 FROM products WHERE active = 1 AND hidden = 0 "
+    from .catalog import OFF_KINDS
+    if not OFF_KINDS and conn.execute("SELECT 1 FROM products WHERE active = 1 AND hidden = 0 "
                     "AND kind IN ('telegram_stars', 'telegram_premium') LIMIT 1").fetchone():
         out.append({"title": "Telegram Stars и Premium", "href": "/panel/catalog?kind=telegram",
                     "kind": "telegram_stars", "image_url": None, "key": "telegram"})
@@ -99,6 +100,9 @@ def _best_sellers(conn: sqlite3.Connection, days: int = 30) -> list[dict[str, An
     out = []
     for r in rows:
         if r["kind"] in ("telegram_stars", "telegram_premium"):
+            from .catalog import OFF_KINDS
+            if OFF_KINDS:
+                continue
             out.append({"title": "Telegram Stars и Premium", "href": "/panel/catalog?kind=telegram",
                         "kind": "telegram_stars", "image_url": None, "key": "telegram"})
         elif r["kind"] in ("steam_topup", "steam_gift"):

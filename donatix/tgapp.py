@@ -243,7 +243,7 @@ async def api_buy(request: Request, conn=Depends(get_conn), config: Config = Dep
         pid, qty = str(body.get("product_id") or ""), 1
     else:
         return {"ok": False, "error": "?"}
-    p = catalog.get_product(conn, pid)
+    p = catalog.get_product(conn, pid)   # Stars и Premium выключены — get_product их не отдаёт
     if p is None or p["kind"] not in ("telegram_stars", "telegram_premium"):
         return {"ok": False, "error": "Товар недоступен."}
     fields = {f["key"]: "@" + username.lstrip("@") for f in p["fields"]}

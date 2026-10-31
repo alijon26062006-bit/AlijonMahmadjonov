@@ -1,6 +1,6 @@
 """Магазин в Telegram — собственный бот проекта Donatix (не бот Telegram или правообладателей игр).
 
-Покупатель делает всё кнопками: игры, Telegram Stars/Premium, карты, баланс, заказы.
+Покупатель делает всё кнопками: игры, карты, баланс, заказы.
 Цены те же, что на сайте. Для каждого покупателя сайт сам заводит аккаунт, привязанный к Telegram:
 баланс, заказы и D-коины общие с сайтом. Заказы помечаются source='shopbot' — в статистике видно,
 сколько продано через бот.
@@ -65,7 +65,7 @@ T: dict[str, tuple[str, str]] = {
               "💰 Баланс: <b>{balance}</b>\n\n"
               "Выберите игру 👇",
               "<b>{name}, хуш омадед ба {site}!</b>\n\n"
-              "🎮 Донат ба бозиҳо, ⭐ Telegram Stars ва Premium, 🎁 кортҳо — зуд ва бо нархи ҳалол.\n\n"
+              "🎮 Донат ба бозиҳо, 🎁 кортҳо — зуд ва бо нархи ҳалол.\n\n"
               "💰 Баланс: <b>{balance}</b>"),
     "games": ("🎮 Все игры", "🎮 Бозиҳо"),
     "ff_cis": ("💎 FF СНГ — алмазы", "💎 FF СНГ"),
@@ -1552,7 +1552,9 @@ class ShopBot:
         if not rows:
             rows.append([(tr(lang, "games"), "g:games:0", "primary")])
         else:
-            rows.append([(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
+            from . import catalog
+            rows.append([(tr(lang, "games"), "g:games:0")] if catalog.OFF_KINDS   # Telegram Stars / Premium недоступны
+                        else [(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
         if bottour.enabled(conn):
             rows.append([("🏆 Турнир друзей — призы", "tour", "success", bottour.badge(conn).get("emoji_id"))])
         rows += [[(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],

@@ -289,7 +289,7 @@ def star_price_usd(conn: sqlite3.Connection, config: Config, user: Any) -> Decim
     """Цена 1 Star для покупателя — та же, что у Telegram Stars в каталоге (с его наценкой)."""
     from . import catalog
     from .money import apply_markup, to_decimal
-    p = catalog.get_product(conn, "tg-stars")
+    p = catalog.get_product(conn, "tg-stars", for_sale=False)   # только цена 1 Star для подарков
     if p is None:
         return Decimal("0.016")
     markup = (accounts.markup_for(user, config, p["kind"]) if user is not None

@@ -112,7 +112,7 @@ input, textarea { font: inherit; color: var(--text); }
 textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none; outline: 0; margin-top: 10px; display: block; }
 
 /* сетки */
-.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(var(--tabs, 5), 1fr); gap: 10px; }
 .pack { padding: 14px 6px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow-1); }
 .pack b { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 20px; font-weight: 700; }
 .pack span { display: block; margin-top: 4px; color: var(--accent); font-weight: 600; font-size: 15px; }
@@ -150,11 +150,12 @@ textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none
 .stat b { font-size: 22px; font-weight: 700; display: block; } .stat span { color: var(--muted); font-size: 14px; }
 
 /* нижнее меню */
-nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr);
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
 nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; justify-content: center;
   color: var(--muted); font-size: 12px; font-weight: 600; border-radius: var(--r-sm); }
+nav.tabs button[hidden] { display: none; }
 nav.tabs button.on { color: var(--accent); }
 nav.tabs button.on svg { transform: translateY(-1px); }
 
@@ -366,8 +367,8 @@ function home() {
   <div class="menu">
     <button class="mi" data-act="site" data-v="games"><div class="ic ac">${IC.gem}</div><div class="grow"><b>${t("games")}</b><span>${t("games_sub")}</span></div><span class="go">›</span></button>
     <button class="mi" data-act="site" data-v="cards"><div class="ic">${IC.card}</div><div class="grow"><b>${t("cards_t")}</b><span>${t("cards_sub")}</span></div><span class="go">›</span></button>
-    <button class="mi" data-tab="stars"><div class="ic st">${IC.star}</div><div class="grow"><b>Telegram Stars</b><span>${t("fast")}</span></div><span class="go">›</span></button>
-    <button class="mi" data-tab="premium"><div class="ic">${IC.gem}</div><div class="grow"><b>Telegram Premium</b><span>${t("months")}</span></div><span class="go">›</span></button>
+    ${D.stars ? `<button class="mi" data-tab="stars"><div class="ic st">${IC.star}</div><div class="grow"><b>Telegram Stars</b><span>${t("fast")}</span></div><span class="go">›</span></button>` : ""}
+    ${D.premium.length ? `<button class="mi" data-tab="premium"><div class="ic">${IC.gem}</div><div class="grow"><b>Telegram Premium</b><span>${t("months")}</span></div><span class="go">›</span></button>` : ""}
     <button class="mi" data-tab="gifts"><div class="ic">${IC.gift}</div><div class="grow"><b>${t("gifts_title")}</b><span>${t("from_bot")}</span></div><span class="go">›</span></button>
     <button class="mi" data-act="refs"><div class="ic ac">${IC.users}</div><div class="grow"><b>${t("invite")}</b><span>${t("invite_sub", {p: D.ref.percent})}</span></div><span class="go">›</span></button>
   </div>
@@ -442,6 +443,10 @@ const VIEWS = {home, stars, premium, gifts, profile, topup: topupView};
 function render() {
   $("#view").innerHTML = VIEWS[TAB]();
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
+  // Stars / Premium недоступны — их вкладок нет
+  document.querySelector('#tabs [data-tab="stars"]').hidden = !(D && D.stars);
+  document.querySelector('#tabs [data-tab="premium"]').hidden = !(D && D.premium.length);
+  document.getElementById("tabs").style.setProperty("--tabs", document.querySelectorAll("#tabs button:not([hidden])").length);
   if (tg && tg.BackButton) { TAB === "home" ? tg.BackButton.hide() : tg.BackButton.show(); }
 }
 function go(tab) { TAB = tab; haptic(); render(); window.scrollTo({top: 0, behavior: "instant"}); }
