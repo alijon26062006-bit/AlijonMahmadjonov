@@ -5,262 +5,314 @@
   "0": {
    "job": "782b752d-0a5a-4105-bf05-f246e7bde0d8",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045424_782b752d-0a5a-4105-bf05-f246e7bde0d8.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.2428
   },
   "1": {
    "job": "5ba9bf90-b229-40b1-8b3b-2155915d26c6",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045424_5ba9bf90-b229-40b1-8b3b-2155915d26c6.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 15.8531
   },
   "2": {
    "job": "7f1d07e1-0e3d-486e-9c49-74b5793554e5",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045449_7f1d07e1-0e3d-486e-9c49-74b5793554e5.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.3541
   },
   "3": {
    "job": "0f942a43-ddcc-4b9d-b7a8-aca2c607546f",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045517_0f942a43-ddcc-4b9d-b7a8-aca2c607546f.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.251
   },
   "4": {
    "job": "79f0792d-f243-4390-b43e-92d4a4200568",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045545_79f0792d-f243-4390-b43e-92d4a4200568.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 7.4336
   },
   "5": {
    "job": "9f0a169a-9593-416f-ba70-6873c37ea9ed",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045619_9f0a169a-9593-416f-ba70-6873c37ea9ed.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.0764
   },
   "6": {
    "job": "e721d054-0148-4273-a563-59a51c53c701",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045619_e721d054-0148-4273-a563-59a51c53c701.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 6.9219
   },
   "7": {
    "job": "879a1620-339b-42f0-b638-7d5f0d5cadde",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045648_879a1620-339b-42f0-b638-7d5f0d5cadde.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 11.0566
   },
   "8": {
    "job": "a376e1f7-dd87-491e-8365-ae102f3234a4",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045715_a376e1f7-dd87-491e-8365-ae102f3234a4.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.907
   },
   "9": {
    "job": "b5bd05c4-8bfd-45d8-8f51-08f703055ad2",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045742_b5bd05c4-8bfd-45d8-8f51-08f703055ad2.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.9025
   },
   "10": {
    "job": "2fde92c6-9240-4973-828c-6e48722c8451",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045742_2fde92c6-9240-4973-828c-6e48722c8451.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 7.6139
   },
   "11": {
    "job": "fe7576c1-fbcb-4eff-b1e0-08df8103319c",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045832_fe7576c1-fbcb-4eff-b1e0-08df8103319c.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 10.6107
   },
   "12": {
    "job": "cbce00eb-a362-410e-9b5a-b693b03c990b",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045832_cbce00eb-a362-410e-9b5a-b693b03c990b.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 10.7903
   },
   "13": {
    "job": "69619e2a-5230-4f6d-9419-b49ba15f4253",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045921_69619e2a-5230-4f6d-9419-b49ba15f4253.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 8.5202
   },
   "14": {
    "job": "96ab3207-4b96-4296-90ce-f0e9d1e9b0c7",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045921_96ab3207-4b96-4296-90ce-f0e9d1e9b0c7.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 6.5561
   },
   "15": {
    "job": "6c97f2c6-0e32-4d8d-be09-7132af0d56be",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045958_6c97f2c6-0e32-4d8d-be09-7132af0d56be.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.5978
   },
   "16": {
    "job": "9d64603f-03bd-4c7a-bc87-16856df45f7b",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_045958_9d64603f-03bd-4c7a-bc87-16856df45f7b.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 7.2492
   },
   "17": {
    "job": "193061ae-e15e-431f-bff1-c44f3115b88e",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050047_193061ae-e15e-431f-bff1-c44f3115b88e.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 14.3209
   },
   "18": {
    "job": "6574aec7-3b72-4f40-8de7-a0fac5b5a12d",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050048_6574aec7-3b72-4f40-8de7-a0fac5b5a12d.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.1466
   },
   "19": {
    "job": "859b96bc-4c87-4f51-8844-5f1b5237427b",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050135_859b96bc-4c87-4f51-8844-5f1b5237427b.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 8.4433
   },
   "20": {
    "job": "8f2f6e6b-3e02-4340-ac94-ce9eb1c25dc3",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050135_8f2f6e6b-3e02-4340-ac94-ce9eb1c25dc3.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 6.9041
   },
   "21": {
    "job": "27432029-4e55-49b8-871f-51a6e691e362",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050203_27432029-4e55-49b8-871f-51a6e691e362.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.5923
   },
   "22": {
    "job": "dbdaf272-89d9-4bb5-85c8-ea95eb1ec2ac",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050229_dbdaf272-89d9-4bb5-85c8-ea95eb1ec2ac.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 11.0682
   },
   "23": {
    "job": "db283169-e633-4ad2-9322-140653c96ae5",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050255_db283169-e633-4ad2-9322-140653c96ae5.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 4.2908
   },
   "24": {
    "job": "1a0c3966-805e-4609-a05e-8997d258695d",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050324_1a0c3966-805e-4609-a05e-8997d258695d.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 14.9926
   },
   "25": {
    "job": "9791c9e4-5aca-4b07-833b-3299318d3ffa",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050353_9791c9e4-5aca-4b07-833b-3299318d3ffa.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 10.4609
   },
   "26": {
    "job": "b2d6b51f-7555-45e6-b849-cbde1aea8f5e",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050422_b2d6b51f-7555-45e6-b849-cbde1aea8f5e.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 14.5318
   },
   "27": {
    "job": "dc123c5b-8b5d-4e37-8fdf-ac5ce70ff0c4",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050449_dc123c5b-8b5d-4e37-8fdf-ac5ce70ff0c4.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 8.871
   },
   "28": {
    "job": "aca395e5-6748-4b55-b3d1-8db91f6d9e31",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050518_aca395e5-6748-4b55-b3d1-8db91f6d9e31.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.2233
   },
   "29": {
    "job": "4c629e80-8625-4f22-b5e7-1501fbb4d740",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050549_4c629e80-8625-4f22-b5e7-1501fbb4d740.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 10.2308
   },
   "30": {
    "job": "fc917cfb-0497-465e-be15-a4372cf9aef1",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050621_fc917cfb-0497-465e-be15-a4372cf9aef1.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.5507
   },
   "31": {
    "job": "b677c5e2-5e84-4277-8a15-a91fdb19d2f2",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050621_b677c5e2-5e84-4277-8a15-a91fdb19d2f2.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.6294
   },
   "32": {
    "job": "7d6647cb-5da8-488e-9f71-4790c16aef9b",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050648_7d6647cb-5da8-488e-9f71-4790c16aef9b.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 5.7001
   },
   "33": {
    "job": "198c1ddb-86be-46e0-ad2a-eb8496447f7c",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050717_198c1ddb-86be-46e0-ad2a-eb8496447f7c.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 14.3331
   },
   "34": {
    "job": "c4a275b8-03af-4be5-9852-5b557d645588",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050729_c4a275b8-03af-4be5-9852-5b557d645588.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.675
   },
   "35": {
    "job": "6ed9332a-ce2a-41f2-9db8-a8316e4b1129",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050756_6ed9332a-ce2a-41f2-9db8-a8316e4b1129.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 8.3882
   },
   "36": {
    "job": "3a8ab835-d004-4c17-8979-ca332bf97184",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050824_3a8ab835-d004-4c17-8979-ca332bf97184.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.8569
   },
   "37": {
    "job": "6e03cba4-2497-4baa-977e-c5d087c7228c",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050853_6e03cba4-2497-4baa-977e-c5d087c7228c.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.6922
   },
   "38": {
    "job": "85c57ef1-1561-40f1-ba30-0fae1a1f2a6e",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050852_85c57ef1-1561-40f1-ba30-0fae1a1f2a6e.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.0363
   },
   "39": {
    "job": "b1474659-203b-40ed-9f38-3476131f8646",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050927_b1474659-203b-40ed-9f38-3476131f8646.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.5018
   },
   "40": {
    "job": "fa7a1c7b-97af-467b-9da3-4dbee14fb504",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_050927_fa7a1c7b-97af-467b-9da3-4dbee14fb504.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 8.8017
   },
   "41": {
    "job": "dd92418b-4e40-4f4b-bdb4-0fd3f35d171b",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051001_dd92418b-4e40-4f4b-bdb4-0fd3f35d171b.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.7657
   },
   "42": {
    "job": "cae2764d-575e-4bf6-980d-dc98d21c0d02",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051001_cae2764d-575e-4bf6-980d-dc98d21c0d02.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 13.3021
   },
   "43": {
    "job": "92eb952d-1304-4946-9af2-7dcdabdd6c89",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051034_92eb952d-1304-4946-9af2-7dcdabdd6c89.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 11.7582
   },
   "44": {
    "job": "76862fb6-3770-4c6c-92e4-de4e2b277b1d",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051034_76862fb6-3770-4c6c-92e4-de4e2b277b1d.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.4887
   },
   "45": {
    "job": "6f1c6363-1a3e-4cdc-9a1a-6eda17d13399",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051102_6f1c6363-1a3e-4cdc-9a1a-6eda17d13399.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 5.2803
   },
   "46": {
    "job": "02e1a0e0-1f93-4a65-b3a6-a90905d9ef15",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051133_02e1a0e0-1f93-4a65-b3a6-a90905d9ef15.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.5821
   },
   "47": {
    "job": "803baee4-fe06-4a52-b913-9669b3aa27ea",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051133_803baee4-fe06-4a52-b913-9669b3aa27ea.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 9.6773
   },
   "48": {
    "job": "6211054d-7402-4682-8601-dbf5c607f7d3",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051219_6211054d-7402-4682-8601-dbf5c607f7d3.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 12.5235
   },
   "49": {
    "job": "38b9ef6f-f96f-4f5f-be07-2659b4fb6796",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051251_38b9ef6f-f96f-4f5f-be07-2659b4fb6796.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 11.7961
   },
   "50": {
    "job": "5e77d1be-7fe4-4b53-8fec-eec115cb0484",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051251_5e77d1be-7fe4-4b53-8fec-eec115cb0484.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 15.5494
   },
   "51": {
    "job": "37f7ae16-6206-4b7e-97af-5cbae1898957",
    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HG3fccCSc9RBcokIfoh3Aig0Oy/hf_20261031_051328_37f7ae16-6206-4b7e-97af-5cbae1898957.wav",
-   "status": "completed"
+   "status": "completed",
+   "dur": 10.6994
   }
  }
 }
