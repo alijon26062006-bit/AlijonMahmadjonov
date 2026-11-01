@@ -39,8 +39,9 @@ _UPSERT = """
 """
 
 
-# Telegram Stars и Premium у поставщика недоступны — на сайте, в ботах, мини-приложении и API их нет нигде
-OFF_KINDS: tuple[str, ...] = ("telegram_stars", "telegram_premium")
+# Виды товаров, выключенные во всём проекте (сайт, боты, мини-приложение, API) — например, если поставщик
+# перестал их продавать: OFF_KINDS = ("telegram_stars", "telegram_premium"). Сейчас всё доступно.
+OFF_KINDS: tuple[str, ...] = ()
 
 
 def _off_sql() -> str:
