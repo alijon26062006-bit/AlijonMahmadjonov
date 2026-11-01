@@ -19,7 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import accounts, admin, api, db, web
 from .config import ROOT, Config
-from .deps import Forbidden, LoginRequired, TelegramRequired, render
+from .deps import Forbidden, LoginRequired, TelegramRequired, render, session_user
 from .ratelimit import RateLimiter
 from .suppliers import Supplier, make_supplier
 from .worker import Worker
@@ -342,14 +342,44 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     async def _api_error(request: Request, exc: api.ApiError):
         return api.api_error_response(exc)
 
+    def _error_page(request: Request, message: str, status: int):
+        """Страница ошибки с обычной шапкой: кто вошёл — видит свою «Панель», а не кнопку «Войти»."""
+        user = None
+        if "session" in request.scope:   # до SessionMiddleware (сбой в самом низу) сессии ещё нет
+            pool = db.pool(config.db_path)
+            c = pool.acquire()
+            try:
+                user = session_user(request, c)
+            except Exception:  # noqa: BLE001 — страница ошибки не должна падать сама
+                user = None
+            finally:
+                pool.release(c)
+        return render(request, "error.html", {"message": message, "user": user}, status)
+
+    # Тексты pydantic — по-английски и про внутренности («path.appid — Input should be a valid integer»);
+    # человеку говорим по-русски, что именно не так
+    _VALID_RU = {"int_parsing": "должно быть целым числом", "int_type": "должно быть целым числом",
+                 "int_from_float": "должно быть целым числом", "float_parsing": "должно быть числом",
+                 "missing": "не заполнено", "string_too_long": "слишком длинное",
+                 "greater_than_equal": "слишком маленькое", "less_than_equal": "слишком большое"}
+
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError):
         first = exc.errors()[0] if exc.errors() else {}
-        where = ".".join(str(x) for x in first.get("loc", []) if x != "body")
-        message = f"Неверный запрос: {where} — {first.get('msg', '')}".strip(" —")
+        where = ".".join(str(x) for x in first.get("loc", []) if x not in ("body", "query", "path"))
+        what = _VALID_RU.get(str(first.get("type", "")), "неверное значение")
+        message = f"Неверный запрос: поле «{where}» — {what}." if where else "Неверный запрос: проверьте данные."
         if request.url.path.startswith("/api/"):
             return JSONResponse({"ok": False, "error": message, "code": "validation_error"}, status_code=400)
-        return render(request, "error.html", {"message": message}, 400)
+        return _error_page(request, message, 400)
+
+    @app.exception_handler(OverflowError)
+    async def _overflow(request: Request, exc: OverflowError):
+        """Число из адреса или формы не влезает в SQLite (id из 20 цифр, page=10**19) — это не поломка, а 400."""
+        message = "Неверный запрос: слишком большое число."
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"ok": False, "error": message, "code": "validation_error"}, status_code=400)
+        return _error_page(request, message, 400)
 
     @app.exception_handler(LoginRequired)
     async def _login(request: Request, exc: LoginRequired):
@@ -361,7 +391,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
 
     @app.exception_handler(Forbidden)
     async def _forbidden(request: Request, exc: Forbidden):
-        return render(request, "error.html", {"message": str(exc)}, 403)
+        return _error_page(request, str(exc), 403)
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException):
@@ -369,6 +399,19 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
             code = "not_found" if exc.status_code == 404 else "http_error"
             return JSONResponse({"ok": False, "error": str(exc.detail), "code": code}, status_code=exc.status_code)
         message = "Страница не найдена." if exc.status_code == 404 else str(exc.detail)
-        return render(request, "error.html", {"message": message}, exc.status_code)
+        return _error_page(request, message, exc.status_code)
+
+    @app.exception_handler(Exception)
+    async def _crash(request: Request, exc: Exception):
+        """Непредвиденная ошибка: человеку — понятная страница вместо голого «Internal Server Error»,
+        трейсбек — только в журнал (Starlette после этого ответа всё равно пишет его в лог)."""
+        message = "Что-то пошло не так. Попробуйте ещё раз через минуту — мы уже видим ошибку."
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"ok": False, "error": message, "code": "server_error"}, status_code=500)
+        try:
+            return _error_page(request, message, 500)
+        except Exception:  # noqa: BLE001 — сломана даже страница ошибки (например, база): хоть текстом
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(message, status_code=500)
 
     return app

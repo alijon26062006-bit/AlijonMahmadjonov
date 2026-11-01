@@ -3112,7 +3112,7 @@ body:has(.bx) { background: #0b0b0e; }
 .bx-seg a, .bx-seg span { padding: 9px 22px; border-radius: 999px; font-weight: 700; font-size: 17px; color: var(--bx-dim); text-decoration: none; cursor: pointer; }
 .bx-seg a.on, .bx-seg input:checked + span { background: var(--bx-on); color: var(--bx-text); }
 .bx-seg.small { display: flex; } .bx-seg.small label { flex: 1; text-align: center; } .bx-seg.small span { display: block; }
-.bx-seg input { position: absolute; opacity: 0; }
+.bx-seg input { position: absolute; opacity: 0; width: 0; height: 0; }   /* без размера: иначе скрытый радио растягивал страницу вширь */
 .bx-seg input:focus-visible + span { outline: 2px solid var(--bx-gold); }
 .bx-filters { display: flex; align-items: center; gap: 14px; padding: 12px 2px; border-top: 1px solid var(--bx-line); border-bottom: 1px solid var(--bx-line); font-weight: 600; }
 .bx-asset { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

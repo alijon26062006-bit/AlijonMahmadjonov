@@ -186,11 +186,12 @@ def reveal_api_key(conn: sqlite3.Connection, user_id: int, key_id: int, secret: 
     return unseal(secret, row["key_enc"])
 
 
-def revoke_api_key(conn: sqlite3.Connection, user_id: int, key_id: int) -> None:
-    conn.execute(
+def revoke_api_key(conn: sqlite3.Connection, user_id: int, key_id: int) -> bool:
+    """True — ключ был активным и отозван; False — чужой, несуществующий или уже отозван."""
+    return conn.execute(
         "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
         (db.now(), key_id, user_id),
-    )
+    ).rowcount > 0
 
 
 def user_by_api_key(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:

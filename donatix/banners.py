@@ -155,14 +155,15 @@ def toggle(conn: sqlite3.Connection, bid: int) -> None:
     cache.clear(CACHE_KEY)
 
 
-def delete(conn: sqlite3.Connection, config: Config, bid: int) -> None:
+def delete(conn: sqlite3.Connection, config: Config, bid: int) -> bool:
     ensure(conn)
     row = conn.execute("SELECT image FROM banners WHERE id = ?", (bid,)).fetchone()
     if row is None:
-        return
+        return False
     conn.execute("DELETE FROM banners WHERE id = ?", (bid,))
     remove_files(config, row["image"])
     cache.clear(CACHE_KEY)
+    return True
 
 
 def _date(value: str) -> str | None:

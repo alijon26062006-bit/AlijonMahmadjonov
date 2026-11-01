@@ -563,6 +563,9 @@ def user_update(user_id: int, request: Request, status: str = Form(...), tier: s
         flash(request, "Нельзя отключить самого себя.", "error")
         return _back(f"/admin/users/{user_id}")
     before = accounts.get_user(conn, user_id)
+    if before is None:
+        flash(request, "Нет такого пользователя.", "error")
+        return _back("/admin/users")
     try:
         accounts.update_user_admin(conn, user_id, status=status, tier=tier, markup_override=markup_override)
         flash(request, "Сохранено.")
@@ -586,6 +589,12 @@ def user_balance(user_id: int, request: Request, amount: str = Form(...), note: 
     if micro == 0:
         flash(request, "Сумма не может быть нулём.", "error")
         return _back(f"/admin/users/{user_id}")
+    if abs(micro) > 10**13:   # больше миллиарда долларов — опечатка (и в SQLite такое число не влезет)
+        flash(request, "Сумма слишком большая.", "error")
+        return _back(f"/admin/users/{user_id}")
+    if accounts.get_user(conn, user_id) is None:
+        flash(request, "Нет такого пользователя.", "error")
+        return _back("/admin/users")
     text = note.strip() or ("Пополнение баланса" if micro > 0 else "Списание")
     try:
         with db.tx(conn):
@@ -658,6 +667,9 @@ def order_detail(order_id: int, request: Request, admin=Depends(admin_user), con
 @router.post("/orders/{order_id}/refund", dependencies=[Depends(check_csrf)])
 def order_refund(order_id: int, request: Request, reason: str = Form(""), admin=Depends(admin_user),
                  conn=Depends(get_conn)):
+    if orders.get_order_row(conn, order_id) is None:
+        flash(request, "Нет такого заказа.", "error")
+        return _back("/admin/orders")
     done = orders.fail_and_refund(conn, order_id, reason.strip() or "Отменён администратором", by_admin=admin["id"])
     flash(request, "Заказ отменён, деньги возвращены." if done else "Заказ уже завершён — возврат не сделан.",
           "ok" if done else "error")
@@ -667,6 +679,9 @@ def order_refund(order_id: int, request: Request, reason: str = Form(""), admin=
 @router.post("/orders/{order_id}/complete", dependencies=[Depends(check_csrf)])
 def order_complete(order_id: int, request: Request, note: str = Form(""), admin=Depends(admin_user),
                    conn=Depends(get_conn)):
+    if orders.get_order_row(conn, order_id) is None:
+        flash(request, "Нет такого заказа.", "error")
+        return _back("/admin/orders")
     done = orders.admin_complete(conn, order_id, note)
     flash(request, "Отмечен выполненным." if done else "Заказ уже завершён.", "ok" if done else "error")
     return _back(f"/admin/orders/{order_id}")
@@ -674,6 +689,9 @@ def order_complete(order_id: int, request: Request, note: str = Form(""), admin=
 
 @router.post("/orders/{order_id}/recheck", dependencies=[Depends(check_csrf)])
 def order_recheck(order_id: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    if orders.get_order_row(conn, order_id) is None:
+        flash(request, "Нет такого заказа.", "error")
+        return _back("/admin/orders")
     orders.admin_recheck(conn, order_id)
     row = orders.get_order_row(conn, order_id)
     if row and row["status"] == "processing":
@@ -770,8 +788,12 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
     form = await request.form()
     old_icons = {m["code"]: m.get("icon", "") for m in payments.settings(conn, config)["stored"]}
     rows = []
+    try:   # n — число строк в форме; кривое или огромное значение не должно ронять или вешать сайт
+        n = min(max(int(form.get("n", 0) or 0), 0), 100)
+    except ValueError:
+        n = 0
     try:
-        for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
+        for i in range(n + 1):  # +1 — строка «новый способ»
             row = ({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details", "auto")}
                    | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
             if form.get(f"m{i}_nets") == "1":   # сети Bybit: галочка, минимум и максимум у каждой
@@ -847,6 +869,8 @@ def payment_receipt_file(payment_id: int, admin=Depends(admin_user), conn=Depend
     if not row or not row["receipt_file"]:
         return Response("Чека нет", status_code=404)
     path = payments.receipts_dir(config) / row["receipt_file"]
+    if not path.is_file():   # файл потерян на диске — FileResponse иначе падает в 500
+        return Response("Файл чека не найден на сервере", status_code=404)
     return FileResponse(path, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
@@ -1064,8 +1088,10 @@ def contest_save(request: Request, enabled: str = Form(""), p1: str = Form(""), 
 @router.post("/contest/{uid:int}/drop", dependencies=[Depends(check_csrf)])
 def contest_drop(uid: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import contest
-    contest.disqualify(conn, uid)
-    flash(request, "Приглашённый снят с конкурса — пригласившему он больше не засчитывается.")
+    if contest.disqualify(conn, uid):
+        flash(request, "Приглашённый снят с конкурса — пригласившему он больше не засчитывается.")
+    else:
+        flash(request, "Такого приглашённого в конкурсе нет.", "error")
     return _back("/admin/contest")
 
 
@@ -1131,7 +1157,7 @@ async def banners_add(request: Request, image: UploadFile | None = File(None), t
         banners.create(conn, config, data=data, title=title, link=link, sort=int(sort or 0),
                        starts_at=starts_at, ends_at=ends_at)
         flash(request, "Баннер добавлен — уже показывается на сайте.")
-    except (banners.BannerError, ValueError) as exc:
+    except (banners.BannerError, ValueError, OverflowError) as exc:   # OverflowError — порядок из 20 цифр
         flash(request, str(exc) if isinstance(exc, banners.BannerError) else "Порядок — числом.", "error")
     return _back("/admin/banners")
 
@@ -1143,7 +1169,7 @@ def banners_edit(bid: int, request: Request, title: str = Form(""), link: str = 
     try:
         banners.update(conn, bid, title=title, link=link, sort=int(sort or 0), starts_at=starts_at, ends_at=ends_at)
         flash(request, "Сохранено.")
-    except (banners.BannerError, ValueError) as exc:
+    except (banners.BannerError, ValueError, OverflowError) as exc:
         flash(request, str(exc) if isinstance(exc, banners.BannerError) else "Порядок — числом.", "error")
     return _back("/admin/banners")
 
@@ -1159,6 +1185,8 @@ def banners_toggle(bid: int, admin=Depends(admin_user), conn=Depends(get_conn)):
 def banners_delete(bid: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                    config: Config = Depends(get_config)):
     from . import banners
-    banners.delete(conn, config, bid)
-    flash(request, "Баннер удалён.")
+    if banners.delete(conn, config, bid):
+        flash(request, "Баннер удалён.")
+    else:
+        flash(request, "Такого баннера уже нет.", "error")
     return _back("/admin/banners")

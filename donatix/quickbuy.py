@@ -211,9 +211,13 @@ def run_pending(conn: sqlite3.Connection, config: Config, supplier, payment_id: 
     return done
 
 
-def product_title(product: dict[str, Any], fields: dict[str, Any]) -> str:
+def product_title(product: dict[str, Any], fields: dict[str, Any], quantity: Any = 1) -> str:
     who = ", ".join(str(v) for v in fields.values() if v)
-    name = orders._display_name(product, 1, None)
+    try:
+        qty = orders._clean_quantity(product, quantity)
+    except orders.OrderError:
+        qty = 1
+    name = orders._display_name(product, qty, None)   # «Steam — $20 × 10», «Telegram Stars 500»
     return f"{name}" + (f" · {who}" if who else "")
 
 

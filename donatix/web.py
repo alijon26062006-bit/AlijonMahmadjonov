@@ -987,6 +987,8 @@ def _tz_hours(conn: sqlite3.Connection, user: Any, cookie: str | None) -> int:
 def panel_timezone(request: Request, tz: str = Form("auto"), user=Depends(panel_user), conn=Depends(get_conn)):
     """Часовой пояс клиента: «автоматически» (по устройству) или выбранный — на всех его устройствах."""
     from . import timez
+    if tz != timez.AUTO and not timez.valid(tz):   # незнакомый пояс не показываем в сообщении и не храним
+        tz = timez.AUTO
     timez.set_user_choice(conn, user["id"], tz)
     flash(request, "Часовой пояс сохранён: " + (timez.label(tz) if tz != timez.AUTO else "автоматически, по устройству")
           + ".")
@@ -1129,7 +1131,7 @@ def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depen
         if exc.code == "insufficient_balance":
             need = quickbuy.need_micro(config, supplier, user, p, qty, fields)
             return _checkout(request, conn, config, user, [{"product_id": p["id"], "quantity": qty, "fields": fields}],
-                             quickbuy.product_title(p, fields) + (f" × {qty}" if tab == "stars" else ""), need)
+                             quickbuy.product_title(p, fields, qty), need)
         return render(request, "panel/telegram.html", _telegram_ctx(
             conn, config, user if isinstance(user, Guest) else accounts.get_user(conn, user["id"]), tab, error=str(exc),
             form={"telegram_username": username, "quantity": form.get("quantity", ""), "product_id": p["id"]}), 400)
@@ -1227,7 +1229,7 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
             need = quickbuy.need_micro(config, supplier, user, p, form.get("quantity", 1), fields)
             return _checkout(request, conn, config, user,
                              [{"product_id": product_id, "quantity": form.get("quantity", 1), "fields": fields}],
-                             quickbuy.product_title(p, fields), need)
+                             quickbuy.product_title(p, fields, form.get("quantity", 1)), need)
         return render(request, "panel/buy.html", _buy_ctx(
             request, conn, config, user if isinstance(user, Guest) else accounts.get_user(conn, user["id"]), p,
             error=str(exc), form={**fields, "quantity": form.get("quantity", "")}), 400)
@@ -1366,7 +1368,7 @@ def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
 
     from . import periods, timez
     per = 30
-    page = max(page, 1)
+    page = min(max(page, 1), 100_000)   # OFFSET от page=10**19 не влезает в SQLite
     tz_name, _ = timez.resolve(conn, user, request.cookies.get("dx_tz"))   # сутки — по часам клиента
     pr = periods.resolve(timez.zone(tz_name), period, date_from, date_to)
     cond, cond_args = pr.sql("created_at")
@@ -1413,8 +1415,8 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
     game = (prod["category_name"] if prod else "") or view["product_name"].split(" — ")[0]
     kind_title = {"topup": "Пополнение"}.get(row["kind"]) or KIND_TITLES.get(row["kind"], "Заказ")
     # история статусов, как у FazerCards: создан → в обработке → выполнен / возврат
-    history = [("created", "Создан", "Создан", row["created_at"]),
-               ("processing", "В обработке", "В обработке", row["created_at"])]
+    history = [("created", "Создан", "Заказ принят, деньги списаны с баланса.", row["created_at"]),
+               ("processing", "В обработке", "Передан на выполнение — обычно это минуты.", row["created_at"])]
     if view["status"] == "completed":
         history.append(("completed", "Выполнен", "Пополнение выполнено.", row["completed_at"] or row["updated_at"]))
     elif view["status"] == "failed":
@@ -1434,7 +1436,7 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
 def panel_transactions(request: Request, type: str = "", page: int = 1,
                        user=Depends(panel_user), conn=Depends(get_conn)):
     per = 40
-    page = max(page, 1)
+    page = min(max(page, 1), 100_000)
     where, args = "t.user_id = ?", [user["id"]]
     if type in ("credit", "debit"):
         where += " AND t.type = ?"
@@ -1819,7 +1821,7 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
     if payments.cancel(conn, user["id"], payment_id, config):
         flash(request, "Заявка отменена.")
     else:
-        flash(request, "Заявка уже проверена — отменить её нельзя.", "error")
+        flash(request, "Заявка не найдена или уже проверена — отменить её нельзя.", "error")
     return _redirect("/panel/balance")
 
 
@@ -1991,7 +1993,7 @@ def _num(raw: str) -> float | None:
         v = float((raw or "").replace(" ", "").replace(",", "."))
     except ValueError:
         return None
-    return v if v > 0 else None
+    return v if 0 < v < 1e12 else None   # «inf», «nan», 1e400 — не сумма
 
 
 def _per_usd(request: Request, conn, config: Config) -> float:
@@ -2013,9 +2015,10 @@ def _price_m(request: Request, conn, config: Config, raw: str) -> int:
 def _d_units(raw: str) -> int:
     from . import dcoin
     try:
-        return int(round(float((raw or "").replace(" ", "").replace(",", ".")) * dcoin.UNIT))
+        v = float((raw or "").replace(" ", "").replace(",", "."))
     except ValueError:
         return 0
+    return int(round(v * dcoin.UNIT)) if -1e12 < v < 1e12 else 0   # «inf» и «nan» в int не превращаются
 
 
 @router.post("/panel/p2p/ad", dependencies=[Depends(check_csrf)])
@@ -2194,8 +2197,10 @@ def panel_api_reveal(key_id: int, request: Request, user=Depends(panel_user), co
 
 @router.post("/panel/api/keys/{key_id}/revoke", dependencies=[Depends(check_csrf)])
 def panel_api_revoke(key_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
-    accounts.revoke_api_key(conn, user["id"], key_id)
-    flash(request, "Ключ отозван.")
+    if accounts.revoke_api_key(conn, user["id"], key_id):
+        flash(request, "Ключ отозван.")
+    else:
+        flash(request, "Ключ не найден или уже отозван.", "error")
     return _redirect("/panel/api")
 
 

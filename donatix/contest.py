@@ -182,10 +182,11 @@ def _self_device(conn: sqlite3.Connection, s: sqlite3.Row) -> bool:
     return False
 
 
-def disqualify(conn: sqlite3.Connection, user_id: int, why: str = "снят админом") -> None:
-    """Админ снимает приглашённого (накрутка) — он больше не считается."""
+def disqualify(conn: sqlite3.Connection, user_id: int, why: str = "снят админом") -> bool:
+    """Админ снимает приглашённого (накрутка) — он больше не считается. False — такого приглашённого нет."""
     _ensure(conn)
-    conn.execute("UPDATE ref_signups SET counted_at = NULL, reason = ? WHERE user_id = ?", (why[:200], user_id))
+    return conn.execute("UPDATE ref_signups SET counted_at = NULL, reason = ? WHERE user_id = ?",
+                        (why[:200], user_id)).rowcount > 0
 
 
 # ── Таблица и итоги ──────────────────────────────────────────

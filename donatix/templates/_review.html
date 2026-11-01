@@ -73,7 +73,7 @@
   .rv-bar i { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; display: block; }
   .rv-bar i span { display: block; height: 100%; background: #f5b301; border-radius: 99px; }
   .rv-bar.on { color: var(--text); font-weight: 700; }
-  .rv-pick { display: flex; gap: 4px; flex-direction: row-reverse; justify-content: flex-end; }
+  .rv-pick { position: relative; display: flex; gap: 4px; flex-direction: row-reverse; justify-content: flex-end; }
   .rv-pick input { position: absolute; opacity: 0; pointer-events: none; }
   .rv-pick label { cursor: pointer; font-size: 2rem; line-height: 1; color: var(--line-strong, #c9cdd6); transition: transform .15s; }
   .rv-pick label:hover, .rv-pick label:hover ~ label, .rv-pick input:checked ~ label { color: #f5b301; }

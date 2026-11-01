@@ -71,7 +71,7 @@
         <div class="grow"><b>Оплата покупки</b><span>{{ buy.title }}</span></div>
         <div class="bp-sum"><small>К оплате</small><b>{{ buy.tjs }} с.</b></div>
       </div>
-      <p class="hint" style="margin:8px 0 14px">После оплаты заказ оформится сам — регистрироваться не нужно.</p>
+      <p class="hint" style="margin:8px 0 14px">{% if user.balance_micro > 0 %}Цена {{ money(buy.need) }}, на балансе {{ money(user.balance_micro) }} — доплатить {{ buy.tjs }} с. {% endif %}После оплаты заказ оформится сам{% if is_guest_account(user) %} — регистрироваться не нужно{% endif %}.</p>
       {% endif %}
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if crypto_only %}<div class="flash" role="status"><span>Из вашей страны оплата — <b>криптой (USDT)</b>.
