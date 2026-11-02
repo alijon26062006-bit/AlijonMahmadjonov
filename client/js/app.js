@@ -52,6 +52,10 @@ function draw() {
     ${dock ? `<div class="dock ${tabs ? 'over-tabs' : ''}">${dock}</div>` : ''}
     ${!tabs ? '' : `<nav class="tabs" aria-label="Разделы"><div class="tabs-in">${TABS.map(([k, to, t, i]) => `<button class="tab" data-go="${to}" ${r.tab === k ? 'aria-current="page"' : ''}>${ico(i)}<span>${t}</span>${k === 'cart' && T.rows.length ? `<span class="badge">${T.rows.length}</span>` : k === 'profile' && active ? '<span class="badge dot"></span>' : ''}</button>`).join('')}</div></nav>`}`;
   if (enter) { $('#main').classList.add('enter', enter); enter = ''; }
+  // товаров в корзине стало больше — полоса корзины коротко «подпрыгивает», чтобы было видно, куда ушёл товар
+  const n = T.rows.reduce((sum, row) => sum + row.qty, 0);
+  if (n > cartN) $('.cartbar')?.classList.add('bump');
+  cartN = n;
   const ph = $('#track');
   if (ph && keepTrack && keepTrack.dataset.id === ph.dataset.id) ph.replaceWith(keepTrack);
   if ($('#track')) { const o = C.orders.find(x => x.id === $('#track').dataset.id), at = o && courierWhere(o.id); if (at) showTrack($('#track'), { courier: at, home: o.addr?.lat != null ? { lat: o.addr.lat, lng: o.addr.lng } : null }); }
@@ -60,8 +64,19 @@ function draw() {
 }
 let depth = 0;   // сколько шагов сделали внутри приложения — «назад» не уводит с сайта
 export function go(to) { if (location.hash === to) render(); else { depth++; location.hash = to; } }
-let lastHash = location.hash, enter = '';   // enter — с какой стороны въезжает новый экран
-window.addEventListener('hashchange', () => { closeSheet(); const deeper = location.hash.length > lastHash.length; lastHash = location.hash; enter = deeper ? 'in-fwd' : 'in-back'; render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); });
+let lastHash = location.hash, enter = '', cartN = Infinity;   // enter — с какой стороны въезжает новый экран; cartN — сколько было в корзине
+// Переход между экранами. Где браузер умеет (View Transitions), старый и новый экран плавно сменяют друг друга,
+// а обложка магазина «перетекает» из карточки на главной в шапку магазина. Иначе — прежний въезд экрана сбоку.
+const smooth = () => 'startViewTransition' in document && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.addEventListener('hashchange', () => {
+  closeSheet();
+  const deeper = location.hash.length > lastHash.length; lastHash = location.hash;
+  const show = () => { render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); };
+  if (!smooth()) { enter = deeper ? 'in-fwd' : 'in-back'; show(); return; }
+  document.documentElement.dataset.nav = deeper ? 'fwd' : 'back';
+  const t = document.startViewTransition(show);
+  t.finished.finally(() => { delete document.documentElement.dataset.nav; document.querySelectorAll('[style*="view-transition-name"]').forEach(el => { /** @type {HTMLElement} */ (el).style.viewTransitionName = ''; }); });
+});
 
 // ----- действия -----
 Object.entries({ ...productActions, ...cartActions, ...checkoutActions, ...orderActions, ...profileActions, ...introActions, ...addressActions, ...loginActions }).forEach(([k, fn]) => on(k, fn));
@@ -99,7 +114,12 @@ on('qInput', el => { ui.q = el.value; clearTimeout(searchTimer); searchTimer = s
 
 document.addEventListener('click', async e => {
   const g = e.target.closest('[data-go]');
-  if (g && !g.disabled) { e.preventDefault(); return go(g.dataset.go); }
+  if (g && !g.disabled) {
+    e.preventDefault();
+    // обложка нажатой карточки станет шапкой магазина: имя перехода получает только она одна
+    if (g.dataset.go.startsWith('#/shop/')) { const pic = g.closest('.big')?.querySelector('.big-pic'); if (pic) pic.style.viewTransitionName = 'shop-hero'; }
+    return go(g.dataset.go);
+  }
   const el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
   const fn = actions[el.dataset.a]; if (!fn) return;
   const res = await fn(el, go);

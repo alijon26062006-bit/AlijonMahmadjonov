@@ -30,8 +30,8 @@ function courierBlock(o, v) {
     </section>
     ${at ? `<div class="track" id="track" data-id="${o.id}" role="img" aria-label="Курьер на карте"></div>
       <span class="small muted track-note">${ico('bike', 'xs')} ${far != null ? `Курьер в ${kmText(far)} от вас` : 'Курьер на карте'} · обновляется само</span>` : ''}
-    <section class="code-card"><small>Код для курьера</small><b class="code num" translate="no">${code || '····'}</b>
-      <small>Назовите его курьеру, когда он отдаст заказ. Без кода курьер не сможет закрыть заказ — так никто не отметит доставку за вас</small></section>`;
+    <section class="code-card"><span class="cc-t"><b>Код для курьера</b><small>Назовите его, когда курьер отдаст заказ. Без кода он не закроет доставку — так никто не отметит её за вас</small></span>
+      <b class="code num" translate="no" aria-label="Код ${esc(code || '')}">${[...(code || '····')].map(d => `<i>${esc(d)}</i>`).join('')}</b></section>`;
 }
 
 export function vOrder(id) {
@@ -42,6 +42,7 @@ export function vOrder(id) {
     : o.when && o.when.at > Date.now() + 15 * 60000 && v.stage < 2 ? `Привезём ${o.when.label.toLowerCase()}` : `Привезём примерно к ${hhmm(v.eta)}`;
   return `${backBar(`Заказ № ${o.no}`, v.stage >= 3 ? `<button class="round" data-a="problem" data-id="${o.id}" aria-label="Сообщить о проблеме">${ico('help')}</button>` : '', '#/orders')}
     <section class="status-hero">
+      <span class="tag order-no">Заказ № ${o.no}</span>
       <div class="col" style="gap:6px"><h1>${v.stage < 0 ? 'Заказ отменён' : v.stage < 4 && COURIER_TITLES[v.cstep] || TITLES[v.stage]}</h1><span class="muted">${esc(sub)}</span></div>
       ${v.stage >= 0 ? `<div class="steps" aria-label="Этап ${v.stage + 1} из 5: ${STAGES[v.stage]}">${STAGES.map((_, i) => `<i class="${i < v.stage || v.stage === 4 ? 'on' : i === v.stage ? 'now' : ''}"></i>`).join('')}</div>` : ''}
       ${v.stage === 3 ? `<button class="btn primary block" data-a="received" data-id="${o.id}">${ico('check')} Заказ получил</button><span class="tiny muted">После этого деньги уйдут магазину. Если что-то не так — нажмите «?» вверху.</span>` : ''}

@@ -15,7 +15,7 @@ export function vCart() {
   const st = openState(shop);
   return `${backBar('Корзина', `<button class="round" data-a="clearCart" aria-label="Очистить корзину">${ico('trash')}</button>`)}
     <button class="li list" data-go="#/shop/${shop.id}" style="border-radius:var(--r)">${logo(shop)}<span class="grow"><b>${esc(shop.name)}</b><small>${st.open ? 'Доставка ' + eta(shop) : esc(st.text)}</small></span>${ico('right', 'chev')}</button>
-    <div class="col" style="gap:14px">${rows.map(r => {
+    <div class="cart-list">${rows.map(r => {
       const w = WEIGHT_UNITS.includes(r.p.unit);
       return `<div class="cart-row"><span class="thumb">${pic(r.p)}</span>
         <div style="min-width:0"><div class="small" style="font-weight:600">${esc(r.p.name)}${r.variant ? ', ' + esc(r.variant) : ''}</div>

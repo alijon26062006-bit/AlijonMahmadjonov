@@ -1,6 +1,6 @@
 import { BRAND, KINDS, kindSrc } from '../config.js';
 import { feeFor, route } from '../model/delivery.js';
-import { eta, loadingShops, openState, ratingText, shopById, shops } from '../model/catalog.js';
+import { eta, kindName, loadingShops, openState, ratingText, shopById, shops } from '../model/catalog.js';
 import { STAGES, view } from '../model/orders.js';
 import { esc, money } from '../lib/format.js';
 import { C, ui } from '../state.js';
@@ -24,22 +24,18 @@ export const shopMark = (s, cls = '') => `<span class="mark ${cls}" style="backg
 // магазин в ленте «рядом»: круглый знак, название, время
 export const shopTile = s => `<button class="near" data-go="#/shop/${s.id}">${shopMark(s)}<b translate="no">${esc(s.name)}</b><small>${eta(s)}</small></button>`;
 
-/** Строка «★ 4,8 · 35–45 мин · 2,1 км · 9 смн» — всё, по чему выбирают магазин. Цена доставки — по расстоянию до вашего адреса. */
-export function shopMeta(s) {
-  const r = route(s);
-  return `<span class="meta-line"><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span>${r.ok ? `<span>${eta(s)}</span><span>${ico('bike', 'xs')}${money(feeFor(s))}</span>` : `<span class="far">Не доставляет на ваш адрес</span>`}</span>`;
-}
-
-// большая карточка магазина: обложка магазина или фирменный цвет с картинкой раздела
+// большая карточка магазина: обложка магазина или фирменный цвет с картинкой раздела;
+// на обложке — сколько ехать, под ней — название с рейтингом и строка «раздел · доставка»
 export function bigCard(s) {
-  const st = openState(s), d = off(s), fav = C.favShops.includes(s.id);
+  const st = openState(s), d = off(s), fav = C.favShops.includes(s.id), r = route(s);
   const cover = s.cover ? `<img class="cover" src="${s.cover}" alt="" width="1200" height="600" loading="lazy">`
     : `<span class="poster" style="background:${s.tile?.bg || s.color};color:${s.tile?.fg || '#21201f'}"><b translate="no">${esc(s.about || s.name)}</b><img src="${kindSrc(s.kind)}" alt="" width="200" height="200" loading="lazy"></span>`;
   return `<article class="big ${st.open ? '' : 'closed'}">
     <button class="big-pic" data-go="#/shop/${s.id}" aria-label="${esc(s.name)}">${cover}
-      ${d ? `<span class="badge-off">−${d}%</span>` : ''}${st.open ? '' : `<span class="badge-closed">${esc(st.text)}</span>`}</button>
+      ${d ? `<span class="badge-off">−${d}%</span>` : ''}${st.open ? (r.ok ? `<span class="big-eta">${eta(s)}</span>` : '') : `<span class="badge-closed">${esc(st.text)}</span>`}</button>
     <button class="big-fav" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${fav}" aria-label="${fav ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button>
-    <button class="big-info" data-go="#/shop/${s.id}">${shopMark(s, 'sm')}<span class="grow"><b translate="no">${esc(s.name)}</b>${shopMeta(s)}</span></button>
+    <button class="big-info" data-go="#/shop/${s.id}"><span class="big-name"><b translate="no">${esc(s.name)}</b><span class="rate">${ico('starFill', 'xs')}${ratingText(s)}</span></span>
+      <span class="big-sub">${r.ok ? `${esc(kindName(s.kind))} · доставка ${money(feeFor(s))}` : '<span class="far">Не доставляет на ваш адрес</span>'}</span></button>
   </article>`;
 }
 
@@ -56,7 +52,7 @@ const banner = b => b.src ? `<button class="banner photo" data-go="#/shop/${b.id
   : `<button class="banner" style="background:${b.bg}" data-go="${b.go}"><span class="bt"><b>${esc(b.t)}</b><small>${esc(b.s)}</small></span><img src="${b.img}" alt="" width="200" height="200" loading="lazy"></button>`;
 
 /** Разделы: четыре равные плитки — компактно, чтобы магазины были видны сразу. */
-export const kindTiles = () => `<nav class="kinds" aria-label="Разделы">${KINDS.map(k => `<button class="kind" data-go="#/kind/${k.id}"><span class="kind-img"><img src="${kindSrc(k.id)}" alt="" width="120" height="120"></span><b>${k.name}</b></button>`).join('')}</nav>`;
+export const kindTiles = () => `<nav class="kinds" aria-label="Разделы">${KINDS.map(k => `<button class="kind" data-go="#/kind/${k.id}"><span class="kind-img k-${k.id}"><img src="${kindSrc(k.id)}" alt="" width="120" height="120"></span><b>${k.name}</b></button>`).join('')}</nav>`;
 
 export function vHome() {
   const all = shops(), live = C.orders.map(view).find(v => v.stage >= 0 && v.stage < 4);
@@ -66,9 +62,10 @@ export function vHome() {
   const food = all.filter(s => s.kind === 'food');
   return `
     <header class="home-head">
-      <button class="where" data-a="address"><small>Доставка</small><b>${addrShort() ? `<span translate="no">${esc(addrShort())}</span>` : '<span>Укажите адрес</span>'}${ico('down', 'sm')}</b></button>
+      <button class="where" data-a="address">${ico('pin')}<span class="where-t"><small>Доставка</small><b>${addrShort() ? `<span translate="no">${esc(addrShort())}</span>` : '<span>Укажите адрес</span>'}${ico('down', 'sm')}</b></span></button>
       <button class="round" data-go="#/favorites" aria-label="Избранное">${ico('heart')}</button>
     </header>
+    <h1 class="home-title">Что привезти<br>сегодня?</h1>
     <button class="search-pill" data-go="#/search">${ico('search')}<span>Найти товар или магазин</span></button>
     ${live ? `<button class="live" data-go="#/order/${live.o.id}"><span class="pulse"></span><span class="grow"><b>${STAGES[live.stage]}</b><small>Заказ № ${live.o.no} · ${esc(live.o.shopName)}${live.waiting ? ' · нужен ваш ответ' : ''}</small></span>${ico('right', 'sm')}</button>` : ''}
     ${kindTiles()}
@@ -76,7 +73,7 @@ export function vHome() {
     ${past.length ? `<section class="section">${head('Вы заказывали', '#/orders')}<div class="hscroll">${past.map(bigCard).join('')}</div></section>` : ''}
     ${loadingShops() ? '<section class="section" aria-busy="true"><span class="sk card"></span><span class="sk line w60"></span><span class="sk card"></span></section>'
       : !all.length ? `<section class="section"><div class="empty"><p><b>Магазины скоро появятся</b></p><p class="muted">Продавцы Шахритуса подключаются к ${BRAND}. Загляните чуть позже.</p></div></section>` : `
-    <section class="section">${head('Магазины рядом')}<div class="near-row">${all.map(shopTile).join('')}</div></section>
+    <section class="section">${head('Рядом с вами')}<div class="near-row">${all.map(shopTile).join('')}</div></section>
     <section class="section">${head('Все магазины')}
       <div class="filters">
         <button class="fbtn ${ui.sort === 'rating' ? 'on' : ''}" data-a="sortRating" aria-pressed="${ui.sort === 'rating'}">${ico('starFill', 'xs')} Высокий рейтинг</button>

@@ -1,7 +1,19 @@
 import { esc } from '../lib/format.js';
 
-// Пока у товара нет фото — спокойная серая плитка с маленьким знаком категории, как заглушка в больших приложениях.
-// Яркие цветные плитки с крупной иконкой выглядят как сломанная картинка, поэтому только нейтральный фон.
+// Пока у товара нет фото: для самых частых продуктов — рисунок (как в макете Figma), для остального —
+// спокойная плитка с маленьким знаком категории. Яркая плитка с крупной иконкой выглядит как сломанная картинка.
+
+// рисунки 120×120: тень снизу, сам продукт, блик; цвета — естественные, без обводок
+const DRAW = {
+  tomato: '<ellipse cx="60" cy="98" rx="38" ry="6" fill="#000" opacity=".08"/><circle cx="46" cy="66" r="28" fill="#E5432D"/><circle cx="74" cy="62" r="30" fill="#F0553B"/><path d="M62 34c4-6 12-6 16-2-6 0-8 4-10 6 6-2 12 0 14 4-8-2-12 0-16 2z" fill="#3D8B37"/><ellipse cx="82" cy="52" rx="7" ry="4" fill="#fff" opacity=".35" transform="rotate(-30 82 52)"/>',
+  cucumber: '<ellipse cx="60" cy="98" rx="40" ry="6" fill="#000" opacity=".08"/><rect x="18" y="52" width="86" height="24" rx="12" fill="#3F8E3B" transform="rotate(-18 60 64)"/><rect x="22" y="66" width="84" height="22" rx="11" fill="#57A64F" transform="rotate(-6 64 77)"/><circle cx="40" cy="74" r="2" fill="#2E6B2B"/><circle cx="62" cy="72" r="2" fill="#2E6B2B"/><circle cx="84" cy="70" r="2" fill="#2E6B2B"/>',
+  bread: '<ellipse cx="60" cy="96" rx="44" ry="7" fill="#000" opacity=".08"/><ellipse cx="60" cy="66" rx="44" ry="26" fill="#D99A4E"/><ellipse cx="60" cy="64" rx="30" ry="16" fill="#E9B970"/><g fill="#8A5A2B"><circle cx="50" cy="60" r="1.6"/><circle cx="60" cy="66" r="1.6"/><circle cx="70" cy="60" r="1.6"/><circle cx="56" cy="70" r="1.6"/><circle cx="66" cy="56" r="1.6"/></g>',
+  milk: '<ellipse cx="60" cy="102" rx="26" ry="5" fill="#000" opacity=".08"/><path d="M46 24h28v12l8 12v48a6 6 0 0 1-6 6H44a6 6 0 0 1-6-6V48l8-12z" fill="#fff" stroke="#D8D5CE" stroke-width="2"/><rect x="46" y="18" width="28" height="8" rx="3" fill="#2F6FDF"/><rect x="38" y="60" width="44" height="22" fill="#2F6FDF"/><path d="M44 72c6-4 10 4 16 0s10 4 16 0" stroke="#fff" stroke-width="2.5" fill="none"/>',
+  apple: '<ellipse cx="60" cy="98" rx="38" ry="6" fill="#000" opacity=".08"/><path d="M60 40c-14-8-34 0-32 24 2 22 18 34 32 28 14 6 30-6 32-28 2-24-18-32-32-24z" fill="#C8352A"/><path d="M60 40c2-8 6-12 10-14" stroke="#6B4423" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M64 34c8-8 18-6 20-2-8 4-14 4-20 2z" fill="#4C9A3F"/><ellipse cx="44" cy="56" rx="6" ry="9" fill="#fff" opacity=".3"/>',
+  cheese: '<ellipse cx="60" cy="96" rx="42" ry="6" fill="#000" opacity=".08"/><path d="M18 76l64-34 22 16v26H18z" fill="#F2B632"/><path d="M18 76l64-34 22 16-60 18z" fill="#F7CD5B"/><circle cx="52" cy="82" r="4" fill="#D9961A"/><circle cx="80" cy="78" r="3" fill="#D9961A"/><circle cx="66" cy="62" r="3.5" fill="#E3A52A"/>',
+};
+/** @type {Array<[RegExp, string]>} — только по названию товара: рисунок помидора у «картофеля» был бы неправдой */
+const DRAW_RULES = [[/огур/i, 'cucumber'], [/помидор|томат/i, 'tomato'], [/яблок/i, 'apple'], [/сыр/i, 'cheese'], [/молок|кефир|чакка|йогурт/i, 'milk'], [/лепёш|лепеш|хлеб/i, 'bread']];
 const ICONS = {
   veg: '<path d="M14 4c2 0 4 1 5 3-1 0-2 1-3 1M12 6c0-2 1-3 2-3M6 20l9-9a3.5 3.5 0 0 0-5-5L4 14c-1 1-1 3 0 4l2 2c1 1 3 1 4 0"/>',
   fruit: '<path d="M12 7c-2-2-7-2-7 4 0 5 3 9 5 9 1 0 1-1 2-1s1 1 2 1c2 0 5-4 5-9 0-6-5-6-7-4zM12 7c0-2 1-4 3-4"/>',
@@ -42,6 +54,8 @@ const RULES = [
 ];
 
 export function art(p) {
+  const draw = DRAW_RULES.find(([re]) => re.test(p.name))?.[1];
+  if (draw) return `<span class="art ill" aria-hidden="true"><svg viewBox="0 0 120 120">${DRAW[draw]}</svg></span>`;
   const text = `${p.cat} ${p.name}`;
   const key = RULES.find(([re]) => re.test(text))?.[1] || 'bag';
   return `<span class="art" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[key]}</svg></span>`;

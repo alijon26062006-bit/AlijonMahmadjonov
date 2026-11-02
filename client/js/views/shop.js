@@ -1,4 +1,4 @@
-import { WEIGHT_UNITS } from '../config.js';
+import { WEIGHT_UNITS, kindSrc } from '../config.js';
 import { feeFor, route } from '../model/delivery.js';
 import { add, stepOf, unitPrice } from '../model/cart.js';
 import { eta, kindName, openState, productIn, ratingText, shopById } from '../model/catalog.js';
@@ -15,11 +15,19 @@ export function vShop(id) {
   if (!s) return `${backBar('Магазин')}<div class="empty"><p>Магазин не найден или больше не работает.</p><button class="btn primary" data-go="#/">На главную</button></div>`;
   const st = openState(s), on = C.favShops.includes(s.id);
   const deals = s.products.filter(p => p.oldPrice > p.price).sort((x, y) => (y.oldPrice - y.price) - (x.oldPrice - x.price)).slice(0, 4);
-  return `<div class="shop-top">
+  const fav = (cls = '') => `<button class="${cls} ${on ? 'faved' : ''}" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${on}" aria-label="${on ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button>`;
+  // шапка: обложка на всю ширину, круглые кнопки поверх, белая карточка магазина наезжает на обложку (как в макете);
+  // когда обложка уехала вверх, сверху выезжает узкая полоса с названием (spyTabs)
+  return `<div class="shop-top" id="shopTop">
       <button class="icon-btn" data-a="back" aria-label="Назад">${ico('arrowL')}</button><b class="t" translate="no">${esc(s.name)}</b>
-      <button class="icon-btn" data-go="#/search" aria-label="Поиск">${ico('search')}</button>
-      <button class="icon-btn ${on ? 'faved' : ''}" data-a="fav" data-kind="shop" data-id="${s.id}" aria-pressed="${on}" aria-label="${on ? 'Убрать из избранного' : 'В избранное'}">${ico('heart')}</button></div>
-    ${s.cover ? `<img class="shop-cover-img" src="${s.cover}" alt="" width="1200" height="600">` : ''}
+      <button class="icon-btn" data-go="#/search" aria-label="Поиск">${ico('search')}</button>${fav('icon-btn')}</div>
+    <header class="shop-hero">
+      ${s.cover ? `<img class="hero-img" src="${s.cover}" alt="" width="1200" height="600">`
+        : `<span class="hero-fill" style="background:${s.tile?.bg || s.color}"><img src="${kindSrc(s.kind)}" alt="" width="200" height="200"></span>`}
+      <div class="hero-btns"><button class="round" data-a="back" aria-label="Назад">${ico('arrowL')}</button><span class="grow"></span>
+        <button class="round" data-go="#/search" aria-label="Поиск">${ico('search')}</button>${fav('round')}</div>
+    </header>
+    <section class="shop-head">
     <h1 class="shop-name" translate="no">${esc(s.name)}</h1>
     <div class="shop-info">
       <button class="si" data-a="shopInfo" data-id="${s.id}"><span class="si-ico">${ico('starFill')}</span><span><b>${ratingText(s)}${s.count ? ` <small class="inl">(${s.count})</small>` : ''}</b><small>Рейтинг ${ico('right', 'xs')}</small></span></button>
@@ -30,6 +38,7 @@ export function vShop(id) {
     </div>
     ${st.open ? `<p class="shop-sub">${esc(st.text)}${s.minOrder ? ` · заказ от ${money(s.minOrder)}` : ''}</p>`
       : `<div class="notice">${ico('clock', 'sm')}<span><b>${esc(st.text)}.</b> Соберите корзину сейчас — оформим заказ к открытию.</span></div>`}
+    </section>
     ${deals.length ? `<div class="deals">${deals.map(p => `<button class="deal" data-a="product" data-shop="${s.id}" data-pid="${p.id}"><span class="deal-ico">${ico('tag')}</span><b>−${money(p.oldPrice - p.price)}</b><small>${esc(p.name)}</small>${ico('right', 'sm')}</button>`).join('')}</div>` : ''}
     ${s.cats.length > 1 ? `<nav class="utabs" aria-label="Разделы меню">${s.cats.map((c, i) => `<button class="ut ${i ? '' : 'on'}" data-a="jump" data-to="${slug(c)}">${esc(c)}</button>`).join('')}</nav>` : ''}
     ${s.products.length ? s.cats.map(c => `<section class="section menu-sec" id="${slug(c)}"><h2>${esc(c)}</h2><div class="grid">${s.products.filter(p => p.cat === c).map(p => productCard(s, p)).join('')}</div></section>`).join('')
@@ -37,6 +46,7 @@ export function vShop(id) {
 }
 /** Подсветка раздела меню при прокрутке. */
 export function spyTabs() {
+  watchTop();
   const tabs = [...document.querySelectorAll('.ut')]; if (!tabs.length) return;
   const io = new IntersectionObserver(es => {
     const vis = es.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]; if (!vis) return;
@@ -44,6 +54,14 @@ export function spyTabs() {
     const on = tabs.find(t => t.classList.contains('on')); on?.scrollIntoView({ inline: 'center', block: 'nearest' });
   }, { rootMargin: '-140px 0px -60% 0px' });
   document.querySelectorAll('.menu-sec').forEach(sec => io.observe(sec));
+}
+// узкая полоса сверху появляется, когда обложка магазина уехала за экран
+let topWatch = null;
+function watchTop() {
+  topWatch?.disconnect();
+  const hero = document.querySelector('.shop-hero'), bar = document.getElementById('shopTop'); if (!hero || !bar) return;
+  topWatch = new IntersectionObserver(([e]) => bar.classList.toggle('show', !e.isIntersecting), { rootMargin: '-56px 0px 0px 0px' });
+  topWatch.observe(hero);
 }
 export function shopInfo(id) {
   const s = shopById(id), st = openState(s);
