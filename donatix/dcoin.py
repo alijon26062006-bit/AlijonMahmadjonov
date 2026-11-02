@@ -6,13 +6,12 @@
   • Копилка. С того же заказа в копилку идёт часть НАШЕЙ ПРИБЫЛИ с него: обычный заказ — 10%,
     заказ крупнее обычного — больше (до 20%), мельче — меньше (от 5%). «Обычный» — средний
     заказ за последние сутки. Заказ без прибыли копилку не пополняет.
-  • Цена 1 D = копилка ÷ все монеты (вместе с запасом сайта). Покупка больше предыдущей поднимает
-    цену (зелёная свеча), меньше — опускает (красная), по проценту разницы; падение чуть мягче роста,
-    без покупок цена стоит. Одна покупка сдвигает цену не больше чем на 4%: рост сильнее — в копилку идёт меньше, падение сильнее — чуть больше (в пределах
-    потолка), поэтому график идёт мягко. Ничего не подкручено: цена — это
-    ровно те деньги, что лежат в копилке.
-  • Обмен на баланс сайта по цене минус 5%: эти 5% остаются в копилке, и цена для остальных
-    растёт. Больше, чем лежит в копилке, забрать невозможно, поэтому сайт отдаёт максимум
+  • Цена 1 D = копилка ÷ все монеты (вместе с запасом сайта). Каждая покупка поднимает цену (зелёная
+    свеча): чем крупнее по сравнению с обычной, тем сильнее, но не больше чем на 4% за раз. Вниз цену
+    двигают только продажи (обмен монет), возвраты денег и акции. Без покупок цена стоит. Ничего не
+    подкручено: выше «настоящей» цены (копилка ÷ монеты людей) график не поднимается.
+  • Обмен на баланс сайта по цене минус 5%: эти 5% остаются в копилке. Обмен — это продажа,
+    цена идёт вниз (через запас сайта), тем сильнее, чем крупнее обмен. Больше, чем лежит в копилке, забрать невозможно, поэтому сайт отдаёт максимум
     20% прибыли заказа (в среднем около 10%), остальное всегда наше.
 """
 
@@ -123,19 +122,18 @@ def fmt_d(units: int) -> str:
 # ── Копилка и монеты ────────────────────────────────────────────
 # Старт почти с нуля: у сайта есть запас монет, которых нет ни у кого на руках. Цена считается на
 # все монеты вместе с запасом, и первая цена — не выше START_PRICE (≈ 0.0005 с.). Каждая покупка двигает
-# цену через запас сайта: больше предыдущей — вверх, меньше — вниз, от MIN_MOVE до MAX_STEP, плюс
-# небольшой общий рост DRIFT. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
+# цену через запас сайта всегда вверх: чем крупнее покупка по сравнению с обычной, тем сильнее
+# (от BUY_MIN до MAX_STEP). Вниз цену двигают только продажи (обмен монет), возвраты и акции. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
 # ни добавляли, каждый получит не больше своей доли копилки.
 # Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
 START_PRICE = 0.000046            # $ за 1 D на старте (≈ 0.0005 с.) — коротко и видно каждое движение
 START_TJS = 0.0005                # та же стартовая цена в сомони: к ней один раз подняли уже работающий график
 RESERVE0 = 1_000_000_000 * UNIT   # от этого считается предел запаса
-# Шаг цены — по проценту разницы с предыдущей покупкой. Падение чуть меньше роста, и каждая покупка
-# добавляет немного вверх: при обычных продажах график в целом растёт, без обвалов.
-#   $5 после $4 → +1.1%   $4 после $5 → −0.9%   $4 после $4 → +0.2%   $10 после $4 → +3.9%
-DRIFT = 0.002                     # каждая покупка: +0.2%
-UP_K = 0.0404                     # рост: × ln(во сколько раз больше)
-DOWN_K = 0.0493                   # падение: × ln(во сколько раз меньше) — вместе с DRIFT выходит чуть меньше роста
+# Шаг цены за покупку — вверх всегда, по размеру относительно обычного заказа (ratio = эта ÷ обычная):
+#   в 10 раз мельче обычной → +0.18%   обычная → +0.65%   в 10 раз крупнее → +2%   (не больше MAX_STEP)
+# Раньше шаг считался от предыдущей покупки, и при разных суммах подряд график в итоге полз вниз.
+BUY_MIN = 0.001                   # даже самая мелкая покупка: +0.1%
+BUY_K = 0.008                     # плюс × ln(1 + во сколько раз крупнее обычной)
 MIN_POOL = 100                   # копилка меньше цента и запас на пределе — график «застрял», см. steer()
 WICK = 0.4                        # тень свечи: цена «простреливает» на 40% дальше и откатывается назад
 
@@ -299,7 +297,7 @@ def _award(conn: sqlite3.Connection, order_id: int) -> int:
     # крупнее обычного — больше в копилку (до ×2), мельче — меньше (до ×0.5)
     to_pool = int(profit * pool_pct(conn) / 100 * max(MIN_SHARE, min(MAX_SHARE, math.sqrt(ratio))))
     cap = profit * pool_pct(conn) * 2 // 100                      # никогда больше 2× процента прибыли
-    to_pool, reserve = steer(cur, units, min(to_pool, cap), cap, prev_ratio(conn, usd, order_id))
+    to_pool, reserve = steer(cur, units, min(to_pool, cap), cap, ratio)
     if given is not None:   # монеты уже на счету с момента покупки — теперь они настоящие
         if not conn.execute("UPDATE dcoin_ledger SET pending = 0, pool_micro = ? WHERE id = ? AND pending = 1",
                             (to_pool, given["id"])).rowcount:
@@ -330,23 +328,13 @@ def share_ratio(conn: sqlite3.Connection, usd: float, order_id: int) -> float:
     return usd / usual
 
 
-def prev_ratio(conn: sqlite3.Connection, usd: float, order_id: int) -> float:
-    """Во сколько раз покупка больше предыдущей: $5 после $4 — вверх, $4 после $5 — вниз."""
-    row = conn.execute("SELECT total_micro FROM orders WHERE status = 'completed' AND id != ? AND total_micro > 0 "
-                       "ORDER BY COALESCE(completed_at, created_at) DESC, id DESC LIMIT 1", (order_id,)).fetchone()
-    return usd / (row[0] / 10_000) if row and usd > 0 else 1.0
-
-
 def move_for(ratio: float) -> float:
-    """На сколько сдвинуть цену: по проценту разницы с предыдущей покупкой (ratio = эта ÷ предыдущая).
-    Больше — вверх, меньше — вниз, падение чуть мягче роста. Не больше ±MAX_STEP за покупку."""
-    r = math.log(max(ratio, 1e-6))
-    m = DRIFT + (UP_K if r >= 0 else DOWN_K) * r
-    return max(-MAX_STEP, min(MAX_STEP, m))
+    """На сколько поднять цену за покупку: ratio = эта покупка ÷ обычная. Всегда вверх, не больше MAX_STEP."""
+    return min(MAX_STEP, BUY_MIN + BUY_K * math.log1p(max(ratio, 0.0)))
 
 
 def steer(cur: dict[str, int], units: int, to_pool: int, cap: int, ratio: float) -> tuple[int, int]:
-    """Копилка и запас после покупки. Цена идёт на move_for(ratio) через запас сайта;
+    """Копилка и запас после покупки. Цена идёт вверх на move_for(ratio) через запас сайта;
     если запаса уже нет — работает обычное сглаживание через копилку."""
     pool, supply, reserve = cur["pool"], cur["supply"], cur["reserve"]
     coins = supply + reserve
@@ -376,13 +364,13 @@ def steer(cur: dict[str, int], units: int, to_pool: int, cap: int, ratio: float)
 
 def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int) -> int:
     """Когда запаса нет: одна покупка двигает цену не больше чем на ±MAX_STEP.
-    Рост сильнее — в копилку кладём меньше (экономия сайта); падение сильнее — добавляем,
+    Рост сильнее — в копилку кладём меньше (экономия сайта); если покупка опустила бы цену — добавляем,
     но не больше cap (потолок доли прибыли), так что минуса не бывает."""
     if pool <= 0 or coins <= 0:
         return to_pool
     total = coins + units
     hi = int(pool * (1 + MAX_STEP) * total / coins) - pool
-    lo = math.ceil(pool * (1 - MAX_STEP) * total / coins) - pool
+    lo = math.ceil(pool * total / coins) - pool          # покупка цену не опускает (пока хватает доли прибыли)
     if to_pool > hi:
         return max(0, hi)
     if to_pool < lo:
@@ -460,6 +448,17 @@ def quote(conn: sqlite3.Connection, units: int) -> int:
     return units * s["pool"] * (100 - EXCHANGE_FEE_PCT) // (coins * 100)
 
 
+def _sell_reserve(conn: sqlite3.Connection, s: dict[str, int], pool: int, supply: int, pay: int) -> int:
+    """Продажа двигает цену вниз — как покупка вверх, тем сильнее, чем крупнее обмен. Через запас сайта:
+    цена только ниже, значит каждому по-прежнему не больше своей доли копилки."""
+    before = price_of(s["pool"], s["supply"], s["reserve"])
+    if before <= 0 or pool <= 0:
+        return s["reserve"]
+    target = before * (1 - move_for(share_ratio(conn, pay / 10_000, 0)))
+    reserve = int(pool / (target * 10_000 / UNIT)) - supply
+    return reserve if s["reserve"] <= reserve <= max(RESERVE0, supply) * 4 else s["reserve"]
+
+
 def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime | None = None) -> int:
     """Обменять монеты на баланс сайта. Возвращает зачисленное (микро)."""
     now = now or _now()
@@ -484,7 +483,8 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
         conn.execute("UPDATE users SET dcoin = dcoin - ? WHERE id = ?", (units, user_id))
         conn.execute("INSERT INTO dcoin_ledger (user_id, amount, pool_micro, reason, created_at) "
                      "VALUES (?, ?, ?, ?, ?)", (user_id, -units, -pay, "Обмен на баланс", _iso(now)))
-        _point(conn, s["pool"] - pay, s["supply"] - units, "exchange", reserve=s["reserve"])
+        _point(conn, s["pool"] - pay, s["supply"] - units, "exchange",
+               reserve=_sell_reserve(conn, s, s["pool"] - pay, s["supply"] - units, pay))
         accounts.post_ledger(conn, user_id, pay, f"Обмен {fmt_d(units)} D-коинов на баланс")
     return pay
 

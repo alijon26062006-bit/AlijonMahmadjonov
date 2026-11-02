@@ -39,16 +39,16 @@ def test_price_starts_at_zero_and_coins_come_from_purchases(conn):
     assert dcoin.award(conn, oid) == 0                              # за заказ — один раз
 
 
-def test_bigger_order_moves_up_smaller_moves_down(conn):
+def test_bigger_order_moves_up_more(conn):
     uid = _user(conn)
     _buy(conn, uid, 10_000)
     _buy(conn, uid, 10_000)
     p1 = dcoin.price(conn)
-    _buy(conn, uid, 5_000)                                          # мельче обычного
+    _buy(conn, uid, 5_000)                                          # мельче обычного — чуть вверх
     p2 = dcoin.price(conn)
-    _buy(conn, uid, 30_000)                                         # крупнее обычного
+    _buy(conn, uid, 30_000)                                         # крупнее обычного — заметно вверх
     p3 = dcoin.price(conn)
-    assert p2 < p1 < p3
+    assert p1 < p2 < p3 and (p3 - p2) / p2 > (p2 - p1) / p1
 
 
 def test_never_more_than_pool_and_owner_keeps_most(conn):
@@ -83,10 +83,12 @@ def test_exchange_opens_later_and_keeps_fee_in_pool(conn, monkeypatch):
         assert "откроется" in str(exc)
     later = datetime.now(timezone.utc) + timedelta(days=31)
     before_price, before_bal = dcoin.price(conn), balance(conn, uid)
+    before_pool = dcoin.state(conn)["pool"]
     half = units // 2
     pay = dcoin.exchange(conn, uid, half, now=later)
     assert pay > 0 and balance(conn, uid) == before_bal + pay
-    assert dcoin.price(conn) > before_price                          # 5% остались в копилке — цена выросла
+    assert dcoin.price(conn) < before_price                          # обмен — продажа: цена вниз
+    assert dcoin.state(conn)["pool"] == before_pool - pay            # 5% комиссии остались в копилке
     try:
         dcoin.exchange(conn, uid, 100, now=later + timedelta(hours=1))
         raise AssertionError("раз в сутки")
@@ -187,23 +189,31 @@ def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points").fetchone()[0] == 1
 
 
-def test_price_follows_previous_purchase(conn):
+def test_every_purchase_moves_price_up(conn):
+    """Любая покупка — вверх, крупнее — сильнее. Раньше шаг считался от предыдущей покупки,
+    и при разных суммах подряд график полз вниз."""
     uid = _user(conn)
     for total in (30_000, 30_000, 30_000):
         _buy(conn, uid, total)
-    p0 = dcoin.price(conn)
-    _buy(conn, uid, 50_000)                                            # $5 после $3 — вверх
-    p1 = dcoin.price(conn)
-    _buy(conn, uid, 40_000)                                            # $4 после $5 — вниз
-    p2 = dcoin.price(conn)
-    _buy(conn, uid, 60_000)                                            # $6 после $4 — снова вверх
-    p3 = dcoin.price(conn)
-    assert p1 > p0 and p2 < p1 and p3 > p2
-    # по проценту разницы с предыдущей покупкой; падение чуть мягче роста
-    for (a, b), ratio in zip(((p0, p1), (p1, p2), (p2, p3)), (5 / 3, 4 / 5, 6 / 4)):
-        assert abs((b - a) / a - dcoin.move_for(ratio)) < 0.001, (a, b, ratio)
-    assert round(dcoin.move_for(5 / 4) * 100, 1) == 1.1 and round(dcoin.move_for(4 / 5) * 100, 1) == -0.9
-    assert round(dcoin.move_for(1) * 100, 1) == 0.2 and dcoin.move_for(0.1) == -dcoin.MAX_STEP
+    prices = [dcoin.price(conn)]
+    for total in (50_000, 10_000, 200_000, 5_000, 40_000, 30_000):    # больше, меньше, вперемешку
+        _buy(conn, uid, total)
+        prices.append(dcoin.price(conn))
+    assert all(b > a for a, b in zip(prices, prices[1:])), prices
+    assert dcoin.move_for(10) > dcoin.move_for(1) > dcoin.move_for(0.1) > 0
+    assert dcoin.move_for(1000) == dcoin.MAX_STEP
+
+
+def test_exchange_moves_price_down(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.0001)
+    uid = _user(conn)
+    for total in (300_000, 500_000, 400_000) * 4:
+        _buy(conn, uid, total, cost=total // 2)
+    later = datetime.now(timezone.utc) + timedelta(days=dcoin.open_days(conn) + 1)
+    monkeypatch.setattr(dcoin, "_now", lambda: later)
+    before = dcoin.price(conn)
+    dcoin.exchange(conn, uid, dcoin.balance(conn, uid) // 2, now=later)
+    assert dcoin.price(conn) < before
 
 
 def test_history_for_scrolling_back(conn):
