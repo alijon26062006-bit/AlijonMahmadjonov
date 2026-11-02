@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_review.html" import review_card, review_styles, stars %}
 {% block title %}Отзывы покупателей — {{ site_name }}{% endblock %}
-{% block description %}Отзывы покупателей {{ site_name }}: оценка {{ s.avg }} из 5 по {{ s.total }} отзывам. Только реальные заказы — каждая покупка подтверждена.{% endblock %}
+{% block description %}Отзывы покупателей {{ site_name }}{% if s.total %}: оценка {{ s.avg }} из 5 по {{ s.total }} отзывам{% endif %}. Только реальные заказы — каждая покупка подтверждена.{% endblock %}
 {% block body %}
 <main class="section">
   <div class="wrap" style="max-width:760px">

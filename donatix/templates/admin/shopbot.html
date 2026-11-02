@@ -54,7 +54,7 @@
   <p class="muted">Уйдёт всем, кто запускал бота и не отписался. Под сообщением — кнопки «Меню» и «Отписаться».</p>
   {% if last %}<p class="small muted">Прошлая: {{ last.at | dt }} · доставлено {{ last.sent }}{% if last.gone %} · заблокировали бота {{ last.gone }}{% endif %}</p>{% endif %}
   <form method="post" action="/admin/shopbot/broadcast"><input type="hidden" name="csrf" value="{{ csrf }}">
-    <textarea name="text" rows="5" maxlength="3500" placeholder="🔥 Сегодня UC в PUBG дешевле! Заходите в бот 👇" required></textarea>
+    <textarea name="text" rows="5" maxlength="3500" aria-label="Текст рассылки" placeholder="🔥 Сегодня UC в PUBG дешевле! Заходите в бот 👇" required></textarea>
     <button class="btn" style="margin-top:10px" {{ 'disabled' if not on }}>{{ icon('zap-send', 16) }}Отправить всем</button>
   </form>
 </div>

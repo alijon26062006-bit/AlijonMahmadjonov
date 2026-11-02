@@ -77,8 +77,8 @@ def _premium(conn, config: Config, user) -> list[dict[str, Any]]:
     return plans
 
 
-def _feed(conn) -> list[dict[str, Any]]:
-    """Последние покупки всех: имя покупателя (только имя из Telegram), что купил, когда."""
+def _feed(conn, lang: str = "tj") -> list[dict[str, Any]]:
+    """Последние покупки всех: имя покупателя (только имя из Telegram), что купил, когда. Подписи — на языке открывшего."""
     tggifts.ensure(conn)
     rows = conn.execute(
         "SELECT * FROM ("
@@ -97,10 +97,10 @@ def _feed(conn) -> list[dict[str, Any]]:
             what = f"{r['qty']} Stars"
         elif r["kind"] == "telegram_premium":
             m = re.search(r"(\d+)", r["name"] or "")
-            what = f"Premium · {m.group(1) if m else ''} моҳ"
+            what = f"Premium · {m.group(1) if m else ''} {'мес' if lang == 'ru' else 'моҳ'}"
         else:
             what = f"{r['emoji'] or '🎁'} Gift · {r['qty']}⭐"
-        out.append({"who": who or "Харидор", "what": what, "kind": r["kind"], "at": r["at"]})
+        out.append({"who": who or ("Покупатель" if lang == "ru" else "Харидор"), "what": what, "kind": r["kind"], "at": r["at"]})
     return out
 
 
@@ -161,7 +161,7 @@ async def api_init(request: Request, conn=Depends(get_conn), config: Config = De
         "stars": _stars(conn, config, user),
         "premium": _premium(conn, config, user),
         "gifts": tggifts.listing(conn, config, user) if tggifts.enabled(config) else [],
-        "feed": _feed(conn),
+        "feed": _feed(conn, tgnotify.lang_of(tg)),
         "ref": {"percent": referrals.percent(conn), "invited": referrals.stats(conn, user["id"])["invited"],
                 "link": f"https://t.me/{bot}?start=r_{referrals.code_for(conn, user['id'])}" if bot else ""},
         "bot": bot,
@@ -269,7 +269,7 @@ def _buy_gift(conn, config: Config, user, tg: dict[str, Any], body: dict, to_fri
         known = tggifts.find_username(conn, username)
         rid, rname = (int(known["tg_id"]), "@" + username.lstrip("@")) if known else (None, "@" + username.lstrip("@"))
     else:
-        rid, rname = int(tg["id"]), tg.get("first_name") or "Худам"
+        rid, rname = int(tg["id"]), tg.get("first_name") or ("Себе" if tgnotify.lang_of(tg) == "ru" else "Худам")
     try:
         o = tggifts.buy(conn, config, user, gift_id, recipient_id=rid, recipient=rname, text=text)
     except tggifts.GiftError as exc:

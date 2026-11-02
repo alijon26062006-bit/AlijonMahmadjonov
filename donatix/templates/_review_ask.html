@@ -13,7 +13,7 @@
       {% for i in [5, 4, 3, 2, 1] %}<input type="radio" id="ra{{ i }}" name="rating" value="{{ i }}" required><label for="ra{{ i }}" title="{{ i }} из 5">★</label>{% endfor %}
     </div>
     <p class="rvask-hint muted small" id="rvask-hint">&nbsp;</p>
-    <textarea name="text" rows="3" maxlength="1000" id="rvask-text" placeholder="Пару слов о заказе (можно на любом языке)"></textarea>
+    <textarea name="text" rows="3" maxlength="1000" id="rvask-text" aria-label="Текст отзыва" placeholder="Пару слов о заказе (можно на любом языке)"></textarea>
     <button class="btn primary block">Отправить отзыв</button>
     <button type="button" class="rvask-later" data-rvask-close>Позже</button>
   </form>

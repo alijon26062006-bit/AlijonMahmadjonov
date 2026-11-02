@@ -303,3 +303,48 @@ def test_soft_navigation_wiring(app, conn):
     assert '<main id="main" data-full>' in a.get("/admin/catalog-sync").text   # опрос каталога — только целиком
     js = c.get("/static/nav.js")
     assert js.status_code == 200 and "dxNav" in js.text
+
+
+def test_error_pages_russian_know_user_and_catch_crash(app, conn):
+    """Ошибки — страницей сайта и по-русски: текст pydantic переведён (без «query.page — Input should…»),
+    id из 20 цифр не влезает в SQLite — это 400, а не 500; вошедший видит в шапке «Панель», а не «Войти»;
+    непойманное исключение — страница 500 без трейсбека, для /api/ — JSON."""
+    from conftest import make_client
+    from fastapi.testclient import TestClient
+    make_client(conn, login="errpage")
+    c = TestClient(app, raise_server_exceptions=False)
+    web_login(c, "errpage@example.com", "password123")
+    r = c.get("/panel/orders?page=abc")
+    assert r.status_code == 400 and "поле «page» — должно быть целым числом" in r.text
+    assert "Input should" not in r.text and "query." not in r.text
+    r = c.get("/panel/balance/99999999999999999999/pay")
+    assert r.status_code == 400 and "слишком большое число" in r.text
+    r = c.get("/panel/zzz")
+    assert r.status_code == 404 and 'href="/panel">Панель</a>' in r.text
+
+    @app.get("/__boom")
+    def _boom():
+        raise RuntimeError("boom")
+
+    @app.get("/api/__boom")
+    def _api_boom():
+        raise RuntimeError("boom")
+
+    r = c.get("/__boom")
+    assert r.status_code == 500 and "Что-то пошло не так" in r.text and "RuntimeError" not in r.text
+    assert 'href="/panel">Панель</a>' in r.text
+    r = c.get("/api/__boom")
+    assert r.status_code == 500 and r.json() == {"ok": False, "error": "Что-то пошло не так. Попробуйте ещё раз "
+                                                 "через минуту — мы уже видим ошибку.", "code": "server_error"}
+
+
+def test_product_title_keeps_quantity():
+    """В «Оплате покупки» 10 карт Steam — «Steam — $20 × 10», звёзды — «Telegram Stars 10000», не «1 × 10000»."""
+    from donatix import quickbuy
+    steam = {"kind": "gift_card", "name": "Steam — $20", "category_name": "Steam USD",
+             "min_qty": 1, "max_qty": 50, "stock": None}
+    assert quickbuy.product_title(steam, {}, "10") == "Steam — $20 × 10"
+    assert " × " not in quickbuy.product_title(steam, {}, "abc")       # кривое количество — как одна штука
+    stars = {"kind": "telegram_stars", "name": "Telegram Stars", "category_name": "Telegram",
+             "min_qty": 50, "max_qty": 100_000, "stock": None}
+    assert quickbuy.product_title(stars, {"username": "@farrukh_tj"}, 10000) == "Telegram Stars 10000 · @farrukh_tj"

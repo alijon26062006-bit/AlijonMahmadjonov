@@ -25,7 +25,7 @@
   <p class="muted small" style="margin:0 0 10px">Впишите, сколько Stars, и нажмите кнопку — откроется оплата в Telegram.
     Stars спишутся с вашего аккаунта Telegram и придут на баланс бота{% if bot %} @{{ bot }}{% endif %}.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <input name="stars" inputmode="numeric" placeholder="например, 500" style="max-width:180px" required>
+    <input name="stars" inputmode="numeric" aria-label="Количество Stars" placeholder="например, 500" style="max-width:180px" required>
     {% for n in (100, 500, 1000) %}<button class="btn sm" type="button" onclick="this.form.stars.value={{ n }}">{{ n }} ⭐</button>{% endfor %}
     <button class="btn primary" {{ 'disabled' if not on }}>Пополнить</button>
   </div>
