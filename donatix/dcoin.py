@@ -33,6 +33,9 @@ DEFAULT_REFUND_PCT = 2           # возврат денег за заказ —
 DEFAULT_OPEN_DAYS = 30            # обмен открывается через месяц после запуска
 EXCHANGE_FEE_PCT = 5              # остаются в копилке — цена растёт для остальных
 MIN_EXCHANGE = 10_000             # от $1 (микро-доллары)
+# Обмена на баланс сайта нет: монеты продают и покупают только друг у друга через P2P, копилка ничего не выплачивает.
+# Поэтому цену можно держать на уровне START_TJS, а не «копилка ÷ монеты».
+EXCHANGE_OFF = True
 TIMEFRAMES = {"1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
 CANDLES = 80
 MAX_CANDLES = 400               # сколько свечей можно пролистать назад
@@ -207,10 +210,41 @@ def _retarget(conn: sqlite3.Connection) -> None:
     cache.clear("dcoin:")
 
 
+def _scale_once(conn: sqlite3.Connection) -> None:
+    """Один раз: цена графика — к START_TJS (0.001 с. за 1 D), вся история умножается на один коэффициент —
+    рост и падения те же. Копилка на это не влияет: обмена на баланс нет (EXCHANGE_OFF), только P2P."""
+    if db.get_setting(conn, "dcoin.scale_001"):
+        return
+    db.set_setting(conn, "dcoin.scale_001", db.now())
+    row = conn.execute("SELECT price FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None or float(row["price"]) <= 0:
+        return
+    try:
+        rate = float(db.get_setting(conn, "pay.tjs_rate") or 10.9)
+    except ValueError:
+        rate = 10.9
+    factor = (START_TJS / rate) / float(row["price"])
+    if factor <= 1:
+        return
+    conn.execute("UPDATE dcoin_points SET price = price * ?", (factor,))
+    db.set_setting(conn, "dcoin.scale", repr(_scale(conn) * factor))
+    from . import cache
+    cache.clear("dcoin:")
+
+
+def _scale(conn: sqlite3.Connection) -> float:
+    """Во сколько раз цена на графике выше «копилка ÷ монеты» (1 — пока не поднимали)."""
+    try:
+        return float(db.get_setting(conn, "dcoin.scale") or 1.0)
+    except ValueError:
+        return 1.0
+
+
 def state(conn: sqlite3.Connection) -> dict[str, int]:
     _launch(conn)
     _rebase(conn)
     _retarget(conn)
+    _scale_once(conn)
     row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
         return {"pool": 0, "supply": 0, "reserve": 0}
@@ -225,13 +259,13 @@ def price_of(pool: int, supply: int, reserve: int = 0) -> float:
 
 def price(conn: sqlite3.Connection) -> float:
     s = state(conn)
-    return price_of(s["pool"], s["supply"], s["reserve"])
+    return price_of(s["pool"], s["supply"], s["reserve"]) * _scale(conn)
 
 
 def _point(conn: sqlite3.Connection, pool: int, supply: int, reason: str, when: str | None = None,
            *, reserve: int = 0) -> None:
     conn.execute("INSERT INTO dcoin_points (ts, pool, supply, reserve, price, reason) VALUES (?, ?, ?, ?, ?, ?)",
-                 (when or db.now(), pool, supply, reserve, price_of(pool, supply, reserve), reason))
+                 (when or db.now(), pool, supply, reserve, price_of(pool, supply, reserve) * _scale(conn), reason))
 
 
 def reward_units(conn: sqlite3.Connection, usd: float) -> int:
@@ -462,6 +496,8 @@ def _sell_reserve(conn: sqlite3.Connection, s: dict[str, int], pool: int, supply
 def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime | None = None) -> int:
     """Обменять монеты на баланс сайта. Возвращает зачисленное (микро)."""
     now = now or _now()
+    if EXCHANGE_OFF:
+        raise ExchangeError("Обмена на баланс нет — продавайте D-коины другим людям через P2P.")
     if not exchange_open(conn, now):
         raise ExchangeError(f"Обмен откроется {exchange_opens(conn):%d.%m.%Y}.")
     with db.tx(conn):
@@ -602,11 +638,12 @@ def balance(conn: sqlite3.Connection, user_id: int) -> int:
 def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
     bal, wait = balance(conn, user_id), waiting(conn, user_id)
     s = state(conn)
-    return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": quote(conn, bal),
+    return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": int(bal / UNIT * price(conn) * 10_000),
             "waiting": wait, "waiting_text": fmt_d(wait), "free": max(0, bal - wait),
-            "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_today(conn),
+            "price": price_of(s["pool"], s["supply"], s["reserve"]) * _scale(conn), "change": change_today(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
+            "exchange_off": EXCHANGE_OFF,
             "enabled": enabled(conn), "earning": earning(conn),
             "earn_until": int(e.timestamp()) if (e := earn_until(conn)) else 0}
 

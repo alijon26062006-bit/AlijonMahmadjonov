@@ -71,6 +71,7 @@ def test_zero_profit_order_gives_coins_but_not_money(conn):
 
 
 def test_exchange_opens_later_and_keeps_fee_in_pool(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "EXCHANGE_OFF", False)                 # проверяем механику обмена (сейчас выключен)
     monkeypatch.setattr(dcoin, "START_PRICE", 1.0)                    # без запаса: цена сразу «взрослая»
     uid = _user(conn)
     for _ in range(20):
@@ -108,7 +109,7 @@ def test_candles_and_page(app, config, conn):
     client = TestClient(app)
     web_login(client, "coiner@example.com", "password123")
     page = client.get("/panel/dcoin").text
-    assert "dc-canvas" in page and "D-коин" in page and "Обмен откроется" in page
+    assert "dc-canvas" in page and "D-коин" in page and "/panel/p2p" in page   # обмена нет — только P2P
     j = client.get("/panel/data/dcoin?tf=5m").json()
     assert j["tf"] == "5m" and j["price"] > 0 and len(j["candles"]) == dcoin.CANDLES
     assert "dc-card" in client.get("/panel").text                     # карточка на главной кабинета
@@ -205,6 +206,7 @@ def test_every_purchase_moves_price_up(conn):
 
 
 def test_exchange_moves_price_down(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "EXCHANGE_OFF", False)                 # проверяем механику обмена (сейчас выключен)
     monkeypatch.setattr(dcoin, "START_PRICE", 0.0001)
     uid = _user(conn)
     for total in (300_000, 500_000, 400_000) * 4:
@@ -284,6 +286,7 @@ def test_coins_given_at_purchase_become_real_on_completion(conn):
 
 
 def test_waiting_coins_cannot_be_exchanged(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "EXCHANGE_OFF", False)                 # проверяем механику обмена (сейчас выключен)
     monkeypatch.setattr(dcoin, "START_PRICE", 1.0)
     uid = _user(conn)
     for _ in range(5):
@@ -421,3 +424,26 @@ def test_running_chart_lifted_once_to_001_somoni(conn, monkeypatch):
     assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)
     assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
     assert dcoin.price(conn) == p                                          # второй раз не двигает
+
+
+def test_exchange_off_and_price_lifted_to_001(conn):
+    """Обмена на баланс нет — только P2P; цена работающего графика один раз поднимается к 0.001 с."""
+    uid = _user(conn)
+    db.set_setting(conn, "dcoin.scale_001", "skip")                     # как на сервере до обновления
+    for total in (30_000, 50_000, 40_000):
+        _buy(conn, uid, total)
+    before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    db.set_setting(conn, "pay.tjs_rate", "10")
+    conn.execute("DELETE FROM settings WHERE key = 'dcoin.scale_001'")
+    p = dcoin.price(conn)
+    assert abs(p - 0.001 / 10) / p < 1e-6                                  # 0.001 с. за 1 D
+    after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    factor = after[-1] / before[-1]
+    assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)   # история — тем же коэффициентом
+    _buy(conn, uid, 40_000)
+    assert dcoin.price(conn) > p                                            # дальше покупки двигают от новой цены
+    try:
+        dcoin.exchange(conn, uid, 100, now=datetime.now(timezone.utc) + timedelta(days=60))
+        raise AssertionError("обмена нет")
+    except dcoin.ExchangeError as exc:
+        assert "P2P" in str(exc)

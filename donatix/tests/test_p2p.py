@@ -131,7 +131,8 @@ def test_guards(conn, market):
         p2p.open_order(conn, buyer, ad, 30 * dcoin.UNIT)
 
 
-def test_p2p_sale_does_not_block_daily_exchange(conn, market):
+def test_p2p_sale_does_not_block_daily_exchange(conn, market, monkeypatch):
+    monkeypatch.setattr(dcoin, "EXCHANGE_OFF", False)
     seller, buyer = market
     p2p.create_ad(conn, seller, "sell", _px(conn, 100), 10 * dcoin.UNIT)
     assert dcoin.exchange(conn, seller, dcoin.balance(conn, seller)) > 0
