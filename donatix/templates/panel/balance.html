@@ -7,6 +7,7 @@
     border: 1px solid var(--accent-line, var(--line)); border-radius: var(--r); background: var(--accent-soft); }
   .pay-copy small { display: block; color: var(--muted); font-size: .75rem; } .pay-copy b { font-size: 1.05rem; letter-spacing: .02em; word-break: break-all; }
   .pay-copy .btn { flex: none; }
+  @media (max-width: 560px) { .pay-copy { flex-wrap: wrap; } }   /* на телефоне номер карты не рвётся на две строки — кнопка уходит под него */
   .pay-how { margin: 8px 0; padding: 10px 12px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); font-size: .88rem; }
   .pay-how ol { margin: 6px 0 0; padding-left: 20px; } .pay-how li { margin: 3px 0; }
   .cx { margin-top: 18px; }

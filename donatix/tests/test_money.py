@@ -1,6 +1,8 @@
 from decimal import Decimal
 
-from donatix.money import apply_markup, fmt, fmt_unit, order_total_micro, to_micro
+import pytest
+
+from donatix.money import MoneyError, apply_markup, fmt, fmt_unit, order_total_micro, to_micro, to_micro_ceil
 
 
 def test_fmt_four_digits():
@@ -31,3 +33,11 @@ def test_fmt_unit():
 def test_to_micro():
     assert to_micro("100") == 1_000_000
     assert to_micro("-5.50") == -55_000
+
+
+def test_huge_number_is_money_error():
+    """«1e30» не влезает в точность Decimal — это ошибка ввода (MoneyError), а не 500."""
+    with pytest.raises(MoneyError):
+        to_micro("1e30")
+    with pytest.raises(MoneyError):
+        to_micro_ceil(Decimal("1e30"))

@@ -101,7 +101,7 @@ def number_list(request: Request, limit: int = Query(default=20, ge=1, le=100), 
 @router.get("/numbers/orders/{vid}")
 def number_get(vid: int, request: Request, user=Depends(api_user), conn=Depends(get_conn),
                config: Config = Depends(get_config)) -> dict[str, Any]:
-    """Каждый запрос спрашивает 5sim: пришёл ли код. Код не пришёл и время вышло — деньги вернутся сами."""
+    """Каждый запрос проверяет, пришёл ли код. Код не пришёл и время вышло — деньги вернутся сами."""
     _limit(request, "catalog", str(user["id"]))
     v = _own_number(conn, vid, user["id"])
     if fivesim.enabled(config):

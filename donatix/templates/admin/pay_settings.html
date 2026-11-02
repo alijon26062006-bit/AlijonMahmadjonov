@@ -125,7 +125,7 @@
       {% elif v.file or v.src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ v.src }}" controls preload="none"></video>
       {% else %}<a class="btn block" href="{{ v.src }}" target="_blank" rel="noopener">Открыть ссылку</a>{% endif %}
     </div>
-    <div class="hint">Посмотрели и согласились: <b>{{ v.seen }}</b> клиент(ов)</div>
+    <div class="hint">Посмотрели и согласились: <b>{{ v.seen }}</b> {{ plural(v.seen, 'клиент', 'клиента', 'клиентов') }}</div>
     {% else %}<div class="hint">Видео отключено — клиенты платят без него.</div>{% endif %}
     <label>Файл видео <input type="file" name="file" accept="video/mp4,video/webm,video/quicktime"></label>
     <label>или ссылка <input name="url" placeholder="https://youtube.com/shorts/… или https://…/video.mp4" value="{{ '' if not v or v.file else v.url }}"></label>

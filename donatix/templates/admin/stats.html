@@ -41,7 +41,7 @@
   <div class="an-rows">
     {% for c in a.channels %}
     <div><span>{{ c.title }} <small>{{ c.note }} · {{ c.done }} {{ plural(c.done, 'заказ', 'заказа', 'заказов') }}{% if c.created != c.done %} из {{ c.created }}{% endif %}</small></span>
-      <b>{{ money(c.turnover) }} <small class="muted">· {{ c.share }}% · прибыль {{ money(c.profit) }}</small></b></div>
+      <b>{{ money(c.turnover) }} <small class="muted">{{ c.share }}% · прибыль {{ money(c.profit) }}</small></b></div>
     {% endfor %}
   </div>
   {% set tot = a.channels | sum(attribute='turnover') %}

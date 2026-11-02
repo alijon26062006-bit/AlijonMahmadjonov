@@ -32,7 +32,7 @@ def _tg(request: Request, config: Config) -> dict[str, Any] | None:
 
 
 def _deny() -> JSONResponse:
-    return JSONResponse({"error": "Откройте магазин из Telegram-бота."}, status_code=403)
+    return JSONResponse({"error": "Мағозаро аз Telegram-бот кушоед. / Откройте магазин из Telegram-бота."}, status_code=403)
 
 
 def _account(conn, tg: dict[str, Any], start: str = ""):
@@ -245,7 +245,7 @@ async def api_buy(request: Request, conn=Depends(get_conn), config: Config = Dep
         return {"ok": False, "error": "?"}
     p = catalog.get_product(conn, pid)   # Stars и Premium выключены — get_product их не отдаёт
     if p is None or p["kind"] not in ("telegram_stars", "telegram_premium"):
-        return {"ok": False, "error": "Товар недоступен."}
+        return {"ok": False, "error": "Мол дастрас нест. / Товар недоступен."}
     fields = {f["key"]: "@" + username.lstrip("@") for f in p["fields"]}
     try:
         order, _ = orders.create_order(conn, config, request.app.state.supplier, user, product_id=pid, quantity=qty,
@@ -338,7 +338,7 @@ async def api_topup(request: Request, conn=Depends(get_conn), config: Config = D
     user = _account(conn, tg)
     method = str(form.get("method") or "")
     if not any(m["code"] == method for m in _pay_methods(request, conn, config)):
-        return {"ok": False, "error": "Способ оплаты недоступен."}
+        return {"ok": False, "error": "Ин тарзи пардохт дастрас нест. / Способ оплаты недоступен."}
     file = form.get("receipt")
     data = await file.read(payments.MAX_RECEIPT_BYTES + 1) if file is not None and getattr(file, "filename", "") else b""
     auto = payments.is_auto(conn, config, method)
@@ -347,10 +347,11 @@ async def api_topup(request: Request, conn=Depends(get_conn), config: Config = D
         chosen = next((m for m in payments.methods(conn, config) if m["code"] == method), {})
         if chosen.get("auto") == "dcbank" and dcvideo.needed(conn, user["id"], "site"):
             if form.get("agree") != "1":
-                return {"ok": False, "error": "Сначала посмотрите видео и отметьте, что поняли.", "video": True}
+                return {"ok": False, "error": "Аввал видеоро бинед ва қайд кунед, ки фаҳмидед. / "
+                                              "Сначала посмотрите видео и отметьте, что поняли.", "video": True}
             dcvideo.ack(conn, user["id"], "site")
     elif not data:
-        return {"ok": False, "error": "Прикрепите чек об оплате — фото или PDF."}
+        return {"ok": False, "error": "Чеки пардохтро замима кунед — акс ё PDF. / Прикрепите чек об оплате — фото или PDF."}
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     details = payments.settings(conn, config)["details"].get(method, "")
     seen = payments.read_receipt(config, data, details) if data else None

@@ -8,7 +8,7 @@
   <a class="{{ 'on' if show == 'all' }}" href="?show=all">Все</a>
 </div>
 <div class="rv-list">
-  {% for r in items %}{{ review_card(r, site_name, admin=True, csrf=csrf) }}{% else %}<p class="muted">{{ 'Все отзывы с ответом 👍' if show == 'new' else 'Отзывов пока нет.' }}</p>{% endfor %}
+  {% for r in items %}{{ review_card(r, site_name, admin=True, csrf=csrf) }}{% else %}<p class="muted">{{ 'Все отзывы с ответом 👍' if show == 'new' and s.total else 'Отзывов пока нет.' }}</p>{% endfor %}
 </div>
 {{ review_styles() }}
 {% endblock %}

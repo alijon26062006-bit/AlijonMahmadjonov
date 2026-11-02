@@ -12,12 +12,13 @@ import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-from . import catalog, db
+from . import catalog, db, timez
 from .config import Config
 from .suppliers import Supplier
 
@@ -247,7 +248,7 @@ def status(conn: Any = None) -> dict[str, Any]:
 
 def _say(line: str) -> None:
     with _lock:
-        _state.setdefault("log", []).append(time.strftime("%H:%M:%S ") + line)
+        _state.setdefault("log", []).append(datetime.now(timez.zone(None)).strftime("%H:%M:%S ") + line)
         _state["log"] = _state["log"][-200:]
     log.info("каталог: %s", line)
     _persist()

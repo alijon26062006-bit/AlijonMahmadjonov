@@ -7,16 +7,16 @@
   <h1>{{ o.public_id }}</h1>
   <span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span>
 </section>
-{% if o.error %}<div class="flash {{ 'error' if o.status in ('attention', 'failed') else 'warn' }}">{{ o.error }}</div>{% endif %}
+{% if o.error %}<div class="flash {{ 'error' if o.status in ('attention', 'failed') else 'warn' }}" style="overflow-wrap:anywhere">{{ o.error }}</div>{% endif %}
 <div class="grid two" style="align-items:start">
   <div class="summary card" style="padding:0">
-    <div><span class="muted">Клиент</span><span><a href="/admin/users/{{ o.user_id }}">{{ o.login }}</a></span></div>
-    <div><span class="muted">Товар</span><span>{{ o.product_name | pack_title(o.kind) }} <span class="mono small muted">{{ o.product_id }}</span></span></div>
-    {% for k, v in fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
+    <div><span class="muted">Клиент</span><span class="wrap-text"><a href="/admin/users/{{ o.user_id }}">{{ o.login }}</a></span></div>
+    <div><span class="muted">Товар</span><span class="wrap-text">{{ o.product_name | pack_title(o.kind) }} <span class="mono small muted">{{ o.product_id }}</span></span></div>
+    {% for k, v in fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono wrap-text">{{ v }}</span></div>{% endfor %}
     <div><span class="muted">Количество</span><span>{{ o.quantity }}</span></div>
     <div><span class="muted">Источник</span><span>{{ o.source }}</span></div>
-    <div><span class="muted">Заказ у поставщика</span><span class="mono">{{ o.supplier_order_id or '—' }} {{ o.supplier_status or '' }}</span></div>
-    <div><span class="muted">Ключ идемпотентности</span><span class="mono small">{{ o.supplier_idem_key }}</span></div>
+    <div><span class="muted">Заказ у поставщика</span><span class="mono wrap-text">{{ o.supplier_order_id or '—' }} {{ o.supplier_status or '' }}</span></div>
+    <div><span class="muted">Ключ идемпотентности</span><span class="mono small wrap-text">{{ o.supplier_idem_key }}</span></div>
     <div><span class="muted">Попыток отправки</span><span>{{ o.supplier_attempts }}</span></div>
     <div><span class="muted">Webhook</span><span>{{ o.webhook_state }}</span></div>
     <div><span class="muted">Создан / обновлён</span><span class="small wrap-text">{{ o.created_at | dt('%d.%m.%Y %H:%M:%S') }} / {{ o.updated_at | dt('%d.%m.%Y %H:%M:%S') }}</span></div>

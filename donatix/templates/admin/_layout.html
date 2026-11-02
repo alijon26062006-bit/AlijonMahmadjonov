@@ -21,7 +21,7 @@
     <div class="adm-top-act">
       {% from "_cur_pick.html" import cur_button with context %}{{ cur_button('adm-cur') }}
       {{ theme_button() }}
-      <button class="adm-circle" type="button" aria-label="Все разделы" onclick="dxMenu(true)">{{ icon('menu', 18) }}</button>
+      <button class="adm-circle" type="button" aria-label="Все разделы" onclick="event.stopPropagation(); dxMenu(true)">{{ icon('menu', 18) }}</button>
     </div>
   </div>
 </header>
@@ -33,7 +33,7 @@
                               ('/admin/banners', 'Реклама', 'image'), ('/admin/bots', 'Боты партнёров', 'zap-send'), ('/admin/settings', 'Настройки', 'shield')] %}
   <a class="adm-rail-i {{ on(href) }}" href="{{ href }}" data-tip="{{ label }}" aria-label="{{ label }}"{% if on(href) %} aria-current="page"{% endif %}>{{ icon(ico, 18) }}</a>
   {% endfor %}
-  <button class="adm-rail-i more" type="button" data-tip="Все разделы" aria-label="Все разделы" onclick="dxMenu(true)">{{ icon('chevron', 18) }}</button>
+  <button class="adm-rail-i more" type="button" data-tip="Все разделы" aria-label="Все разделы" onclick="event.stopPropagation(); dxMenu(true)">{{ icon('chevron', 18) }}</button>
 </nav>
 {% endblock %}
 {% block tabbar %}

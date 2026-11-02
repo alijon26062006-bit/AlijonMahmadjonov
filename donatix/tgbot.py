@@ -20,6 +20,7 @@ from . import accounts, cashiers, db, orders, payments, supplier_queue
 from .config import PAY_METHODS, TIERS, Config
 from .money import fmt
 from .notify import notify
+from .packs import plural
 
 log = logging.getLogger(__name__)
 
@@ -114,7 +115,8 @@ def payment_event(conn: sqlite3.Connection, payment_id: int, config: Config | No
     if su is not None:
         text += f"\nTelegram: {tg_who(su)}"
     if p["fraud_count"]:
-        text = (f"🚨 <b>ВНИМАНИЕ: этот клиент уже присылал поддельный чек ({p['fraud_count']} раз)</b>"
+        text = (f"🚨 <b>ВНИМАНИЕ: этот клиент уже присылал поддельный чек ({p['fraud_count']} "
+                f"{plural(p['fraud_count'], 'раз', 'раза', 'раз')})</b>"
                 + (f"\nДолг ${fmt(-p['balance_micro'])} — спишется из этого пополнения автоматически"
                    if p["balance_micro"] < 0 else "") + "\nПроверьте поступление по выписке банка!\n\n" + text)
     return text, [[(f"✅ Зачислить ${fmt(p['amount_micro'])}", f"pay:ok:{p['id']}"),
@@ -156,8 +158,9 @@ def summary(conn: sqlite3.Connection) -> str:
         "📊 <b>Сводка</b>\n"
         f"Баланс FazerCards: <b>{'$' + str(bal) if bal is not None else '—'}</b>\n"
         f"Балансы клиентов: ${fmt(owed)}\n\n"
-        f"Сегодня (с 00:00): {today['orders']} заказов, прибыль ${fmt(today['profit'])}\n"
-        f"30 дней: {month['orders']} заказов, выручка ${fmt(month['revenue'])}, прибыль ${fmt(month['profit'])}\n\n"
+        f"Сегодня (с 00:00): {today['orders']} {_orders_word(today['orders'])}, прибыль ${fmt(today['profit'])}\n"
+        f"30 дней: {month['orders']} {_orders_word(month['orders'])}, выручка ${fmt(month['revenue'])}, "
+        f"прибыль ${fmt(month['profit'])}\n\n"
         f"Заявок на пополнение: {pays}\nНовых партнёров: {users}\nПроблемных заказов: {problems}"
         + supplier_queue.summary_line(conn)
     )
@@ -165,6 +168,10 @@ def summary(conn: sqlite3.Connection) -> str:
 
 def _e(value: Any) -> str:
     return html.escape(str(value if value is not None else ""))
+
+
+def _orders_word(n: int) -> str:
+    return plural(n, "заказ", "заказа", "заказов")
 
 
 # ── Обработка входящих ──────────────────────────────────────

@@ -7,7 +7,7 @@
     <a class="back hide-in-app" href="/login">{{ icon('arrow-left', 18) }}Назад</a>
     <h2>Забыли пароль?</h2>
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
-    <p class="muted">Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.</p>
+    {% if mail or ways.google or ways.telegram %}<p class="muted">Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.</p>{% endif %}
     {% if mail %}
     <form method="post" action="/forgot/email" class="fg-mail">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -25,7 +25,7 @@
     <a class="btn lg block tg-btn" href="/auth/telegram?reset=1">{{ tg_logo(22) }}Восстановить через Telegram</a>
     <p class="hint">Если к аккаунту привязан Telegram — подтвердите в боте одной кнопкой.</p>
     {% endif %}
-    {% if not ways.google and not ways.telegram and not mail %}<p>Напишите в поддержку{% if support_contact %}: {{ support_contact }}{% endif %}.</p>{% endif %}
+    {% if not ways.google and not ways.telegram and not mail %}<p class="muted">Сбросить пароль самостоятельно сейчас нельзя — <a href="/panel/support">напишите в поддержку</a>{% if support_contact %} или {{ support_contact }}{% endif %}, поможем вернуть доступ. Баланс и заказы останутся.</p>{% endif %}
     {% if support_contact and (ways.google or ways.telegram or mail) %}<p class="hint center">Не получается? Напишите {{ support_contact }}</p>{% endif %}
   </div>
 </main>

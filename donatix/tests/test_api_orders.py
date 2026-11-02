@@ -241,3 +241,11 @@ def test_site_price_changes_do_not_touch_api_partners(client, conn, config, shop
     assert accounts.markup_for(site_user, config, "game_topup") == 20
     sitecfg.save(conn, config, {"markup_api": "10"})          # наценку API админ меняет отдельно
     assert client.get("/api/v1/products/tg-premium-3", headers=shop["h"]).json()["product"]["price_usd"] == "13.51878"
+
+
+def test_api_keys_page_shows_last_use_in_local_time(client, conn, shop):
+    from conftest import web_login
+    conn.execute("UPDATE api_keys SET last_used_at = '2026-11-02T06:42:10' WHERE user_id = ?", (shop["id"],))
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/api").text
+    assert "02.11.2026 11:42" in page and "2026-11-02 06:42" not in page   # Душанбе, UTC+5

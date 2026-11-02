@@ -35,7 +35,7 @@
           <button type="button" class="link-btn" data-test="{{ k.id }}">Проверить ключ</button>
         </div><div class="small key-msg" id="km-{{ k.id }}" role="status"></div>{% endif %}</td>
       <td class="small">{{ k.created_at | dt('%d.%m.%Y') }}</td>
-      <td class="small">{{ (k.last_used_at or 'ни разу')[:16] | replace('T', ' ') }}</td>
+      <td class="small">{{ k.last_used_at | dt if k.last_used_at else 'ни разу' }}</td>
       <td class="right">
         {% if k.revoked_at %}<span class="badge">отозван</span>{% else %}
         <form class="inline" method="post" action="/panel/api/keys/{{ k.id }}/revoke" onsubmit="return confirm('Отозвать ключ? Всё, что его использует, перестанет работать.')">

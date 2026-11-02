@@ -39,7 +39,7 @@
   </form>
   <hr class="fc-sep">
   <div class="list fc-list">
-    {% for o in orders %}{% include "panel/_order_item.html" %}{% else %}<div class="fc-empty">Заказов не найдено.</div>{% endfor %}
+    {% for o in orders %}{% include "panel/_order_item.html" %}{% else %}<div class="fc-empty">{% if q or status or kind or request.query_params.get('period') or request.query_params.get('date_from') %}Заказов не найдено.{% else %}Заказов пока нет. <a href="/panel/catalog">Выберите игру в каталоге</a> — заказ появится здесь.{% endif %}</div>{% endfor %}
   </div>
 </div>
 <script>

@@ -2,7 +2,7 @@
 {% block title %}{{ c.login }} — админка{% endblock %}
 {% block content %}
 {% from "_icons.html" import icon %}
-<section class="page-hero">
+<section class="page-hero" style="overflow-wrap:anywhere">
   <a class="back" href="/admin/users">{{ icon('arrow-left', 18) }}Клиенты</a>
   <h1>{% if guest_code_of and is_guest_account(c) %}Гость {{ guest_code_of }}{% else %}{{ c.login }}{% endif %}</h1>
   <p>{% if guest_code_of %}<span class="badge accent">🛒 купил без регистрации · код {{ guest_code_of }}</span> {% endif %}{{ '' if is_guest_account(c) else c.email ~ ' · ' }}с {{ c.created_at | dt('%d.%m.%Y') }}{% if c.project %} · {{ c.project }}{% endif %}</p>
@@ -60,7 +60,7 @@
   {% for t in txs %}
   <tr><td>tx{{ t.id }}</td><td>{{ t.note }}</td>
     <td class="num">${{ fmt(t.balance_before) }}</td>
-    <td class="num amount {{ 'plus' if t.amount_micro > 0 else 'minus' }}">${{ fmt(t.amount_micro) }}</td>
+    <td class="num amount {{ 'plus' if t.amount_micro > 0 else 'minus' }}">{{ '+' if t.amount_micro > 0 else '−' }}${{ fmt(t.amount_micro | abs) }}</td>
     <td class="num">${{ fmt(t.balance_after) }}</td><td class="small">{{ t.created_at | dt }}</td></tr>
   {% else %}<tr><td colspan="6" class="muted">Нет движений.</td></tr>{% endfor %}
 </table></div>

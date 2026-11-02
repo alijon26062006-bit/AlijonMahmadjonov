@@ -109,7 +109,7 @@ T: dict[str, tuple[str, str]] = {
     "bc": ("📣 Рассылка", "📣 Паём ба ҳама"),
     "bc_ask": ("📣 Напишите текст рассылки одним сообщением — перед отправкой покажу, как выглядит.",
                "📣 Матни паёмро бо як паём нависед — пеш аз фиристодан нишон медиҳам."),
-    "bc_preview": ("👀 Так увидят {n} человек:\n\n{text}", "👀 {n} нафар чунин мебинанд:\n\n{text}"),
+    "bc_preview": ("👀 Так увидят {n} {who}:\n\n{text}", "👀 {n} нафар чунин мебинанд:\n\n{text}"),
     "bc_send": ("✅ Отправить всем", "✅ Ба ҳама фиристодан"),
     "bc_started": ("🚀 Рассылка пошла. Итог — в админке сайта.", "🚀 Паём фиристода мешавад."),
     "back": ("‹ Назад", "‹ Бозгашт"),
@@ -1333,7 +1333,8 @@ class ShopBot:
                           [[(tr("", "balance"), "b", "success")], [(tr("", "home"), "h")]], effect=EFFECT_PARTY)
         from .worker import notify_admin
         notify_admin(self.config, "🏆 Итоги турнира друзей в боте:\n" + "\n".join(
-            f"{medals[r['place'] - 1]} {r['name']} (tg {r['tg']}) — {r['points']} баллов, {r['prize']} сомони"
+            f"{medals[r['place'] - 1]} {r['name']} (tg {r['tg']}) — {r['points']} "
+            f"{packs_mod.plural(r['points'], 'балл', 'балла', 'баллов')}, {r['prize']} сомони"
             for r in won))
 
     # админ: настройки турнира
@@ -1881,7 +1882,8 @@ class ShopBot:
         elif step == "bc" and self.is_admin(tg_id):
             n = conn.execute("SELECT COUNT(*) FROM shop_users WHERE subscribed = 1").fetchone()[0]
             self.state[tg_id] = {"step": "bc_ready", "text": _e(text[:3500])}
-            self.show(tg_id, tr(lang, "bc_preview", n=n, text=_e(text[:3500])),
+            self.show(tg_id, tr(lang, "bc_preview", n=n, who=packs_mod.plural(n, "человек", "человека", "человек"),
+                                text=_e(text[:3500])),
                       [[(tr(lang, "bc_send"), "bcgo", "success")], [(tr(lang, "cancel"), "adm", "danger")]])
         elif step == "search":
             self.state.pop(tg_id, None)
@@ -1913,7 +1915,8 @@ class ShopBot:
             return
         elif head == "tour":
             self.screen_tour(conn, su, mid)
-        elif head in ("ta", "tat", "tach", "tachx", "tapz", "tab", "tabx", "tban") and self.is_admin(tg_id):
+        elif head in ("ta", "tat", "tach", "tachx", "tapz", "tab", "tabx", "tban") and len(parts) == 1 \
+                and self.is_admin(tg_id):   # «ta:100» — сумма пополнения, не турнир
             self.on_tour_admin(conn, su, head, mid)
         elif head == "h" or head == "lang":
             self.state.pop(tg_id, None)

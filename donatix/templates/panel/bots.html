@@ -73,7 +73,7 @@
       <button class="btn sm">Сменить админов</button>
     </form>
   </div>
-  {% else %}<div class="card empty">Ботов пока нет — подключите первый выше.</div>{% endfor %}
+  {% else %}<div class="card empty">Ботов пока нет{% if elig.ok %} — подключите первый выше{% endif %}.</div>{% endfor %}
 </div>
 
 <div class="card reveal" style="margin-top:18px">

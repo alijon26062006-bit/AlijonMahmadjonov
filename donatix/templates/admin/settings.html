@@ -32,7 +32,7 @@
     <style>.api-markup{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:var(--r)}</style>
     <label class="switch" style="margin-top:10px"><input type="checkbox" name="same_for_all" value="1"><span>Одна наценка для всех уровней — как у Bronze</span></label>
     {% if s.personal %}
-    <div class="flash warn" style="margin-top:10px">{{ icon('alert', 20) }}<span>У {{ s.personal | length }} клиент(ов) личная наценка — для них наценка уровня <b>не действует</b>:
+    <div class="flash warn" style="margin-top:10px">{{ icon('alert', 20) }}<span>У {{ s.personal | length }} {{ plural(s.personal | length, 'клиента', 'клиентов', 'клиентов') }} личная наценка — для них наценка уровня <b>не действует</b>:
       {% for p in s.personal[:8] %}{{ p.login }} ({{ p.markup }}%){{ ', ' if not loop.last }}{% endfor %}{% if s.personal | length > 8 %} и ещё {{ s.personal | length - 8 }}{% endif %}.</span></div>
     <label class="switch"><input type="checkbox" name="reset_personal" value="1"><span>Убрать личные наценки — всем клиентам наценка по уровню</span></label>
     {% endif %}

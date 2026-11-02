@@ -142,7 +142,7 @@
           .then(function () { return timeout(opened, 9000, "интернет не пропускает живой голос"); })
           .then(function () {
             rt = true; lastTalk = performance.now(); store(FAIL, null);
-            showMode("Режим: живой голос (как в ChatGPT)", true);
+            showMode("Режим: живой голос", true);
             micTrack(!muted);
             set(muted ? "muted" : "listening");
           });

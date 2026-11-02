@@ -589,3 +589,18 @@ def test_effect_rejected_message_still_sent(app, config, conn, supplier):
     bot = _bot(config, supplier, NoEffects())
     bot.handle(conn, msg("/start"))
     assert "добро пожаловать" in bot.api.last_text()
+
+
+def test_admin_topup_amount_button_is_not_tournament(app, config, conn, supplier):
+    """«ta:100» — сумма пополнения; у админа она не должна открывать настройки турнира («ta»)."""
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    config.shop_admin_ids = str(TG)
+    api = FakeApi()
+    bot = _bot(config, supplier, api)
+    _start(bot, conn)
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(api.button("Ал")))
+    bot.handle(conn, press("ta:100"))
+    assert "+992" in api.last_text() and "Турнир" not in api.last_text()
+    bot.handle(conn, press("ta"))                                   # кнопка турнира в админ-панели работает
+    assert "Турнир друзей — настройки" in api.last_text()

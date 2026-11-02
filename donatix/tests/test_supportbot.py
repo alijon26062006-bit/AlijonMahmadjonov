@@ -220,3 +220,20 @@ def test_find_code_forgiving():
     assert f("DХ-АВСD2345") == "ABCD2345"                # кириллица вместо латиницы
     assert f("/start ABCD2345") == "ABCD2345"
     assert f("balances") is None and f("заказ не пришёл") is None
+
+
+def test_no_ai_answer_really_goes_to_admin(config, conn):
+    """Бот пишет «передал администратору» — значит, обращение действительно создано и админ его получил."""
+    bot = _bot(config, lambda m: {"content": ""})
+    bot.handle(conn, {"message": {"chat": {"id": 556, "type": "private"}, "from": {"id": 556}, "text": "где заказ?"}})
+    assert "передал ваш вопрос" in bot.api.sent[-1][1]
+    assert conn.execute("SELECT COUNT(*) FROM support_tickets WHERE tg_id = 556").fetchone()[0] == 1
+    assert any(chat == "999" and "tg556" in text for chat, text in bot.api.sent)
+
+
+def test_quick_answers_in_tajik_have_no_russian_status(config, conn):
+    uid, _ = make_client(conn)
+    conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (557, ?, 'x')", (uid,))
+    _order(conn, uid, "dx-77", "completed")
+    text = supportbot.quick_orders(conn, config, 557, "tg")
+    assert "иҷро шуд" in text and "выполнен" not in text

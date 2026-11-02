@@ -1436,8 +1436,12 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
                         "Пополнение выполнено." if row["kind"] in ("topup", "steam_topup") else "Заказ выполнен.",
                         row["completed_at"] or row["updated_at"]))
     elif view["status"] == "failed":
-        history.append(("refund", "Возврат", f"{view['error'] or 'Поставщик отклонил заказ.'} "
-                        f"Деньги вернулись на баланс.", row["updated_at"]))
+        # причина бывает без точки («Отменён администратором») или уже про возврат денег — не дублируем
+        reason = (view["error"] or "Поставщик отклонил заказ.").strip()
+        reason += "" if reason.endswith((".", "!", "?")) else "."
+        if "возвращены на баланс" not in reason and "вернулись на баланс" not in reason:
+            reason += " Деньги вернулись на баланс."
+        history.append(("refund", "Возврат", reason, row["updated_at"]))
     from . import reviews
     review = reviews.by_order(conn, row["id"])
     return render(request, "panel/order.html", {

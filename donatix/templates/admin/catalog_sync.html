@@ -10,7 +10,7 @@
 
 <div class="grid kpis">
   <div class="kpi"><span class="tile">{{ icon('grid', 20) }}</span><div class="label">Товаров</div><div class="value">{{ counts.products }}</div>
-    <div class="note">обновлён {{ (synced_at or 'ещё не загружали')[:16] | replace('T', ' ') }}</div></div>
+    <div class="note">{{ 'обновлён ' ~ (synced_at | dt) if synced_at else 'ещё не загружали' }}</div></div>
   <div class="kpi"><span class="tile g5">{{ icon('bolt', 20) }}</span><div class="label">Игр и сервисов</div><div class="value">{{ counts.categories }}</div></div>
   <div class="kpi"><span class="tile ok">{{ icon('card', 20) }}</span><div class="label">Картинок на сервере</div>
     <div class="value" id="k-local">{{ job.images_local }}</div><div class="note">из {{ counts.images }} у поставщика</div></div>

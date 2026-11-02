@@ -567,7 +567,7 @@ def answer(conn: sqlite3.Connection, config: Config, chat: Callable[[list[dict[s
     messages += [{"role": r["role"], "content": r["content"]} for r in history]
     messages.append({"role": "system", "content": state + "\n" + memory_block(conn, tools.tg_id)})
     messages.append({"role": "user", "content": text})
-    reply = ""
+    reply, escalated = "", False
     for _ in range(MAX_TOOL_ROUNDS):
         msg = chat(messages)
         calls = msg.get("tool_calls") or []
@@ -582,9 +582,12 @@ def answer(conn: sqlite3.Connection, config: Config, chat: Callable[[list[dict[s
             except json.JSONDecodeError:
                 args = {}
             result = tools.run(str(fn.get("name")), args if isinstance(args, dict) else {})
+            escalated = escalated or (fn.get("name") == "escalate_to_admin" and bool(result.get("ok")))
             messages.append({"role": "tool", "tool_call_id": call.get("id"),
                              "content": json.dumps(result, ensure_ascii=False)})
     if not reply:
+        if not escalated:   # обещаем клиенту, что передали, — значит, и правда передаём
+            tools.t_escalate_to_admin("Бот не смог ответить сам. Вопрос клиента: " + text[:500])
         reply = ("Не получилось ответить сразу — передал ваш вопрос администратору, ответ придёт сюда. / "
                  "Ҷавоб додан нашуд — саволи шумо ба админ фиристода шуд.")
     now = db.now()
@@ -651,7 +654,9 @@ def quick_orders(conn: sqlite3.Connection, config: Config, tg_id: int, lang: str
     lines = []
     for o in rows:
         a = _order_for_ai(o)
-        line = f"{icon.get(a['status'], '•')} {a['order_id']} · {a['product']} · ${a['price_usd']} — {a['status']}"
+        status = {"выполнен": "иҷро шуд", "не выполнен": "иҷро нашуд", "в обработке": "дар кор"}.get(
+            a["status"], a["status"]) if _tj(lang) else a["status"]
+        line = f"{icon.get(a['status'], '•')} {a['order_id']} · {a['product']} · ${a['price_usd']} — {status}"
         if a["money_returned_to_balance"]:
             line += " (деньги на балансе)" if not _tj(lang) else " (пул ба тавозун баргашт)"
         lines.append(line)
@@ -669,8 +674,10 @@ def quick_balance(conn: sqlite3.Connection, config: Config, tg_id: int, lang: st
                         (u["id"],)).fetchall()
     for p in pend:
         a = _payment_for_ai(conn, config, p)
+        checking = a["receipt_attached"] or a["automatic_crypto"]
         text += (f"\n⏳ #{a['payment_id']} · {a['to_pay']} ({a['method']}) — "
-                 + ("на проверке" if a["receipt_attached"] or a["automatic_crypto"] else "ждём чек — прикрепите его"))
+                 + (("дар санҷиш" if checking else "чекро интизорем — замима кунед") if _tj(lang) else
+                    ("на проверке" if checking else "ждём чек — прикрепите его")))
     return text
 
 
@@ -705,11 +712,14 @@ def quick_text(conn: sqlite3.Connection, config: Config, key: str, lang: str) ->
                 (f"🎁 Приглашайте друзей: {site}/panel/referrals — там ваша личная ссылка. С каждого их заказа "
                  "вам на баланс бонус — навсегда."))
     if key == "bot":
+        from .packs import plural
         need = _min_orders(conn)
         return ((f"🤖 Боти мағозаи худ: шарт — камаш {need} фармоиши иҷрошуда. @BotFather → /newbot → токенро "
                  "ба ин ҷо фиристед, худам пайваст мекунам.") if tj else
-                (f"🤖 Свой бот-магазин: нужно не меньше {need} выполненных заказов. В @BotFather: /newbot → "
-                 "пришлите токен сюда — подключу сам. Потом в своём боте /panel — цены и реквизиты."))
+                (f"🤖 Свой бот-магазин: нужно не меньше {need} "
+                 f"{plural(need, 'выполненного заказа', 'выполненных заказов', 'выполненных заказов')}. "
+                 "В @BotFather: /newbot → пришлите токен сюда — подключу сам. Потом в своём боте /panel — цены "
+                 "и реквизиты."))
     return ""
 
 

@@ -28,12 +28,18 @@ def to_decimal(value) -> Decimal:
 
 def to_micro(value) -> int:
     """Сумма → микро, с обычным округлением (для ввода админом)."""
-    return int((to_decimal(value) * SCALE).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    try:
+        return int((to_decimal(value) * SCALE).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    except InvalidOperation as exc:   # 1e30 — не влезает в точность Decimal
+        raise MoneyError(f"слишком большое число: {value!r}") from exc
 
 
 def to_micro_ceil(value: Decimal) -> int:
     """Сумма → микро, округление вверх: клиенту никогда не выставляем меньше себестоимости."""
-    return int((to_decimal(value) * SCALE).quantize(Decimal(1), rounding=ROUND_CEILING))
+    try:
+        return int((to_decimal(value) * SCALE).quantize(Decimal(1), rounding=ROUND_CEILING))
+    except InvalidOperation as exc:
+        raise MoneyError(f"слишком большое число: {value!r}") from exc
 
 
 def fmt(micro: int) -> str:

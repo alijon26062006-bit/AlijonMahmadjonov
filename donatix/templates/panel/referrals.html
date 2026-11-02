@@ -53,6 +53,7 @@
 .cst-head h2 { margin: 4px 0 0; font-size: 1.15rem; }
 .cst-timer { text-align: right; } .cst-timer small { display: block; color: var(--muted); font-size: .78rem; }
 .cst-timer b { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .cst-timer { text-align: left; } }   /* на телефоне таймер уходит под заголовок — ровняем по левому краю */
 .cst-prizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .cst-prize { display: grid; justify-items: center; gap: 2px; padding: 12px 6px; border-radius: 14px; background: var(--accent-soft); text-align: center; }
 .cst-cap { display: inline-flex; align-items: center; gap: 6px; }

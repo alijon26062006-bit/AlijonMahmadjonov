@@ -76,6 +76,7 @@ def _glass(conn, config: Config, counts: dict) -> dict:
     from decimal import Decimal
 
     from . import timez
+    from .packs import plural
     local = datetime.now(timezone.utc).astimezone(timez.zone(timez.site_zone_name(conn)))
     h = local.hour
     hello = "Доброе утро" if 5 <= h < 12 else "Добрый день" if 12 <= h < 18 else "Добрый вечер" if 18 <= h < 23 else "Доброй ночи"
@@ -111,14 +112,14 @@ def _glass(conn, config: Config, counts: dict) -> dict:
         "rings": [
             {"title": "Маржа", "sub": f"прибыль ${usd(month['profit'])} из ${usd(month['revenue'])}", "pct": pct(month["profit"], month["revenue"]),
              "when": "30 дней", "icon": "chart", "tone": "violet", "href": "/admin/money"},
-            {"title": "Заказы выполнены", "sub": f"{done} из {done + bad} заказов", "pct": pct(done, done + bad),
+            {"title": "Заказы выполнены", "sub": f"{done} из {done + bad} {plural(done + bad, 'заказа', 'заказов', 'заказов')}", "pct": pct(done, done + bad),
              "when": "30 дней", "icon": "bag", "tone": "blue", "href": "/admin/orders"},
             {"title": "Деньги клиентов покрыты", "sub": f"у поставщика ${usd(supplier_micro)} из ${usd(owed)}",
              "pct": pct(supplier_micro, owed) if owed else 100, "when": "сейчас", "icon": "shield", "tone": "green",
              "href": "/admin/money"},
             {"title": "Сегодня к среднему дню", "sub": f"${usd(today['revenue'])} из ${usd(avg)} в среднем",
              "pct": pct(today["revenue"], avg), "when": "сегодня", "icon": "flame", "tone": "orange", "href": "/admin/stats"},
-            {"title": "Через бот-магазин", "sub": f"{shop_today} из {today['orders']} заказов сегодня",
+            {"title": "Через бот-магазин", "sub": f"{shop_today} из {today['orders']} {plural(today['orders'], 'заказа', 'заказов', 'заказов')} сегодня",
              "pct": pct(shop_today, today["orders"]), "when": "сегодня", "icon": "zap-send", "tone": "pink", "href": "/admin/shopbot"},
         ],
     }
@@ -414,7 +415,9 @@ def bots_terms(request: Request, text: str = Form(""), send: str = Form(""), adm
     botterms.save_text(conn, text)
     if send:
         sent, failed = botterms.send_all(conn, config)
-        flash(request, f"Условия отправлены в {sent} бот(ов)" + (f", не доставлено: {failed}" if failed else "")
+        from .packs import plural
+        flash(request, f"Условия отправлены в {sent} {plural(sent, 'бот', 'бота', 'ботов')}"
+              + (f", не доставлено: {failed}" if failed else "")
               + f". Кто не ответит за {botterms.DEADLINE_HOURS} ч — бот выключится сам.", "ok" if not failed else "warn")
     else:
         flash(request, "Текст условий сохранён.", "ok")
@@ -606,7 +609,7 @@ def user_balance(user_id: int, request: Request, amount: str = Form(...), note: 
     notify(conn, request.app.state.config, user_id,
            (f"Баланс пополнен на ${fmt(micro)}" if micro > 0 else f"С баланса списано ${fmt(-micro)}") + f": {text}.",
            "/panel/transactions")
-    flash(request, f"Баланс изменён на ${fmt(micro)}.")
+    flash(request, f"Баланс изменён на {'+' if micro > 0 else '−'}${fmt(abs(micro))}.")
     return _back(f"/admin/users/{user_id}")
 
 

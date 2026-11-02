@@ -40,10 +40,10 @@
     </form>
   </div>
   <div class="mt-checks">
-    {% if loss_n %}<div class="flash error">{{ icon('alert', 18) }}<span>В минусе <b>{{ loss_n }}</b> заказ(ов) на <b>${{ usd(loss_micro) }}</b>
+    {% if loss_n %}<div class="flash error">{{ icon('alert', 18) }}<span>В минусе <b>{{ loss_n }}</b> {{ plural(loss_n, 'заказ', 'заказа', 'заказов') }} на <b>${{ usd(loss_micro) }}</b>
       — продали дешевле, чем купили у поставщика. Поднимите наценку или обновите каталог (цены поставщика). Список — в файле, красным.</span></div>
     {% else %}<div class="muted small">✅ Убыточных заказов за период нет.</div>{% endif %}
-    {% if orders_n %}<div class="muted small">Закупка точно от поставщика — у {{ exact_n }} из {{ orders_n }} заказов, у остальных — по цене каталога.</div>{% endif %}
+    {% if orders_n %}<div class="muted small">Закупка точно от поставщика — у {{ exact_n }} из {{ orders_n }} {{ plural(orders_n, 'заказа', 'заказов', 'заказов') }}, у остальных — по цене каталога.</div>{% endif %}
   </div>
 </section>
 
