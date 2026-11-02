@@ -25,7 +25,7 @@
     {% if c.mine %}Вы на <b>{{ c.mine.place }} месте</b> · друзей: <b>{{ c.my_friends }}</b>
       {% if c.to_top3 %} · до 3 места не хватает <b>{{ c.to_top3 }}</b>{% else %} · вы в тройке призёров!{% endif %}
     {% else %}Пока у вас 0 друзей на этой неделе — пригласите {{ c.to_top3 }}, чтобы попасть в тройку.{% endif %}
-    {% if c.pending %}<div class="muted small">Ещё {{ c.pending }} друг(а) зарегистрировались, но не подтвердили почту — напомните им.</div>{% endif %}
+    {% if c.pending %}<div class="muted small">Ещё {{ c.pending }} {{ plural(c.pending, 'друг зарегистрировался, но не подтвердил', 'друга зарегистрировались, но не подтвердили', 'друзей зарегистрировались, но не подтвердили') }} почту — напомните {{ 'ему' if c.pending == 1 else 'им' }}.</div>{% endif %}
   </div>
   {% if c.top %}
   <ol class="cst-top">
@@ -43,7 +43,7 @@
     </ul></details>
   {% if c.winners %}
   <div class="cst-past"><div class="label-caps">Прошлые победители</div>
-    {% for w in c.winners %}<div class="cst-win">{{ place(w.place, 20) }} {{ w.name }} — {{ w.friends }} друзей, {{ w.prize_tjs }} сомони
+    {% for w in c.winners %}<div class="cst-win">{{ place(w.place, 20) }} {{ w.name }} — {{ w.friends }} {{ plural(w.friends, 'друг', 'друга', 'друзей') }}, {{ w.prize_tjs }} сомони
       <span class="muted small">· неделя до {{ w.week }}</span></div>{% endfor %}</div>
   {% endif %}
 </div>

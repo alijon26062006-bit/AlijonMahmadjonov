@@ -10,7 +10,7 @@
   {{ media(kind_cover(p.kind, p.image_url), p.category_name, p.kind, 'cover') }}
   <div class="grow">
     <div class="bh-kind">{{ p.kind_title }}</div>
-    <h1>{{ ('Пополнение для ' ~ p.category_name) if siblings else p.title }}</h1>
+    <h1>{{ (('Пополнение для ' ~ p.category_name) if p.kind == 'topup' else p.category_name) if siblings else p.title }}</h1>
     <div class="bh-tags">
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
       {% if p.platform %}<span class="badge accent">{{ p.platform }}</span>{% endif %}
@@ -19,7 +19,7 @@
     </div>
     {% if not user.guest and not is_guest_account(user) %}<div class="api-id muted small">ID для API: <code>{{ p.product_id }}</code>
       <button class="link-btn" type="button" data-copy="{{ p.product_id }}">Копировать</button>
-      · <a href="/docs#ids">что это?</a></div>{% endif %}
+      <span class="nowrap">· <a href="/docs#ids">что это?</a></span></div>{% endif %}
   </div>
 </div>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}

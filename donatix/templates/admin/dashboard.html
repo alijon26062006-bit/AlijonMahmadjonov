@@ -119,7 +119,7 @@
       {% for c in top %}
       <a class="person" href="/admin/users/{{ c.id }}">
         <span class="avatar">{{ c.login[:2] | upper }}</span>
-        <span class="grow"><b>{{ c.login }}</b><span class="sub">{{ c.project or (c.n ~ ' заказов') }}</span></span>
+        <span class="grow"><b>{{ c.login }}</b><span class="sub">{{ c.project or (c.n ~ ' ' ~ plural(c.n, 'заказ', 'заказа', 'заказов')) }}</span></span>
         <span class="amount">${{ usd(c.revenue) }}</span>
       </a>
       {% else %}<div class="empty small">Пока нет продаж.</div>{% endfor %}

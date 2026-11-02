@@ -54,7 +54,7 @@ def test_gift_panel_page_and_data(client, conn):
     accounts.create_user(conn, email="g@example.com", login="gifter", password="password123", status="active")
     web_login(client, "g@example.com", "password123")
     page = client.get("/panel/buy/steam-gift").text
-    assert "Steam Гифты (игры)" in page and "Регион и цена" in page and "Steam Invite ссылка" in page
+    assert "Steam Гифты (игры)" in page and "Регион и цена" in page and "Ссылка-приглашение Steam" in page
     d = client.get("/panel/data/steam-gifts/games?q=dota").json()
     assert d["items"][0]["appid"] == 570
     assert client.get("/panel/data/steam-gifts/games/570").json()["offers"][0]["sub_id"] == 197846

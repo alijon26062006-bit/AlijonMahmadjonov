@@ -1,6 +1,6 @@
 {% extends "admin/_layout.html" %}
 {% from "_review.html" import review_card, review_styles %}
-{% block title %}Отзывы — {{ site_name }}{% endblock %}
+{% block title %}Отзывы — админка{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Отзывы</h1><p class="muted">Средняя оценка <b>{{ s.avg }}</b> из 5 · всего {{ s.total }} · без ответа <b>{{ s.unanswered }}</b>. <a href="/reviews">Страница для покупателей →</a></p></section>
 <div class="seg" style="margin-bottom:12px">

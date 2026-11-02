@@ -38,7 +38,7 @@
 
   <div class="card sticky-summary">
     <h3>Сводка</h3>
-    <label for="f_invite_url" class="label-caps">Steam Invite ссылка</label>
+    <label for="f_invite_url" class="label-caps">Ссылка-приглашение Steam</label>
     <input id="f_invite_url" name="field_invite_url" required inputmode="url" autocapitalize="off" spellcheck="false"
            placeholder="Вставьте короткую ссылку s.team/p/…" value="{{ form.get('invite_url', '') }}">
     <div class="hint">Ссылка-приглашение в друзья из Steam: Друзья → Добавить друга → «Ссылка для приглашения».</div>
@@ -48,7 +48,7 @@
       <div><span>Издание</span><span id="s-ed" class="wrap-text">—</span></div>
       <div><span>Регион</span><span id="s-reg">—</span></div>
       <div class="total"><span>Цена</span><span id="s-price">$0.0000</span></div>
-      <div><span>Ссылка invite</span><span id="s-inv" class="wrap-text">—</span></div>
+      <div><span>Приглашение</span><span id="s-inv" class="wrap-text">—</span></div>
     </div>
     <button class="btn primary lg block" id="g-go" style="margin-top:18px" disabled>Продолжить</button>
     <p class="hint center">{{ icon('shield', 16) }} Если гифт не отправится, деньги вернутся на баланс.</p>

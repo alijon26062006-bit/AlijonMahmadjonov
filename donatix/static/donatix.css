@@ -993,7 +993,7 @@ html { scroll-behavior: smooth; }
   .qrow:hover, a.bal-tile:hover, .bal-btn:hover { transform: none; }
 }
 
-/* Раздел «Telegram»: вкладки Звёзды / Premium и карточки планов, как у FazerCards */
+/* Раздел «Telegram»: вкладки Звёзды / Premium и карточки планов */
 .tg-tabs-card { padding: 8px; margin-bottom: 12px; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--r); background: var(--bg);
   border: 1px solid var(--line); }
@@ -1029,7 +1029,7 @@ html { scroll-behavior: smooth; }
 .hero-points { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 6px; color: var(--muted); font-size: .95rem; }
 .hero-points li { display: flex; align-items: center; gap: 8px; }
 .hero-points .ico { color: var(--ok, var(--accent)); flex: none; }
-.pop-grid .pop-tile { display: grid; place-items: center; aspect-ratio: 1 / 1; }
+.pop-grid .pop-tile { display: grid; place-items: center; aspect-ratio: 1 / 1; flex: none; }
 .con-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 520px) { .con-steps { grid-template-columns: 1fr; } }
 /* На телефоне пример API на главной не нужен — сразу «Популярное» и конструктор */
@@ -1276,7 +1276,7 @@ html { scroll-behavior: smooth; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
 .link-btn.copied { background: none; color: #16a34a; }
 .tz-row .v { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.tz-row select { max-width: 280px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line, #ddd);
+.tz-row select { width: auto; max-width: 100%; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line, #ddd);
   background: var(--surface); color: inherit; font: inherit; }
 .fin-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .fin-kpis { margin-bottom: 14px; }
@@ -1391,6 +1391,7 @@ a.order-card:hover { transform: translateY(-1px); }
 .order-card .oc-img { flex: none; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; align-self: flex-start;
   box-shadow: 0 0 0 1px var(--line); }
 .order-card .oc-img img { width: 100%; height: 100%; object-fit: cover; }
+.order-card .oc-img .media-initials { font-size: .95rem; }
 .order-card .title { font-size: 1.02rem; }
 .order-card .amount { font-size: 1.02rem; }
 .order-card .oc-who { margin-top: 1px; display: flex; justify-content: space-between; gap: 10px; font-size: .8rem;
@@ -1523,7 +1524,7 @@ a.order-card:hover { transform: translateY(-1px); }
 .mf-bar span + span { box-shadow: -2px 0 0 var(--surface); }
 .mf-cost { background: #94a3b8; } .mf-ref { background: #f59e0b; } .mf-dcoin { background: #eab308; }
 .mf-cash { background: #8b5cf6; } .mf-own { background: var(--ok); }
-.mf-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 14px; }
+.mf-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 8px 16px; margin-top: 14px; }
 .mf-item { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 8px; font-size: .92rem; }
 .mf-item i { width: 12px; height: 12px; border-radius: 4px; }
 .mf-item b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
@@ -1628,9 +1629,10 @@ body.rcc-open { overflow: hidden; }
   .app-ui .tabbar .on { color: var(--accent); }
   .app-ui .tabbar .tab-main svg { width: 34px; height: 34px; padding: 7px; border-radius: 12px; margin-top: -14px;
     background: var(--accent); color: #fff; box-shadow: 0 6px 16px -6px var(--accent); }
-  .app-ui main#main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .app-ui main#main { padding-bottom: 0; }   /* зазор под нижнее меню даёт подвал .app-foot (96px), иначе между контентом и дисклеймером дыра */
   .app-ui .buy-bar { bottom: calc(65px + env(safe-area-inset-bottom)); padding-bottom: 10px; }
-  .app-ui .buy-grid { padding-bottom: 150px; }
+  .app-ui .buy-grid { padding-bottom: 0; }
+  .app-ui body:has(.buy-bar) .app-foot { padding-bottom: calc(96px + 65px + env(safe-area-inset-bottom)); }
   .app-ui .only-sm[aria-label="Открыть меню"] { display: none; }
 }
 /* Форма покупки только проявляется, без сдвига: иначе закреплённая снизу кнопка «Купить» прыгает при открытии */
@@ -1879,7 +1881,7 @@ body.rcc-open { overflow: hidden; }
 .dcv-agree small { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
 .dcp-guide .dcv-frame { margin: 6px 0 10px; }
 
-/* ── Заказы в стиле FazerCards: рамка заголовка, фильтры, страницы цифрами ── */
+/* ── Заказы: рамка заголовка, фильтры, страницы цифрами ── */
 .fc-hero { margin: 14px 0 16px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 20px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), color-mix(in srgb, var(--accent) 3%, var(--surface))); }
 .fc-hero h1 { margin: 0; font-size: 1.55rem; font-weight: 800; letter-spacing: -.01em; }
@@ -1890,6 +1892,7 @@ body.rcc-open { overflow: hidden; }
 .fc-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .fc-selects .label-caps { display: block; margin: 0 0 6px; }
 .fc-selects select { width: 100%; height: 44px; border-radius: 14px; }
+@media (max-width: 480px) { .fc-selects { grid-template-columns: 1fr; } }
 .fc-dates { margin-top: 10px; }
 .fc-dates summary { cursor: pointer; color: var(--muted); font-size: .85rem; font-weight: 600; }
 .fc-dates[open] summary { margin-bottom: 10px; }
@@ -1985,11 +1988,11 @@ body.rcc-open { overflow: hidden; }
 .tk-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .tk-file img { display: block; max-width: 240px; max-height: 240px; border-radius: 10px; margin-top: 6px; }
 .tk-reply { padding: 12px; border-top: 1px solid var(--line); }
-.tk-reply-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.tk-reply-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .tk-audio { display: block; width: 240px; max-width: 100%; height: 40px; margin-top: 6px; }
 .tk-mic.rec { background: var(--bad); color: #fff; border-color: var(--bad); }
 
-/* ── Поддержка в стиле FazerCards: поиск, база знаний, заявки, «С чем нужна помощь?» ── */
+/* ── Поддержка: поиск, база знаний, заявки, «С чем нужна помощь?» ── */
 .sp-hero { margin: 8px -4px 22px; padding: 30px 18px 22px; text-align: center; border-radius: 24px;
   background: radial-gradient(120% 90% at 10% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
               radial-gradient(90% 80% at 90% 20%, color-mix(in srgb, #f5b84a 10%, transparent), transparent 60%); }
@@ -2079,8 +2082,8 @@ body.rcc-open { overflow: hidden; }
 .sp-search { height: 44px; border-radius: 12px; padding: 0 12px; gap: 8px; box-shadow: 0 2px 10px rgba(20, 22, 40, .05); }
 .sp-search input { font-size: .95rem; }
 .sp-h { margin: 18px 2px 10px; font-size: 1.05rem; }
-.sp-cards { grid-template-columns: 1fr; gap: 8px; }
-@media (min-width: 860px) { .sp-cards { grid-template-columns: 1fr 1fr; } }
+.sp-cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (min-width: 860px) { .sp-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sp-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; box-shadow: none; }
 .sp-card:hover { transform: none; box-shadow: none; border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
 .sp-card b { margin: 0; font-size: .95rem; font-weight: 700; }
@@ -2120,9 +2123,10 @@ body.rcc-open { overflow: hidden; }
 .sp-actions .tk-mic { width: 46px; height: 46px; border-radius: 12px; }
 .sp-card .grow, .sp-topic .grow { flex: 1; min-width: 0; }
 
-/* ══ Тонкий стиль на всём сайте (как «Поддержка» / FazerCards): меньше отступов, строки вместо больших карточек ══ */
+/* ══ Тонкий стиль на всём сайте (как «Поддержка»): меньше отступов, строки вместо больших карточек ══ */
 .card { padding: 14px; border-radius: 16px; }
 .card + .card, .stack > * + * { margin-top: 10px; }
+.grid > .card + .card { margin-top: 0; }   /* в сетке отступы задаёт gap */
 .page-hero { margin: 10px 0 10px; }
 .page-hero h1 { font-size: 1.3rem; }
 .page-hero p { font-size: .88rem; }
@@ -2273,7 +2277,7 @@ input, select, textarea { font-size: .95rem; }
 .pack-card .media.pack-img .media-initials { font-size: .8rem; }
 @media (max-width: 860px) { .pack-card .media.pack-img { width: 38px; height: 38px; } }
 
-/* ── Аналитика: компактно, как у FazerCards — мелкие подписи, плотные карточки, таблица в одну строку ── */
+/* ── Аналитика: компактно — мелкие подписи, плотные карточки, таблица в одну строку ── */
 .an-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 10px 0 12px; }
 .an-kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line);
   border-radius: 12px; background: var(--surface); min-width: 0; }
@@ -2318,7 +2322,7 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .an-th { font-size: .62rem; letter-spacing: 0; }
 @media (max-width: 560px) { .an-tr { grid-template-columns: minmax(0, 1fr) 30px 30px 30px minmax(64px, auto); gap: 5px; } }
 
-/* ══ Админка целиком — один тонкий размер, как в кабинете (FazerCards): поля, кнопки, таблицы, карточки ══ */
+/* ══ Админка целиком — один тонкий размер, как в кабинете: поля, кнопки, таблицы, карточки ══ */
 .adm main { font-size: .9rem; }
 .adm .page-hero { margin-bottom: 10px; }
 .adm .page-hero h1 { font-size: 1.2rem; margin-bottom: 2px; }
@@ -2389,7 +2393,6 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
   .app-ui .tabbar .tab-main { color: var(--text); }
   .app-ui .tabbar .tab-main svg { width: 22px; height: 22px; padding: 8px; margin-top: -10px; border-radius: 13px;
     box-shadow: 0 4px 12px -4px var(--accent); }
-  .app-ui main#main { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
   .app-ui .buy-bar { bottom: calc(57px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 900px) {
@@ -2720,6 +2723,7 @@ html:has(body.adm) { background: #cdb79e; }
   display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 22px; width: -webkit-max-content; width: max-content; max-width: calc(100vw - 24px);
   background: var(--g-panel); border: 1px solid var(--g-line); box-shadow: var(--g-hi), 0 20px 40px -18px rgb(0 0 0 / .45);
   -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); grid-template-columns: none; }
+.adm .save-bar { bottom: calc(84px + env(safe-area-inset-bottom)); }   /* липкая «Сохранить» — над плавающим доком */
 .adm .adm-dock > a { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px;
   color: var(--g-muted); font: 600 .78rem/1 var(--font); text-decoration: none; transition: background .18s ease, color .18s ease; }
 .adm .adm-dock > a svg { display: none; }

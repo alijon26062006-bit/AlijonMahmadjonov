@@ -908,7 +908,7 @@ class SupportBot:
         cmd, rest = cmd.lower(), rest.strip()
         if cmd == "/learn":
             if len(rest) < 5:
-                self.send(tg_id, "Напишите правило после команды. Пример:\n/learn Заказы Free Fire выполняются "
+                self.send(tg_id, "Напишите правило после команды. Пример:\n/learn Заказы FF СНГ выполняются "
                                  "до 5 минут. Если дольше 15 минут — передавай админу.")
                 return
             n = learn(conn, rest)

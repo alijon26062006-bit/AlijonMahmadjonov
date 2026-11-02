@@ -58,7 +58,7 @@
       <div class="bx-who">
         <span class="bx-ava c{{ a.color }}">{{ a.letter }}<i></i></span>
         <b>{{ a.who }}</b>
-        <span class="bx-orders">{{ a.deals }} Ордера ({{ a.rate }}%)</span>
+        <span class="bx-orders">{{ a.deals }} {{ plural(a.deals, 'ордер', 'ордера', 'ордеров') }} ({{ a.rate }}%)</span>
       </div>
       <div class="bx-tags"><span class="bx-fast">{{ icon('bolt', 14) }}Мгновенно</span></div>
       <div class="bx-price"><small>{{ ap[0] }}</small>{{ ap[1] }}</div>
@@ -157,7 +157,7 @@
   <div class="bx-prof">
     <span class="bx-ava big c{{ user.id % 6 }}">{{ (user.login or '?')[:1] | upper }}<i></i></span>
     <b>{{ user.login }}</b>
-    <span class="bx-dim">{{ prof.deals }} сделок</span>
+    <span class="bx-dim">{{ prof.deals }} {{ plural(prof.deals, 'сделка', 'сделки', 'сделок') }}</span>
   </div>
   <div class="bx-grid">
     <div><span>Куплено</span><b class="g">{{ prof.bought }} D</b></div>

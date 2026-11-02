@@ -29,7 +29,7 @@
         </div>
         {% if reviews_sum and reviews_sum.total %}
         <a class="rv-badge" href="/reviews"><span class="rv-badge-stars" aria-hidden="true">★</span>
-          <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов покупателей →</a>
+          <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} {{ plural(reviews_sum.total, 'отзыв', 'отзыва', 'отзывов') }} покупателей →</a>
         {% endif %}
         <ul class="hero-points">
           <li>{{ icon('check', 16) }}Оплата: Алиф, Душанбе Сити, USDT</li>
@@ -111,7 +111,7 @@
   <section class="section" data-reveal id="reviews">
     <div class="wrap" style="max-width:760px">
       <div class="section-head"><h2>Отзывы покупателей</h2>
-        <p>{{ stars(reviews_sum.avg | round | int, 18) }} <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов о настоящих заказах</p></div>
+        <p>{{ stars(reviews_sum.avg | round | int, 18) }} <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} {{ plural(reviews_sum.total, 'отзыв', 'отзыва', 'отзывов') }} о настоящих заказах</p></div>
       <div class="rv-list">{% for r in reviews_top %}{{ review_card(r, site_name) }}{% endfor %}</div>
       <a class="btn block" style="margin-top:12px" href="/reviews">Все отзывы →</a>
     </div>
@@ -123,7 +123,7 @@
     <div class="wrap">
       <div class="section-head">
         <h2>{{ 'Весь каталог' if popular else 'Выберите игру' }}</h2>
-        {% if total_products %}<p>{{ total_products }} позиций</p>{% endif %}
+        {% if total_products %}<p>{{ total_products }} {{ plural(total_products, 'позиция', 'позиции', 'позиций') }}</p>{% endif %}
       </div>
       {% if not popular %}<span id="games"></span>{% endif %}
       <div class="grid">

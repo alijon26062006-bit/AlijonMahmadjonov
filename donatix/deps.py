@@ -196,6 +196,15 @@ templates.env.globals["ad_when"] = _ad_when
 templates.env.globals["ad_left"] = _ad_left
 
 
+def _plural(n, one: str, few: str, many: str) -> str:
+    """{{ n }} {{ plural(n, 'пакет', 'пакета', 'пакетов') }} — слово после числа в нужной форме."""
+    from .packs import plural
+    return plural(int(n or 0), one, few, many)
+
+
+templates.env.globals["plural"] = _plural
+
+
 @pass_context
 def _dprice(ctx, usd: float) -> str:
     """Цена D-коина (доли цента) в валюте клиента: 3 значащие цифры — коротко и видно каждое движение."""

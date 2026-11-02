@@ -22,7 +22,7 @@
 <h2 class="section-title">Таблица этой недели</h2>
 <div class="list">
   {% for r in top %}<div class="item">{% if r.place <= 3 %}{{ place(r.place, 32) }}{% else %}<div class="tile sm">{{ r.place }}</div>{% endif %}
-    <div class="grow"><div class="title">{{ r.login }}</div></div><b>{{ r.friends }} друзей</b></div>
+    <div class="grow"><div class="title">{{ r.login }}</div></div><b>{{ r.friends }} {{ plural(r.friends, 'друг', 'друга', 'друзей') }}</b></div>
   {% else %}<div class="card empty">Пока никого.</div>{% endfor %}
 </div>
 

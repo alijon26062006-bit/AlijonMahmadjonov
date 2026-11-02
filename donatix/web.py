@@ -81,7 +81,8 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "total_products": total,
         "markups": config.markups,
         "examples": examples,
-        "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
+        "faq": FAQ + ([(q, a.format(**_bot_terms(conn))) for q, a in BOT_FAQ]
+                      if sitecfg.client_bots_enabled(conn) else []),
         "popular": popular.with_extras(popular.services(conn), config),
         "reviews_top": reviews_mod.listing(conn, limit=3),
         "reviews_sum": reviews_mod.summary(conn),
@@ -98,8 +99,8 @@ FAQ = [
                                    "Перед оплатой мы проверяем ID и показываем ник — ошибиться сложно."),
     ("Как быстро придёт донат?", "Обычно за минуту после оплаты. Если перевод проверяют вручную — до часа."),
     ("Что если заказ не выполнится?", "Деньги сразу вернутся на баланс — купите заново или напишите в поддержку."),
-    ("Как пополнить баланс?", "Картами Алиф, Душанбе Сити, Эсхата или криптовалютой USDT (TRC20, BEP20) — "
-                              "на любую сумму."),
+    ("Как пополнить баланс?", "Переводом по реквизитам (Алиф, Душанбе Сити и другие банки) или криптовалютой USDT "
+                              "(TRC20, BEP20). Все способы и минимальная сумма — на странице пополнения."),
 ]
 
 BOT_FAQ = [
@@ -108,16 +109,28 @@ BOT_FAQ = [
                                      "выполняются автоматически с вашего баланса Donatix."),
     ("Сколько стоит конструктор?", "Подключение бесплатное. Вы платите только за проданные товары по нашей "
                                    "цене, а наценку в боте ставите сами — разница ваш заработок."),
-    ("Как создать своего бота?", "Сделайте 5 заказов на сайте — после этого откроется «Мой Telegram-бот». "
+    ("Как создать своего бота?", "Сделайте {orders} на сайте — после этого откроется «Мой Telegram-бот». "
                                  "Создайте бота в @BotFather и вставьте токен в кабинете или отправьте его нашему "
                                  "боту поддержки. Бот запустится сразу с готовыми играми: FF СНГ и "
                                  "Индонезия, PUBG Mobile."),
     ("Как клиенты платят в моём боте?", "На ваши реквизиты: карта, Душанбе Сити, USDT. Вы подтверждаете оплату "
                                         "в боте, и баланс клиента пополняется. Контакт поддержки тоже ваш."),
-    ("Что будет, если в боте нет продаж?", "Если продаж долго нет, бот трижды предупредит вас, а потом "
+    ("Что будет, если в боте нет продаж?", "Если продаж долго нет, бот предупредит вас {warns}, а потом "
                                            "отключится. Включить его снова или подключить нового может только "
                                            "администратор — напишите в поддержку."),
 ]
+
+
+def _bot_terms(conn) -> dict[str, str]:
+    """Числа из настроек для FAQ и соглашения: сколько заказов до своего бота и сколько предупреждений."""
+    from . import bot_watch, bots
+    from .packs import plural
+    n = bots.min_orders(conn)
+    k = bot_watch.rules(conn)["warnings"]
+    return {"orders": f"{n} {plural(n, 'заказ', 'заказа', 'заказов')}",
+            "warns": f"{k} {plural(k, 'раз', 'раза', 'раз')}",
+            "orders_done": f"{n} {plural(n, 'выполненного заказа', 'выполненных заказов', 'выполненных заказов')}",
+            "warnings": f"{k} {plural(k, 'предупреждение', 'предупреждения', 'предупреждений')}"}
 
 
 def _price_examples(conn, config: Config) -> list[tuple[str, str]]:
@@ -149,7 +162,8 @@ def privacy(request: Request, conn=Depends(get_conn)):
 
 @router.get("/terms")
 def terms(request: Request, conn=Depends(get_conn)):
-    return render(request, "legal.html", {"user": session_user(request, conn), "page": "terms"})
+    return render(request, "legal.html", {"user": session_user(request, conn), "page": "terms",
+                                          "bot_terms": _bot_terms(conn)})
 
 
 # ── Приложение для телефона (Android APK / «Установить на экран») ──
@@ -1418,7 +1432,9 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
     history = [("created", "Создан", "Заказ принят, деньги списаны с баланса.", row["created_at"]),
                ("processing", "В обработке", "Передан на выполнение — обычно это минуты.", row["created_at"])]
     if view["status"] == "completed":
-        history.append(("completed", "Выполнен", "Пополнение выполнено.", row["completed_at"] or row["updated_at"]))
+        history.append(("completed", "Выполнен",
+                        "Пополнение выполнено." if row["kind"] in ("topup", "steam_topup") else "Заказ выполнен.",
+                        row["completed_at"] or row["updated_at"]))
     elif view["status"] == "failed":
         history.append(("refund", "Возврат", f"{view['error'] or 'Поставщик отклонил заказ.'} "
                         f"Деньги вернулись на баланс.", row["updated_at"]))

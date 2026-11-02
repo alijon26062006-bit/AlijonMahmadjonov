@@ -22,7 +22,7 @@
 </div>
 
 {% if not sections %}
-<div class="card empty">В каталоге пока нет Free Fire СНГ / Индонезия и PUBG Mobile. Загрузите каталог: Админка → Загрузка каталога.</div>
+<div class="card empty">В каталоге пока нет FF СНГ / FF Индонезия и PUBG Mobile. Загрузите каталог: Админка → Загрузка каталога.</div>
 {% else %}
 <p class="muted small">Не скачивается? Нажмите на картинку и удерживайте → «Сохранить изображение».</p>
 <div class="pl-stage" id="pl-stage"><div class="pl-wait">Рисуем картинку…</div></div>
@@ -34,7 +34,7 @@
   "title_em": (cards[0].sub if single and cards[0].key != "pubg" else ""),
   "subtitle": ("UC на ваш ID за секунды" if single and cards[0].key == "pubg" else
                ("Алмазы, ваучеры и прокачка — моментально на ваш ID" if single else
-                "Алмазы Free Fire и UC PUBG Mobile — моментально на ваш ID")),
+                "Алмазы FF и UC PUBG Mobile — моментально на ваш ID")),
   "sections": cards,
 } | tojson }}</script>
 {% endif %}

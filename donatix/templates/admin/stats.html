@@ -40,7 +40,7 @@
   <div class="an-head"><h3>Откуда продажи</h3><span class="muted small">{{ a.periods[a.period] }} · выполненные заказы</span></div>
   <div class="an-rows">
     {% for c in a.channels %}
-    <div><span>{{ c.title }} <small>{{ c.note }} · {{ c.done }} заказов{% if c.created != c.done %} из {{ c.created }}{% endif %}</small></span>
+    <div><span>{{ c.title }} <small>{{ c.note }} · {{ c.done }} {{ plural(c.done, 'заказ', 'заказа', 'заказов') }}{% if c.created != c.done %} из {{ c.created }}{% endif %}</small></span>
       <b>{{ money(c.turnover) }} <small class="muted">· {{ c.share }}% · прибыль {{ money(c.profit) }}</small></b></div>
     {% endfor %}
   </div>

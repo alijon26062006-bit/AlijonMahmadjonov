@@ -134,10 +134,14 @@ def create(conn: sqlite3.Connection, config: Config, *, data: bytes, title: str,
     link = clean_link(link)
     starts_at, ends_at = _date(starts_at), _date(ends_at)
     name = save_image(config, data)
-    with db.tx(conn):
-        bid = int(conn.execute(
-            "INSERT INTO banners (title, image, link, sort, starts_at, ends_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ((title or "").strip()[:120], name, link, int(sort), starts_at, ends_at, db.now())).lastrowid)
+    try:
+        with db.tx(conn):
+            bid = int(conn.execute(
+                "INSERT INTO banners (title, image, link, sort, starts_at, ends_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                ((title or "").strip()[:120], name, link, int(sort), starts_at, ends_at, db.now())).lastrowid)
+    except OverflowError:   # порядок из 20 цифр не влезает в SQLite — картинку уже сохранили, убираем
+        remove_files(config, name)
+        raise
     cache.clear(CACHE_KEY)
     return bid
 

@@ -95,6 +95,8 @@
   const qty = document.getElementById("quantity");
   const packs = form.querySelectorAll(".pack");
   const money = v => dxMoney(Math.ceil(v * 10000 - 1e-6) / 10000);
+  const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10;
+    return a > 10 && a < 15 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many; };
   packs.forEach(b => { b.querySelector(".pack-price").textContent = money(unit * +b.dataset.qty); });
   let tab = form.dataset.tab;
   function setTab(t) {
@@ -116,7 +118,7 @@
     let what = "—", total = null;
     if (tab === "stars" && qty) {
       const n = parseInt(qty.value || "0", 10) || 0;
-      what = n + " звёзд"; total = unit * n;
+      what = n + " " + plural(n, "звезда", "звезды", "звёзд"); total = unit * n;
       packs.forEach(b => b.classList.toggle("on", +b.dataset.qty === n));
     } else {
       const r = form.querySelector(".tg-plan input:checked");

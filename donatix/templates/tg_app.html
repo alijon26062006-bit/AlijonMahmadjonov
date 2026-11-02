@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="format-detection" content="telephone=no">
 <title>{{ site_name }} — Stars · Premium · Тӯҳфа</title>
+<link rel="icon" href="/static/logo.svg?v={{ asset_v }}" type="image/svg+xml">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 {% include "_fonts.html" %}
 <style>
@@ -112,7 +113,7 @@ input, textarea { font: inherit; color: var(--text); }
 textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none; outline: 0; margin-top: 10px; display: block; }
 
 /* сетки */
-.grid3 { display: grid; grid-template-columns: repeat(var(--tabs, 5), 1fr); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pack { padding: 14px 6px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow-1); }
 .pack b { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 20px; font-weight: 700; }
 .pack span { display: block; margin-top: 4px; color: var(--accent); font-weight: 600; font-size: 15px; }
@@ -150,7 +151,7 @@ textarea.field { min-height: 72px; padding: 12px 14px; width: 100%; resize: none
 .stat b { font-size: 22px; font-weight: 700; display: block; } .stat span { color: var(--muted); font-size: 14px; }
 
 /* нижнее меню */
-nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr);
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(var(--tabs, 5), 1fr);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
 nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; justify-content: center;

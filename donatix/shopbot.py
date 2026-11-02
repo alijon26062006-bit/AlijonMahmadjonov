@@ -94,7 +94,7 @@ T: dict[str, tuple[str, str]] = {
                   "Обуна ёфт нашуд — ба ҳамаи каналҳо обуна шавед."),
     "admin_title": ("👑 <b>Админ-панель бота</b>\n\n"
                     "🛍 Продажи через бот:\n"
-                    "• сегодня: <b>{t_n}</b> заказов · ${t_r} · прибыль ${t_p}\n"
+                    "• сегодня: <b>{t_n}</b> {t_w} · ${t_r} · прибыль ${t_p}\n"
                     "• 7 дней: <b>{w_n}</b> · ${w_r} · прибыль ${w_p}\n"
                     "• 30 дней: <b>{m_n}</b> · ${m_r} · прибыль ${m_p}\n\n"
                     "👥 Людей в боте: <b>{users}</b> · купили: {buyers} · новых сегодня: {new}\n"
@@ -1458,7 +1458,8 @@ class ShopBot:
         o = overview(conn)
         t, w, m = o["today"], o["week"], o["month"]
         top = "\n".join(f"{i + 1}. {_e(r['name'])} — {r['n']}" for i, r in enumerate(o["top"][:5])) or "—"
-        text = tr(lang, "admin_title", t_n=t["orders"], t_r=fmt(t["revenue"]), t_p=fmt(t["profit"]),
+        text = tr(lang, "admin_title", t_n=t["orders"], t_w=packs_mod.plural(t["orders"], "заказ", "заказа", "заказов"),
+                  t_r=fmt(t["revenue"]), t_p=fmt(t["profit"]),
                   w_n=w["orders"], w_r=fmt(w["revenue"]), w_p=fmt(w["profit"]),
                   m_n=m["orders"], m_r=fmt(m["revenue"]), m_p=fmt(m["profit"]),
                   users=o["users"], buyers=o["buyers"], new=t["new_users"], subs=o["subscribed"], top=top)
@@ -2138,14 +2139,14 @@ class ShopBot:
         prev = self.state.get(tg_id) or {}
         self.state[tg_id] = {"step": "amount", "method": code, "msg": edit, "resume": prev.get("resume"),
                              "photo": prev.get("photo")}
-        rows = [[(f"{v} смн", f"ta:{v}") for v in (20, 50, 100)], [(f"{v} смн", f"ta:{v}") for v in (200, 500, 1000)],
+        rows = [[(f"{v} с.", f"ta:{v}") for v in (20, 50, 100)], [(f"{v} с.", f"ta:{v}") for v in (200, 500, 1000)],
                 [(tr(lang, "cancel"), "x", "danger")]]
         need = (prev.get("resume") or {}).get("need") if isinstance(prev.get("resume"), dict) else None
         if need:   # пополняет ради покупки — первой кнопкой ровно то, чего не хватает (не меньше минимума)
             import math
             conf = payments.settings(conn, self.config)
             tjs = max(math.ceil(Decimal(need) / 10_000 * conf["tjs_rate"]), math.ceil(conf["min_tjs"] or 0), 1)
-            rows.insert(0, [(f"✅ {tjs} смн", f"ta:{tjs}", "success")])
+            rows.insert(0, [(f"✅ {tjs} с.", f"ta:{tjs}", "success")])
         self.show(tg_id, tr(lang, "ask_amount", method=_e(method["title"])), rows, edit=edit)
 
     def send_dc_video(self, conn: sqlite3.Connection, su: sqlite3.Row, code: str | None) -> None:

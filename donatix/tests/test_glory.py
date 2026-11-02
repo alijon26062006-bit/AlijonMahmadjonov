@@ -120,7 +120,7 @@ def test_pages_and_popular(app, client, config, conn, ffg):
     make_client(conn, balance="5")
     token = web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/glory").text
-    assert "Glory для клана в Free Fire" in page and "Bangladesh" in page and "не возвращаются" in page
+    assert "Glory для клана в FF" in page and "Bangladesh" in page and "не возвращаются" in page
     assert 'href="/panel/glory"' in client.get("/panel").text                # в «Популярном»
     r = client.post("/panel/glory/buy", data={"csrf": token, "region": "bd", "clan_id": "3012345678"},
                     follow_redirects=False)

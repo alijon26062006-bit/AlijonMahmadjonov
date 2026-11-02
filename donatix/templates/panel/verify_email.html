@@ -18,12 +18,12 @@
   </form>
   <form method="post" action="/panel/verify-email" class="vf-again">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="btn block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>Отправить новый код</button>
+    <button class="btn block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait or not ready }}>Отправить новый код</button>
   </form>
   {% else %}
   <form method="post" action="/panel/verify-email">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="btn primary lg block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>{{ icon('mail', 18) }}Подтвердить — прислать код</button>
+    <button class="btn primary lg block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait or not ready }}>{{ icon('mail', 18) }}Подтвердить — прислать код</button>
   </form>
   {% endif %}
   <a class="btn block vf-skip" href="/panel/verify-email/skip">Пропустить</a>
@@ -42,7 +42,7 @@
     if (left <= 0) { b.disabled = false; b.textContent = label; return; }
     b.textContent = label + " (" + left + " сек)"; left -= 1; setTimeout(tick, 1000);
   }
-  tick();
+  if (left > 0) tick();
 })();
 </script>
 {% endblock %}

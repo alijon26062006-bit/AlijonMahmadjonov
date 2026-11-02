@@ -270,13 +270,16 @@ def settle(conn: sqlite3.Connection, config: Any, now: datetime | None = None) -
                                  f"Конкурс рефералов {week}: {r['place']} место ({tjs} сомони)")
             paid += 1
         db.set_setting(conn, f"contest.done.{week}", "1")
+    from .packs import plural
     for r, tjs in zip(top, prizes(conn)):
         if tjs > 0:
             notify(conn, config, r["user_id"], f"{medals[r['place'] - 1]} Вы заняли {r['place']} место в конкурсе "
-                   f"недели ({r['friends']} друзей)! Приз {tjs} сомони уже на балансе.", "/panel/referrals")
+                   f"недели ({r['friends']} {plural(r['friends'], 'друг', 'друга', 'друзей')})! "
+                   f"Приз {tjs} сомони уже на балансе.", "/panel/referrals")
     if top:
         from .worker import notify_admin
-        lines = "\n".join(f"{medals[r['place'] - 1]} {r['login']} — {r['friends']} друзей, {t} сомони"
+        lines = "\n".join(f"{medals[r['place'] - 1]} {r['login']} — {r['friends']} "
+                          f"{plural(r['friends'], 'друг', 'друга', 'друзей')}, {t} сомони"
                           for r, t in zip(top, prizes(conn)))
         notify_admin(config, f"🏆 Итоги конкурса рефералов ({week}):\n{lines}\n\n"
                              "Подробно и снять за накрутку: админка → Конкурс.")

@@ -6,7 +6,7 @@
 <div class="docs">
   <aside class="docs-nav" aria-label="Разделы документации">
     <div class="label-caps">API v1</div>
-    {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
+    {% for id, t in [('auth', 'Ключ и адрес'), ('start', 'Быстрый старт'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
                      ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
                      ('numbers', 'Виртуальные номера'), ('gifts', 'Подарки Telegram'),
                      ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (совместимый формат)'),
@@ -121,7 +121,7 @@
       <p>В ответе у каждой игры есть <code>category_id</code> — по нему удобно брать только её пакеты.</p>
 
       <h3><span class="step-n">2</span>Получить пакеты и их ID</h3>
-<pre data-lang="bash">curl -s "{{ base_url }}/api/v1/products?kind=topup&q=free%20fire" -H "X-API-Key: $KEY"</pre>
+<pre data-lang="bash">curl -s "{{ base_url }}/api/v1/products?kind=topup&q=ff" -H "X-API-Key: $KEY"</pre>
       <p class="hint"><b>Картинки:</b> у каждого товара и каждой игры есть поле <code>image_url</code> — полная ссылка на картинку
         на donatix.tj. Если картинки ещё нет, поле равно <code>null</code>.</p>
       <p class="hint">За один запрос отдаётся не больше <code>limit</code> товаров: по умолчанию <b>100</b>, максимум <b>500</b>.
@@ -166,7 +166,7 @@ done</pre>
         <tr><td>Пополнения игр</td><td><code>player_id</code>, иногда сервер или зона</td></tr>
         <tr><td>Подарочные карты, ключи игр</td><td>нет, только <code>quantity</code></td></tr>
         <tr><td>Пополнение Steam</td><td><code>steam_login</code> <code>currency</code> <code>amount</code></td></tr>
-        <tr><td>Steam-гифт</td><td><code>app_id</code> <code>sub_id</code> <code>region</code> <code>invite_url</code></td></tr>
+        <tr><td>Steam Гифты</td><td><code>app_id</code> <code>sub_id</code> <code>region</code> <code>invite_url</code></td></tr>
       </table></div>
     </section>
 
@@ -283,7 +283,7 @@ done</pre>
             Утёк — сразу отзовите в кабинете → API и создайте новый. За заказы по вашему ключу отвечаете вы.</li>
           <li><b>Нельзя</b>: подбирать ключи и ID, обходить лимиты, слать заведомо неверные данные массово, перепродавать доступ к ключу.
             За это ключ и аккаунт блокируются.</li>
-          <li><b>Цены</b> в API — уже с вашей наценкой уровня (bronze/silver/gold). Цена фиксируется в момент заказа.</li>
+          <li><b>Цены</b> в API — уже с вашей наценкой (личная договорённость или общая наценка для API-партнёров). Цена фиксируется в момент заказа.</li>
           <li>Вопросы и спорные заказы — в поддержку (кабинет → «Поддержка»), с номером заказа <code>dx-…</code>.</li>
         </ol>
       </div>
@@ -311,7 +311,7 @@ done</pre>
           ('POST', '/gamekeys/order', 'Купить ключ'),
           ('GET', '/steam-topup/rates · /steam-topup/public-rates', 'Курсы Steam'),
           ('POST', '/steam-topup/check-login · /steam-topup/order', 'Пополнить Steam'),
-          ('GET', '/steam-gifts/games · /steam-gifts/games/{appid}', 'Steam-гифты'),
+          ('GET', '/steam-gifts/games · /steam-gifts/games/{appid}', 'Steam Гифты'),
           ('POST', '/steam-gifts/order', 'Отправить гифт'),
           ('GET/POST', '/payments/methods · /payments/create · /payments/{id}', 'Пополнение баланса'),
           ('GET', '/orders · /orders/{id}', 'Заказы'),

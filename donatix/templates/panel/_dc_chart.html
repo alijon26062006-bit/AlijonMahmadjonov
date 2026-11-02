@@ -101,11 +101,12 @@
     ctx.clearRect(0, 0, W, H);
 
     ctx.font = "500 12px " + css("--font-num"); ctx.textBaseline = "middle";
+    var ly = clamp(Y(last), T, T + ph);   // уровень плашки текущей цены — подпись сетки под ней не рисуем
     for (var g = 0; g <= 4; g++) {
       var v = lo + (hi - lo) * g / 4, y = Y(v);
       ctx.strokeStyle = css("--dc-grid"); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(pw, Math.round(y) + .5); ctx.stroke();
-      ctx.fillStyle = css("--dc-axis"); ctx.textAlign = "left"; ctx.fillText(axis(v), pw + 8, y);
+      ctx.fillStyle = css("--dc-axis"); ctx.textAlign = "left"; if (Math.abs(y - ly) >= 18) ctx.fillText(axis(v), pw + 8, y);
     }
     // время снизу: подписи привязаны к свечам и едут вместе с графиком
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
@@ -145,7 +146,6 @@
     }
     ctx.restore();
     // линия текущей цены и «таблетка» справа — видна, даже когда пролистали назад
-    var ly = clamp(Y(last), T, T + ph);
     ctx.setLineDash([6, 5]); ctx.strokeStyle = css("--dc-now-line"); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, Math.round(ly) + .5); ctx.lineTo(pw, Math.round(ly) + .5); ctx.stroke(); ctx.setLineDash([]);
     if (view.offset < 0.5) {
