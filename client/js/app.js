@@ -64,14 +64,18 @@ function draw() {
 }
 let depth = 0;   // сколько шагов сделали внутри приложения — «назад» не уводит с сайта
 export function go(to) { if (location.hash === to) render(); else { depth++; location.hash = to; } }
-let lastHash = location.hash, enter = '', cartN = Infinity;   // enter — с какой стороны въезжает новый экран; cartN — сколько было в корзине
+let lastHash = location.hash, enter = '', cartN = Infinity, heroMorph = false;   // enter — с какой стороны въезжает новый экран; cartN — сколько было в корзине
 // Переход между экранами. Где браузер умеет (View Transitions), старый и новый экран плавно сменяют друг друга,
 // а обложка магазина «перетекает» из карточки на главной в шапку магазина. Иначе — прежний въезд экрана сбоку.
 const smooth = () => 'startViewTransition' in document && !matchMedia('(prefers-reduced-motion: reduce)').matches;
 window.addEventListener('hashchange', () => {
   closeSheet();
   const deeper = location.hash.length > lastHash.length; lastHash = location.hash;
-  const show = () => { render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0); };
+  const show = () => {
+    render(); if (deeper || !location.hash.startsWith('#/shop')) window.scrollTo(0, 0);
+    // пара для «перетекания»: обложка нажатой карточки → шапка магазина (имя только на время перехода)
+    if (heroMorph) { const hero = $('.shop-hero'); if (hero) hero.style.viewTransitionName = 'shop-hero'; heroMorph = false; }
+  };
   if (!smooth()) { enter = deeper ? 'in-fwd' : 'in-back'; show(); return; }
   document.documentElement.dataset.nav = deeper ? 'fwd' : 'back';
   const t = document.startViewTransition(show);
@@ -117,7 +121,7 @@ document.addEventListener('click', async e => {
   if (g && !g.disabled) {
     e.preventDefault();
     // обложка нажатой карточки станет шапкой магазина: имя перехода получает только она одна
-    if (g.dataset.go.startsWith('#/shop/')) { const pic = g.closest('.big')?.querySelector('.big-pic'); if (pic) pic.style.viewTransitionName = 'shop-hero'; }
+    if (g.dataset.go.startsWith('#/shop/')) { const pic = g.closest('.big')?.querySelector('.big-pic'); if (pic) { pic.style.viewTransitionName = 'shop-hero'; heroMorph = true; } }
     return go(g.dataset.go);
   }
   const el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
