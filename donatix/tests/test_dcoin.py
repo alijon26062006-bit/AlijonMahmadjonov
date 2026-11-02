@@ -41,12 +41,12 @@ def test_price_starts_at_zero_and_coins_come_from_purchases(conn):
 
 def test_bigger_order_moves_up_more(conn):
     uid = _user(conn)
-    _buy(conn, uid, 10_000)
-    _buy(conn, uid, 10_000)
+    _buy(conn, uid, 10_000, cost=5_000)
+    _buy(conn, uid, 10_000, cost=5_000)
     p1 = dcoin.price(conn)
-    _buy(conn, uid, 5_000)                                          # мельче обычного — чуть вверх
+    _buy(conn, uid, 5_000, cost=2_500)                              # мельче обычного — чуть вверх
     p2 = dcoin.price(conn)
-    _buy(conn, uid, 30_000)                                         # крупнее обычного — заметно вверх
+    _buy(conn, uid, 30_000, cost=15_000)                                       # крупнее обычного — заметно вверх
     p3 = dcoin.price(conn)
     assert p1 < p2 < p3 and (p3 - p2) / p2 > (p2 - p1) / p1
 
@@ -403,19 +403,19 @@ def test_earning_closes_at_deadline(conn, config):
     assert dcoin.balance(conn, uid) > before
 
 
-def test_running_chart_lifted_once_to_0005_somoni(conn, monkeypatch):
-    """Уже работающий график: цена один раз поднимается к 0.0005 с. за 1 D, история — тем же коэффициентом."""
+def test_running_chart_lifted_once_to_001_somoni(conn, monkeypatch):
+    """Уже работающий график: цена один раз поднимается к 0.001 с. за 1 D, история — тем же коэффициентом."""
     uid = _user(conn)
-    db.set_setting(conn, "dcoin.retarget_0005", "skip")                  # как на сервере до обновления
+    db.set_setting(conn, "dcoin.retarget_001", "skip")                  # как на сервере до обновления
     monkeypatch.setattr(dcoin, "START_PRICE", 0.000002)                   # старая стартовая цена
     for total in (30_000, 50_000, 40_000):
         _buy(conn, uid, total)
     before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
     db.set_setting(conn, "pay.tjs_rate", "10")
-    conn.execute("DELETE FROM settings WHERE key = 'dcoin.retarget_0005'")
+    conn.execute("DELETE FROM settings WHERE key = 'dcoin.retarget_001'")
     p = dcoin.price(conn)
     real = dcoin.price_of(dcoin.state(conn)["pool"], dcoin.state(conn)["supply"])
-    assert abs(p - min(0.0005 / 10, real)) / p < 0.01                     # 0.0005 с. (или «настоящая», если меньше)
+    assert abs(p - min(0.001 / 10, real)) / p < 0.01                      # 0.001 с. (или «настоящая», если меньше)
     after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
     factor = after[-1] / before[-1]
     assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)
