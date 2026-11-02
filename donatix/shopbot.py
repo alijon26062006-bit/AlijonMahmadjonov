@@ -2163,8 +2163,9 @@ class ShopBot:
         markup = kb(rows)
         try:
             if video["file"] or video.get("builtin"):
-                fid = db.get_setting(conn, "pay.dc_video_bot_fid") or ""
-                if fid:
+                tag = dcvideo.file_tag(video)
+                saved_tag, _, fid = (db.get_setting(conn, "pay.dc_video_bot_fid") or "").rpartition("|")
+                if fid and saved_tag == tag:
                     self.api("sendVideo", chat_id=tg_id, video=fid, caption=caption, parse_mode="HTML",
                              reply_markup=markup, supports_streaming=True)
                     return
@@ -2177,7 +2178,7 @@ class ShopBot:
                                 reply_markup=markup))
                 got = ((res or {}).get("video") or {}).get("file_id") if isinstance(res, dict) else None
                 if got:   # дальше — без повторной загрузки, по file_id
-                    db.set_setting(conn, "pay.dc_video_bot_fid", got)
+                    db.set_setting(conn, "pay.dc_video_bot_fid", f"{tag}|{got}")
                 return
             if video["url"].lower().split("?")[0].endswith((".mp4", ".mov", ".webm")):
                 self.api("sendVideo", chat_id=tg_id, video=video["url"], caption=caption, parse_mode="HTML",

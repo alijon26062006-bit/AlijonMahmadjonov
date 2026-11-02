@@ -288,6 +288,13 @@ def test_video_required_in_shop_bot(app, dc, conn, supplier):
     assert any(b.get("callback_data") == "dv:show" for b in bot.api.last_buttons())
     bot.handle(conn, press("dv:show"))                                     # повтор — по file_id, без загрузки
     assert ("sendVideo", "FID1") in [(m, p.get("video")) for m, p in bot.api.calls]
+    # файл ролика сменился (обновление сайта) — старый file_id не отдаём, загружаем новый файл
+    from donatix import db
+    db.set_setting(conn, "pay.dc_video_bot_fid", "builtin:1:1|FID1")
+    bot.api.calls.clear()
+    bot.handle(conn, press("dv:show"))
+    assert sent[-1][0] == "sendVideo" and len(sent) == 2
+    assert ("sendVideo", "FID1") not in [(m, p.get("video")) for m, p in bot.api.calls]
 
 
 def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monkeypatch):

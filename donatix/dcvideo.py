@@ -48,6 +48,15 @@ BUILTIN_VERSION = "builtin-1"
 BUILTIN_FILE = Path(__file__).resolve().parent / "static" / "app" / "dc-guide.mp4"
 
 
+def file_tag(video: dict[str, Any]) -> str:
+    """Метка файла ролика для бота: file_id в Telegram годится, только пока файл тот же. Встроенный ролик
+    обновляется вместе с сайтом — после обновления бот один раз загрузит его заново, а не отдаст старый."""
+    if video.get("builtin"):
+        st = BUILTIN_FILE.stat()
+        return f"builtin:{st.st_size}:{int(st.st_mtime)}"
+    return f"file:{video['file']}"
+
+
 def get(conn: sqlite3.Connection, kind: str) -> dict[str, Any] | None:
     """Видео для сайта или бота: {"file": имя файла | "", "url": ссылка | "", "youtube": id | "",
     "builtin": встроенная анимация, "version"}. None — видео отключено («off»)."""
