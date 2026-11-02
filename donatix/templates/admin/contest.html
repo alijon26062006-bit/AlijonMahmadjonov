@@ -43,7 +43,7 @@
 <h2 class="section-title">Победители</h2>
 <div class="list">
   {% for w in winners %}<div class="item">{{ place(w.place, 32) }}
-    <div class="grow"><div class="title">{{ w.login }} — {{ w.friends }} друзей</div>
+    <div class="grow"><div class="title">{{ w.login }} — {{ w.friends }} {{ plural(w.friends, 'друг', 'друга', 'друзей') }}</div>
       <div class="sub">неделя до {{ w.week }} · приз {{ w.prize_tjs }} сомони ({{ money(w.amount_micro) }})</div></div></div>
   {% else %}<div class="card empty">Итогов ещё не было.</div>{% endfor %}
 </div>
