@@ -41,17 +41,21 @@
 </div>
 
 <h2 style="margin-top:28px">Заявки на пополнение</h2>
+<style>.sp-row td{padding-top:0;border-top:0}.sp-codes{display:flex;flex-wrap:wrap;gap:6px;position:sticky;left:0;max-width:min(100%,calc(100vw - 72px))}
+.sp-code{display:inline-flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:10px;background:rgba(127,127,127,.12);vertical-align:top}
+.sp-code small{font-size:11px;opacity:.65}.sp-code b{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}</style>
 <div class="card table-wrap"><table>
   <tr><th>Заявка</th><th>Способ</th><th class="num">Сумма</th><th>Статус</th><th>Кто решил</th><th>Создана</th><th>Решена</th></tr>
   {% for p in pays %}
   <tr><td>#{{ p.id }}{% if p.receipt_file %} · <a href="/admin/payments/{{ p.id }}/receipt" target="_blank" rel="noopener">🧾 чек</a>{% endif %}
-      {% if p.sp %}<div class="small muted mono" style="overflow-wrap:anywhere">{{ p.sp }}</div>{% endif %}</td>
+</td>
     <td>{{ pay_titles.get(p.method, p.method) }}</td>
     <td class="num">${{ fmt(p.amount_micro) }}<div class="small muted">{{ p.pay_amount }} {{ p.pay_currency }}</div></td>
     <td><span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'pending': 'warn', 'fake': 'bad'}.get(p.status, '') }}">{{ {'pending': 'Ждёт проверки', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': '🚨 Поддельный чек'}.get(p.status, p.status) }}</span>
       {% if p.admin_note %}<div class="small muted">{{ p.admin_note }}</div>{% endif %}</td>
     <td>{{ p.who or '—' }}</td>
     <td class="small">{{ p.created_at | dt }}</td><td class="small">{{ p.resolved_at | dt if p.resolved_at else '—' }}</td></tr>
+  {% if p.sp %}<tr class="sp-row"><td colspan="7"><div class="sp-codes">{% for k, v in p.sp %}<span class="sp-code"><small>{{ k }}</small><b>{{ v }}</b></span>{% endfor %}</div></td></tr>{% endif %}
   {% else %}<tr><td colspan="7" class="muted">Заявок не было.</td></tr>{% endfor %}
 </table></div>
 

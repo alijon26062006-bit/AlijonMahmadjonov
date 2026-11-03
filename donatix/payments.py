@@ -584,6 +584,27 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
     return True
 
 
+def sp_items(row: Any) -> list[tuple[str, str]]:
+    """Коды SmartPay парами «подпись — значение» для красивого показа (UUID не показываем — длинный, ищется и так)."""
+    import json
+    if row["auto_kind"] != "smartpay":
+        return []
+    try:
+        info = json.loads(row["ext_info"] or "{}")
+    except (ValueError, KeyError, IndexError):
+        info = {}
+    out = [("Заказ", f"dx{row['id']}")]
+    if info.get("smartpay_id") or row["pay_memo"]:
+        out.append(("№ SmartPay", str(info.get("smartpay_id") or row["pay_memo"])))
+    if info.get("invoice_number"):
+        out.append(("Инвойс", str(info["invoice_number"])))
+    if info.get("payment_id"):
+        out.append(("Платёж", str(info["payment_id"])))
+    if info.get("bank"):
+        out.append(("Банк", str(info["bank"])))
+    return out
+
+
 def sp_codes(row: Any) -> str:
     """Коды SmartPay заявки одной строкой (для админки и бота): заказ, № SmartPay, инвойс, платёж, банк."""
     import json
