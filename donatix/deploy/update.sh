@@ -31,6 +31,10 @@ step "перезапущен — боты партнёров запускают�
 for _ in $(seq 1 60); do
   if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/robots.txt | grep -q 200; then
     echo "✅ Готово за $(( $(date +%s) - START )) с — версия $(sudo -u donatix git -C "$APP_DIR" log --oneline -1)"
+    # SmartPay ещё не подключён — сразу спросить ключи (2 шага). Без терминала (автообновление) — пропускаем.
+    if ! grep -qE '^DONATIX_SMARTPAY_KEY=.+' "$APP_DIR/donatix/.env" 2>/dev/null && [ -r /dev/tty ] && [ -z "${SKIP_SMARTPAY:-}" ]; then
+      bash "$APP_DIR/donatix/deploy/smartpay.sh" || echo "  SmartPay не подключён — можно позже: sudo bash $APP_DIR/donatix/deploy/smartpay.sh"
+    fi
     exit 0
   fi
   sleep 0.5

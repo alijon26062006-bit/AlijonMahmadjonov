@@ -9,14 +9,17 @@ die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "Запустите через sudo."
 [ -f "$ENV_FILE" ] || die "Donatix не найден."
 
-MODE="${SMARTPAY_MODE:-}"; KEY="${SMARTPAY_KEY:-}"; HTOKEN="${SMARTPAY_HOOK_TOKEN:-}"; HSECRET="${SMARTPAY_HOOK_SECRET:-}"
-if [ -z "$MODE" ]; then
-  printf 'Режим: 1 — боевой (production), 2 — тест (sandbox) [1]: '; read -r ans < /dev/tty
-  [ "$ans" = "2" ] && MODE="sandbox" || MODE="production"
+MODE="${SMARTPAY_MODE:-production}"; KEY="${SMARTPAY_KEY:-}"; HTOKEN="${SMARTPAY_HOOK_TOKEN:-}"; HSECRET="${SMARTPAY_HOOK_SECRET:-}"
+printf '\n\033[1mПодключаю SmartPay (оплата из любого банка). Ввод скрытый — символы не видны, это нормально.\033[0m\n'
+if [ -z "$KEY" ]; then
+  printf '\nШаг 1 из 2 — API Key (кабинет SmartPay → Танзимот → API Keys): '; read -rs KEY < /dev/tty; echo
 fi
-if [ -z "$KEY" ]; then printf 'SmartPay API Key (Танзимот → API Keys), скрыто: '; read -rs KEY < /dev/tty; echo; fi
-if [ -z "$HTOKEN" ]; then printf 'Webhook X-Api-Token (64 символа, Танзимот → Webhooks), скрыто: '; read -rs HTOKEN < /dev/tty; echo; fi
-if [ -z "$HSECRET" ]; then printf 'Webhook секрет подписи (HMAC, показывался один раз), скрыто: '; read -rs HSECRET < /dev/tty; echo; fi
+if [ -z "$HTOKEN" ] || [ -z "$HSECRET" ]; then
+  printf '\nШаг 2 из 2 — Webhook (Танзимот → Webhooks, адрес https://donatix.tj/pay/smartpay/webhook)\n'
+  [ -n "$HTOKEN" ] || { printf '  X-Api-Token (из поля Headers, без кавычек): '; read -rs HTOKEN < /dev/tty; echo; }
+  [ -n "$HSECRET" ] || { printf '  Секрет подписи HMAC (показывался один раз): '; read -rs HSECRET < /dev/tty; echo; }
+fi
+HTOKEN=$(printf '%s' "$HTOKEN" | tr -d '" '); KEY=$(printf '%s' "$KEY" | tr -d '" '); HSECRET=$(printf '%s' "$HSECRET" | tr -d '" ')
 [ -n "$KEY" ] || die "API Key пустой — ничего не записано."
 [ -n "$HTOKEN" ] && [ -n "$HSECRET" ] || die "Без токена и секрета webhook оплата не зачислится — ничего не записано."
 
