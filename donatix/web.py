@@ -1840,7 +1840,10 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
 def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                          config: Config = Depends(get_config)):
     from . import payments
-    if payments.cancel(conn, user["id"], payment_id, config):
+    wait = payments.cancel_wait(conn, payment_id)
+    if wait > 0:
+        flash(request, f"Отменить можно через {wait // 60 + 1} мин. Не оплатите за 30 минут — заявка отменится сама.", "error")
+    elif payments.cancel(conn, user["id"], payment_id, config):
         flash(request, "Заявка отменена.")
     else:
         flash(request, "Заявка не найдена или уже проверена — отменить её нельзя.", "error")

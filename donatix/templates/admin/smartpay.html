@@ -1,0 +1,44 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Отчёт SmartPay — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Отчёт SmartPay</h1><p>Все пополнения через SmartPay: сколько пришло и каждая оплата с номером SmartPay.</p></section>
+<div class="chips" style="margin-bottom:14px">
+  {% for k, t in [('1', 'Сегодня'), ('7', '7 дней'), ('30', '30 дней'), ('all', 'Всё время')] %}
+  <a class="chip {{ 'on' if period == k }}" href="/admin/smartpay?period={{ k }}{% if q %}&q={{ q | urlencode }}{% endif %}">{{ t }}</a>
+  {% endfor %}
+</div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px">
+  <div class="card"><div class="muted small">Зачислено</div><div class="amount" style="font-size:1.5rem">{{ '%.2f' | format(total.tjs) }} с.</div><div class="small muted">≈ ${{ fmt(total.usd_micro) }}</div></div>
+  <div class="card"><div class="muted small">Оплат</div><div class="amount" style="font-size:1.5rem">{{ total.count }}</div></div>
+  <div class="card"><div class="muted small">Ждут оплаты</div><div class="amount" style="font-size:1.5rem">{{ total.waiting }}</div></div>
+  <div class="card"><div class="muted small">Отменены (не оплатили)</div><div class="amount" style="font-size:1.5rem">{{ total.cancelled }}</div></div>
+</div>
+<form method="get" action="/admin/smartpay" class="filters" style="margin-bottom:14px">
+  <input type="hidden" name="period" value="{{ period }}">
+  <label class="label-caps" for="spq">Поиск</label>
+  <input id="spq" name="q" value="{{ q }}" placeholder="Логин, № заявки, № SmartPay, ID платежа, банк">
+  <button class="btn" style="margin-top:8px">{{ icon('search', 18) }}Найти</button>
+</form>
+<div class="list">
+  {% for p in rows %}
+  <div class="card">
+    <div class="head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0"><b>#{{ p.id }} · <a href="/admin/users/{{ p.user_id }}">{{ p.login }}</a></b>
+        <div class="muted small">{{ p.created_at | dt }}{% if p.resolved_at and p.status == 'paid' %} · оплачено {{ p.resolved_at | dt }}{% endif %}</div></div>
+      <div class="right"><div class="amount">{{ p.pay_amount }} с.</div>
+        <div class="small {{ 'ok' if p.status == 'paid' else 'muted' }}">{{ {'paid': 'Зачислено', 'pending': 'Ждёт оплаты', 'cancelled': 'Отменена', 'rejected': 'Отклонена'}.get(p.status, p.status) }}</div></div>
+    </div>
+    <div class="small" style="margin-top:8px;display:grid;gap:2px;overflow-wrap:anywhere">
+      <div>Заказ в SmartPay: <span class="mono">dx{{ p.id }}</span>{% if p.pay_memo %} · № SmartPay <span class="mono">{{ p.pay_memo }}</span>{% endif %}</div>
+      {% if p.info %}
+      <div>Платёж: <span class="mono">{{ p.info.payment_id }}</span>{% if p.info.invoice_number %} · инвойс <span class="mono">{{ p.info.invoice_number }}</span>{% endif %}</div>
+      <div>Банк: <b>{{ p.info.bank or '—' }}</b>{% if p.info.payment_date %} · время оплаты {{ p.info.payment_date }}{% endif %}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">За этот период оплат через SmartPay нет{% if q %} по запросу «{{ q }}»{% endif %}.</p>
+  {% endfor %}
+</div>
+{% endblock %}

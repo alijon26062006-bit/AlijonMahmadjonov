@@ -480,6 +480,11 @@ def init(path: Path | str) -> None:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
         if "resolved_who" not in pay_cols:  # кто решил: «кассир Али», «админ (сайт)», «автоматически»…
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_who TEXT")
+        if "ext_info" not in pay_cols:      # SmartPay: банк, номер инвойса, ID платежа, время оплаты (JSON)
+            conn.execute("ALTER TABLE payments ADD COLUMN ext_info TEXT")
+        if get_setting(conn, "pay.min_sp_v1") is None:   # минимум пополнения — как у SmartPay (меньше 2 с. он не принимает)
+            set_setting(conn, "pay.min_tjs", "2")
+            set_setting(conn, "pay.min_sp_v1", "1")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "
                      "WHERE receipt_hash IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, status)")

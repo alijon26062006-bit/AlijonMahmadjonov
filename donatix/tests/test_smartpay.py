@@ -148,3 +148,24 @@ def test_smartpay_only_amount_on_site_and_bot(app, conn, sp):
     assert not any("Алиф" in b["text"] for b in api.last_buttons())          # сразу сумма, без выбора способа
     sp.smartpay_key = ""                                                      # ключа нет — обычный список
     assert len(payments.offered(conn, sp)) == 2
+
+
+def test_cancel_after_10_min_auto_cancel_30_and_report(app, conn, sp, monkeypatch):
+    monkeypatch.setattr(payments, "CANCEL_AFTER_MIN", 10)
+    uid, c, token = _client(app, conn)
+    _pay(c, token)
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    assert not payments.cancel(conn, uid, p["id"])                           # сразу — нельзя
+    r = c.post(f"/panel/balance/{p['id']}/cancel", data={"csrf": token}, follow_redirects=True)
+    assert "Отменить можно через" in r.text
+    conn.execute("UPDATE payments SET created_at = '2020-01-01T00:00:00.000Z' WHERE id = ?", (p["id"],))
+    assert smartpay.expire(conn) == 1                                         # 30 минут — отменилась сама
+    # оплата пришла позже — зачислена и видна в отчёте с номерами SmartPay
+    hook = TestClient(app).post("/pay/smartpay/webhook", json=_hook(p["id"], 10000), headers={"X-Api-Token": TOKEN})
+    assert hook.json()["status"] == "ok"
+    adm = TestClient(app)
+    web_login(adm, "admin@example.com", "adminpass123")
+    page = adm.get("/admin/smartpay?period=all").text
+    assert f"dx{p['id']}" in page and "78901" in page and "Алиф Банк" in page and "Зачислено" in page
+    assert "78901" in adm.get("/admin/smartpay?period=all&q=78901").text
+    assert "нет" in adm.get("/admin/smartpay?period=all&q=nobody").text

@@ -202,6 +202,10 @@ def handle_webhook(conn: sqlite3.Connection, config: Config, token: str, payload
         notify_admin(config, f"⚠️ SmartPay: оплата {got / 100:.2f} TJS пришла, но заявка #{pid} уже закрыта — "
                              "повторно не зачислено. Проверьте.")
         return {"status": "closed", "payment_id": pid}
+    import json
+    info = {k: payload.get(k) for k in ("payment_id", "invoice_number", "invoice_uuid", "bank", "bank_id", "payment_date")}
+    info["amount_tjs"] = f"{got / 100:.2f}"
+    conn.execute("UPDATE payments SET ext_info = ? WHERE id = ?", (json.dumps(info, ensure_ascii=False), pid))
     try:
         conn.execute("UPDATE payments SET ext_id = ? WHERE id = ?", (pay_ref, pid))
     except sqlite3.IntegrityError:
@@ -211,8 +215,8 @@ def handle_webhook(conn: sqlite3.Connection, config: Config, token: str, payload
 
 
 def expire(conn: sqlite3.Connection) -> int:
-    """Не оплатили за время жизни инвойса (+5 минут на задержку банка) — заявка закрывается."""
-    since = (datetime.now(timezone.utc) - timedelta(seconds=LIFETIME + 300)).strftime("%Y-%m-%dT%H:%M:%S")
+    """Не оплатили за 30 минут — заявка закрывается сама. Оплата придёт позже — webhook откроет и зачислит её."""
+    since = (datetime.now(timezone.utc) - timedelta(seconds=LIFETIME)).strftime("%Y-%m-%dT%H:%M:%S")
     return conn.execute("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? "
                         "WHERE auto_kind = ? AND status = 'pending' AND created_at < ?",
                         (EXPIRED_NOTE, db.now(), KIND, since)).rowcount

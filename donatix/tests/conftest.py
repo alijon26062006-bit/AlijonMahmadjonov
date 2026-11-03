@@ -121,3 +121,10 @@ def _tg_kinds_on(monkeypatch):
     """В проекте Telegram Stars/Premium выключены (catalog.OFF_KINDS); старые тесты берут их как обычный товар."""
     from donatix import catalog
     monkeypatch.setattr(catalog, "OFF_KINDS", ())
+
+
+@pytest.fixture(autouse=True)
+def _cancel_any_time(monkeypatch):
+    """В проекте отменить заявку можно через 10 минут; старые тесты отменяют сразу (свой тест — в test_smartpay)."""
+    from donatix import payments
+    monkeypatch.setattr(payments, "CANCEL_AFTER_MIN", 0)

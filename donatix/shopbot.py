@@ -1965,6 +1965,11 @@ class ShopBot:
             self.buy(conn, su, mid)
         elif head == "pc" and len(parts) == 2 and parts[1].isdigit():   # отменить свою заявку на пополнение
             pid = int(parts[1])
+            wait = payments.cancel_wait(conn, pid)
+            if wait > 0:
+                self.show(tg_id, f"⏳ Отменить заявку можно через {wait // 60 + 1} мин. Не оплатите за 30 минут — "
+                                 "она отменится сама.", [[(tr(lang, "home"), "h")]], edit=mid)
+                return
             conn.execute("DELETE FROM shop_watch WHERE kind = 'pay' AND obj_id = ? AND chat_id = ?", (pid, tg_id))
             if payments.cancel(conn, su["user_id"], pid, self.config):
                 self.state.pop(tg_id, None)

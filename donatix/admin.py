@@ -746,6 +746,43 @@ def payments_list(request: Request, status: str = "pending", admin=Depends(admin
     })
 
 
+@router.get("/smartpay")
+def smartpay_report(request: Request, q: str = "", period: str = "30", admin=Depends(admin_user),
+                    conn=Depends(get_conn)):
+    """Отчёт SmartPay: сколько пришло денег и каждая оплата — с номерами SmartPay, банком и клиентом."""
+    import json
+    from datetime import datetime, timedelta, timezone
+    q = q.strip()[:80]
+    days = {"1": 1, "7": 7, "30": 30, "all": 0}.get(period, 30)
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S") if days else ""
+    where, args = "p.auto_kind = 'smartpay'", []
+    if since:
+        where += " AND p.created_at >= ?"
+        args.append(since)
+    if q:
+        like = f"%{q.lstrip('#').lower()}%"
+        where += (" AND (lower(u.login) LIKE ? OR lower(COALESCE(u.email, '')) LIKE ? OR CAST(p.id AS TEXT) = ? "
+                  "OR lower(COALESCE(p.pay_memo, '')) LIKE ? OR lower(COALESCE(p.ext_id, '')) LIKE ? "
+                  "OR lower(COALESCE(p.ext_info, '')) LIKE ?)")
+        args += [like, like, q.lstrip("#").lstrip("dx"), like, like, like]
+    rows = []
+    for r in conn.execute(f"SELECT p.*, u.login FROM payments p JOIN users u ON u.id = p.user_id WHERE {where} "
+                          "ORDER BY p.id DESC LIMIT 500", args).fetchall():
+        d = dict(r)
+        try:
+            d["info"] = json.loads(r["ext_info"]) if r["ext_info"] else {}
+        except ValueError:
+            d["info"] = {}
+        rows.append(d)
+    paid = [r for r in rows if r["status"] == "paid"]
+    total = {"count": len(paid), "tjs": sum(float(r["pay_amount"] or 0) for r in paid),
+             "usd_micro": sum(int(r["amount_micro"] or 0) for r in paid),
+             "waiting": sum(1 for r in rows if r["status"] == "pending"),
+             "cancelled": sum(1 for r in rows if r["status"] == "cancelled")}
+    return render(request, "admin/smartpay.html", {"user": admin, "rows": rows, "total": total, "q": q,
+                                                   "period": period})
+
+
 @router.get("/pay-settings")
 def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                  config: Config = Depends(get_config)):

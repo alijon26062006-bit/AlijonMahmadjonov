@@ -584,7 +584,26 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
     return True
 
 
+CANCEL_AFTER_MIN = 10   # отменить заявку клиент может через 10 минут (вдруг уже платит); через 30 — отменится сама
+
+
+def cancel_wait(conn: sqlite3.Connection, payment_id: int) -> int:
+    """Сколько секунд ещё нельзя отменить заявку (0 — можно)."""
+    row = conn.execute("SELECT created_at FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    if row is None:
+        return 0
+    from datetime import datetime, timezone
+    try:
+        made = datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00")[:19]).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return 0
+    age = (datetime.now(timezone.utc) - made).total_seconds()
+    return max(0, int(CANCEL_AFTER_MIN * 60 - age))
+
+
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Config | None = None) -> bool:
+    if cancel_wait(conn, payment_id) > 0:
+        return False
     done = conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'клиент' "
                         "WHERE id = ? AND user_id = ? AND status = 'pending'",
                         (db.now(), payment_id, user_id)).rowcount > 0
