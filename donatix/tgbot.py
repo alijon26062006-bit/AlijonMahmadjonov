@@ -823,8 +823,8 @@ def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> s
     from . import receipt_ai
     p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     text = payment_event(conn, payment_id, config)[0] + ("\n🧾 Чек приложен" if p["receipt_file"] else "")
-    if payments.sp_codes(p):
-        text += "\n💳 " + _e(payments.sp_codes(p))
+    if payments.sp_items(p):   # коды SmartPay — каждый своей строкой, нажатием копируются
+        text += "\n\n💳 <b>SmartPay</b>\n" + "\n".join(f"{k}: <code>{_e(v)}</code>" for k, v in payments.sp_items(p))
     seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
     if p["receipt_file"] and not receipt_ai.enabled(config) and seen and seen.get("dup_of"):
         text += f"\n⚠️⚠️ ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{seen['dup_of']}. Сверьте поступление в банке!"
