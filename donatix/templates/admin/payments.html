@@ -16,6 +16,7 @@
         <div class="muted small">{{ titles.get(p.method, p.method) }} · {{ p.created_at | dt }} · баланс сейчас ${{ fmt(p.balance_micro) }}</div></div>
       <div class="right"><div class="amount">${{ fmt(p.amount_micro) }}</div><div class="small muted">к переводу {{ p.pay_amount }} {{ p.pay_currency }}</div></div>
     </div>
+    {% if p.sp %}<div class="small mono" style="margin-top:8px;overflow-wrap:anywhere">{{ p.sp }}</div>{% endif %}
     {% if p.reference %}<div class="small" style="margin-top:8px;overflow-wrap:anywhere">Чек / хэш: <span class="mono">{{ p.reference }}</span></div>{% endif %}
     {% if p.ai %}<div class="small receipt-ai">{% for line in p.ai.split('\n') %}<div>{{ line }}</div>{% endfor %}</div>{% endif %}
     {% if p.receipt_file %}<a class="btn sm" style="margin-top:8px" href="/admin/payments/{{ p.id }}/receipt" target="_blank" rel="noopener">🧾 Открыть чек</a>

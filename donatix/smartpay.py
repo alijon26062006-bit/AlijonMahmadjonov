@@ -124,8 +124,10 @@ def create(conn: sqlite3.Connection, config: Config, payment_id: int) -> dict[st
 def start(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
     """Сразу после создания заявки: инвойс и ссылка на страницу оплаты SmartPay (все банки)."""
     inv = create(conn, config, payment_id)
-    conn.execute("UPDATE payments SET auto_kind = ?, pay_url = ?, pay_memo = ? WHERE id = ?",
-                 (KIND, inv["payment_link"], inv["smartpay_id"] or None, payment_id))
+    import json
+    info = {"smartpay_id": inv["smartpay_id"], "invoice_uuid": inv["invoice_uuid"]}   # коды инвойса — сразу, для поиска
+    conn.execute("UPDATE payments SET auto_kind = ?, pay_url = ?, pay_memo = ?, ext_info = ? WHERE id = ?",
+                 (KIND, inv["payment_link"], inv["smartpay_id"] or None, json.dumps(info), payment_id))
 
 
 # ── webhook ──────────────────────────────────────────────────
@@ -203,7 +205,12 @@ def handle_webhook(conn: sqlite3.Connection, config: Config, token: str, payload
                              "повторно не зачислено. Проверьте.")
         return {"status": "closed", "payment_id": pid}
     import json
-    info = {k: payload.get(k) for k in ("payment_id", "invoice_number", "invoice_uuid", "bank", "bank_id", "payment_date")}
+    try:
+        info = json.loads(p["ext_info"] or "{}")
+    except ValueError:
+        info = {}
+    info.update({k: payload.get(k) for k in ("payment_id", "invoice_number", "invoice_uuid", "bank", "bank_id",
+                                               "payment_date") if payload.get(k) not in (None, "")})
     info["amount_tjs"] = f"{got / 100:.2f}"
     conn.execute("UPDATE payments SET ext_info = ? WHERE id = ?", (json.dumps(info, ensure_ascii=False), pid))
     try:

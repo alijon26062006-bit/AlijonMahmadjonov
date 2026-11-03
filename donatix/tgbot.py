@@ -692,7 +692,8 @@ class AdminBot:
         ids = find_payments(conn, self.config, query, cashier)
         if not ids:
             self.send_to(chat_id, f"🔎 Заявку «{_e(query[:40])}» не нашёл.\n"
-                                  "Напишите номер заявки, например <code>#125</code>, или номер операции из чека.",
+                                  "Напишите номер заявки, например <code>#125</code>, номер операции из чека "
+                                  "или код SmartPay (№ SmartPay, инвойс, ID платежа).",
                          [[("🔎 Искать ещё", "q:find:0")]])
             return
         for pid in ids:
@@ -820,9 +821,10 @@ def dup_buttons(conn: sqlite3.Connection, payment_id: int) -> Buttons:
 def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> str:
     """Всё о заявке с чеком: клиент, сумма, способ и что прочитано в чеке."""
     from . import receipt_ai
-    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency, created_at FROM payments "
-                     "WHERE id = ?", (payment_id,)).fetchone()
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     text = payment_event(conn, payment_id, config)[0] + ("\n🧾 Чек приложен" if p["receipt_file"] else "")
+    if payments.sp_codes(p):
+        text += "\n💳 " + _e(payments.sp_codes(p))
     seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
     if p["receipt_file"] and not receipt_ai.enabled(config) and seen and seen.get("dup_of"):
         text += f"\n⚠️⚠️ ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{seen['dup_of']}. Сверьте поступление в банке!"
@@ -894,9 +896,14 @@ def find_payments(conn: sqlite3.Connection, config: Config, query: str,
     if not q:
         return []
     key = re.sub(r"[^0-9A-Za-z]", "", q).upper()
+    if re.fullmatch(r"(?i)dx\d+", q):   # заказ SmartPay «dx1234» — это номер заявки
+        q = q[2:]
+    pid = int(q) if q.isdigit() and len(q) < 12 else -1
+    sp_like = f"%{q}%" if len(q) >= 5 else "-"   # № SmartPay, инвойс, ID платежа, UUID — в ext_info
     rows = conn.execute(
         "SELECT id, method FROM payments WHERE id = ? OR (receipt_txn = ? AND ? != '') OR reference = ? "
-        "ORDER BY id DESC LIMIT 5", (int(q) if q.isdigit() and len(q) < 12 else -1, key, key, q)).fetchall()
+        "OR pay_memo = ? OR ext_id = ? OR (auto_kind = 'smartpay' AND ext_info LIKE ?) "
+        "ORDER BY id DESC LIMIT 5", (pid, key, key, q, q, "sp:" + q, sp_like)).fetchall()
     return [r["id"] for r in rows]   # смотреть может любой кассир; решать — только по своим банкам (find)
 
 

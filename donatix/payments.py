@@ -584,6 +584,29 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
     return True
 
 
+def sp_codes(row: Any) -> str:
+    """Коды SmartPay заявки одной строкой (для админки и бота): заказ, № SmartPay, инвойс, платёж, банк."""
+    import json
+    if row["auto_kind"] != "smartpay":
+        return ""
+    try:
+        info = json.loads(row["ext_info"] or "{}")
+    except (ValueError, KeyError, IndexError):
+        info = {}
+    parts = [f"заказ dx{row['id']}"]
+    if info.get("smartpay_id") or row["pay_memo"]:
+        parts.append(f"№ SmartPay {info.get('smartpay_id') or row['pay_memo']}")
+    if info.get("invoice_number"):
+        parts.append(f"инвойс {info['invoice_number']}")
+    if info.get("payment_id"):
+        parts.append(f"платёж {info['payment_id']}")
+    if info.get("bank"):
+        parts.append(str(info["bank"]))
+    if info.get("invoice_uuid"):
+        parts.append(f"UUID {info['invoice_uuid']}")
+    return " · ".join(parts)
+
+
 CANCEL_AFTER_MIN = 10   # отменить заявку клиент может через 10 минут (вдруг уже платит); через 30 — отменится сама
 
 

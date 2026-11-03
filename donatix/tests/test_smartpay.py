@@ -169,3 +169,20 @@ def test_cancel_after_10_min_auto_cancel_30_and_report(app, conn, sp, monkeypatc
     assert f"dx{p['id']}" in page and "78901" in page and "Алиф Банк" in page and "Зачислено" in page
     assert "78901" in adm.get("/admin/smartpay?period=all&q=78901").text
     assert "нет" in adm.get("/admin/smartpay?period=all&q=nobody").text
+
+
+def test_invoice_codes_in_admin_and_bot_search(app, conn, sp):
+    from donatix import tgbot
+    uid, c, token = _client(app, conn)
+    _pay(c, token)
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    TestClient(app).post("/pay/smartpay/webhook", json=_hook(p["id"], 10000), headers={"X-Api-Token": TOKEN})
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    codes = payments.sp_codes(p)
+    assert "003000000125" in codes and "001-000042" in codes and "78901" in codes and "Алиф Банк" in codes
+    adm = TestClient(app)
+    web_login(adm, "admin@example.com", "adminpass123")
+    assert "001-000042" in adm.get(f"/admin/users/{uid}").text                 # история пополнений клиента
+    for q in ("003000000125", "001-000042", "78901", f"dx{p['id']}", f"inv-dx{p['id']}"):
+        assert tgbot.find_payments(conn, sp, q) == [p["id"]], q               # поиск в боте админа
+    assert "001-000042" in tgbot.receipt_text(conn, sp, p["id"])

@@ -548,7 +548,8 @@ def _pays_with_who(conn, where: str, args: tuple) -> list[dict]:
     import json
 
     from .receipt_ai import summary
-    return [{**dict(r), "who": who_label(r),
+    from .payments import sp_codes
+    return [{**dict(r), "who": who_label(r), "sp": sp_codes(r),
              "ai": summary(json.loads(r["receipt_ai"]), r["pay_amount"], r["pay_currency"] or "")
              if r["receipt_ai"] else ""} for r in rows]
 
