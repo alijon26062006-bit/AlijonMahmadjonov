@@ -225,6 +225,14 @@
   {% elif p.auto == 'binance' %}
   <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">Оплатить в Binance</a>
   {% elif p.auto == 'smartpay' and sp %}
+  <div class="sp-qr">
+    {{ p.pay_url | qr_svg(220) }}
+    <div><b>Оплата с телефона</b><span>Наведите камеру телефона на QR-код — откроется оплата, выберите свой банк.</span></div>
+  </div>
+  <style>.sp-qr{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:18px}
+  .sp-qr .qr-box{flex:0 0 auto;line-height:0;background:#fff;padding:6px;border-radius:12px}.sp-qr .qr-box svg{width:180px;height:180px}
+  .sp-qr b{display:block;margin-bottom:4px}.sp-qr span{color:var(--muted);font-size:.92rem}
+  @media (max-width:700px){.sp-qr{display:none}}</style>
   <a class="btn primary block lg" href="{{ p.pay_url }}" style="margin-top:14px">{{ icon('card', 18) }}Оплатить</a>
   <p class="hint">Откроется страница SmartPay — выберите любой банк Таджикистана. Чек не нужен: баланс пополнится сам
     сразу после оплаты. Ссылка действует {{ (sp.left // 60) or 1 }} мин.</p>

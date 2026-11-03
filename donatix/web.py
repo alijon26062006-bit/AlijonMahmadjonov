@@ -835,6 +835,12 @@ def logout(request: Request, conn=Depends(get_conn)):
     return _redirect("/")
 
 
+def _is_phone(request: Request) -> bool:
+    """Телефон или планшет — платить сразу в банковском приложении. Компьютер — показать QR: навести камеру телефона."""
+    ua = request.headers.get("user-agent", "").lower()
+    return any(k in ua for k in ("mobi", "android", "iphone", "ipad", "telegram"))
+
+
 def _crypto_only(request: Request) -> bool:
     """Посетитель из СНГ (не Таджикистан): местных способов оплаты у нас нет — только крипта (USDT).
     Сам выбрал в настройках сомони (TJS) — видит банки, которые принимают сомони, откуда бы ни зашёл."""
@@ -1817,8 +1823,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     if intent is not None:
         request.session.pop("buy_intent", None)
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
-    if row["auto_kind"] == "smartpay" and row["pay_url"]:
-        return RedirectResponse(row["pay_url"], status_code=303)   # сразу страница SmartPay: там все банки
+    if row["auto_kind"] == "smartpay" and row["pay_url"] and _is_phone(request):
+        return RedirectResponse(row["pay_url"], status_code=303)   # телефон: сразу страница SmartPay, там все банки
     if row["auto_kind"]:
         return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
     send_receipt(conn, config, pid)

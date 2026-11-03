@@ -41,8 +41,12 @@ def _client(app, conn):
     return uid, c, web_login(c, "sp@example.com", "password123")
 
 
-def _pay(c, token, tjs="100"):
-    return c.post("/panel/balance", data={"csrf": token, "method": "sp", "amount_tjs": tjs}, follow_redirects=False)
+PHONE = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148"}
+
+
+def _pay(c, token, tjs="100", headers=PHONE):
+    return c.post("/panel/balance", data={"csrf": token, "method": "sp", "amount_tjs": tjs}, headers=headers,
+                  follow_redirects=False)
 
 
 def _hook(payment_id, amount_diram, **over):
@@ -188,3 +192,14 @@ def test_invoice_codes_in_admin_and_bot_search(app, conn, sp):
     for q in ("003000000125", "003-000000125", "001-000042", "78901", f"dx{p['id']}", f"pay{p['id']}", f"#{p['id']}", f"inv-dx{p['id']}"):
         assert tgbot.find_payments(conn, sp, q) == [p["id"]], q               # поиск в боте админа
     assert "001-000042" in tgbot.receipt_text(conn, sp, p["id"])
+
+
+
+def test_computer_gets_qr_page_phone_goes_straight(app, conn, sp):
+    """С компьютера — наша страница с QR (навести камеру телефона), с телефона — сразу SmartPay."""
+    uid, c, token = _client(app, conn)
+    r = _pay(c, token, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124"})
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    assert r.status_code in (302, 303) and r.headers["location"].endswith(f"/panel/balance/{p['id']}/pay")
+    page = c.get(f"/panel/balance/{p['id']}/pay").text
+    assert "<svg" in page and "Наведите камеру телефона" in page and p["pay_url"] in page
