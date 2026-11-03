@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import sqlite3
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -766,7 +767,7 @@ def smartpay_report(request: Request, q: str = "", period: str = "30", admin=Dep
                   "OR lower(COALESCE(p.pay_memo, '')) LIKE ? OR lower(COALESCE(p.pay_memo, '')) = ? "
                   "OR lower(COALESCE(p.ext_id, '')) LIKE ? "
                   "OR lower(COALESCE(p.ext_info, '')) LIKE ?)")
-        args += [like, like, q.lstrip("#").lstrip("dx"), like, q.replace("-", "").lower(), like, like]
+        args += [like, like, re.sub(r"(?i)^(#|pay|dx)", "", q), like, q.replace("-", "").lower(), like, like]
     rows = []
     for r in conn.execute(f"SELECT p.*, u.login FROM payments p JOIN users u ON u.id = p.user_id WHERE {where} "
                           "ORDER BY p.id DESC LIMIT 500", args).fetchall():

@@ -896,8 +896,9 @@ def find_payments(conn: sqlite3.Connection, config: Config, query: str,
     if not q:
         return []
     key = re.sub(r"[^0-9A-Za-z]", "", q).upper()
-    if re.fullmatch(r"(?i)dx\d+", q):   # заказ SmartPay «dx1234» — это номер заявки
-        q = q[2:]
+    m = re.fullmatch(r"(?i)(?:pay|dx)(\d+)", q)   # номер заявки в SmartPay: «pay1234» (раньше «dx1234»)
+    if m:
+        q = m.group(1)
     pid = int(q) if q.isdigit() and len(q) < 12 else -1
     sp_like = f"%{q}%" if len(q) >= 5 else "-"   # № SmartPay, инвойс, ID платежа, UUID — в ext_info
     rows = conn.execute(

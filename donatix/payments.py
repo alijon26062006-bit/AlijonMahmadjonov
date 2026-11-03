@@ -605,7 +605,7 @@ def sp_items(row: Any) -> list[tuple[str, str]]:
         info = json.loads(row["ext_info"] or "{}")
     except (ValueError, KeyError, IndexError):
         info = {}
-    out = [("Заказ", f"dx{row['id']}")]
+    out = [("Заявка", f"#{row['id']}")]
     inv = invoice_no(row, info)
     if inv:
         out.append(("Инвойс", inv))
@@ -625,7 +625,7 @@ def sp_codes(row: Any) -> str:
         info = json.loads(row["ext_info"] or "{}")
     except (ValueError, KeyError, IndexError):
         info = {}
-    parts = [f"заказ dx{row['id']}"]
+    parts = [f"заявка #{row['id']}"]
     if invoice_no(row, info):
         parts.append(f"инвойс {invoice_no(row, info)}")
     if info.get("payment_id"):

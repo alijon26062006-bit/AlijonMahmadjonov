@@ -58,11 +58,11 @@ def test_amount_opens_smartpay_page_with_all_banks(app, conn, sp):
     uid, c, token = _client(app, conn)
     r = _pay(c, token)
     p = conn.execute("SELECT * FROM payments").fetchone()
-    link = f"https://smartpay.tj/invoice/dx{p['id']}"
+    link = f"https://smartpay.tj/invoice/pay{p['id']}"
     assert p["auto_kind"] == "smartpay" and p["pay_url"] == link
     assert r.status_code == 303 and r.headers["location"] == link       # сразу страница SmartPay — там все банки
     body = next(b for m, path, b in sp.calls if path == "/invoices")
-    assert body["order_id"] == f"dx{p['id']}" and body["amount"] == 100.0 and body["lifetime"] == 1800
+    assert body["order_id"] == f"pay{p['id']}" and body["amount"] == 100.0 and body["lifetime"] == 1800
     assert "deeplink_bank_id" not in body
     assert body["return_url"].endswith(f"/panel/balance/{p['id']}/pay")
     page = c.get(f"/panel/balance/{p['id']}/pay").text                  # вернулся с SmartPay — кнопка ещё раз
@@ -166,7 +166,7 @@ def test_cancel_after_10_min_auto_cancel_30_and_report(app, conn, sp, monkeypatc
     adm = TestClient(app)
     web_login(adm, "admin@example.com", "adminpass123")
     page = adm.get("/admin/smartpay?period=all").text
-    assert f"dx{p['id']}" in page and "78901" in page and "Алиф Банк" in page and "Зачислено" in page
+    assert f"#{p['id']}" in page and "78901" in page and "Алиф Банк" in page and "Зачислено" in page
     assert "78901" in adm.get("/admin/smartpay?period=all&q=78901").text
     assert "нет" in adm.get("/admin/smartpay?period=all&q=nobody").text
 
@@ -185,6 +185,6 @@ def test_invoice_codes_in_admin_and_bot_search(app, conn, sp):
     adm = TestClient(app)
     web_login(adm, "admin@example.com", "adminpass123")
     assert "001-000042" in adm.get(f"/admin/users/{uid}").text                 # история пополнений клиента
-    for q in ("003000000125", "003-000000125", "001-000042", "78901", f"dx{p['id']}", f"inv-dx{p['id']}"):
+    for q in ("003000000125", "003-000000125", "001-000042", "78901", f"dx{p['id']}", f"pay{p['id']}", f"#{p['id']}", f"inv-dx{p['id']}"):
         assert tgbot.find_payments(conn, sp, q) == [p["id"]], q               # поиск в боте админа
     assert "001-000042" in tgbot.receipt_text(conn, sp, p["id"])

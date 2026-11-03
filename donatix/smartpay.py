@@ -2,7 +2,7 @@
 
 Как идёт оплата:
   1. Клиент выбирает «SmartPay» и сумму — сайт создаёт инвойс (POST /merchant/invoices,
-     order_id = «dx<номер заявки>») и сразу открывает payment_link: страницу SmartPay, где клиент выбирает
+     order_id = «pay<номер заявки>», раньше «dx…») и сразу открывает payment_link: страницу SmartPay, где клиент выбирает
      любой банк Таджикистана. После оплаты SmartPay возвращает его на наш сайт (return_url).
   2. После оплаты SmartPay присылает webhook на /pay/smartpay/webhook. Опроса статуса у SmartPay нет —
      только webhook. Ему верим, только если совпали ОБЕ проверки: заголовок X-Api-Token (64 hex из настроек
@@ -38,7 +38,7 @@ BASES = {"sandbox": "https://sandbox.smartpay.tj/api/merchant", "production": "h
 LIFETIME = 1800                    # инвойс живёт 30 минут
 MIN_TJS = Decimal("2")             # меньше SmartPay не принимает
 EXPIRED_NOTE = "SmartPay: время оплаты вышло"
-ORDER_RE = re.compile(r"^dx(\d+)$")
+ORDER_RE = re.compile(r"^(?:pay|dx)(\d+)$")   # «dx…» — старые инвойсы, путались с заказами dx-…
 
 
 class SmartPayError(Exception):
@@ -93,8 +93,8 @@ def health(config: Config) -> str:
 
 
 def order_id(payment_id: int) -> str:
-    """Наш номер заказа в SmartPay: dx1234."""
-    return f"dx{payment_id}"
+    """Номер заявки в SmartPay: pay1234 (заявка #1234). Не «dx…» — так начинаются заказы пакетов."""
+    return f"pay{payment_id}"
 
 
 def _amount(p: sqlite3.Row) -> Decimal:
