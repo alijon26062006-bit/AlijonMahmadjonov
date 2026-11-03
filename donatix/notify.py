@@ -20,6 +20,16 @@ def notify(conn: sqlite3.Connection, config: Config | None, user_id: int, text: 
         (user_id, text[:500], link or None, db.now()),
     )
     if config:
+        from . import later
+        if later.defer(lambda c: _send_out(c, config, user_id, text, link)):   # быстрый ответ (webhook) — после
+            return
+        _send_out(conn, config, user_id, text, link)
+        return
+
+
+def _send_out(conn: sqlite3.Connection, config: Config, user_id: int, text: str, link: str) -> None:
+    """Боты партнёров, push и почта — то, что ходит в сеть и может быть медленным."""
+    if config:
         _push_to_bots(conn, config, user_id, text, link)
         try:   # на телефон/компьютер, даже если сайт закрыт
             from . import webpush

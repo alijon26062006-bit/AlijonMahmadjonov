@@ -203,3 +203,26 @@ def test_computer_gets_qr_page_phone_goes_straight(app, conn, sp):
     assert r.status_code in (302, 303) and r.headers["location"].endswith(f"/panel/balance/{p['id']}/pay")
     page = c.get(f"/panel/balance/{p['id']}/pay").text
     assert "<svg" in page and "Наведите камеру телефона" in page and p["pay_url"] in page
+
+
+def test_webhook_answers_fast_messages_go_after(app, conn, sp, monkeypatch):
+    """Сообщения в Telegram (бот, админ) — после ответа SmartPay: раньше ответ ждал их по 10–40 с."""
+    import threading
+    import time
+
+    from donatix import shopbot
+    done = threading.Event()
+
+    def slow_push(c, cfg, pid, api=None):
+        time.sleep(1.5)
+        done.set()
+        return 1
+    monkeypatch.setattr(shopbot, "payment_push", slow_push)
+    uid, c, token = _client(app, conn)
+    _pay(c, token)
+    p = conn.execute("SELECT * FROM payments").fetchone()
+    t = time.monotonic()
+    r = TestClient(app).post("/pay/smartpay/webhook", json=_hook(p["id"], 10000), headers={"X-Api-Token": TOKEN})
+    assert r.json()["status"] == "ok" and time.monotonic() - t < 1.0          # ответ сразу
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "paid"
+    assert done.wait(5)                                                          # а сообщение в бот — следом

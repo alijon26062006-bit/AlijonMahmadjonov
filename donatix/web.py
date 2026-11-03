@@ -1738,7 +1738,12 @@ async def smartpay_webhook(request: Request, conn=Depends(get_conn), config: Con
         body = None
     if not isinstance(body, dict):
         return JSONResponse({"status": "bad request"}, status_code=400)
-    res = smartpay.handle_webhook(conn, config, request.headers.get("x-api-token", ""), body)
+    from . import later
+    token = later.start()   # сообщения в Telegram — после ответа SmartPay, иначе ответ шёл 10–40 с
+    try:
+        res = smartpay.handle_webhook(conn, config, request.headers.get("x-api-token", ""), body)
+    finally:
+        later.finish(token, config)
     if res["status"] == "forbidden":
         return JSONResponse({"status": "forbidden"}, status_code=403)
     return JSONResponse({"status": "ok" if res["status"] in ("ok", "duplicate") else res["status"]})

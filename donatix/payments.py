@@ -523,6 +523,9 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
 def _tell_shop_buyer(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
     """Покупатель из бота-магазина узнаёт о решении сразу, кто бы и откуда ни подтвердил заявку
     (автоплатёж «Душанбе Сити», кассир, админ) — не дожидаясь, пока бот сам заметит."""
+    from . import later
+    if later.defer(lambda c: _tell_shop_buyer(c, config, payment_id)):
+        return
     try:
         from .shopbot import payment_push
         payment_push(conn, config, payment_id)

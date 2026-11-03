@@ -24,6 +24,13 @@ def notify_admin(config: Config, text: str, buttons: list | None = None, *, html
     log.warning("ADMIN: %s", "(код входа — только в Telegram)" if secret else text)
     if not (config.alert_telegram_token and config.alert_telegram_chat_id):
         return
+    from . import later
+    if later.defer(lambda c: _send_admin(config, text, buttons, html, secret)):   # быстрый ответ (webhook) — после
+        return
+    _send_admin(config, text, buttons, html, secret)
+
+
+def _send_admin(config: Config, text: str, buttons: list | None, html: bool, secret: bool) -> None:
     from .tgbot import keyboard
     payload = {"chat_id": config.alert_telegram_chat_id, "text": text if html else f"{config.site_name}: {text}",
                "disable_web_page_preview": True}
