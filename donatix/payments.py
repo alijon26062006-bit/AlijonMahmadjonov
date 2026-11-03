@@ -336,6 +336,13 @@ def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
             for m in conf["all_methods"] if m["code"] in conf["details"]]
 
 
+def offered(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
+    """Способы, которые видит клиент. Подключён SmartPay — только он: клиент выбирает сумму и сразу попадает
+    на страницу SmartPay со всеми банками. Ключа нет или не работает — обычный список способов."""
+    ms = methods(conn, config)
+    return [m for m in ms if m["auto"] == "smartpay"][:1] or ms
+
+
 def pay_amount(tjs_rate: Decimal, currency: str, usd: Decimal) -> tuple[str, str]:
     if currency == "TJS":
         return str((usd * tjs_rate).quantize(Decimal("0.01"), rounding=ROUND_UP)), "TJS"

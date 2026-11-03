@@ -2117,7 +2117,12 @@ class ShopBot:
                       [[(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")], [(tr(lang, "home"), "h")]],
                       edit=edit)
             return
-        methods = payments.methods(conn, self.config)
+        methods = payments.offered(conn, self.config)
+        if len(methods) == 1 and methods[0]["auto"] == "smartpay":   # выбирать нечего — сразу сумма
+            prev = self.state.get(tg_id) or {}
+            self.state[tg_id] = {"step": "method", "resume": prev if prev.get("resume") else None, "photo": prev.get("photo")}
+            self.pick_method(conn, su, methods[0]["code"], edit)
+            return
         if not methods:
             self.show(tg_id, tr(lang, "no_methods"), [[(tr(lang, "home"), "h")]], edit=edit)
             return

@@ -74,6 +74,18 @@
       </div>
       <p class="hint" style="margin:8px 0 14px">{% if user.balance_micro > 0 %}Цена {{ money(buy.need) }}, на балансе {{ money(user.balance_micro) }} — доплатить {{ buy.tjs }} с. {% endif %}После оплаты заказ оформится сам{% if is_guest_account(user) %} — регистрироваться не нужно{% endif %}.</p>
       {% endif %}
+      {% if methods | length == 1 and methods[0].auto == 'smartpay' %}
+      {#- Подключён SmartPay: способ не выбираем — сумма и сразу страница SmartPay со всеми банками -#}
+      <input type="hidden" name="method" value="{{ methods[0].code }}">
+      <label for="amount">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
+      <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 50" autocomplete="off" {% if buy %}value="{{ buy.tjs }}" readonly{% endif %}>
+      {% if not buy %}<div class="sp-chips">{% for v in (20, 50, 100, 200) %}<button type="button" class="btn sm" data-sp="{{ v }}">{{ v }} с.</button>{% endfor %}</div>{% endif %}
+      <div class="hint">{% if min_tjs > 0 and not buy %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони. {% endif %}Откроется страница оплаты — выберите любой банк Таджикистана. Чек не нужен: баланс пополнится сам.</div>
+      <button class="btn primary lg block" style="margin-top:16px">{{ icon('card', 18) }}{{ 'Оплатить' if buy else 'Пополнить' }}</button>
+      <style>.sp-chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}</style>
+      <script data-soft>document.querySelectorAll("[data-sp]").forEach(function (b) { b.addEventListener("click", function () {
+        var a = document.getElementById("amount"); a.value = b.dataset.sp; a.focus(); }); });</script>
+      {% else %}
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if crypto_only %}<div class="flash" role="status"><span>Из вашей страны оплата — <b>криптой (USDT)</b>.
         Цены показаны в вашей валюте для удобства, списание — в долларах по курсу.</span></div>{% endif %}
@@ -202,6 +214,7 @@
       </div>
       {% else %}
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены. <a href="/panel/support">Напишите в поддержку</a>.</p>
+      {% endif %}
       {% endif %}
     </form>
     {% if methods and crypto %}<form id="cryptoform" method="post" action="/panel/balance" hidden>

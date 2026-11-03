@@ -126,3 +126,25 @@ def test_admin_check_button(app, conn, sp):
     r = c.post("/admin/pay-settings/smartpay-check", data={"csrf": csrf_of(page)})
     assert "ключ работает, мерчант m-uuid-1" in r.text
     assert token
+
+
+def test_smartpay_only_amount_on_site_and_bot(app, conn, sp):
+    """Подключён SmartPay — других способов клиент не видит: только сумма → страница SmartPay."""
+    payments.save_methods(conn, [{"code": "alif", "title": "Алиф", "currency": "TJS", "details": "+992 90 000 00 00",
+                                  "enabled": True, "auto": ""},
+                                 {"code": "sp", "title": "SmartPay", "currency": "TJS", "details": "",
+                                  "enabled": True, "auto": "smartpay"}])
+    assert [m["code"] for m in payments.offered(conn, sp)] == ["sp"]
+    uid, c, token = _client(app, conn)
+    page = c.get("/panel/balance").text
+    assert 'name="method" value="sp"' in page and "Способ оплаты" not in page and "Алиф" not in page
+    from test_shopbot import FakeApi, _bot, _start, press
+    from conftest import MockSupplier
+    api = FakeApi()
+    sp.shop_bot_token = "t"
+    bot = _bot(sp, MockSupplier(), api)
+    _start(bot, conn)
+    bot.handle(conn, press("t"))
+    assert not any("Алиф" in b["text"] for b in api.last_buttons())          # сразу сумма, без выбора способа
+    sp.smartpay_key = ""                                                      # ключа нет — обычный список
+    assert len(payments.offered(conn, sp)) == 2

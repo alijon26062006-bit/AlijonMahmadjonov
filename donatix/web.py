@@ -854,7 +854,9 @@ def _no_tjs(request: Request) -> bool:
 
 def _pay_methods(request: Request, conn, config: Config) -> list[dict]:
     from . import payments
-    ms = payments.methods(conn, config)
+    ms = payments.offered(conn, config)
+    if len(ms) == 1 and ms[0]["auto"] == "smartpay":   # только сумма → страница SmartPay (все банки)
+        return ms
     if _crypto_only(request):
         return [m for m in ms if m.get("network")]
     return [m for m in ms if m["currency"] != "TJS"] if _no_tjs(request) else ms
