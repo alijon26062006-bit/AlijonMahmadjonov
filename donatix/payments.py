@@ -584,6 +584,18 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
     return True
 
 
+def invoice_no(row: Any, info: dict[str, Any]) -> str:
+    """Номер инвойса, как в кабинете SmartPay: «806-000000065». Это тот же smartpay_id («806000000065»),
+    только с дефисом после первых трёх цифр; он же в конце ссылки на оплату."""
+    if info.get("invoice_number"):
+        return str(info["invoice_number"])
+    sp_id = str(info.get("smartpay_id") or row["pay_memo"] or "")
+    if sp_id.isdigit() and len(sp_id) > 3:
+        return f"{sp_id[:3]}-{sp_id[3:]}"
+    link = str(row["pay_url"] or "")
+    return link.rstrip("/").rsplit("/", 1)[-1] if "/invoice/" in link else sp_id
+
+
 def sp_items(row: Any) -> list[tuple[str, str]]:
     """Коды SmartPay парами «подпись — значение» для красивого показа (UUID не показываем — длинный, ищется и так)."""
     import json
@@ -594,10 +606,9 @@ def sp_items(row: Any) -> list[tuple[str, str]]:
     except (ValueError, KeyError, IndexError):
         info = {}
     out = [("Заказ", f"dx{row['id']}")]
-    if info.get("smartpay_id") or row["pay_memo"]:
-        out.append(("№ SmartPay", str(info.get("smartpay_id") or row["pay_memo"])))
-    if info.get("invoice_number"):
-        out.append(("Инвойс", str(info["invoice_number"])))
+    inv = invoice_no(row, info)
+    if inv:
+        out.append(("Инвойс", inv))
     if info.get("payment_id"):
         out.append(("Платёж", str(info["payment_id"])))
     if info.get("bank"):
@@ -615,10 +626,8 @@ def sp_codes(row: Any) -> str:
     except (ValueError, KeyError, IndexError):
         info = {}
     parts = [f"заказ dx{row['id']}"]
-    if info.get("smartpay_id") or row["pay_memo"]:
-        parts.append(f"№ SmartPay {info.get('smartpay_id') or row['pay_memo']}")
-    if info.get("invoice_number"):
-        parts.append(f"инвойс {info['invoice_number']}")
+    if invoice_no(row, info):
+        parts.append(f"инвойс {invoice_no(row, info)}")
     if info.get("payment_id"):
         parts.append(f"платёж {info['payment_id']}")
     if info.get("bank"):

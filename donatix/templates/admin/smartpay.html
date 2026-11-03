@@ -30,9 +30,9 @@
         <div class="small {{ 'ok' if p.status == 'paid' else 'muted' }}">{{ {'paid': 'Зачислено', 'pending': 'Ждёт оплаты', 'cancelled': 'Отменена', 'rejected': 'Отклонена'}.get(p.status, p.status) }}</div></div>
     </div>
     <div class="small" style="margin-top:8px;display:grid;gap:2px;overflow-wrap:anywhere">
-      <div>Заказ в SmartPay: <span class="mono">dx{{ p.id }}</span>{% if p.pay_memo %} · № SmartPay <span class="mono">{{ p.pay_memo }}</span>{% endif %}</div>
-      {% if p.info %}
-      <div>Платёж: <span class="mono">{{ p.info.payment_id }}</span>{% if p.info.invoice_number %} · инвойс <span class="mono">{{ p.info.invoice_number }}</span>{% endif %}</div>
+      <div>Заказ: <span class="mono">dx{{ p.id }}</span>{% if p.inv %} · инвойс <span class="mono">{{ p.inv }}</span>{% endif %}</div>
+      {% if p.info.payment_id %}
+      <div>Платёж: <span class="mono">{{ p.info.payment_id }}</span></div>
       <div>Банк: <b>{{ p.info.bank or '—' }}</b>{% if p.info.payment_date %} · время оплаты {{ p.info.payment_date }}{% endif %}</div>
       {% endif %}
     </div>

@@ -179,10 +179,12 @@ def test_invoice_codes_in_admin_and_bot_search(app, conn, sp):
     TestClient(app).post("/pay/smartpay/webhook", json=_hook(p["id"], 10000), headers={"X-Api-Token": TOKEN})
     p = conn.execute("SELECT * FROM payments").fetchone()
     codes = payments.sp_codes(p)
-    assert "003000000125" in codes and "001-000042" in codes and "78901" in codes and "Алиф Банк" in codes
+    assert "001-000042" in codes and "78901" in codes and "Алиф Банк" in codes and "№ SmartPay" not in codes
+    before = dict(p); before["ext_info"] = '{"smartpay_id": "806000000065"}'
+    assert payments.invoice_no(before, {"smartpay_id": "806000000065"}) == "806-000000065"   # до оплаты — из smartpay_id
     adm = TestClient(app)
     web_login(adm, "admin@example.com", "adminpass123")
     assert "001-000042" in adm.get(f"/admin/users/{uid}").text                 # история пополнений клиента
-    for q in ("003000000125", "001-000042", "78901", f"dx{p['id']}", f"inv-dx{p['id']}"):
+    for q in ("003000000125", "003-000000125", "001-000042", "78901", f"dx{p['id']}", f"inv-dx{p['id']}"):
         assert tgbot.find_payments(conn, sp, q) == [p["id"]], q               # поиск в боте админа
     assert "001-000042" in tgbot.receipt_text(conn, sp, p["id"])

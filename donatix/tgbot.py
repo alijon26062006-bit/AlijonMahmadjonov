@@ -902,8 +902,8 @@ def find_payments(conn: sqlite3.Connection, config: Config, query: str,
     sp_like = f"%{q}%" if len(q) >= 5 else "-"   # № SmartPay, инвойс, ID платежа, UUID — в ext_info
     rows = conn.execute(
         "SELECT id, method FROM payments WHERE id = ? OR (receipt_txn = ? AND ? != '') OR reference = ? "
-        "OR pay_memo = ? OR ext_id = ? OR (auto_kind = 'smartpay' AND ext_info LIKE ?) "
-        "ORDER BY id DESC LIMIT 5", (pid, key, key, q, q, "sp:" + q, sp_like)).fetchall()
+        "OR pay_memo = ? OR pay_memo = ? OR ext_id = ? OR (auto_kind = 'smartpay' AND ext_info LIKE ?) "
+        "ORDER BY id DESC LIMIT 5", (pid, key, key, q, q, q.replace("-", ""), "sp:" + q, sp_like)).fetchall()
     return [r["id"] for r in rows]   # смотреть может любой кассир; решать — только по своим банкам (find)
 
 
