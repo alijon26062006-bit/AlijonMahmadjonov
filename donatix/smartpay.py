@@ -154,13 +154,28 @@ def verify(config: Config, token: str, payload: dict[str, Any]) -> bool:
     return hmac.compare_digest(str(payload.get("signature") or ""), signature(config.smartpay_hook_secret, payload))
 
 
+def why_rejected(config: Config, token: str, payload: dict[str, Any]) -> str:
+    """Причина отказа для журнала — без самих ключей: что не совпало и в каком виде пришли поля подписи."""
+    if not hook_ready(config):
+        return "на сервере не заданы токен или секрет webhook"
+    t = str(token or "")
+    if not hmac.compare_digest(t, config.smartpay_hook_token):
+        return (f"X-Api-Token не совпал (пришёл: {len(t)} символов, «{t[:4]}…»; на сервере: "
+                f"{len(config.smartpay_hook_token)} символов, «{config.smartpay_hook_token[:4]}…»)")
+    got = str(payload.get("signature") or "")
+    fields = {k: payload.get(k) for k in ("payment_date", "amount", "order_id", "bank_id", "invoice_uuid")}
+    return (f"токен верный, подпись не совпала (подпись пришла: {len(got)} символов; поля: {fields}) — "
+            "проверьте секрет подписи HMAC")
+
+
 def handle_webhook(conn: sqlite3.Connection, config: Config, token: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Оплата пришла: проверить, найти заявку, сверить сумму и зачислить ровно один раз."""
     from . import payments
     from .cryptopay import _admin_id, _tell_admin
     from .worker import notify_admin
     if not verify(config, token, payload):
-        log.warning("SmartPay webhook: не прошёл проверку (order_id=%s)", str(payload.get("order_id"))[:40])
+        log.warning("SmartPay webhook: не прошёл проверку (order_id=%s): %s", str(payload.get("order_id"))[:40],
+                    why_rejected(config, token, payload))
         return {"status": "forbidden"}
     m = ORDER_RE.match(str(payload.get("order_id") or ""))
     pid = int(m.group(1)) if m else 0
