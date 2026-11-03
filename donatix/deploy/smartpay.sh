@@ -24,6 +24,29 @@ HTOKEN=$(printf '%s' "$HTOKEN" | tr -d '" '); KEY=$(printf '%s' "$KEY" | tr -d '
 [ -n "$HTOKEN" ] && [ -n "$HSECRET" ] || die "Без токена и секрета webhook оплата не зачислится — ничего не записано."
 
 sudo -u donatix git -C "$APP_DIR" pull -q --ff-only origin "$BRANCH" || true
+
+# Ключ проверяем ДО записи: сначала в выбранном режиме, потом в другом (тестовый ключ к боевому адресу не подходит)
+check() {   # $1 — режим; печатает UUID мерчанта или причину
+  (cd "$APP_DIR" && DONATIX_SMARTPAY_KEY="$KEY" DONATIX_SMARTPAY_MODE="$1" \
+    sudo --preserve-env=DONATIX_SMARTPAY_KEY,DONATIX_SMARTPAY_MODE -u donatix .venv/bin/python -c '
+import logging; logging.disable(logging.CRITICAL)
+from donatix.config import Config; from donatix import smartpay
+try: print("OK", smartpay.health(Config.from_env()))
+except Exception as e: print("ERR", e)' 2>/dev/null)
+}
+printf '\nПроверяю ключ в SmartPay… '
+OTHER=$([ "$MODE" = sandbox ] && echo production || echo sandbox)
+RES=$(check "$MODE")
+if [ "${RES%% *}" != OK ]; then
+  RES2=$(check "$OTHER")
+  if [ "${RES2%% *}" = OK ]; then
+    printf '\n  ключ от режима «%s», а не «%s» — использую «%s».\n' "$OTHER" "$MODE" "$OTHER"; MODE="$OTHER"; RES="$RES2"
+  else
+    die "Ключ не принят SmartPay ни в боевом, ни в тестовом режиме (Invalid API key). Скопируйте API Key заново (Танзимот → API Keys — именно API Key, не токен webhook) и запустите ещё раз. Ничего не записано."
+  fi
+fi
+printf '\033[1;32m✔ ключ работает (%s), мерчант %s\033[0m\n' "$MODE" "${RES#OK }"
+
 cp "$ENV_FILE" "$ENV_FILE.bak.$(date +%s)"
 MODE="$MODE" KEY="$KEY" HTOKEN="$HTOKEN" HSECRET="$HSECRET" python3 - "$ENV_FILE" <<'PY'
 import os, re, sys
@@ -36,11 +59,6 @@ open(path, "w", encoding="utf-8").write(s)
 PY
 chown donatix:donatix "$ENV_FILE"; chmod 600 "$ENV_FILE"
 systemctl restart donatix
-
-printf '\nПроверяю ключ в SmartPay… '
-if (cd "$APP_DIR" && sudo -u donatix .venv/bin/python -c \
-    'from donatix.config import Config; from donatix import smartpay; print("✔ ключ работает, мерчант", smartpay.health(Config.from_env()))'); then :
-else printf '\033[1;31m✖ Ключ не принят — проверьте режим (тест/боевой) и ключ, запустите ещё раз.\033[0m\n'; fi
 
 DOMAIN=$(grep -E '^DONATIX_BASE_URL=' "$ENV_FILE" | cut -d= -f2- | sed 's#/*$##'); DOMAIN="${DOMAIN:-https://donatix.tj}"
 printf '\n\033[1;32m✔ SmartPay подключён (%s), сайт перезапущен.\033[0m\n' "$MODE"
