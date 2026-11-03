@@ -137,7 +137,7 @@ def test_smartpay_only_amount_on_site_and_bot(app, conn, sp):
     assert [m["code"] for m in payments.offered(conn, sp)] == ["sp"]
     uid, c, token = _client(app, conn)
     page = c.get("/panel/balance").text
-    assert 'name="method" value="sp"' in page and "Способ оплаты" not in page and "Алиф" not in page
+    assert 'data-no-swap' in page and 'name="method" value="sp"' in page and "Способ оплаты" not in page and "Алиф" not in page
     from test_shopbot import FakeApi, _bot, _start, press
     from conftest import MockSupplier
     api = FakeApi()

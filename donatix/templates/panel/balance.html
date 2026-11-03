@@ -63,7 +63,9 @@
       </div>
     </div>
     {% else %}
-    <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
+    {%- set sp_only = methods | length == 1 and methods[0].auto == 'smartpay' %}
+    {#- SmartPay: ответ — переход на чужой сайт (smartpay.tj), его нельзя «подменить» на месте — обычная отправка -#}
+    <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data"{{ ' data-no-swap' if sp_only }}>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       {% if buy %}
       <input type="hidden" name="buy" value="1">
@@ -74,7 +76,7 @@
       </div>
       <p class="hint" style="margin:8px 0 14px">{% if user.balance_micro > 0 %}Цена {{ money(buy.need) }}, на балансе {{ money(user.balance_micro) }} — доплатить {{ buy.tjs }} с. {% endif %}После оплаты заказ оформится сам{% if is_guest_account(user) %} — регистрироваться не нужно{% endif %}.</p>
       {% endif %}
-      {% if methods | length == 1 and methods[0].auto == 'smartpay' %}
+      {% if sp_only %}
       {#- Подключён SmartPay: способ не выбираем — сумма и сразу страница SmartPay со всеми банками -#}
       <input type="hidden" name="method" value="{{ methods[0].code }}">
       <label for="amount">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
