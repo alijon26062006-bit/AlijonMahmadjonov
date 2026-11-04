@@ -90,6 +90,10 @@ async def main() -> None:
     bn = dict(trc, auto="binance", pay_url="https://pay.binance.com/x", address="")
     urls = [b.url for row in _auto_kb(bn).inline_keyboard for b in row if b.url]
     check("Binance Pay: кнопка оплаты", urls == ["https://pay.binance.com/x"])
+    sp = dict(trc, auto="smartpay", pay_url="https://pay.smartpay.tj/invoice/806-1", address="")
+    kb = [b for row in _auto_kb(sp).inline_keyboard for b in row if b.url]
+    check("SmartPay: кнопка «любой банк»", kb and kb[0].url.endswith("806-1") and "любой банк" in kb[0].text)
+    check("SmartPay: чек не нужен", "SmartPay" in _auto_text(sp) and "чек присылать не нужно" in _auto_text(sp))
     donatix._call = real_call
     await conn.close()
 

@@ -146,6 +146,9 @@ async def methods(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer()
         return
     await state.update_data(dx_min=data.get("min_tjs"), dx_rate=data.get("tjs_rate"))
+    if len(ms) == 1:  # один способ (SmartPay) — сразу спрашиваем сумму
+        await _ask_amount(call, state, ms[0]["code"])
+        return
     rows = [[(_method_label(m), f"dx:m:{m['code']}")] for m in ms]
     rows.append([("‹ Назад", "dx:home")])
     await _show(call, f"💳 <b>Пополнение счёта Donatix</b>\n\nВыберите способ оплаты.\n"
@@ -156,7 +159,11 @@ async def methods(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("dx:m:"))
 async def pick_method(call: CallbackQuery, state: FSMContext) -> None:
-    await state.update_data(dx_method=call.data[5:])
+    await _ask_amount(call, state, call.data[5:])
+
+
+async def _ask_amount(call: CallbackQuery, state: FSMContext, code: str) -> None:
+    await state.update_data(dx_method=code)
     await state.set_state(TopUp.amount)
     data = await state.get_data()
     minimum = float(data.get("dx_min") or 0)
@@ -198,7 +205,7 @@ async def got_amount(message: Message, state: FSMContext) -> None:
 
 
 def _auto_text(p: dict) -> str:
-    """Автоплатёж (USDT TRC20 по блокчейну или Binance Pay): чек не нужен, зачислится само."""
+    """Автоплатёж (SmartPay, USDT TRC20 по блокчейну, Binance Pay): чек не нужен, зачислится само."""
     head = (f"⚡️ <b>Заявка #{p['id']}</b> · {esc(p['method_title'])}\n\n"
             f"К оплате: <b>{esc(p['pay_amount'])} {esc(p['pay_currency'])}</b>\n"
             f"Будет зачислено: <b>${esc(p['amount_usd'])}</b>\n\n")
@@ -206,6 +213,10 @@ def _auto_text(p: dict) -> str:
         head += (f"<b>Адрес USDT · сеть TRC20:</b>\n<code>{esc(p.get('address', ''))}</code>\n\n"
                  f"⚠️ Переведите <b>ровно {esc(p['pay_amount'])} USDT</b> — по последним цифрам суммы "
                  "мы узнаём ваш перевод. Другая сумма или сеть сама не зачислится.\n\n")
+    elif p["auto"] == "smartpay":
+        return head + ("Нажмите «💳 Оплатить (любой банк)» — откроется страница SmartPay, выберите свой банк "
+                       "(Алиф, Душанбе Сити, Эсхата и другие) и оплатите.\n\n"
+                       "Баланс пополнится сам сразу после оплаты — чек присылать не нужно.")
     elif p["auto"] == "bybit":
         head += (f"<b>Bybit UID получателя:</b> <code>{esc(p.get('address', ''))}</code>\n\n"
                  f"В Bybit: Активы → Перевод → <b>По UID</b>, USDT, ровно <b>{esc(p['pay_amount'])}</b> — "
@@ -216,7 +227,8 @@ def _auto_text(p: dict) -> str:
 def _auto_kb(p: dict):
     kb = InlineKeyboardBuilder()
     if p.get("pay_url"):
-        kb.row(InlineKeyboardButton(text="💳 Оплатить в Binance", url=p["pay_url"]))
+        label = "💳 Оплатить (любой банк)" if p.get("auto") == "smartpay" else "💳 Оплатить в Binance"
+        kb.row(InlineKeyboardButton(text=label, url=p["pay_url"]))
     kb.row(InlineKeyboardButton(text="🔄 Проверить оплату", callback_data=f"dx:chk:{p['id']}"))
     kb.row(InlineKeyboardButton(text="‹ Счёт Donatix", callback_data="dx:home"))
     return kb.as_markup()

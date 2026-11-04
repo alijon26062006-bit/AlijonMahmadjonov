@@ -340,7 +340,8 @@ def payment_methods(request: Request, user=Depends(api_user), conn=Depends(get_c
     from . import payments, rates
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     conf = payments.settings(conn, config)
-    return {"ok": True, "methods": payments.methods(conn, config), "tjs_rate": str(conf["tjs_rate"]),
+    # SmartPay подключён — партнёрам тоже только он: сумма → страница оплаты со всеми банками, зачисление само
+    return {"ok": True, "methods": payments.offered(conn, config), "tjs_rate": str(conf["tjs_rate"]),
             "min_tjs": str(conf["min_tjs"]), "min_usd": str(conf["min_usd"])}
 
 
