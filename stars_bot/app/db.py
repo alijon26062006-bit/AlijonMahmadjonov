@@ -823,6 +823,9 @@ MIGRATIONS: dict[str, dict[str, str]] = {
         "title": "TEXT NOT NULL DEFAULT ''",
         "hidden": "INTEGER NOT NULL DEFAULT 0",
     },
+    # Когда клиент поставил галочку «настройки гильдии сделал, за ошибки
+    # отвечаю сам» — довод в споре, если боты не зашли.
+    "glory_runs": {"agreed_at": "TEXT"},
 }
 
 
@@ -2135,6 +2138,12 @@ async def save_glory_run(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (order_id, ext_id, user_id, region, region_title, clan_id, status, now, now),
     )
+    await conn.commit()
+
+
+async def mark_glory_agreed(conn: aiosqlite.Connection, order_id: int) -> None:
+    await conn.execute("UPDATE glory_runs SET agreed_at = ? WHERE order_id = ?",
+                       (_now(), order_id))
     await conn.commit()
 
 

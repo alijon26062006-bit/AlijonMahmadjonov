@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 import aiosqlite
 from aiogram import Bot, F, Router
@@ -88,9 +89,66 @@ async def apply(conn: aiosqlite.Connection, order_id: int, remote: dict) -> None
                                                  if v not in (None, "")})
 
 
+#: Картинка-пример настроек гильдии. Своя из панели важнее этой.
+GUIDE_IMAGE = Path(__file__).resolve().parent.parent / "assets" / "glory_settings.jpg"
+AGREE_OFF = "⬜ Я понял: настройки сделал, за ошибки отвечаю сам"
+AGREE_ON = "✅ Я понял: настройки сделал, за ошибки отвечаю сам"
+
+
+def guide_kb(agreed: bool) -> object:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(AGREE_ON if agreed else AGREE_OFF, "gl:agree",
+               style=SUCCESS if agreed else None))
+    kb.row(btn("Дальше ➡️", "gl:next", style=PRIMARY if agreed else None))
+    kb.row(btn("📋 Ботҳои ман", "gl:my"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:games"))
+    return kb.as_markup()
+
+
 @router.callback_query(F.data == "gl:menu")
-async def cb_menu(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_menu(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    """Первый шаг — пример настроек гильдии и галочка «я понял».
+
+    Без авто-подтверждения и уровней «по умолчанию» боты в гильдию не
+    попадают, а деньги после запуска не возвращаются. Поэтому каждый раз
+    сначала картинка с настройками, и дальше — только с галочкой.
+    """
+    from aiogram.types import FSInputFile
+
+    from app import runtime, screens
+
     await state.clear()
+    if not dx.ready():
+        await call.answer("Бахш муваққатан баста аст.", show_alert=True)
+        return
+    await state.update_data(glory_agreed=False)
+    photo = screens.image("glory_help") or (
+        FSInputFile(GUIDE_IMAGE) if GUIDE_IMAGE.exists() else "")
+    sent = await screens.show(call, texts.GLORY_GUIDE, guide_kb(False), photo=photo)
+    # Картинку из файла загружаем один раз: дальше Telegram отдаёт её
+    # по file_id, без повторной загрузки.
+    photos = getattr(sent, "photo", None)
+    if photos and not screens.image("glory_help"):
+        await runtime.set_value(conn, "img:glory_help", photos[-1].file_id)
+    await call.answer()
+
+
+@router.callback_query(F.data == "gl:agree")
+async def cb_agree(call: CallbackQuery, state: FSMContext) -> None:
+    agreed = not (await state.get_data()).get("glory_agreed")
+    await state.update_data(glory_agreed=agreed)
+    try:
+        await call.message.edit_reply_markup(reply_markup=guide_kb(agreed))
+    except Exception:  # noqa: BLE001 — «не изменилось» не ошибка
+        pass
+    await call.answer("✅" if agreed else "")
+
+
+@router.callback_query(F.data.in_({"gl:next", "gl:regions"}))
+async def cb_regions(call: CallbackQuery, state: FSMContext) -> None:
+    if not (await state.get_data()).get("glory_agreed"):
+        await call.answer(texts.GLORY_GUIDE_NEED, show_alert=True)
+        return
     if not dx.ready():
         await call.answer("Бахш муваққатан баста аст.", show_alert=True)
         return
@@ -112,6 +170,9 @@ async def cb_menu(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("gl:r:"))
 async def cb_region(call: CallbackQuery, state: FSMContext) -> None:
+    if not (await state.get_data()).get("glory_agreed"):
+        await call.answer(texts.GLORY_GUIDE_NEED, show_alert=True)
+        return
     region_id = call.data.split(":", 2)[2]
     try:
         items = await dx.regions()
@@ -126,7 +187,7 @@ async def cb_region(call: CallbackQuery, state: FSMContext) -> None:
                             price=region["price"], cost=region["cost"])
     await call.message.edit_text(
         texts.GLORY_ASK_CLAN.format(region=region["name"], price=fmt(region["price"])),
-        reply_markup=keyboards.back("gl:menu", "‹ Минтақаҳо"),
+        reply_markup=keyboards.back("gl:regions", "‹ Минтақаҳо"),
     )
     await call.answer()
 
@@ -188,6 +249,9 @@ async def cb_go(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connecti
     await db.save_glory_run(conn, order_id=order.id, user_id=call.from_user.id,
                             region=data["region"], region_title=data["region_title"],
                             clan_id=clan, status="starting")
+    # Галочка «я понял, за настройки отвечаю сам» — на случай спора.
+    if data.get("glory_agreed"):
+        await db.mark_glory_agreed(conn, order.id)
     await call.message.edit_text(texts.GLORY_STARTING.format(clan=clan))
     await call.answer()
 

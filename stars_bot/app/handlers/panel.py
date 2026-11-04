@@ -1908,7 +1908,8 @@ async def image_slots(conn: aiosqlite.Connection) -> list[tuple[str, str]]:
     from app.services import regions
 
     slots = [("main", "🏠 Главный экран (/start)"), ("games", "🎮 Раздел «Игры»"),
-             ("glory", "🏆 Боты для гильдии")]
+             ("glory", "🏆 Боты для гильдии"),
+             ("glory_help", "🧾 Боты для гильдии — пример настроек")]
     games = await db.list_games(conn, only_enabled=True)
     for group in regions.group(games):
         items = group["games"]

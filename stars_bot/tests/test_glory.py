@@ -74,12 +74,33 @@ class User:
 class Screen:
     def __init__(self):
         self.text, self.markup = "", None
+        self.photo, self.photo_sent, self.caption = None, False, ""
 
     async def edit_text(self, text, reply_markup=None, **kw):
         self.text, self.markup = text, reply_markup
 
     async def answer(self, text, reply_markup=None, **kw):
         self.text, self.markup = text, reply_markup
+
+    async def edit_reply_markup(self, reply_markup=None, **kw):
+        self.markup = reply_markup
+
+    async def delete(self):
+        pass
+
+    async def answer_photo(self, photo, caption="", reply_markup=None, **kw):
+        class P:
+            file_id = "FILE_GUIDE"
+
+        self.photo_sent, self.caption, self.markup = True, caption, reply_markup
+        self.text = caption
+        sent = Screen()
+        sent.photo = [P()]
+        return sent
+
+    async def edit_media(self, media, reply_markup=None, **kw):
+        self.caption, self.markup, self.text = media.caption, reply_markup, media.caption
+        return self
 
 
 class Call:
@@ -120,6 +141,7 @@ def btns(markup):
 
 async def flow(conn, fake: Fake, bot: Bot, clan: str):
     state = FSMContext(storage=MemoryStorage(), key=StorageKey(bot_id=1, chat_id=UID, user_id=UID))
+    await state.update_data(glory_agreed=True)     # галочку поставили
     call = Call("gl:r:bd")
     await gh.cb_region(call, state)
     msg = Msg(clan)
@@ -157,10 +179,33 @@ async def run(conn) -> None:
     check("цена = Donatix × курс + наценка 25%, округлена как все цены",
           items[0]["price"] == price, str(items[0]["price"]))
 
+    # Первый шаг — пример настроек гильдии и галочка.
+    guide_state = FSMContext(storage=MemoryStorage(),
+                             key=StorageKey(bot_id=1, chat_id=1, user_id=1))
     call = Call("gl:menu")
-    await gh.cb_menu(call, FSMContext(storage=MemoryStorage(),
-                                      key=StorageKey(bot_id=1, chat_id=1, user_id=1)))
-    check("экран регионов с ценой", any(f"{price / 100:.2f}" in t for t, _ in btns(call.message.markup)),
+    await gh.cb_menu(call, guide_state, conn)
+    check("первый шаг — картинка с настройками и объяснение",
+          call.message.photo_sent and "Авто подтверждение" in call.message.caption,
+          str(call.message.caption)[:120])
+    check("галочка пустая", any(t.startswith("⬜") for t, _ in btns(call.message.markup)))
+    check("file_id картинки запомнен", runtime.get("img:glory_help") == "FILE_GUIDE")
+
+    call = Call("gl:next")
+    await gh.cb_regions(call, guide_state)
+    check("без галочки дальше не пускает", call.alerts and "галочку" in call.alerts[0],
+          str(call.alerts))
+    call = Call("gl:r:bd")
+    await gh.cb_region(call, guide_state)
+    check("и в обход, сразу к региону, тоже", call.alerts and "галочку" in call.alerts[0])
+
+    call = Call("gl:agree")
+    await gh.cb_agree(call, guide_state)
+    check("галочка ставится", any(t.startswith("✅") for t, _ in btns(call.message.markup)))
+
+    call = Call("gl:next")
+    await gh.cb_regions(call, guide_state)
+    check("с галочкой — регионы с ценой",
+          any(f"{price / 100:.2f}" in t for t, _ in btns(call.message.markup)),
           str(btns(call.message.markup))[:200])
 
     bot = Bot()
@@ -175,6 +220,8 @@ async def run(conn) -> None:
           order.status == db.ORDER_DELIVERED and order.fragment_order_id == "gl-1"
           and order.product_type == "glory", f"{order.status} {order.fragment_order_id}")
     check("в названии заказа клан", "3012345678" in order.title, order.title)
+    check("галочка «за настройки отвечаю сам» сохранена в запуске",
+          bool((await db.get_glory_run(conn, order.id))["agreed_at"]))
     check("есть кнопка «Қатъ кардан»",
           any(c.startswith("gl:s:") for _, c in btns(call.message.markup)))
 

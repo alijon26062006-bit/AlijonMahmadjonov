@@ -32,13 +32,18 @@ def image(*keys: str | None) -> str:
     return ""
 
 
-async def show(target, text: str, markup=None, keys: tuple = (), effect: dict | None = None):
+async def show(target, text: str, markup=None, keys: tuple = (), effect: dict | None = None,
+               photo=None):
     """Показать экран: с картинкой, если она задана, иначе текстом.
 
     target — сообщение (команда /start) или нажатие кнопки.
+    photo — своя картинка вместо места из панели (file_id или файл).
     """
     effect = effect or {}
-    photo = image(*keys) if len(text) <= CAPTION_MAX else ""
+    if photo is None:
+        photo = image(*keys)
+    if len(text) > CAPTION_MAX:
+        photo = ""
     message = getattr(target, "message", None)       # нажатие кнопки
 
     if message is None:                              # пришло сообщение
