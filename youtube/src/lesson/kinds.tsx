@@ -172,6 +172,9 @@ const CodeBig: React.FC<{text: string}> = ({text}) => (
 
 // ================================================================ код в VS Code: печать, запуск, вывод
 const CMD = 'PS C:\\Users\\User\\Desktop\\python_course> python main.py';
+// «пользователь» начинает печатать ответ через IN_DELAY с, по букве каждые IN_DT с (те же числа в lesson_build.py)
+const IN_DELAY = 0.8;
+const IN_DT = 0.12;
 
 export const CodeKind: React.FC<P> = ({d}) => {
   const sec = useSec();
@@ -205,22 +208,37 @@ export const CodeKind: React.FC<P> = ({d}) => {
       {shown.map((txt, i) => (txt === null ? null : <CodeLine key={i} n={i + 1} text={txt + (i === typingLine && blink ? '|' : '')} />))}
     </div>
   );
-  // вывод в терминале
-  const rows: {text: string; kind: 'cmd' | 'out' | 'err'}[] = [];
+  // вывод в терминале; строка ввода ['o1', 'Вопрос? |ответ', 'run', 'in'] — ответ «печатает пользователь»
+  const rows: {text: string; kind: 'cmd' | 'out' | 'err' | 'in'; answer?: string; caret?: boolean}[] = [];
   runs.forEach((rk) => {
     if (sec < ev(d, rk)) return;
     rows.push({text: CMD, kind: 'cmd'});
     (p.out || []).forEach((o: string[]) => {
       const grp = o[2] || 'run';
-      if (grp === rk && has(d, o[0]) && sec >= ev(d, o[0])) rows.push({text: o[1], kind: o[3] === 'err' ? 'err' : 'out'});
+      if (grp !== rk || !has(d, o[0]) || sec < ev(d, o[0])) return;
+      if (o[3] === 'in') {
+        const [prompt, answer = ''] = o[1].split('|');
+        const t0 = ev(d, o[0]) + IN_DELAY;
+        const n = Math.max(0, Math.min(answer.length, Math.floor((sec - t0) / IN_DT) + 1));
+        const entered = sec >= t0 + answer.length * IN_DT + 0.25;
+        rows.push({text: prompt, kind: 'in', answer: answer.slice(0, n), caret: !entered && Math.floor(sec * 2.5) % 2 === 0});
+      } else {
+        rows.push({text: o[1], kind: o[3] === 'err' ? 'err' : 'out'});
+      }
     });
   });
   const maxRows = Math.floor((panelHeight - 60) / 35);
   const panel = (
     <>
       {rows.slice(-maxRows).map((row, i) => (
-        <div key={i} style={{color: row.kind === 'cmd' ? '#8E98AA' : row.kind === 'err' ? '#FF8A8A' : '#fff', fontSize: row.kind === 'out' ? 24 : row.kind === 'err' ? 21 : 19, fontWeight: row.kind === 'cmd' ? 400 : 700, whiteSpace: 'pre', minHeight: 35}}>
+        <div key={i} style={{color: row.kind === 'cmd' ? '#8E98AA' : row.kind === 'err' ? '#FF8A8A' : '#fff', fontSize: row.kind === 'out' || row.kind === 'in' ? 24 : row.kind === 'err' ? 21 : 19, fontWeight: row.kind === 'cmd' ? 400 : 700, whiteSpace: 'pre', minHeight: 35}}>
           {row.text}
+          {row.kind === 'in' ? (
+            <>
+              <span style={{color: '#4EC9B0'}}>{row.answer}</span>
+              <span style={{opacity: row.caret ? 1 : 0}}>▌</span>
+            </>
+          ) : null}
         </div>
       ))}
     </>

@@ -76,6 +76,7 @@ def sfx_for(name):
 
 
 MAX_CPS = 22  # быстрее печатать уже неестественно
+IN_DELAY, IN_DT = 0.8, 0.12  # ответ пользователя в терминале (те же числа в kinds.tsx)
 
 
 def fix_timeline(ev, typing, out):
@@ -109,6 +110,17 @@ def fix_timeline(ev, typing, out):
         mine = sorted((k for k, g in group_of.items() if g == rk and k in ev), key=lambda k: ev[k])
         for j, k in enumerate(mine):
             ev[k] = round(max(ev[k], need + 0.3 + 0.12 * j), 3)
+    # программа ждёт ввода: вывод после строки ввода появляется, только когда ответ напечатан
+    ready = {}
+    for o in out:
+        k, grp = o[0], group_of[o[0]]
+        if k not in ev:
+            continue
+        if grp in ready:
+            ev[k] = round(max(ev[k], ready[grp]), 3)
+        if len(o) > 3 and o[3] == "in":
+            answer = o[1].split("|", 1)[1] if "|" in o[1] else ""
+            ready[grp] = ev[k] + IN_DELAY + len(answer) * IN_DT + 0.45
 
 
 def load_wav(path):
@@ -197,7 +209,14 @@ def main():
                 typing.append([name, et, e[3], e[4]])
             else:
                 ev[name] = et
-        fix_timeline(ev, typing, sc.get("params", {}).get("out", []))
+        out = sc.get("params", {}).get("out", [])
+        fix_timeline(ev, typing, out)
+        for o in out:  # стук клавиш, пока «пользователь» печатает ответ
+            if len(o) > 3 and o[3] == "in" and o[0] in ev and "|" in o[1]:
+                answer = o[1].split("|", 1)[1]
+                t0 = ev[o[0]] + IN_DELAY
+                sfx += [(start + t0 + j * IN_DT, "space" if ch == " " else "key", 0.5) for j, ch in enumerate(answer)]
+                sfx.append((start + t0 + len(answer) * IN_DT + 0.2, "enter", 0.6))
         last = 0.0
         for name, et, text, cps in typing:
             times = [round(et + (k + 1) / cps, 3) for k in range(len(text))]
