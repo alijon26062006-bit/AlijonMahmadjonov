@@ -125,8 +125,12 @@ def test_pages_and_popular(app, client, config, conn, ffg):
     r = client.post("/panel/glory/buy", data={"csrf": token, "region": "bd", "clan_id": "3012345678"},
                     follow_redirects=False)
     assert r.headers["location"] == "/panel/glory"                           # без галочки «согласен» — нет
+    assert "glory-setup.jpg" in page and "Авто подтверждение" in page and "отвечаю я сам" in page
     r = client.post("/panel/glory/buy", data={"csrf": token, "region": "bd", "clan_id": "3012345678", "agree": "1"},
                     follow_redirects=False)
+    assert r.headers["location"] == "/panel/glory"                           # без «клан настроен» (шаг 1) — нет
+    r = client.post("/panel/glory/buy", data={"csrf": token, "region": "bd", "clan_id": "3012345678", "agree": "1",
+                                              "setup": "1"}, follow_redirects=False)
     loc = r.headers["location"]
     assert loc.startswith("/panel/glory/")
     page = client.get(loc).text

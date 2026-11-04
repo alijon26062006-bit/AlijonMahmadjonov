@@ -12,6 +12,20 @@
 {% if regions %}
 <form class="card gl-form" method="post" action="/panel/glory/buy">
   <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="gl-step"><span class="gl-n">1</span><h3>Сначала настройте клан в игре</h3></div>
+  <p class="muted small" style="margin:0 0 10px">В игре: Клан → Настройки клана → <b>Метод подтверждения</b>. Сделайте точно как на картинке (обведено зелёным):</p>
+  <img class="gl-shot" src="{{ static_url('/static/img/glory-setup.jpg') }}" width="1280" height="576" loading="lazy"
+       alt="Настройки клана: Метод подтверждения — авто подтверждение «Вкл.», Ур., КБ-рейтинг и БО-рейтинг — «По умолчанию»">
+  <ul class="gl-how">
+    <li><b>Авто подтверждение — «Вкл.»</b> Тогда боты вступают в клан сами, без вашего одобрения.</li>
+    <li><b>Ур., КБ-рейтинг, БО-рейтинг — «По умолчанию».</b> Если поставить ограничение по уровню или рейтингу, боты не смогут вступить.</li>
+    <li>В клане должны быть <b>свободные места</b>.</li>
+    <li>Не меняйте эти настройки, пока Glory работает.</li>
+  </ul>
+  <label class="gl-agree gl-agree-setup"><input type="checkbox" name="setup" value="1" required>
+    <span>Я настроил клан точно так. Если настройки неверные и очки не пошли, <b>отвечаю я сам</b> — Donatix за это не отвечает, деньги за такой запуск не возвращаются.</span></label>
+
+  <div class="gl-step" style="margin-top:20px"><span class="gl-n">2</span><h3>Клан и регион</h3></div>
   <label for="gl-clan">ID клана</label>
   <input id="gl-clan" name="clan_id" inputmode="numeric" pattern="[0-9]{5,15}" required placeholder="Например, 3012345678" autocomplete="off">
   <p class="id-only">{{ icon('shield', 16) }}<span>Неофициальный сервис. Вводите только ID клана, никогда не вводите пароль от игрового аккаунта.</span></p>
@@ -70,5 +84,12 @@
   .gl-warn ul { margin: 6px 0 0; padding-left: 18px; } .gl-warn li { margin: 3px 0; }
   .gl-agree { display: flex !important; gap: 8px; align-items: center; font-weight: 400 !important; margin: 4px 0 12px !important; }
   .gl-item { display: flex; align-items: center; gap: 10px; }
+  .gl-step { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+  .gl-step h3 { margin: 0; font-size: 1.05rem; }
+  .gl-n { flex: none; width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; font-size: .9rem; }
+  .gl-shot { display: block; width: 100%; height: auto; border-radius: 14px; }
+  .gl-how { margin: 10px 0 8px; padding-left: 18px; font-size: .9rem; } .gl-how li { margin: 4px 0; }
+  .gl-agree-setup { align-items: flex-start !important; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); }
+  .gl-agree-setup input { margin-top: 2px !important; }
 </style>
 {% endblock %}

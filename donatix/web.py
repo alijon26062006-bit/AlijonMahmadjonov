@@ -2387,10 +2387,14 @@ def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_con
 
 @router.post("/panel/glory/buy", dependencies=[Depends(check_csrf)])
 def panel_glory_buy(request: Request, region: str = Form(""), clan_id: str = Form(""), agree: str = Form(""),
-                    user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+                    setup: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
     from . import glory
     if not glory.selling(config):
         return _redirect("/panel")
+    if not setup:
+        flash(request, "Сначала настройте клан (шаг 1) и отметьте, что настройки верные.", "error")
+        return _redirect("/panel/glory")
     if not agree:
         flash(request, "Отметьте, что вы прочитали условия.", "error")
         return _redirect("/panel/glory")
