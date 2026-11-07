@@ -27,6 +27,7 @@ def _tg_off() -> bool:
 
 
 templates.env.globals["tg_off"] = _tg_off
+templates.env.globals["this_year"] = lambda: __import__("datetime").date.today().year  # для «© 2025–год»
 
 _static_v: dict[str, str] = {}
 
