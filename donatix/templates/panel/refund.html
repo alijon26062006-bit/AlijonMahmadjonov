@@ -2,46 +2,144 @@
 {% from "_icons.html" import icon %}
 {% block title %}Номер для возврата — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Номер для возврата денег</h1>
-  <p>Рақам барои баргардонидани пул{% if first %} · Один раз, это займёт минуту{% endif %}</p></section>
+<style>
+.rf { max-width: 560px; margin: 18px auto 32px; }
+.rf-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-2); overflow: hidden; }
+.rf-top { position: relative; padding: 28px 24px 22px; text-align: center;
+  background: radial-gradient(120% 90% at 50% 0%, var(--accent-soft) 0%, transparent 70%); }
+.rf-badge { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; display: grid; place-items: center;
+  color: #fff; background: linear-gradient(145deg, #6d63ff, var(--accent) 55%, #3b32c9);
+  box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--accent) 80%, transparent), inset 0 1px 0 rgb(255 255 255 / .25); }
+.rf-top h1 { margin: 0; font-size: 1.45rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
+.rf-top p { margin: 8px auto 0; max-width: 400px; color: var(--muted); font-size: .95rem; line-height: 1.5; }
+.rf-lang { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-top: 18px;
+  border-radius: 999px; background: var(--surface-2); }
+.rf-lang button { border: 0; background: none; font: inherit; font-size: .88rem; font-weight: 600; color: var(--muted);
+  padding: 8px 18px; min-height: 36px; border-radius: 999px; cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease); }
+.rf-lang button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.rf-body { padding: 4px 24px 24px; }
+.rf-points { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 10px; }
+.rf-points li { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; padding: 12px 14px;
+  border-radius: var(--r); background: var(--surface-2); font-size: .93rem; line-height: 1.45; }
+.rf-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--surface);
+  color: var(--accent); box-shadow: var(--shadow-1); }
+.rf-points li:nth-child(3) .rf-ico { color: var(--bad); }
+.rf-more { margin: 4px 0 0; }
+.rf-more summary { cursor: pointer; color: var(--accent); font-size: .88rem; font-weight: 600; padding: 8px 2px;
+  list-style: none; display: inline-flex; gap: 6px; align-items: center; }
+.rf-more summary::-webkit-details-marker { display: none; }
+.rf-more p { margin: 6px 0 0; color: var(--muted); font-size: .9rem; line-height: 1.55; }
+.rf-sep { height: 1px; background: var(--line); margin: 20px 0; }
+.rf-step { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-weight: 700; font-size: 1rem; }
+.rf-step b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem;
+  background: var(--accent-soft); color: var(--accent); flex: none; }
+.rf-banks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 18px; }
+@media (min-width: 560px) { .rf-banks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rf-bank { position: relative; min-width: 0; display: block; margin: 0 !important; padding: 0; font-weight: inherit; }
+.rf-bank input { position: absolute; opacity: 0; pointer-events: none; }
+.rf-bank span { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 10px; border-radius: var(--r-sm);
+  background: var(--field); border: 1.5px solid var(--line); font-size: .86rem; font-weight: 600; line-height: 1.25; min-width: 0; overflow-wrap: break-word;
+  cursor: pointer; transition: border-color .15s var(--ease), background .15s var(--ease), transform .15s var(--ease); }
+.rf-bank span i { width: 26px; height: 26px; flex: none; border-radius: 9px; display: grid; place-items: center; font-style: normal;
+  font-size: .78rem; font-weight: 700; color: #fff; background: var(--bh, var(--accent)); }
+.rf-bank span:hover { border-color: var(--line-strong); }
+.rf-bank span:active { transform: scale(.98); }
+.rf-bank input:checked + span { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.rf-bank input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rf-other { margin: -8px 0 18px; }
+.rf-phone { display: flex; align-items: stretch; border-radius: var(--r-sm); background: var(--field); border: 1.5px solid var(--line);
+  overflow: hidden; transition: border-color .15s var(--ease), box-shadow .15s var(--ease); }
+.rf-phone:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.rf-phone span { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 14px; font-weight: 700; color: var(--text);
+  border-right: 1.5px solid var(--line); background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.rf-phone input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important;
+  font-size: 1.1rem; font-weight: 600; letter-spacing: .04em; padding: 14px; min-height: 54px; font-variant-numeric: tabular-nums; outline: 0; }
+.rf-hint { margin: 8px 2px 0; color: var(--muted); font-size: .84rem; line-height: 1.45; }
+.rf-save { margin-top: 22px; width: 100%; min-height: 54px; font-size: 1.02rem; border-radius: var(--r); }
+.rf-safe { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 14px 0 0; color: var(--muted); font-size: .82rem; }
+.rf-now { display: flex; gap: 10px; align-items: center; margin: 0 0 18px; padding: 12px 14px; border-radius: var(--r);
+  background: var(--ok-soft); color: var(--ok); font-size: .9rem; font-weight: 600; }
+[data-l] { display: none; }
+.rf[data-lang="tj"] [data-l="tj"], .rf[data-lang="ru"] [data-l="ru"] { display: revert; }
+</style>
 
-<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;max-width:900px;margin-bottom:14px">
-  <div class="card rf-why" lang="tg"><h3 style="margin-top:0">Тоҷикӣ</h3>
-    {% for p in explain_tj.split('\n\n') %}<p>{% if loop.index == 3 %}{{ icon('shield', 18) }} {% endif %}{{ p }}</p>{% endfor %}</div>
-  <div class="card rf-why" lang="ru"><h3 style="margin-top:0">Русский</h3>
-    {% for p in explain.split('\n\n') %}<p>{% if loop.index == 3 %}{{ icon('shield', 18) }} {% endif %}{{ p }}</p>{% endfor %}</div>
-</div>
+<div class="rf" data-lang="tj" id="rf">
+  <div class="rf-card">
+    <div class="rf-top">
+      <div class="rf-badge">{{ icon('shield', 32) }}</div>
+      <h1><span data-l="tj">Рақам барои баргардонидани пул</span><span data-l="ru">Номер для возврата денег</span></h1>
+      <p><span data-l="tj">Як маротиба — як дақиқа. Барои он ки пули шумо ҳеҷ гоҳ гум нашавад.</span><span data-l="ru">Один раз — одна минута. Чтобы ваши деньги никогда не пропали.</span></p>
+      <div class="rf-lang" role="group" aria-label="Язык">
+        <button type="button" data-set="tj" aria-pressed="true">Тоҷикӣ</button>
+        <button type="button" data-set="ru" aria-pressed="false">Русский</button>
+      </div>
+    </div>
 
-<form class="card" method="post" action="/panel/refund" style="max-width:620px" autocomplete="off">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
-  {% if row %}<p class="rf-now">Сейчас указано / Ҳоло: <b>{{ row.bank }}</b> · {{ masked }}</p>{% endif %}
+    <div class="rf-body">
+      <ul class="rf-points">
+        {% for ic, tj, ru in points %}
+        <li><span class="rf-ico">{{ icon(ic, 20) }}</span><span><span data-l="tj">{{ tj }}</span><span data-l="ru">{{ ru }}</span></span></li>
+        {% endfor %}
+      </ul>
+      <details class="rf-more">
+        <summary>{{ icon('help', 16) }}<span data-l="tj">Муфассал</span><span data-l="ru">Подробнее</span></summary>
+        <div data-l="tj">{% for p in explain_tj.split('\n\n') %}<p>{{ p }}</p>{% endfor %}</div>
+        <div data-l="ru">{% for p in explain.split('\n\n') %}<p>{{ p }}</p>{% endfor %}</div>
+      </details>
 
-  <label for="rf-bank">Банк / Бонк</label>
-  <select id="rf-bank" name="bank" required>
-    <option value="">— выберите банк / бонкро интихоб кунед —</option>
-    {% set known = form.get('bank') in banks %}
-    {% for b in banks %}<option value="{{ b }}" {{ 'selected' if form.get('bank') == b or (b == 'Другой банк' and form.get('bank') and not known) }}>{{ b }}</option>{% endfor %}
-  </select>
-  <div id="rf-other" {{ 'hidden' if known or not form.get('bank') }}>
-    <label for="rf-bank-other">Название банка / Номи бонк</label>
-    <input id="rf-bank-other" name="bank_other" maxlength="60" value="{{ '' if known else form.get('bank', '') }}">
+      <div class="rf-sep"></div>
+
+      <form method="post" action="/panel/refund" autocomplete="off" novalidate>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
+        {% if row %}<div class="rf-now">{{ icon('check', 18) }}<span><span data-l="tj">Ҳоло:</span><span data-l="ru">Сейчас:</span> {{ row.bank }} · {{ masked }}</span></div>{% endif %}
+
+        <div class="rf-step"><b>1</b><span data-l="tj">Бонки худро интихоб кунед</span><span data-l="ru">Выберите ваш банк</span></div>
+        {% set known = form.get('bank') in banks %}
+        <div class="rf-banks" role="radiogroup">
+          {% for b in banks %}
+          {% set on = form.get('bank') == b or (b == 'Другой банк' and form.get('bank') and not known) %}
+          <label class="rf-bank"><input type="radio" name="bank" value="{{ b }}" {{ 'checked' if on }} required>
+            <span style="--bh: {{ bank_colors[loop.index0 % bank_colors|length] }}"><i>{{ '+' if b == 'Другой банк' else b[:1] }}</i>{{ 'Другой / Дигар' if b == 'Другой банк' else b }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="rf-other" id="rf-other" {{ 'hidden' if known or not form.get('bank') }}>
+          <input name="bank_other" maxlength="60" placeholder="Номи бонк · Название банка" value="{{ '' if known else form.get('bank', '') }}">
+        </div>
+
+        <div class="rf-step"><b>2</b><span data-l="tj">Рақами телефон</span><span data-l="ru">Номер телефона</span></div>
+        <label class="rf-phone" for="rf-number"><span>🇹🇯 +992</span>
+          <input id="rf-number" name="number" type="tel" inputmode="numeric" maxlength="12" required placeholder="90 123 45 67"
+                 value="{{ form.get('number', '') | replace('+992', '') }}" aria-label="Номер телефона"></label>
+        <p class="rf-hint"><span data-l="tj">Рақаме, ки ҳамёни ҳамин бонк ба он пайваст аст.</span><span data-l="ru">Номер, к которому привязан кошелёк этого банка.</span></p>
+
+        <button class="btn primary lg rf-save"><span data-l="tj">Нигоҳ доштан</span><span data-l="ru">Сохранить</span></button>
+        <p class="rf-safe">{{ icon('shield', 14) }}<span data-l="tj">Рақамро танҳо маъмур мебинад · иваз кардан мумкин</span><span data-l="ru">Номер видит только администратор · можно изменить</span></p>
+      </form>
+    </div>
   </div>
-
-  <label for="rf-number">Номер телефона / Рақами телефон</label>
-  <input id="rf-number" name="number" type="tel" inputmode="tel" required maxlength="20" placeholder="+992 90 123 45 67"
-         value="{{ form.get('number', '') }}">
-  <p class="hint">Номер, к которому привязан кошелёк в этом банке. · Рақаме, ки ҳамёни ин бонк ба он пайваст аст.</p>
-
-  <label style="font-weight:400;margin-top:14px"><input type="checkbox" name="agree" value="1" required style="width:auto;min-height:0">
-    Это мой номер, указан правильно · Ин рақами ман аст, дуруст навиштам</label>
-  <button class="btn primary lg block" style="margin-top:18px">Сохранить / Нигоҳ доштан</button>
-  <p class="hint center">Вопросы — <a href="/panel/support">в поддержку</a> · Савол — <a href="/panel/support">ба дастгирӣ</a></p>
-</form>
+</div>
 <script>
 (function () {
-  var bank = document.getElementById("rf-bank"), other = document.getElementById("rf-other");
-  bank.addEventListener("change", function () { other.hidden = bank.value !== "Другой банк"; });
+  var rf = document.getElementById("rf"), other = document.getElementById("rf-other");
+  var saved = null;
+  try { saved = localStorage.getItem("dx_rf_lang"); } catch (e) {}
+  function setLang(l) {
+    rf.dataset.lang = l;
+    rf.querySelectorAll(".rf-lang button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.set === l ? "true" : "false"); });
+    try { localStorage.setItem("dx_rf_lang", l); } catch (e) {}
+  }
+  if (saved === "ru" || saved === "tj") setLang(saved);
+  rf.querySelectorAll(".rf-lang button").forEach(function (b) { b.addEventListener("click", function () { setLang(b.dataset.set); }); });
+  rf.querySelectorAll('input[name="bank"]').forEach(function (r) {
+    r.addEventListener("change", function () { other.hidden = r.value !== "Другой банк" || !r.checked; });
+  });
+  var num = document.getElementById("rf-number");
+  num.addEventListener("input", function () {   // 90 123 45 67
+    var d = num.value.replace(/\D/g, "").replace(/^992/, "").slice(0, 9), out = "";
+    [2, 3, 2, 2].reduce(function (i, n) { if (d.length > i) out += (out ? " " : "") + d.slice(i, i + n); return i + n; }, 0);
+    num.value = out;
+  });
 })();
 </script>
 {% endblock %}

@@ -443,7 +443,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             from .popular import services as popular_services, with_extras
             ctx["popular"] = with_extras(popular_services(c), config)
             from .reviews import ask_for
-            ctx["review_ask"] = ask_for(c, ctx["user"])   # окно «Оцените заказ» после выполнения
+            # окно «Оцените заказ» после выполнения — не поверх обязательной формы номера для возврата
+            ctx["review_ask"] = None if request.url.path == "/panel/refund" else ask_for(c, ctx["user"])
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
             ctx["low_balance_micro"] = int(float(low) * 10_000)
             if ctx["cur_code"] == "TJS":

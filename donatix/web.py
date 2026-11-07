@@ -1877,6 +1877,9 @@ def _refund_page(request: Request, conn, config: Config, user, form: dict, error
         "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "form": form,
         "explain": refunds.EXPLAIN_RU.format(site=config.site_name),
         "explain_tj": refunds.EXPLAIN_TJ.format(site=config.site_name),
+        "points": [(ic, tj.format(site=config.site_name), ru.format(site=config.site_name))
+                   for ic, tj, ru in refunds.POINTS],
+        "bank_colors": ("#16a34a", "#2563eb", "#0f766e", "#b45309", "#7c3aed", "#db2777", "#0891b2", "#4f46e5"),
         "error": error, "first": row is None and refunds.required(conn)}, status_code=status)
 
 
@@ -1895,8 +1898,7 @@ def panel_refund_save(request: Request, bank: str = Form(""), bank_other: str = 
                       config: Config = Depends(get_config)):
     from . import refunds
     bank = bank_other.strip() if bank == "Другой банк" and bank_other.strip() else bank
-    error = "" if agree else "Отметьте, что номер ваш и указан правильно. · Қайд кунед, ки рақам аз они шумост."
-    error = error or refunds.save(conn, config.secret_key, user["id"], bank=bank, number=number, source="site")
+    error = refunds.save(conn, config.secret_key, user["id"], bank=bank, number=number, source="site")
     if error:
         return _refund_page(request, conn, config, user, {"bank": bank, "number": number}, error, 400)
     flash(request, "Готово: номер для возврата сохранён. · Тайёр: рақам нигоҳ дошта шуд.")
