@@ -27,6 +27,7 @@ def _tg_off() -> bool:
 
 
 templates.env.globals["tg_off"] = _tg_off
+
 templates.env.globals["this_year"] = lambda: __import__("datetime").date.today().year  # для «© 2025–год»
 
 _static_v: dict[str, str] = {}
@@ -278,6 +279,10 @@ class TelegramRequired(Exception):
     """Клиент вошёл, но ещё не привязал Telegram с номером — сначала привязка."""
 
 
+class RefundRequired(Exception):
+    """Клиент ещё не указал карту для возврата остатка — сначала её."""
+
+
 class Forbidden(Exception):
     pass
 
@@ -400,6 +405,15 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         _c = _pool.acquire()
         try:
             ctx["tg_login"] = db.get_setting(_c, "shop.bot_username") or ""
+        finally:
+            _pool.release(_c)
+    ctx["refund_on"] = False
+    if request.url.path.startswith("/panel"):   # пункт «Карта для возврата» — только когда админ включил сбор
+        from . import refunds
+        _pool = db.pool(config.db_path)
+        _c = _pool.acquire()
+        try:
+            ctx["refund_on"] = refunds.required(_c)
         finally:
             _pool.release(_c)
     ctx["canonical"] = config.base_url + request.url.path

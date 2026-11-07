@@ -953,6 +953,8 @@ class ShopBot:
             if not data.startswith(("l:", "lang")) and not self.subscribed(conn, tg_id):
                 self.screen_subscribe(conn, su, msg.get("message_id"))
                 return
+            if self.refund_gate(conn, su, data=data, mid=msg.get("message_id")):
+                return
             self.on_button(conn, su, data, msg.get("message_id"))
             return
         msg = upd.get("message") or {}
@@ -983,6 +985,8 @@ class ShopBot:
         need_lang = text.startswith(("/start", "/lang")) and not su["lang"] or text.startswith("/lang")
         if not need_lang and not self.subscribed(conn, tg_id):
             self.screen_subscribe(conn, su)
+            return
+        if not (msg.get("photo") or msg.get("document")) and self.refund_gate(conn, su, text=text):
             return
         if text.startswith("/"):
             self.on_command(conn, su, text, start)
@@ -1092,6 +1096,113 @@ class ShopBot:
     # экраны
     def _user(self, conn: sqlite3.Connection, su: sqlite3.Row) -> sqlite3.Row:
         return accounts.get_user(conn, su["user_id"])
+
+    # ── Карта для возврата остатка (если проект закроется) — обязательна один раз ──
+
+    def refund_gate(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str | None = None,
+                    text: str | None = None, mid: int | None = None) -> bool:
+        """True — сообщение или кнопку разобрали здесь (заполнение карты), дальше не идём."""
+        from . import refunds
+        tg_id = su["tg_id"]
+        st = self.state.get(tg_id) or {}
+        if data is not None and data.startswith("rf:"):
+            self.on_refund_button(conn, su, data, mid)
+            return True
+        if data is not None and str(st.get("step", "")).startswith("rf_"):
+            self.state.pop(tg_id, None)   # ушёл из заполнения другой кнопкой
+        if text is not None and text.split(maxsplit=1)[:1] in (["/card"], ["/karta"]):
+            self.screen_refund(conn, su)
+            return True
+        if text is not None and str(st.get("step", "")).startswith("rf_") and not text.startswith("/"):
+            self.on_refund_text(conn, su, text)
+            return True
+        if self.is_admin(tg_id) or not refunds.needed(conn, self._user(conn, su)):
+            return False
+        self.screen_refund(conn, su, edit=mid)
+        return True
+
+    def screen_refund(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        from . import refunds
+        tg_id = su["tg_id"]
+        self.state[tg_id] = {"step": "rf_bank_pick"}
+        row = refunds.get(conn, su["user_id"])
+        site = self.config.site_name
+        now = f"\n\nСейчас указано: <b>{_e(row['bank'])}</b> · {_e(refunds.masked(row))}" if row else ""
+        text = ("🛡 <b>Карта для возврата денег</b>\n\n"
+                + _e(refunds.EXPLAIN_RU.format(site=site)) + "\n\n<i>" + _e(refunds.EXPLAIN_TJ.format(site=site))
+                + "</i>" + now + "\n\n<b>Шаг 1 из 3.</b> Выберите ваш банк 👇")
+        banks = [(b, f"rf:b:{i}") for i, b in enumerate(refunds.BANKS)]
+        rows = [banks[i:i + 2] for i in range(0, len(banks), 2)]
+        if row:
+            rows.append([("‹ Оставить как есть", "h")])
+        self.show(tg_id, text, rows, edit=edit)
+
+    def on_refund_button(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str, mid: int | None) -> None:
+        from . import refunds
+        tg_id = su["tg_id"]
+        st = self.state.get(tg_id) or {}
+        parts = data.split(":")
+        if parts[1] == "b" and len(parts) == 3 and parts[2].isdigit() and int(parts[2]) < len(refunds.BANKS):
+            bank = refunds.BANKS[int(parts[2])]
+            if bank == "Другой банк":
+                self.state[tg_id] = {"step": "rf_bank"}
+                self.show(tg_id, "Напишите название вашего банка.", [[("‹ Назад", "rf:start")]], edit=mid)
+                return
+            self.state[tg_id] = {"step": "rf_kind", "bank": bank}
+            self.screen_refund_kind(tg_id, bank, mid)
+        elif parts[1] == "k" and len(parts) == 3 and parts[2] in refunds.KINDS and st.get("bank"):
+            self.state[tg_id] = {"step": "rf_num", "bank": st["bank"], "kind": parts[2]}
+            ask = ("Напишите <b>номер карты</b> — 16 цифр с лицевой стороны.\nТолько номер: срок действия и CVV "
+                   "не нужны." if parts[2] == "card" else
+                   "Напишите <b>номер телефона</b>, к которому привязан кошелёк в банке, например 90 123 45 67.")
+            self.show(tg_id, f"<b>Шаг 3 из 3.</b> Банк: {_e(st['bank'])}\n\n{ask}", [[("‹ Назад", "rf:start")]],
+                      edit=mid)
+        else:
+            self.screen_refund(conn, su, edit=mid)
+
+    def screen_refund_kind(self, tg_id: int, bank: str, mid: int | None = None) -> None:
+        from . import refunds
+        self.show(tg_id, f"<b>Шаг 2 из 3.</b> Банк: {_e(bank)}\n\nЧто укажете?",
+                  [[(title, f"rf:k:{k}")] for k, title in refunds.KINDS.items()] + [[("‹ Назад", "rf:start")]],
+                  edit=mid)
+
+    def on_refund_text(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str) -> None:
+        from . import refunds
+        tg_id = su["tg_id"]
+        st = self.state.get(tg_id) or {}
+        step = st.get("step")
+        back = [[("‹ Назад", "rf:start")]]
+        if step == "rf_bank":
+            bank, err = refunds.clean_bank(text)
+            if bank is None:
+                self.show(tg_id, err, back)
+                return
+            self.state[tg_id] = {"step": "rf_kind", "bank": bank}
+            self.screen_refund_kind(tg_id, bank)
+        elif step == "rf_num":
+            num, err = refunds.clean_number(st["kind"], text)
+            if num is None:
+                self.show(tg_id, "⚠️ " + err + "\nНапишите ещё раз.", back)
+                return
+            self.state[tg_id] = {**st, "step": "rf_name", "number": num}
+            self.show(tg_id, "Последнее: <b>имя владельца</b> — как на карте или в банке, например «Алиев Алишер».",
+                      back)
+        elif step == "rf_name":
+            name, err = refunds.clean_holder(text)
+            if name is None:
+                self.show(tg_id, "⚠️ " + err, back)
+                return
+            err = refunds.save(conn, self.config.secret_key, su["user_id"], bank=st["bank"], kind=st["kind"],
+                               number=st["number"], holder=name, source="bot")
+            if err:
+                self.show(tg_id, "⚠️ " + err, back)
+                return
+            self.state.pop(tg_id, None)
+            row = refunds.get(conn, su["user_id"])
+            self.show(tg_id, f"✅ <b>Сохранено.</b>\n\n{_e(row['bank'])} · {_e(refunds.masked(row))} · {_e(name)}\n\n"
+                             "Изменить можно в любой момент командой /card.", [[(tr(su["lang"], "home"), "h")]])
+        else:
+            self.screen_refund(conn, su)
 
     # ── Обязательная подписка на канал (спонсоры) ──
 

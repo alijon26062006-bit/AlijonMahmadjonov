@@ -19,7 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import accounts, admin, api, db, web
 from .config import ROOT, Config
-from .deps import Forbidden, LoginRequired, TelegramRequired, render, session_user
+from .deps import Forbidden, LoginRequired, RefundRequired, TelegramRequired, render, session_user
 from .ratelimit import RateLimiter
 from .suppliers import Supplier, make_supplier
 from .worker import Worker
@@ -388,6 +388,10 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     @app.exception_handler(TelegramRequired)
     async def _tg_required(request: Request, exc: TelegramRequired):
         return RedirectResponse("/panel/telegram", status_code=303)
+
+    @app.exception_handler(RefundRequired)
+    async def _refund_required(request: Request, exc: RefundRequired):
+        return RedirectResponse("/panel/refund", status_code=303)
 
     @app.exception_handler(Forbidden)
     async def _forbidden(request: Request, exc: Forbidden):

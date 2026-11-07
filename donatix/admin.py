@@ -8,7 +8,7 @@ import logging
 import re
 import sqlite3
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 
 from . import accounts, cache, catalog, db, orders, payments, shopbot, worker
@@ -785,6 +785,41 @@ def smartpay_report(request: Request, q: str = "", period: str = "30", admin=Dep
              "cancelled": sum(1 for r in rows if r["status"] == "cancelled")}
     return render(request, "admin/smartpay.html", {"user": admin, "rows": rows, "total": total, "q": q,
                                                    "period": period})
+
+
+@router.get("/refunds")
+def refunds_page(request: Request, only: str = "", fmt_: str = Query("", alias="format"), admin=Depends(admin_user),
+                 conn=Depends(get_conn)):
+    """Куда вернуть остаток каждому клиенту, если проект закроется: банк, полный номер, имя, сумма."""
+    from . import refunds
+    config = request.app.state.config
+    rows = refunds.report(conn, config.secret_key, only_balance=bool(only))
+    if fmt_ == "csv":
+        import csv
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "логин", "email", "баланс USD", "банк", "тип", "номер", "владелец", "обновлено"])
+        for r in rows:
+            w.writerow([r["id"], r["login"], r["email"], fmt(r["balance_micro"]), r["bank"] or "",
+                        {"card": "карта", "phone": "телефон"}.get(r["kind"] or "", ""), r["number"] or "",
+                        r["holder"] or "", r["updated_at"] or ""])
+        return Response("\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=refunds.csv",
+                                 "Cache-Control": "no-store"})
+    filled = sum(1 for r in rows if r["bank"])
+    total = {"users": len(rows), "filled": filled, "missing": len(rows) - filled,
+             "bal_micro": sum(r["balance_micro"] for r in rows),
+             "bal_missing_micro": sum(r["balance_micro"] for r in rows if not r["bank"] and r["balance_micro"] > 0),
+             "broken": sum(1 for r in rows if r["bank"] and r["number"] is None)}
+    return render(request, "admin/refunds.html", {"user": admin, "rows": rows[:1000], "total": total, "only": only,
+                                                  "required": refunds.required(conn)})
+
+
+@router.post("/refunds/required", dependencies=[Depends(check_csrf)])
+def refunds_required(request: Request, on: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn)):
+    db.set_setting(conn, "refund.required", "1" if on else "0")
+    return RedirectResponse("/admin/refunds", status_code=303)
 
 
 @router.get("/pay-settings")

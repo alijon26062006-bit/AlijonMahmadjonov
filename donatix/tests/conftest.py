@@ -117,6 +117,13 @@ def _not_friday_break(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _refund_off(monkeypatch):
+    """Обязательная карта для возврата закрывает кабинет и бот; старые тесты её не заполняют (см. test_refunds)."""
+    from donatix import refunds
+    monkeypatch.setattr(refunds, "ENFORCE", False)
+
+
+@pytest.fixture(autouse=True)
 def _tg_kinds_on(monkeypatch):
     """В проекте Telegram Stars/Premium выключены (catalog.OFF_KINDS); старые тесты берут их как обычный товар."""
     from donatix import catalog

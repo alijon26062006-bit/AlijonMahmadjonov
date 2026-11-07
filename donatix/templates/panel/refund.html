@@ -1,0 +1,63 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Карта для возврата — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Карта для возврата денег</h1>
+  <p>{% if first %}Один раз укажите, куда вернуть остаток вашего баланса. Это займёт минуту.{% else %}Куда вернуть остаток вашего баланса.{% endif %}</p></section>
+
+<div class="card rf-why" style="max-width:620px">
+  {% for p in explain.split('\n\n') %}<p>{% if loop.index == 2 %}{{ icon('shield', 18) }} {% endif %}{{ p }}</p>{% endfor %}
+</div>
+
+<form class="card" method="post" action="/panel/refund" style="max-width:620px" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
+  {% if row %}<p class="rf-now">Сейчас указано: <b>{{ row.bank }}</b> · {{ masked }} · {{ row.holder }}</p>{% endif %}
+
+  <label for="rf-bank">Банк</label>
+  <select id="rf-bank" name="bank" required>
+    <option value="">— выберите банк —</option>
+    {% set known = form.get('bank') in banks %}
+    {% for b in banks %}<option value="{{ b }}" {{ 'selected' if form.get('bank') == b or (b == 'Другой банк' and form.get('bank') and not known) }}>{{ b }}</option>{% endfor %}
+  </select>
+  <div id="rf-other" {{ 'hidden' if known or not form.get('bank') }}>
+    <label for="rf-bank-other">Название банка</label>
+    <input id="rf-bank-other" name="bank_other" maxlength="60" value="{{ '' if known else form.get('bank', '') }}">
+  </div>
+
+  <label>Что указать</label>
+  <div class="seg rf-kind">
+    {% for k, title in kinds.items() %}
+    <label class="{{ 'on' if form.get('kind') == k }}"><input type="radio" name="kind" value="{{ k }}" {{ 'checked' if form.get('kind') == k }} style="width:auto;min-height:0"> {{ title }}</label>
+    {% endfor %}
+  </div>
+
+  <label for="rf-number" id="rf-number-label">{{ 'Номер карты' if form.get('kind') != 'phone' else 'Номер телефона' }}</label>
+  <input id="rf-number" name="number" inputmode="numeric" required maxlength="23"
+         placeholder="{{ '9762 0000 0000 0000' if form.get('kind') != 'phone' else '+992 90 123 45 67' }}">
+  <p class="hint">Только номер. Срок действия, CVV и коды из SMS не нужны — никогда никому их не сообщайте.</p>
+
+  <label for="rf-holder">Имя владельца</label>
+  <input id="rf-holder" name="holder" required maxlength="80" placeholder="Алиев Алишер" value="{{ form.get('holder', '') }}">
+
+  <label style="font-weight:400;margin-top:14px"><input type="checkbox" name="agree" value="1" required style="width:auto;min-height:0">
+    Это моя карта (или номер), данные указаны правильно</label>
+  <button class="btn primary lg block" style="margin-top:18px">Сохранить</button>
+  <p class="hint center">Вопросы — <a href="/panel/support">в поддержку</a>.</p>
+</form>
+<script>
+(function () {
+  var bank = document.getElementById("rf-bank"), other = document.getElementById("rf-other");
+  var num = document.getElementById("rf-number"), lab = document.getElementById("rf-number-label");
+  bank.addEventListener("change", function () { other.hidden = bank.value !== "Другой банк"; });
+  document.querySelectorAll(".rf-kind input").forEach(function (r) {
+    r.addEventListener("change", function () {
+      document.querySelectorAll(".rf-kind label").forEach(function (l) { l.classList.toggle("on", l.contains(r) && r.checked); });
+      var phone = r.value === "phone";
+      lab.textContent = phone ? "Номер телефона" : "Номер карты";
+      num.placeholder = phone ? "+992 90 123 45 67" : "9762 0000 0000 0000";
+    });
+  });
+})();
+</script>
+{% endblock %}

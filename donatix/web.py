@@ -13,8 +13,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse,
 
 from . import accounts, cache, catalog, db, jumuah, orders, popular, promo, referrals, sitecfg
 from .config import PAY_METHODS, Config
-from .deps import (INDEXABLE, LoginRequired, TelegramRequired, check_csrf, flash, get_config, get_conn, render,
-                   session_user)
+from .deps import (INDEXABLE, LoginRequired, RefundRequired, TelegramRequired, check_csrf, flash, get_config,
+                   get_conn, render, session_user)
 from .money import apply_markup, fmt, order_total_micro, to_decimal
 from .suppliers import KIND_TITLES, KINDS, region_title
 
@@ -35,10 +35,17 @@ def panel_user(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -
     from . import tglogin
     if request.url.path not in TG_FREE and tglogin.required(conn, request.app.state.config, user):
         raise TelegramRequired()
+    if not request.url.path.startswith(REFUND_FREE):
+        from . import refunds
+        if refunds.needed(conn, user):
+            if request.method == "GET":
+                request.session["refund_next"] = _safe_next(request.url.path)
+            raise RefundRequired()
     return user
 
 
 TG_FREE = {"/panel/telegram", "/panel/password"}   # открываются и без привязки Telegram
+REFUND_FREE = ("/panel/refund", "/panel/support", "/panel/password")   # открываются, пока карта не указана
 
 
 class Guest(dict):
@@ -1859,6 +1866,39 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
     else:
         flash(request, "Заявка не найдена или уже проверена — отменить её нельзя.", "error")
     return _redirect("/panel/balance")
+
+
+# ── Карта для возврата остатка (если проект закроется) ──
+
+@router.get("/panel/refund")
+def panel_refund(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import refunds
+    row = refunds.get(conn, user["id"])
+    form = {"bank": row["bank"], "kind": row["kind"], "holder": row["holder"]} if row else {"kind": "card"}
+    return render(request, "panel/refund.html", {
+        "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "kinds": refunds.KINDS,
+        "explain": refunds.EXPLAIN_RU.format(site=config.site_name), "form": form, "error": "",
+        "first": row is None and refunds.required(conn)})
+
+
+@router.post("/panel/refund", dependencies=[Depends(check_csrf)])
+def panel_refund_save(request: Request, bank: str = Form(""), bank_other: str = Form(""), kind: str = Form("card"),
+                      number: str = Form(""), holder: str = Form(""), agree: str = Form(""),
+                      user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import refunds
+    bank = bank_other.strip() if bank == "Другой банк" and bank_other.strip() else bank
+    error = "" if agree else "Отметьте, что номер ваш и указан правильно."
+    error = error or refunds.save(conn, config.secret_key, user["id"], bank=bank, kind=kind, number=number,
+                                  holder=holder, source="site")
+    if error:
+        row = refunds.get(conn, user["id"])
+        return render(request, "panel/refund.html", {
+            "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "kinds": refunds.KINDS,
+            "explain": refunds.EXPLAIN_RU.format(site=config.site_name), "error": error,
+            "form": {"bank": bank, "kind": kind, "holder": holder}, "first": row is None}, status_code=400)
+    flash(request, "Готово: карта для возврата сохранена.")
+    return _redirect(_safe_next(request.session.pop("refund_next", "")) or "/panel")
 
 
 @router.get("/panel/support")

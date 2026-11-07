@@ -1,0 +1,40 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Карты для возврата — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Карты для возврата</h1>
+  <p>Куда вернуть остаток баланса каждому клиенту, если проект закроется. Полные номера видны только здесь — не пересылайте эту страницу и файл.</p></section>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px">
+  <div class="card"><div class="muted small">Указали карту</div><div class="amount" style="font-size:1.5rem">{{ total.filled }} из {{ total.users }}</div></div>
+  <div class="card"><div class="muted small">Остаток у всех клиентов</div><div class="amount" style="font-size:1.5rem">${{ fmt(total.bal_micro) }}</div></div>
+  <div class="card"><div class="muted small">Остаток без карты</div><div class="amount" style="font-size:1.5rem">${{ fmt(total.bal_missing_micro) }}</div></div>
+  {% if total.broken %}<div class="card"><div class="muted small">Не расшифровать (сменили DONATIX_SECRET_KEY)</div><div class="amount" style="font-size:1.5rem">{{ total.broken }}</div></div>{% endif %}
+</div>
+<form method="post" action="/admin/refunds/required" class="card" style="margin-bottom:14px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label style="font-weight:400"><input type="checkbox" name="on" value="1" {{ 'checked' if required }} style="width:auto;min-height:0" onchange="this.form.submit()">
+    Обязательно: без карты клиент не пользуется сайтом и ботом, пока не заполнит</label>
+</form>
+<div class="chips" style="margin-bottom:14px">
+  <a class="chip {{ 'on' if not only }}" href="/admin/refunds">Все клиенты</a>
+  <a class="chip {{ 'on' if only }}" href="/admin/refunds?only=1">Только с остатком</a>
+  <a class="chip" href="/admin/refunds?format=csv{{ '&only=1' if only }}">{{ icon('download', 16) }} Скачать таблицу (CSV)</a>
+</div>
+<div class="list">
+  {% for r in rows %}
+  <div class="card">
+    <div class="head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0"><b><a href="/admin/users/{{ r.id }}">{{ r.login }}</a></b><div class="muted small">{{ r.email }}</div></div>
+      <div class="right"><div class="amount">${{ fmt(r.balance_micro) }}</div></div>
+    </div>
+    <div class="small" style="margin-top:8px;display:grid;gap:2px;overflow-wrap:anywhere">
+      {% if r.bank %}
+      <div>Банк: <b>{{ r.bank }}</b> · {{ 'карта' if r.kind == 'card' else 'телефон' }}</div>
+      <div>Номер: <span class="mono">{{ r.number or ('•••• ' ~ r.last4 ~ ' — не расшифровать') }}</span></div>
+      <div>Владелец: {{ r.holder }} · обновлено {{ r.updated_at | dt }}</div>
+      {% else %}<div class="muted">Карту ещё не указал</div>{% endif %}
+    </div>
+  </div>
+  {% else %}<p class="muted">Клиентов нет.</p>{% endfor %}
+</div>
+{% endblock %}
