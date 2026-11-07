@@ -1870,34 +1870,36 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
 
 # ── Карта для возврата остатка (если проект закроется) ──
 
+def _refund_page(request: Request, conn, config: Config, user, form: dict, error: str = "", status: int = 200):
+    from . import refunds
+    row = refunds.get(conn, user["id"])
+    return render(request, "panel/refund.html", {
+        "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "form": form,
+        "explain": refunds.EXPLAIN_RU.format(site=config.site_name),
+        "explain_tj": refunds.EXPLAIN_TJ.format(site=config.site_name),
+        "error": error, "first": row is None and refunds.required(conn)}, status_code=status)
+
+
 @router.get("/panel/refund")
 def panel_refund(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                  config: Config = Depends(get_config)):
     from . import refunds
     row = refunds.get(conn, user["id"])
-    form = {"bank": row["bank"], "kind": row["kind"], "holder": row["holder"]} if row else {"kind": "card"}
-    return render(request, "panel/refund.html", {
-        "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "kinds": refunds.KINDS,
-        "explain": refunds.EXPLAIN_RU.format(site=config.site_name), "form": form, "error": "",
-        "first": row is None and refunds.required(conn)})
+    phone = (user["phone"] or "") if "phone" in user.keys() else ""   # номер из Telegram — подставим, если есть
+    return _refund_page(request, conn, config, user, {"bank": row["bank"]} if row else {"number": phone})
 
 
 @router.post("/panel/refund", dependencies=[Depends(check_csrf)])
-def panel_refund_save(request: Request, bank: str = Form(""), bank_other: str = Form(""), kind: str = Form("card"),
-                      number: str = Form(""), holder: str = Form(""), agree: str = Form(""),
-                      user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+def panel_refund_save(request: Request, bank: str = Form(""), bank_other: str = Form(""), number: str = Form(""),
+                      agree: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                      config: Config = Depends(get_config)):
     from . import refunds
     bank = bank_other.strip() if bank == "Другой банк" and bank_other.strip() else bank
-    error = "" if agree else "Отметьте, что номер ваш и указан правильно."
-    error = error or refunds.save(conn, config.secret_key, user["id"], bank=bank, kind=kind, number=number,
-                                  holder=holder, source="site")
+    error = "" if agree else "Отметьте, что номер ваш и указан правильно. · Қайд кунед, ки рақам аз они шумост."
+    error = error or refunds.save(conn, config.secret_key, user["id"], bank=bank, number=number, source="site")
     if error:
-        row = refunds.get(conn, user["id"])
-        return render(request, "panel/refund.html", {
-            "user": user, "row": row, "masked": refunds.masked(row), "banks": refunds.BANKS, "kinds": refunds.KINDS,
-            "explain": refunds.EXPLAIN_RU.format(site=config.site_name), "error": error,
-            "form": {"bank": bank, "kind": kind, "holder": holder}, "first": row is None}, status_code=400)
-    flash(request, "Готово: карта для возврата сохранена.")
+        return _refund_page(request, conn, config, user, {"bank": bank, "number": number}, error, 400)
+    flash(request, "Готово: номер для возврата сохранён. · Тайёр: рақам нигоҳ дошта шуд.")
     return _redirect(_safe_next(request.session.pop("refund_next", "")) or "/panel")
 
 

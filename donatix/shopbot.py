@@ -1127,44 +1127,36 @@ class ShopBot:
         self.state[tg_id] = {"step": "rf_bank_pick"}
         row = refunds.get(conn, su["user_id"])
         site = self.config.site_name
-        now = f"\n\nСейчас указано: <b>{_e(row['bank'])}</b> · {_e(refunds.masked(row))}" if row else ""
-        text = ("🛡 <b>Карта для возврата денег</b>\n\n"
-                + _e(refunds.EXPLAIN_RU.format(site=site)) + "\n\n<i>" + _e(refunds.EXPLAIN_TJ.format(site=site))
-                + "</i>" + now + "\n\n<b>Шаг 1 из 3.</b> Выберите ваш банк 👇")
+        now = f"\n\nСейчас указано / Ҳоло: <b>{_e(row['bank'])}</b> · {_e(refunds.masked(row))}" if row else ""
+        text = ("🛡 <b>Рақам барои баргардонидани пул</b>\n\n" + _e(refunds.EXPLAIN_TJ.format(site=site))
+                + "\n\n— — —\n\n🛡 <b>Номер для возврата денег</b>\n\n" + _e(refunds.EXPLAIN_RU.format(site=site))
+                + now + "\n\n<b>1/2.</b> Бонкро интихоб кунед · Выберите банк 👇")
         banks = [(b, f"rf:b:{i}") for i, b in enumerate(refunds.BANKS)]
         rows = [banks[i:i + 2] for i in range(0, len(banks), 2)]
         if row:
             rows.append([("‹ Оставить как есть", "h")])
         self.show(tg_id, text, rows, edit=edit)
 
+    def ask_refund_phone(self, tg_id: int, bank: str, mid: int | None = None) -> None:
+        self.state[tg_id] = {"step": "rf_num", "bank": bank}
+        self.show(tg_id, f"<b>2/2.</b> {_e(bank)}\n\nРақами телефонро нависед, ки ҳамёни бонк ба он пайваст аст.\n"
+                         "Напишите номер телефона, к которому привязан кошелёк банка.\n\nМасалан / например: "
+                         "<code>90 123 45 67</code>", [[("‹ Назад", "rf:start")]], edit=mid)
+
     def on_refund_button(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str, mid: int | None) -> None:
         from . import refunds
         tg_id = su["tg_id"]
-        st = self.state.get(tg_id) or {}
         parts = data.split(":")
         if parts[1] == "b" and len(parts) == 3 and parts[2].isdigit() and int(parts[2]) < len(refunds.BANKS):
             bank = refunds.BANKS[int(parts[2])]
             if bank == "Другой банк":
                 self.state[tg_id] = {"step": "rf_bank"}
-                self.show(tg_id, "Напишите название вашего банка.", [[("‹ Назад", "rf:start")]], edit=mid)
+                self.show(tg_id, "Номи бонкро нависед · Напишите название банка.", [[("‹ Назад", "rf:start")]],
+                          edit=mid)
                 return
-            self.state[tg_id] = {"step": "rf_kind", "bank": bank}
-            self.screen_refund_kind(tg_id, bank, mid)
-        elif parts[1] == "k" and len(parts) == 3 and parts[2] in refunds.KINDS and st.get("bank"):
-            self.state[tg_id] = {"step": "rf_num", "bank": st["bank"], "kind": parts[2]}
-            ask = ("Напишите <b>номер карты</b> — 16 цифр с лицевой стороны.\nТолько номер: срок действия и CVV "
-                   "не нужны." if parts[2] == "card" else
-                   "Напишите <b>номер телефона</b>, к которому привязан кошелёк в банке, например 90 123 45 67.")
-            self.show(tg_id, f"<b>Шаг 3 из 3.</b> Банк: {_e(st['bank'])}\n\n{ask}", [[("‹ Назад", "rf:start")]],
-                      edit=mid)
+            self.ask_refund_phone(tg_id, bank, mid)
         else:
             self.screen_refund(conn, su, edit=mid)
-
-    def screen_refund_kind(self, tg_id: int, bank: str, mid: int | None = None) -> None:
-        from . import refunds
-        self.show(tg_id, f"<b>Шаг 2 из 3.</b> Банк: {_e(bank)}\n\nЧто укажете?",
-                  [[(title, f"rf:k:{k}")] for k, title in refunds.KINDS.items()] + [[("‹ Назад", "rf:start")]],
-                  edit=mid)
 
     def on_refund_text(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str) -> None:
         from . import refunds
@@ -1177,30 +1169,17 @@ class ShopBot:
             if bank is None:
                 self.show(tg_id, err, back)
                 return
-            self.state[tg_id] = {"step": "rf_kind", "bank": bank}
-            self.screen_refund_kind(tg_id, bank)
+            self.ask_refund_phone(tg_id, bank)
         elif step == "rf_num":
-            num, err = refunds.clean_number(st["kind"], text)
-            if num is None:
-                self.show(tg_id, "⚠️ " + err + "\nНапишите ещё раз.", back)
-                return
-            self.state[tg_id] = {**st, "step": "rf_name", "number": num}
-            self.show(tg_id, "Последнее: <b>имя владельца</b> — как на карте или в банке, например «Алиев Алишер».",
-                      back)
-        elif step == "rf_name":
-            name, err = refunds.clean_holder(text)
-            if name is None:
-                self.show(tg_id, "⚠️ " + err, back)
-                return
-            err = refunds.save(conn, self.config.secret_key, su["user_id"], bank=st["bank"], kind=st["kind"],
-                               number=st["number"], holder=name, source="bot")
+            err = refunds.save(conn, self.config.secret_key, su["user_id"], bank=st["bank"], number=text,
+                               source="bot")
             if err:
-                self.show(tg_id, "⚠️ " + err, back)
+                self.show(tg_id, "⚠️ " + _e(err), back)
                 return
             self.state.pop(tg_id, None)
             row = refunds.get(conn, su["user_id"])
-            self.show(tg_id, f"✅ <b>Сохранено.</b>\n\n{_e(row['bank'])} · {_e(refunds.masked(row))} · {_e(name)}\n\n"
-                             "Изменить можно в любой момент командой /card.", [[(tr(su["lang"], "home"), "h")]])
+            self.show(tg_id, f"✅ <b>Нигоҳ дошта шуд · Сохранено.</b>\n\n{_e(row['bank'])} · {_e(refunds.masked(row))}"
+                             "\n\nИваз кардан / изменить: /card", [[(tr(su["lang"], "home"), "h")]])
         else:
             self.screen_refund(conn, su)
 
