@@ -87,8 +87,8 @@ def decrypt(secret: str, token: str) -> str | None:
 
 
 def required(conn: sqlite3.Connection) -> bool:
-    # Пока ВЫКЛЮЧЕНО: дизайн согласуем с владельцем. Включить — в админке «Номера для возврата»
-    return ENFORCE and db.get_setting(conn, "refund.required", "0") == "1"
+    # Включено: каждый клиент (старый и новый) один раз указывает номер. Выключить — в админке «Номера для возврата»
+    return ENFORCE and db.get_setting(conn, "refund.required", "1") == "1"
 
 
 def get(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
