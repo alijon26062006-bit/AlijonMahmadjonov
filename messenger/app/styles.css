@@ -239,7 +239,7 @@ svg.ic { flex: none; display: block; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } }
 .composer { flex: none; display: flex; align-items: flex-end; gap: 6px; padding: 8px 8px calc(8px + var(--safe-bottom)); background: var(--bg-surface); border-top: 1px solid var(--border); }
 .composer > .ib:first-child { color: var(--text-2); }
-.field { flex: 1; min-height: 44px; border-radius: 22px; background: var(--bg-subtle); display: flex; align-items: flex-end; padding: 0 0 0 16px; }
+.field { flex: 1; min-width: 0; min-height: 44px; border-radius: 22px; background: var(--bg-subtle); display: flex; align-items: flex-end; padding: 0 0 0 16px; }
 .field textarea { flex: 1; min-width: 0; resize: none; border: 0; background: none; outline: none; font-size: 16px; line-height: 22px; padding: 11px 0; max-height: 132px; font-weight: 500; }
 .field textarea::placeholder { color: var(--text-2); }
 .field .ib { color: var(--text-2); }
@@ -439,3 +439,88 @@ select.inp { width: auto; flex: none; appearance: none; padding-right: 14px; cur
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .sv .bars i.cur b { animation-duration: var(--dur, 5s) !important; }
 }
+
+/* =========================================================
+   Attach panel (opens under the composer, like a keyboard)
+   ========================================================= */
+.composer .ib.round { background: var(--bg-subtle); color: var(--text); }
+.composer .ib.round:hover { background: var(--border); }
+.composer.has-panel { padding-bottom: 8px; }
+.attach-panel {
+  flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 4px; padding: 22px 8px calc(24px + var(--safe-bottom));
+  background: var(--bg-surface); animation: panelUp 240ms var(--ease-out);
+}
+@media (min-width: 900px) { .attach-panel { grid-template-columns: repeat(7, 1fr); } }
+.att { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; border-radius: 16px; padding: 2px 0; }
+.att .c { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-subtle); display: grid; place-items: center; transition: transform var(--t-fast) var(--ease-out), background-color var(--t-fast); }
+.att:hover .c { background: var(--border); }
+.att:active .c { transform: scale(.92); }
+.att:nth-child(n) { animation: attIn 260ms var(--ease-out) both; }
+.att:nth-child(2) { animation-delay: 20ms; } .att:nth-child(3) { animation-delay: 40ms; } .att:nth-child(4) { animation-delay: 60ms; }
+.att:nth-child(5) { animation-delay: 80ms; } .att:nth-child(6) { animation-delay: 100ms; } .att:nth-child(7) { animation-delay: 120ms; }
+@keyframes attIn { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+@keyframes panelUp { from { transform: translateY(24px); opacity: 0; } }
+.emoji-panel { border-top: 0; }
+
+/* =========================================================
+   Voice recording panel
+   ========================================================= */
+.recwrap { flex: none; background: var(--bg-surface); border-top: 1px solid var(--border); padding: 12px 12px calc(14px + var(--safe-bottom)); animation: panelUp 220ms var(--ease-out); }
+.recpill { display: flex; align-items: center; gap: 12px; height: 64px; border-radius: 32px; background: var(--bg-subtle); padding: 0 18px 0 20px; }
+.recpill .rdot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); flex: none; animation: blink 1s infinite; }
+.recpill .rtime { font-size: 26px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; min-width: 64px; }
+.livewave { flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; overflow: hidden; }
+.livewave i { width: 3px; flex: none; border-radius: 2px; background: var(--brand); }
+.livewave i.d { height: 3px; background: var(--text-2); opacity: .45; border-radius: 50%; }
+.recwrap.paused .rdot { animation: none; opacity: .35; }
+.recwrap.paused .livewave i:not(.d) { opacity: .55; }
+.recrow { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding: 0 2px; }
+.rbtn { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast); }
+.rbtn:active { transform: scale(.92); }
+.rbtn.del { background: rgba(220, 38, 38, .12); color: var(--danger); }
+.rbtn.pause { background: var(--bg-subtle); color: var(--text); }
+.rbtn.send { background: var(--brand); color: #fff; box-shadow: 0 10px 22px -10px rgba(91, 75, 255, .8); }
+.rbtn.send:hover { filter: brightness(1.08); }
+
+/* =========================================================
+   Rich message cards
+   ========================================================= */
+.loc { display: block; color: inherit; }
+.map { width: 260px; max-width: 100%; height: 130px; border-radius: 15px 15px 8px 8px; display: block; }
+.loc-t { display: block; padding: 6px 8px 0; }
+.loc-t b { display: block; font-size: 15px; line-height: 20px; }
+.loc-t small { font-size: 13px; opacity: .75; }
+.cc { display: flex; align-items: center; gap: 12px; min-width: 220px; padding: 4px 0 8px; }
+.cc b { display: block; font-size: 15px; line-height: 20px; }
+.cc small { font-size: 13px; opacity: .75; }
+.cc-btn { display: block; width: 100%; min-height: 44px; border-top: 1px solid rgba(127, 127, 127, .25); color: var(--brand); font-weight: 700; font-size: 15px; }
+.b.out .cc-btn { color: #fff; border-color: rgba(255, 255, 255, .3); }
+.poll { display: block; min-width: 250px; }
+.pq { display: block; font-size: 16px; line-height: 22px; }
+.pk { display: block; font-size: 13px; opacity: .7; margin: 2px 0 6px; }
+.po { display: block; width: 100%; text-align: left; padding: 8px 0; min-height: 44px; border-radius: 10px; }
+.po-row { display: flex; align-items: center; gap: 10px; }
+.po-c { width: 22px; height: 22px; border-radius: 50%; border: 2px solid currentColor; opacity: .55; display: grid; place-items: center; flex: none; transition: opacity var(--t-fast); }
+.po:not(.done):hover .po-c { opacity: 1; }
+.po.done .po-c { border-color: transparent; }
+.po.mine .po-c { opacity: 1; background: var(--brand); color: #fff; }
+.b.out .po.mine .po-c { background: #fff; color: var(--brand); }
+.po.done { cursor: default; }
+.po-t { flex: 1; font-weight: 600; }
+.po-p { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+.po-bar { display: block; height: 5px; border-radius: 3px; background: rgba(127, 127, 127, .2); margin: 6px 0 0 32px; overflow: hidden; }
+.po-bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; transition: width .4s var(--ease-out); }
+.b.out .po-bar i { background: #fff; }
+.b.out .po-bar { background: rgba(255, 255, 255, .25); }
+.ev { display: flex; gap: 12px; align-items: center; min-width: 240px; padding: 2px 0 10px; }
+.ev-cal { width: 52px; height: 58px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px #E4E7F0; overflow: hidden; display: flex; flex-direction: column; align-items: center; flex: none; color: #11131A; }
+.ev-cal small { display: block; width: 100%; text-align: center; background: #EF4444; color: #fff; font-size: 11px; font-weight: 800; text-transform: uppercase; line-height: 18px; }
+.ev-cal b { font-size: 22px; line-height: 38px; font-weight: 800; }
+.ev-t b { display: block; font-size: 15px; line-height: 20px; }
+.ev-t small { display: block; font-size: 13px; opacity: .75; line-height: 18px; }
+.ev-btn { width: 100%; min-height: 44px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background-color var(--t-fast), color var(--t-fast), transform var(--t-fast); }
+.ev-btn:active { transform: scale(.98); }
+.ev-btn.on { background: var(--brand); color: #fff; }
+.b.out .ev-btn { background: rgba(255, 255, 255, .2); color: #fff; }
+.b.out .ev-btn.on { background: #fff; color: var(--brand); }
+.sheet .opt .av { flex: none; }

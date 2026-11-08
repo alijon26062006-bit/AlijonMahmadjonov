@@ -57,8 +57,23 @@ const I = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   verified: '<path d="M12 2 14.4 4.3l3.3-.5.6 3.3 3 1.5-1.5 3 1.5 3-3 1.5-.6 3.3-3.3-.5L12 22l-2.4-2.3-3.3.5-.6-3.3-3-1.5 1.5-3-1.5-3 3-1.5.6-3.3 3.3.5z" fill="currentColor" stroke="none"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke="#fff"/>',
-  alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>'
+  alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  keyboard: '<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12.5h.01M10 12.5h.01M14 12.5h.01M18 12.5h.01M8 16h8"/>',
+  images: '<rect x="7" y="7" width="15" height="13" rx="2"/><path d="M3 16V5a2 2 0 0 1 2-2h11"/><circle cx="12" cy="11.5" r="1.5"/><path d="m22 16-3-3-6 6"/>',
+  mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" fill="currentColor" fill-opacity=".18"/><circle cx="12" cy="10" r="3"/>',
+  userCircle: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.7 19a6 6 0 0 1 10.6 0"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="currentColor" fill-opacity=".18"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+  poll: '<path d="M4 6h10"/><path d="M4 12h16"/><path d="M4 18h7"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>'
 };
+const MAP = `<svg class="map" viewBox="0 0 260 130" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="260" height="130" fill="#E3EBDD"/><rect x="84" y="50" width="38" height="32" rx="4" fill="#CFDDC3"/><rect x="192" y="104" width="56" height="22" rx="4" fill="#BFD7EA"/><rect x="10" y="102" width="44" height="22" rx="4" fill="#CFDDC3"/><path d="M0 40h260M0 96h260M70 0v130M182 0v130" stroke="#fff" stroke-width="10"/><path d="M0 72 260 18M122 0l40 130" stroke="#fff" stroke-width="5"/><g transform="translate(130 66)"><ellipse cy="4" rx="14" ry="5" fill="#000" opacity=".12"/><path d="M0-30c-9 0-16 7-16 16 0 11 16 24 16 24s16-13 16-24c0-9-7-16-16-16z" fill="#10B981"/><circle cy="-14" r="6" fill="#fff"/></g></svg>`;
+const MON_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const WD_FULL = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+const ATT = [
+  ['att-photo', 'images', 'Фото', '#3B82F6'], ['att-camera', 'camera', 'Камера', 'var(--text)'],
+  ['att-location', 'mapPin', 'Геопозиция', '#10B981'], ['att-contact', 'userCircle', 'Контакт', '#8A90A6'],
+  ['att-doc', 'doc', 'Документ', '#2563EB'], ['att-poll', 'poll', 'Опрос', '#F59E0B'], ['att-event', 'calendar', 'Мероприятие', '#EF4444']
+];
 const ic = (n, s = 24) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${I[n]}</svg>`;
 const av = (t, g, s = 52, online = false) => `<span class="av ${g}" style="--s:${s}px" aria-hidden="true">${esc(t)}${online ? '<span class="dot"></span>' : ''}</span>`;
 const LOGO = `<div class="logo" aria-hidden="true"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${I.chat}<path d="M8.5 13.5 12 7l3.5 6.5M9.6 11.5h4.8"/></svg></div>`;
@@ -188,9 +203,20 @@ function sortedChats() {
   return [...S.chats].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || ((lastMsg(b) || {}).ts || 0) - ((lastMsg(a) || {}).ts || 0));
 }
 function bodyText(m) {
-  return m.kind === 'voice' ? 'Голосовое сообщение · ' + dur(m.dur) : m.kind === 'image' ? (m.caption || 'Фото') : m.kind === 'file' ? m.name : m.text;
+  switch (m.kind) {
+    case 'voice': return 'Голосовое сообщение · ' + dur(m.dur);
+    case 'image': return m.caption || 'Фото';
+    case 'file': return m.name;
+    case 'location': return 'Геопозиция: ' + m.addr;
+    case 'contact': return 'Контакт: ' + person(m.cid).name;
+    case 'poll': return 'Опрос: ' + m.poll.q;
+    case 'event': return 'Мероприятие: ' + m.event.title;
+    default: return m.text;
+  }
 }
 function bodyPreview(m) {
+  const K = { location: 'mapPin', contact: 'userCircle', poll: 'poll', event: 'calendar' };
+  if (K[m.kind]) return `<span class="pv">${ic(K[m.kind], 14)}${esc(bodyText(m))}</span>`;
   if (m.kind === 'voice') return `<span class="pv brand">${ic('mic', 14)}Голосовое · ${dur(m.dur)}</span>`;
   if (m.kind === 'image') return `<span class="pv">${ic('image', 14)}${esc(m.caption || 'Фото')}</span>`;
   if (m.kind === 'file') return `<span class="pv">${ic('file', 14)}${esc(m.name)}</span>`;
@@ -508,7 +534,7 @@ function headerStatus(c) {
   return `<span>${c.subs.toLocaleString('ru')} ${plural(c.subs, 'подписчик', 'подписчика', 'подписчиков')}</span>`;
 }
 function renderConversation(c) {
-  stopVoice(); stopRec(false); UI.reply = null; UI.emoji = false;
+  stopVoice(); stopRec(false); UI.reply = null; UI.emoji = false; UI.attach = false;
   UI.rendered = new Set(c.messages.map(m => m.id));
   const direct = c.type === 'direct';
   $('#main').innerHTML = `<div class="conv">
@@ -526,7 +552,7 @@ function msgHTML(m, c, prev, next) {
   const out = m.from === 'me';
   const same = (a, b) => a && b && a.from === b.from && dayStart(a.ts) === dayStart(b.ts) && Math.abs(a.ts - b.ts) < 5 * 60e3;
   const first = !same(prev, m), last = !same(m, next);
-  const cls = ['b', out ? 'out' : 'in', first ? 'first' : '', last ? 'last' : '', m.kind === 'image' ? 'media' : '', UI.rendered.has(m.id) ? '' : 'enter'].join(' ');
+  const cls = ['b', out ? 'out' : 'in', first ? 'first' : '', last ? 'last' : '', m.kind === 'image' || m.kind === 'location' ? 'media' : '', UI.rendered.has(m.id) ? '' : 'enter'].join(' ');
   const author = c.type === 'group' && !out && first ? `<span class="author" style="color:${({ g2: '#E23E6B', g3: '#0E8F8E', g5: '#2563EB', g4: '#D9630B', g6: '#B21FC3', g7: '#15803D' })[person(m.from).g] || 'var(--brand)'}">${esc(person(m.from).name)}</span>` : '';
   const st = out && c.type !== 'channel' ? `<span class="sr-only">${m.status === 'read' ? 'Прочитано' : 'Отправлено'}</span>${ic(m.status === 'read' ? 'checks' : 'check', 15)}` : '';
   const meta = `<span class="mt">${hhmm(m.ts)}${st}</span>`;
@@ -534,9 +560,23 @@ function msgHTML(m, c, prev, next) {
   let body;
   if (m.kind === 'image') body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}<span class="pic" role="img" aria-label="${esc(m.caption || 'Фото')}">${hueGrad(m.hue || 250)}</span>${m.caption ? `<span class="cap">${esc(m.caption)}${meta}</span>` : meta}`;
   else if (m.kind === 'voice') {
-    const h = waveHeights(m.id);
+    const h = m.wave || waveHeights(m.id);
     body = `${author}<span class="voice" data-voice="${m.id}"><button type="button" class="play" data-act="play" data-id="${m.id}" aria-label="Воспроизвести голосовое, ${dur(m.dur)}">${ic('play', 18)}</button><span style="flex:1"><span class="wave">${h.map(x => `<i style="height:${x}px"></i>`).join('')}</span><small>${dur(m.dur)}</small></span></span>${meta}`;
   } else if (m.kind === 'file') body = `${author}<span class="file"><span class="fi">${ic('file', 22)}</span><span><b>${esc(m.name)}</b><small>${esc(m.size)}</small></span></span>${meta}`;
+  else if (m.kind === 'location') body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}<a class="loc" href="https://www.openstreetmap.org/?mlat=${m.lat}&amp;mlon=${m.lon}#map=16/${m.lat}/${m.lon}" target="_blank" rel="noopener" aria-label="Открыть на карте: ${esc(m.addr)}">${MAP}<span class="loc-t"><b>Геопозиция</b><small>${esc(m.addr)}</small></span></a>${meta}`;
+  else if (m.kind === 'contact') {
+    const p = person(m.cid);
+    body = `${author}<span class="cc">${av(p.ini, p.g, 44)}<span><b>${esc(p.name)}</b><small>${esc(p.phone)}</small></span></span><button type="button" class="cc-btn" data-act="open-contact" data-cid="${m.cid}">Написать</button>${meta}`;
+  } else if (m.kind === 'poll') {
+    const P = m.poll, total = P.opts.reduce((s, o) => s + o.v, 0), voted = P.my >= 0;
+    body = `${author}<span class="poll"><b class="pq">${esc(P.q)}</b><small class="pk">${voted ? 'Вы проголосовали' : 'Опрос · выберите один вариант'}</small>${P.opts.map((o, i) => {
+      const pct = total ? Math.round(o.v * 100 / total) : 0;
+      return `<button type="button" class="po${voted ? ' done' : ''}${P.my === i ? ' mine' : ''}" data-act="vote" data-id="${m.id}" data-i="${i}" ${voted ? 'aria-disabled="true"' : ''}><span class="po-row"><span class="po-c">${P.my === i ? ic('check', 14) : ''}</span><span class="po-t">${esc(o.t)}</span>${voted ? `<span class="po-p">${pct}%</span>` : ''}</span>${voted ? `<span class="po-bar"><i style="width:${pct}%"></i></span>` : ''}</button>`;
+    }).join('')}<small class="pk" style="margin:6px 0 0">${total} ${plural(total, 'голос', 'голоса', 'голосов')}</small></span>${meta}`;
+  } else if (m.kind === 'event') {
+    const E = m.event, d = new Date(E.at);
+    body = `${author}<span class="ev"><span class="ev-cal" aria-hidden="true"><small>${MON_SHORT[d.getMonth()]}</small><b>${d.getDate()}</b></span><span class="ev-t"><b>${esc(E.title)}</b><small>${d.getDate()} ${MON[d.getMonth()]}, ${WD_FULL[d.getDay()]} · ${hhmm(E.at)}</small><small>${E.going} ${plural(E.going, 'идёт', 'идут', 'идут')}</small></span></span><button type="button" class="ev-btn${E.me ? ' on' : ''}" data-act="event-go" data-id="${m.id}" aria-pressed="${!!E.me}">${E.me ? ic('check', 16) + 'Вы идёте' : 'Пойду'}</button>${meta}`;
+  }
   else body = `${author}${q}${esc(m.text).replace(/\n/g, '<br>')}${meta}`;
   return `<div class="${cls}" data-mid="${m.id}" tabindex="0" aria-label="${out ? 'Вы' : esc(c.type === 'channel' ? chatTitle(c) : person(m.from).name)}, ${hhmm(m.ts)}">${body}</div>`;
 }
@@ -568,23 +608,27 @@ function renderComposer(c) {
   if (c.blocked) { w.innerHTML = `<div class="composer-alt"><button class="btn danger-t" type="button" data-act="unblock">Разблокировать</button></div>`; return; }
   w.innerHTML = `
     <div class="replybar" id="replyBar" hidden></div>
-    <div class="emoji-panel" id="emojiPanel" hidden aria-label="Эмодзи">${EMOJI.map(e => `<button type="button" data-act="emoji-pick" data-e="${e}" aria-label="${e}">${e}</button>`).join('')}</div>
     <div class="composer" id="composer">
-      <button class="ib" type="button" data-act="attach" aria-label="Прикрепить файл или фото">${ic('attach', 22)}</button>
+      <button class="ib round" type="button" data-act="attach" id="attachBtn" aria-label="Вложения" aria-expanded="false" aria-controls="attachPanel">${ic('attach', 22)}</button>
       <div class="field"><label class="sr-only" for="msgInput">Сообщение</label>
         <textarea id="msgInput" rows="1" placeholder="Сообщение" enterkeyhint="send">${esc(UI.drafts[c.id] || '')}</textarea>
         <button class="ib" type="button" data-act="emoji" aria-label="Эмодзи" aria-expanded="false" aria-controls="emojiPanel">${ic('smile', 22)}</button></div>
+      <button class="ib round" type="button" data-act="att-camera" id="camBtn" aria-label="Сделать снимок">${ic('camera', 22)}</button>
       <button class="ib brand send-btn" type="button" data-act="send" id="sendBtn" aria-label="Записать голосовое">${ic('mic', 22)}</button>
-    </div>`;
+    </div>
+    <div class="attach-panel" id="attachPanel" hidden role="group" aria-label="Вложения">${ATT.map(([act, i, l, col]) => `<button type="button" class="att" data-act="${act}"><span class="c" style="color:${col}">${ic(i, 30)}</span>${l}</button>`).join('')}</div>
+    <div class="emoji-panel" id="emojiPanel" hidden aria-label="Эмодзи">${EMOJI.map(e => `<button type="button" data-act="emoji-pick" data-e="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`;
   const ta = $('#msgInput');
   const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
   ta.addEventListener('input', () => { UI.drafts[c.id] = ta.value; grow(); syncSend(); });
+  ta.addEventListener('pointerdown', () => { if (UI.attach) closePanels(); });
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(); } if (e.key === 'Escape' && UI.reply) setReply(null); });
   grow(); syncSend();
 }
 function syncSend() {
   const b = $('#sendBtn'), ta = $('#msgInput'); if (!b || !ta) return;
   const has = ta.value.trim().length > 0, mode = has ? 'send' : 'mic';
+  const cam = $('#camBtn'); if (cam) cam.hidden = has;
   if (b.dataset.mode === mode) return;
   b.dataset.mode = mode; b.innerHTML = ic(mode, 22); b.setAttribute('aria-label', has ? 'Отправить' : 'Записать голосовое');
   b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
@@ -615,6 +659,7 @@ function addMessage(c, m) {
   if (UI.route.chat === c.id) refreshChat(c.id);
   renderChatList(); renderTabbar();
   if (m.from === 'me') scheduleReply(c);
+  if (m.from === 'me' && (m.kind === 'poll' || m.kind === 'event')) simulateReaction(c, m);
 }
 function scheduleReply(c) {
   if (c.type === 'channel' || c.blocked) return;
@@ -664,23 +709,123 @@ function stopVoice() {
 
 /* ---------- Voice recording (simulated) ---------- */
 function startRec() {
-  const comp = $('#composer'); if (!comp || UI.rec) return;
-  UI.rec = { start: Date.now() };
-  comp.dataset.html = comp.innerHTML;
-  comp.innerHTML = `<div class="recbar"><span class="rdot" aria-hidden="true"></span><span id="recTime" aria-live="off">0:00</span><span class="lbl">Идёт запись…</span>
-    <button type="button" class="cancel" data-act="rec-cancel">Отмена</button></div>
-    <button class="ib brand" type="button" data-act="rec-send" aria-label="Отправить голосовое">${ic('send', 22)}</button>`;
-  UI.rec.t = setInterval(() => { const e = $('#recTime'); if (e) e.textContent = dur((Date.now() - UI.rec.start) / 1000); }, 250);
-  $('[data-act="rec-send"]').focus();
+  const wrap = $('#composerWrap'), comp = $('#composer'); if (!comp || UI.rec) return;
+  closePanels();
+  UI.rec = { elapsed: 0, paused: false, wave: [], lvl: .3 };
+  comp.hidden = true;
+  const r = document.createElement('div'); r.className = 'recwrap'; r.id = 'recWrap';
+  r.innerHTML = `<div class="recpill"><span class="rdot" aria-hidden="true"></span><span class="rtime" id="recTime">0:00</span>
+      <span class="livewave" id="liveWave" aria-hidden="true">${'<i class="d"></i>'.repeat(46)}</span></div>
+    <div class="recrow">
+      <button type="button" class="rbtn del" data-act="rec-delete" aria-label="Удалить запись">${ic('trash', 24)}</button>
+      <button type="button" class="rbtn pause" data-act="rec-pause" aria-label="Пауза" aria-pressed="false">${ic('pause', 22)}</button>
+      <button type="button" class="rbtn send" data-act="rec-send" aria-label="Отправить голосовое">${ic('send', 24)}</button></div>
+    <p class="sr-only" aria-live="polite">Идёт запись голосового сообщения</p>`;
+  wrap.appendChild(r);
+  UI.rec.t = setInterval(recTick, 100);
+  $('[data-act="rec-send"]', r).focus();
+}
+function recTick() {
+  const R = UI.rec; if (!R || R.paused) return;
+  R.elapsed += .1;
+  const target = Math.random() < .12 ? .04 : .2 + Math.random() * .8;
+  R.lvl = R.lvl * .45 + target * .55; R.wave.push(R.lvl);
+  const w = $('#liveWave');
+  if (w) { const i = document.createElement('i'); i.style.height = Math.max(3, Math.round(R.lvl * 34)) + 'px'; w.appendChild(i); if (w.children.length > 70) w.firstElementChild.remove(); }
+  const t = $('#recTime'); if (t) t.textContent = dur(R.elapsed);
+}
+function toggleRecPause(btn) {
+  const R = UI.rec; if (!R) return; R.paused = !R.paused;
+  btn.innerHTML = ic(R.paused ? 'mic' : 'pause', 22);
+  btn.setAttribute('aria-label', R.paused ? 'Продолжить запись' : 'Пауза'); btn.setAttribute('aria-pressed', R.paused);
+  $('#recWrap').classList.toggle('paused', R.paused);
 }
 function stopRec(send) {
-  if (!UI.rec) return; clearInterval(UI.rec.t);
-  const secs = Math.max(1, Math.round((Date.now() - UI.rec.start) / 1000)); UI.rec = null;
-  const comp = $('#composer');
-  if (comp && comp.dataset.html) {
-    const c = chatById(UI.route.chat); renderComposer(c);
+  const R = UI.rec; if (!R) return; clearInterval(R.t); UI.rec = null;
+  const r = $('#recWrap'); if (r) r.remove();
+  const comp = $('#composer'); if (comp) comp.hidden = false;
+  if (send) {
+    const n = 28, L = R.wave.length, wave = [];
+    for (let i = 0; i < n; i++) { const a = R.wave.slice(Math.floor(i * L / n), Math.floor((i + 1) * L / n)); const v = a.length ? a.reduce((s, x) => s + x, 0) / a.length : .08; wave.push(Math.round(5 + v * 23)); }
+    addMessage(chatById(UI.route.chat), { from: 'me', kind: 'voice', dur: Math.max(1, Math.round(R.elapsed)), wave });
   }
-  if (send) addMessage(chatById(UI.route.chat), { from: 'me', kind: 'voice', dur: secs });
+  const sb = $('#sendBtn'); if (sb && UI.route.chat) sb.focus({ preventScroll: true });
+}
+
+/* ---------- Attach / emoji panels ---------- */
+function closePanels() {
+  const a = $('#attachPanel'), e = $('#emojiPanel'), ab = $('#attachBtn'), eb = $('[data-act="emoji"]');
+  if (a) a.hidden = true; if (e) e.hidden = true; UI.emoji = false; UI.attach = false;
+  if (ab) { ab.innerHTML = ic('attach', 22); ab.setAttribute('aria-expanded', 'false'); ab.setAttribute('aria-label', 'Вложения'); }
+  if (eb) eb.setAttribute('aria-expanded', 'false');
+  const comp = $('#composer'); if (comp) comp.classList.remove('has-panel');
+}
+function toggleAttach() {
+  const open = !UI.attach; closePanels();
+  if (!open) { $('#msgInput').focus(); return; }
+  UI.attach = true; $('#attachPanel').hidden = false; $('#composer').classList.add('has-panel');
+  const ab = $('#attachBtn'); ab.innerHTML = ic('keyboard', 22); ab.setAttribute('aria-expanded', 'true'); ab.setAttribute('aria-label', 'Скрыть вложения');
+  $('#msgInput').blur();
+  const th = $('#thread'); if (th) th.scrollTop = th.scrollHeight;
+}
+function toggleEmoji() {
+  const open = !UI.emoji; closePanels();
+  if (!open) { $('#msgInput').focus(); return; }
+  UI.emoji = true; $('#emojiPanel').hidden = false; $('#composer').classList.add('has-panel');
+  $('[data-act="emoji"]').setAttribute('aria-expanded', 'true');
+  $('#emojiPanel button').focus();
+}
+
+/* ---------- Rich messages: contact, poll, event ---------- */
+function contactSheet() {
+  const list = Object.entries(S.contacts).sort((a, b) => a[1].name.localeCompare(b[1].name, 'ru'));
+  openSheet('Отправить контакт', `<h3>Отправить контакт</h3>${list.map(([id, p]) => `<button type="button" class="opt" data-act="pick-contact" data-cid="${id}">${av(p.ini, p.g, 40)}<span><b style="display:block">${esc(p.name)}</b><small style="color:var(--text-2);font-weight:500">${esc(p.phone)}</small></span></button>`).join('')}`);
+}
+function pollSheet() {
+  openSheet('Новый опрос', `<h3>Новый опрос</h3>
+    <label class="lbl" for="pollQ" style="margin-top:0">Вопрос</label><input class="inp" id="pollQ" maxlength="120" placeholder="Куда пойдём в субботу?">
+    <span class="lbl" id="pollOL">Варианты ответа</span>
+    <div id="pollOpts" role="group" aria-labelledby="pollOL" style="display:flex;flex-direction:column;gap:8px">
+      <input class="inp" maxlength="60" placeholder="Вариант 1" aria-label="Вариант 1"><input class="inp" maxlength="60" placeholder="Вариант 2" aria-label="Вариант 2"></div>
+    <button type="button" class="btn ghost block" id="pollAdd" style="margin-top:8px;color:var(--brand)">${ic('plus', 18)}Добавить вариант</button>
+    <button type="button" class="btn primary block" id="pollGo" style="margin-top:12px" disabled>Создать опрос</button>`, sh => {
+    const q = $('#pollQ', sh), box = $('#pollOpts', sh), go = $('#pollGo', sh), add = $('#pollAdd', sh);
+    q.focus();
+    const opts = () => $$('input', box).map(i => i.value.trim()).filter(Boolean);
+    const check = () => { go.disabled = !(q.value.trim() && opts().length >= 2); add.hidden = $$('input', box).length >= 6; };
+    sh.addEventListener('input', check);
+    add.onclick = () => { const n = $$('input', box).length + 1; box.insertAdjacentHTML('beforeend', `<input class="inp" maxlength="60" placeholder="Вариант ${n}" aria-label="Вариант ${n}">`); box.lastElementChild.focus(); check(); };
+    go.onclick = () => {
+      const c = chatById(UI.route.chat); closeOverlay();
+      addMessage(c, { from: 'me', kind: 'poll', poll: { q: q.value.trim(), opts: opts().map(t => ({ t, v: 0 })), my: -1 } });
+    };
+  });
+}
+function eventSheet() {
+  const d = new Date(Date.now() + 864e5); const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  openSheet('Новое мероприятие', `<h3>Новое мероприятие</h3>
+    <label class="lbl" for="evT" style="margin-top:0">Название</label><input class="inp" id="evT" maxlength="80" placeholder="Встреча команды">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="lbl" for="evD">Дата</label><input class="inp" id="evD" type="date" value="${iso}" min="${iso.slice(0, 8)}01"></div>
+      <div><label class="lbl" for="evH">Время</label><input class="inp" id="evH" type="time" value="18:00"></div></div>
+    <button type="button" class="btn primary block" id="evGo" style="margin-top:16px" disabled>Создать мероприятие</button>`, sh => {
+    const t = $('#evT', sh), go = $('#evGo', sh); t.focus();
+    sh.addEventListener('input', () => { go.disabled = !(t.value.trim() && $('#evD', sh).value && $('#evH', sh).value); });
+    go.onclick = () => {
+      const [y, mo, da] = $('#evD', sh).value.split('-').map(Number), [h, mi] = $('#evH', sh).value.split(':').map(Number);
+      const c = chatById(UI.route.chat); closeOverlay();
+      addMessage(c, { from: 'me', kind: 'event', event: { title: t.value.trim(), at: new Date(y, mo - 1, da, h, mi).getTime(), going: 1, me: true } });
+    };
+  });
+}
+/* Simulate the other side reacting to polls and events */
+function simulateReaction(c, m) {
+  const people = c.type === 'direct' ? [c.cid] : c.members.slice(0, 2);
+  people.forEach((p, k) => setTimeout(() => {
+    if (m.kind === 'poll') m.poll.opts[Math.floor(Math.random() * m.poll.opts.length)].v++;
+    else if (m.kind === 'event') m.event.going++;
+    save(); refreshChat(c.id);
+  }, 2600 + k * 1500));
 }
 
 /* =========================================================
@@ -775,12 +920,6 @@ function newStorySheet() {
     b.onclick = () => { S.myStory = { ts: Date.now(), slides: [{ text: ta.value.trim(), g }] }; save(); closeOverlay(); renderStories(); toast('История опубликована на 24 часа'); };
   });
 }
-function attachSheet() {
-  openSheet('Прикрепить', `<h3>Прикрепить</h3>
-    <button type="button" class="opt" data-act="send-photo"><span class="ico" style="background:#5B4BFF">${ic('image', 20)}</span>Фото или видео</button>
-    <button type="button" class="opt" data-act="send-file"><span class="ico" style="background:#EA580C">${ic('file', 20)}</span>Файл</button>`);
-}
-
 /* =========================================================
    Calls
    ========================================================= */
@@ -901,13 +1040,22 @@ document.addEventListener('click', async e => {
     case 'logout': if (await confirmDialog({ title: 'Выйти из Aloqa?', text: 'Переписки на этом устройстве будут удалены.', ok: 'Выйти', danger: true })) { try { localStorage.removeItem(KEY); } catch (err) { /* ignore */ } S = seed(); OB.step = 1; OB.phone = ''; UI.route = {}; $('#app').innerHTML = ''; history.replaceState(null, '', location.pathname); renderApp(); } break;
     // conversation
     case 'send': if ($('#msgInput').value.trim()) sendText(); else startRec(); break;
-    case 'rec-cancel': stopRec(false); toast('Запись удалена'); break;
+    case 'rec-delete': stopRec(false); toast('Запись удалена'); break;
     case 'rec-send': stopRec(true); break;
-    case 'emoji': { UI.emoji = !UI.emoji; $('#emojiPanel').hidden = !UI.emoji; el.setAttribute('aria-expanded', UI.emoji); if (UI.emoji) $('#emojiPanel button').focus(); break; }
+    case 'emoji': toggleEmoji(); break;
     case 'emoji-pick': { const ta = $('#msgInput'); const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + el.dataset.e + ta.value.slice(ta.selectionEnd ?? s); ta.dispatchEvent(new Event('input')); ta.focus(); ta.selectionStart = ta.selectionEnd = s + el.dataset.e.length; break; }
-    case 'attach': attachSheet(); break;
-    case 'send-photo': closeOverlay(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360) }); break;
-    case 'send-file': closeOverlay(); addMessage(c, { from: 'me', kind: 'file', name: 'Макет_Aloqa.fig', size: '2,4 МБ' }); break;
+    case 'attach': toggleAttach(); break;
+    case 'att-photo': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360) }); break;
+    case 'att-camera': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360), caption: 'Снимок с камеры' }); break;
+    case 'att-location': closePanels(); addMessage(c, { from: 'me', kind: 'location', lat: 38.5598, lon: 68.7870, addr: 'Душанбе, проспект Рудаки' }); break;
+    case 'att-contact': closePanels(); contactSheet(); break;
+    case 'att-doc': closePanels(); addMessage(c, { from: 'me', kind: 'file', name: 'Макет_Aloqa.pdf', size: '2,4 МБ' }); break;
+    case 'att-poll': closePanels(); pollSheet(); break;
+    case 'att-event': closePanels(); eventSheet(); break;
+    case 'pick-contact': closeOverlay(); addMessage(c, { from: 'me', kind: 'contact', cid: el.dataset.cid }); break;
+    case 'vote': { const [ch, m] = findMsg(el.dataset.id); if (!m || m.poll.my >= 0) break; m.poll.my = +el.dataset.i; m.poll.opts[m.poll.my].v++; save(); refreshChat(ch.id); break; }
+    case 'event-go': { const [ch, m] = findMsg(el.dataset.id); if (!m) break; m.event.me = !m.event.me; m.event.going += m.event.me ? 1 : -1; save(); refreshChat(ch.id); toast(m.event.me ? 'Вы идёте на мероприятие' : 'Участие отменено'); break; }
+    case 'rec-pause': toggleRecPause(el); break;
     case 'play': toggleVoice(el.dataset.id); break;
     case 'cancel-reply': setReply(null); $('#msgInput').focus(); break;
     case 'm-reply': closeOverlay(); setTimeout(() => setReply(findMsg(el.dataset.id)[1]), 180); break;
@@ -941,7 +1089,7 @@ function editNameSheet() {
 /* Long-press / right-click on a message opens actions */
 let lp = null;
 document.addEventListener('pointerdown', e => {
-  const b = e.target.closest('.b'); if (!b || e.target.closest('button') || e.button !== 0) return;
+  const b = e.target.closest('.b'); if (!b || e.target.closest('button, a, input') || e.button !== 0) return;
   const x = e.clientX, y = e.clientY;
   lp = { b, x, y, t: setTimeout(() => { b.classList.add('pressed'); if (navigator.vibrate) navigator.vibrate(10); msgActions(b.dataset.mid); setTimeout(() => b.classList.remove('pressed'), 200); lp = null; }, 450) };
 });
@@ -953,7 +1101,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (UI.story) return closeStory();
     if ($('#overlay').innerHTML) return closeOverlay();
-    if (UI.emoji) { UI.emoji = false; $('#emojiPanel').hidden = true; $('[data-act="emoji"]').setAttribute('aria-expanded', 'false'); return; }
+    if (UI.emoji || UI.attach) { closePanels(); const ta = $('#msgInput'); if (ta) ta.focus(); return; }
   }
   if (UI.story) { if (e.key === 'ArrowRight') nextStory(); if (e.key === 'ArrowLeft') prevStory(); }
   const b = document.activeElement && document.activeElement.classList.contains('b') ? document.activeElement : null;
