@@ -205,7 +205,7 @@ class Config:
             markups[tier] = Decimal(_env(f"DONATIX_MARKUP_{tier.upper()}", default))
         pay_methods = {code: _env(f"DONATIX_PAY_{code.upper()}") for code in PAY_METHODS}
         pay_methods = {k: v.replace("\\n", "\n") for k, v in pay_methods.items() if v}
-        kind_markups = {"steam_topup": Decimal(_env("DONATIX_MARKUP_STEAM", "1.5"))}
+        kind_markups = {"steam_topup": Decimal(_env("DONATIX_MARKUP_STEAM", "4.4"))}   # 4.4%: с 1000 с. через SmartPay (−2%) и налог 6% с прибыли — ≈20 с. чистыми
         if _env("DONATIX_MARKUP_STEAM_GIFT"):
             kind_markups["steam_gift"] = Decimal(_env("DONATIX_MARKUP_STEAM_GIFT"))
         return cls(
