@@ -11,8 +11,8 @@ def _ff(conn):
     return conn.execute("SELECT id FROM products WHERE id LIKE 'topup-ff-%' ORDER BY id LIMIT 1").fetchone()["id"]
 
 
-def _start(conn, pid, price="49", days="3"):
-    data = promo.save(conn, product_id=pid, price_tjs=price, days=days, title="Ваучер на месяц", on=True)
+def _start(conn, pid, price="49", days="3", once=False):
+    data = promo.save(conn, product_id=pid, price_tjs=price, days=days, title="Ваучер на месяц", on=True, once=once)
     cache.clear()
     return data
 
@@ -201,7 +201,7 @@ def test_one_promo_voucher_per_buyer(conn, config, supplier, monkeypatch):
     """По акции — 1 раз на покупателя (аккаунт сайта или бота; покупки до правила тоже в счёт).
     Дальше — обычная цена с объяснением; 2 шт. сразу — отказ с причиной; другой покупатель — по акции."""
     pid = _ff(conn)
-    _start(conn, pid)
+    _start(conn, pid, once=True)
     product = catalog.get_product(conn, pid)
 
     def make(login):
@@ -239,3 +239,22 @@ def test_one_promo_voucher_per_buyer(conn, config, supplier, monkeypatch):
         assert exc.code == "promo_limit" and "1 раз" in str(exc) and "dx-" in str(exc)
     assert balance(conn, c) == left
     assert promo.banner(conn, config)["limit"]
+
+
+def test_promo_without_limit_buy_many_times(conn, config, supplier):
+    """Без галочки «1 раз» — по цене акции можно купить сколько угодно раз и штук."""
+    pid = _ff(conn)
+    _start(conn, pid)
+    product = catalog.get_product(conn, pid)
+    uid = accounts.create_user(conn, email="many@example.com", login="many", password="password123", status="active")
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 5_000_000, "Пополнение")
+    unit = int(promo.unit_usd(config, None, pid) * 10_000)
+    fields = {f["key"]: "111222333" for f in product["fields"]}
+    for i in range(3):
+        order, _ = orders.create_order(conn, config, supplier, accounts.get_user(conn, uid), product_id=pid,
+                                       quantity=1, fields=fields, client_idem_key=f"m{i}", source="panel")
+        cache.clear()
+        assert order["total_micro"] == unit
+    assert promo.unit_usd(config, accounts.get_user(conn, uid), pid) is not None
+    assert not promo.banner(conn, config)["limit"]

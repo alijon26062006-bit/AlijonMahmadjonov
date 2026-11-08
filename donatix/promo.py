@@ -46,7 +46,13 @@ def active(conn: sqlite3.Connection, now: float | None = None) -> dict[str, Any]
     return p if float(p.get("starts", 0)) <= now < float(p.get("ends", 0)) else None
 
 
-def save(conn: sqlite3.Connection, *, product_id: str, price_tjs: str, days: str, title: str, on: bool) -> dict:
+def once(p: dict[str, Any] | None) -> bool:
+    """Лимит «1 раз на покупателя» — только если админ его включил. Без галочки — покупай сколько хочешь."""
+    return bool(p and p.get("once"))
+
+
+def save(conn: sqlite3.Connection, *, product_id: str, price_tjs: str, days: str, title: str, on: bool,
+         once: bool = False) -> dict:
     product_id = product_id.strip()[:120]
     if not product_id:
         raise ValueError("Выберите товар.")
@@ -64,7 +70,7 @@ def save(conn: sqlite3.Connection, *, product_id: str, price_tjs: str, days: str
     same = old.get("product_id") == product_id and old.get("price_tjs") == str(price) and old.get("on")
     starts = float(old["starts"]) if same and float(old.get("ends", 0)) > now else now
     data = {"product_id": product_id, "price_tjs": str(price), "title": title.strip()[:80], "on": on,
-            "days": str(n_days), "starts": starts, "ends": starts + float(n_days) * 86400}
+            "days": str(n_days), "starts": starts, "ends": starts + float(n_days) * 86400, "once": bool(once)}
     db.set_setting(conn, KEY, json.dumps(data, ensure_ascii=False))
     cache.clear_everywhere(conn)
     return data
@@ -115,7 +121,7 @@ def unit_usd(config: Config, user: Any, product_id: str) -> Decimal | None:
     p = _current(config)
     if p is None or p["product_id"] != product_id or (user is not None and is_api(user)):
         return None
-    if user is not None and _used_cached(config, p, int(user["id"])):
+    if once(p) and user is not None and _used_cached(config, p, int(user["id"])):
         return None
     rate = _rate(config)
     if rate <= 0:
@@ -169,8 +175,10 @@ def _used_cached(config: Config, p: dict[str, Any], user_id: int) -> bool:
 
 
 def check(conn: sqlite3.Connection, user_id: int, qty: Any) -> None:
-    """Перед заказом по цене акции: 1 штука и 1 раз на покупателя. Иначе — ValueError с причиной."""
+    """Перед заказом по цене акции: 1 штука и 1 раз на покупателя (если лимит включён). Иначе — ValueError."""
     p = get(conn)
+    if not once(p):
+        return
     try:
         many = Decimal(str(qty)) > 1
     except InvalidOperation:
@@ -253,7 +261,7 @@ def banner(conn: sqlite3.Connection, config: Config) -> dict[str, Any] | None:
         "region_title": region_title(product.get("region")) if product.get("region") else "", "image": product.get("image_url"),
         "price": f"{new_tjs:.2f}".removesuffix(".00"), "old": str(old_tjs) if off >= 5 else "", "off": off if off >= 5 else 0,
         "ends": int(float(p["ends"])),
-        "limit": "1 раз на покупателя",
+        "limit": "1 раз на покупателя" if once(p) else "",
     }
 
 

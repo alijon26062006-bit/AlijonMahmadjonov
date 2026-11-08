@@ -1203,7 +1203,7 @@ def _promo_used(conn, user, p: dict) -> dict | None:
     """Клиент уже купил этот товар по акции — объясняем, почему сейчас обычная цена."""
     from . import promo
     a = promo.active(conn)
-    if not a or a["product_id"] != p["id"] or user is None or "id" not in user.keys():
+    if not a or not promo.once(a) or a["product_id"] != p["id"] or user is None or "id" not in user.keys():
         return None
     order = promo.used(conn, user["id"], a)
     return {"order": order, "reason": promo.LIMIT_REASON} if order else None

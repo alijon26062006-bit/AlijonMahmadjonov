@@ -1124,14 +1124,16 @@ def promo_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_co
 
 @router.post("/promo", dependencies=[Depends(check_csrf)])
 def promo_save(request: Request, product_id: str = Form(""), price_tjs: str = Form(""), days: str = Form("3"),
-               title: str = Form(""), action: str = Form("save"), admin=Depends(admin_user), conn=Depends(get_conn)):
+               title: str = Form(""), once: str = Form(""), action: str = Form("save"), admin=Depends(admin_user),
+               conn=Depends(get_conn)):
     from . import promo
     if action == "stop":
         promo.stop(conn)
         flash(request, "Акция остановлена — цена снова обычная.")
         return _back("/admin/promo")
     try:
-        promo.save(conn, product_id=product_id, price_tjs=price_tjs, days=days, title=title, on=True)
+        promo.save(conn, product_id=product_id, price_tjs=price_tjs, days=days, title=title, on=True,
+                   once=bool(once))
         flash(request, "Акция запущена — баннер уже на главной.")
     except ValueError as exc:
         flash(request, str(exc), "error")

@@ -35,6 +35,8 @@
     <div><label for="dd">Сколько дней</label><input id="dd" name="days" inputmode="decimal" value="{{ promo.days or '3' }}"></div>
     <div><label for="tt">Заголовок (необязательно)</label><input id="tt" name="title" maxlength="80" value="{{ promo.title or 'Ваучер на месяц' }}"></div>
   </div>
+  <label style="font-weight:400;margin-top:12px"><input type="checkbox" name="once" value="1" {{ 'checked' if promo.once }} style="width:auto;min-height:0">
+    Только 1 раз на покупателя (без галочки — покупают по акции сколько хотят)</label>
   <p class="muted small">Если товар и цена те же, а акция ещё идёт — таймер не сбрасывается.</p>
   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
     <button class="btn primary" name="action" value="save">{{ 'Сохранить' if live else 'Запустить акцию' }}</button>
