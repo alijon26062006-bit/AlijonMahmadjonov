@@ -232,6 +232,23 @@ def _scale_once(conn: sqlite3.Connection) -> None:
     cache.clear("dcoin:")
 
 
+def _promo_back_once(conn: sqlite3.Connection) -> None:
+    """Один раз: вернуть в копилку всё, что акция забрала (без лимита «1 раз» это обвалило цену на 85%).
+    Дальше акция копилку не трогает (promo.settle) — цена D-коина от акций не зависит."""
+    if db.get_setting(conn, "dcoin.promo_back_v1"):
+        return
+    db.set_setting(conn, "dcoin.promo_back_v1", db.now())
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'promo_ledger'").fetchone() is None:
+        return
+    back = int(conn.execute("SELECT COALESCE(SUM(taken), 0) FROM promo_ledger").fetchone()[0])
+    row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
+    if back <= 0 or row is None:
+        return
+    _point(conn, int(row["pool"]) + back, int(row["supply"]), "promo_back", reserve=int(row["reserve"]))
+    from . import cache
+    cache.clear("dcoin:")
+
+
 def _scale(conn: sqlite3.Connection) -> float:
     """Во сколько раз цена на графике выше «копилка ÷ монеты» (1 — пока не поднимали)."""
     try:
@@ -245,6 +262,7 @@ def state(conn: sqlite3.Connection) -> dict[str, int]:
     _rebase(conn)
     _retarget(conn)
     _scale_once(conn)
+    _promo_back_once(conn)
     row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
         return {"pool": 0, "supply": 0, "reserve": 0}

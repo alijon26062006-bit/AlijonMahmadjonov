@@ -201,18 +201,11 @@ def record(conn: sqlite3.Connection, order_id: int, micro: int) -> None:
 
 
 def settle(conn: sqlite3.Connection, order_id: int) -> int:
-    """Заказ ваучера выполнен — минус забираем из копилки D-коина (один раз). Вернёт, сколько забрали."""
+    """Заказ ваучера выполнен — отмечаем. Из копилки D-коина больше НЕ забираем: акция без лимита
+    обрушила цену D (−85%). Минус акции — просто меньше прибыли магазина. Вернёт 0."""
     _ensure(conn)
-    row = conn.execute("SELECT l.micro FROM promo_ledger l JOIN orders o ON o.id = l.order_id "
-                       "WHERE l.order_id = ? AND l.micro > 0 AND l.settled = 0 AND o.status = 'completed'",
-                       (order_id,)).fetchone()
-    if row is None:
-        return 0
-    from . import dcoin
-    taken = dcoin.take_for_promo(conn, int(row["micro"]))
-    conn.execute("UPDATE promo_ledger SET taken = ?, settled = 1 WHERE order_id = ? AND settled = 0",
-                 (taken, order_id))
-    return taken
+    conn.execute("UPDATE promo_ledger SET settled = 1 WHERE order_id = ? AND settled = 0", (order_id,))
+    return 0
 
 
 def settle_all(conn: sqlite3.Connection) -> int:

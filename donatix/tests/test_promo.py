@@ -156,7 +156,8 @@ def test_other_goods_price_unchanged(conn, config, supplier):
     assert orders.quote(config, user, catalog.get_product(conn, other), 1)["total_micro"] == before
 
 
-def test_loss_taken_from_dcoin_pool_on_completion(conn, config, supplier):
+def test_promo_does_not_touch_dcoin_pool(conn, config, supplier):
+    """Акция больше не забирает из копилки D-коина: цена D от продаж по акции не падает."""
     dcoin = _dcoin_on(conn)
     pid = _ff(conn)
     _start(conn, pid, price="1")
@@ -164,18 +165,32 @@ def test_loss_taken_from_dcoin_pool_on_completion(conn, config, supplier):
     with db.tx(conn):
         accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
     order = _buy(conn, config, supplier, uid, pid, "d1")
-    t = promo.totals(conn)
-    assert t["sold"] == 1 and t["lost"] > 0 and t["back"] == 0     # заказ ещё в работе — копилку не трогаем
-    pool_before, price_before = dcoin.state(conn)["pool"], dcoin.price(conn)
-
+    pool_before = dcoin.state(conn)["pool"]
     orders.process_pending(conn, supplier)                          # выполнен
     assert conn.execute("SELECT status FROM orders WHERE id = ?", (order["id"],)).fetchone()[0] == "completed"
-    t = promo.totals(conn)
-    assert t["back"] == t["lost"] and t["left"] == 0
-    s = dcoin.state(conn)
-    assert s["pool"] < pool_before + 1 and dcoin.price(conn) < price_before + 1e-18
-    assert conn.execute("SELECT 1 FROM dcoin_points WHERE reason = 'promo'").fetchone()
-    assert promo.settle(conn, order["id"]) == 0                    # второй раз — не забираем
+    assert promo.totals(conn)["sold"] == 1 and promo.totals(conn)["back"] == 0
+    assert dcoin.state(conn)["pool"] >= pool_before
+    assert conn.execute("SELECT 1 FROM dcoin_points WHERE reason = 'promo'").fetchone() is None
+
+
+def test_taken_by_old_promo_returned_once(conn, config, supplier):
+    """Что акция уже забрала из копилки раньше — один раз возвращается, цена поднимается обратно."""
+    dcoin = _dcoin_on(conn)
+    pid = _ff(conn)
+    _start(conn, pid, price="1")
+    uid = accounts.create_user(conn, email="r@example.com", login="ret1", password="password123", status="active")
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
+    order = _buy(conn, config, supplier, uid, pid, "r1")
+    pool = dcoin.state(conn)["pool"]
+    taken = dcoin.take_for_promo(conn, pool // 2)                  # как было в старой версии
+    conn.execute("UPDATE promo_ledger SET taken = ?, settled = 1 WHERE order_id = ?", (taken, order["id"]))
+    low = dcoin.price(conn)
+    db.set_setting(conn, "dcoin.promo_back_v1", "")
+    assert dcoin.state(conn)["pool"] == dcoin.state(conn)["pool"] and dcoin.price(conn) > low
+    back_pool = dcoin.state(conn)["pool"]
+    assert back_pool >= pool - 1
+    assert dcoin.state(conn)["pool"] == back_pool                  # второй раз не добавляет
 
 
 def test_failed_order_not_counted(conn, config, supplier):
