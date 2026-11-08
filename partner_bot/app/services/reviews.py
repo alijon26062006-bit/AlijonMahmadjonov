@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import aiosqlite
 from aiogram import Bot
@@ -35,13 +36,59 @@ def channel() -> str:
     return (runtime.get("reviews_channel") or "").strip()
 
 
+INVITE_HINT = ("Это ссылка-приглашение закрытого канала — по ней бот канал не найдёт. "
+               "Перешлите сюда любой пост из канала, и бот возьмёт его сам.")
+
+
+def parse_channel(raw: str) -> tuple[str | int | None, str]:
+    """@kanal, kanal, t.me/kanal, https://t.me/kanal/123, -100… → цель для Telegram.
+    Раньше ссылку сохраняли как есть и писали в «@https://t.me/…» — отзывы не уходили."""
+    value = (raw or "").strip()
+    if not value:
+        return None, "Канал не указан."
+    if value.lstrip("-").isdigit():
+        return int(value), ""
+    m = re.match(r"^(?:https?://)?(?:www\.)?(?:t|telegram)\.(?:me|dog)/(.+)$", value, re.I)
+    if m:
+        path = m.group(1).split("?")[0].strip("/")
+        if path.startswith(("+", "joinchat")):
+            return None, INVITE_HINT
+        if path.startswith("c/"):   # t.me/c/1234567/89 — ссылка на пост закрытого канала
+            num = path.split("/")[1] if len(path.split("/")) > 1 else ""
+            return (int("-100" + num), "") if num.isdigit() else (None, INVITE_HINT)
+        value = path.split("/")[0]
+    name = value.lstrip("@")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{3,31}", name):
+        return None, "Не понял канал. Пришлите @kanal, ссылку t.me/kanal или перешлите пост из канала."
+    return "@" + name, ""
+
+
 def channel_target() -> str | int | None:
-    target = channel()
-    if not target:
-        return None
-    if target.lstrip("-").isdigit():
-        return int(target)
-    return target if target.startswith("@") else f"@{target.lstrip('@')}"
+    target, _ = parse_channel(channel())
+    return target
+
+
+async def check_channel(bot: Bot, target: str | int) -> tuple[str | None, str]:
+    """Канал есть и бот может в нём писать? → (что сохранить, ошибка)."""
+    try:
+        chat = await bot.get_chat(target)
+    except TelegramAPIError:
+        return None, ("Бот не видит этот канал. Добавьте бота в канал администратором "
+                      "(«Управление каналом» → «Администраторы» → «Добавить»), потом пришлите канал ещё раз.")
+    try:
+        me = await bot.get_me()
+        member = await bot.get_chat_member(chat.id, me.id)
+    except TelegramAPIError:
+        member = None
+    status = getattr(member, "status", "")
+    status = getattr(status, "value", status)
+    if status == "creator":
+        pass
+    elif status != "administrator":
+        return None, "Бот в канале не администратор. Сделайте его администратором с правом «Публикация сообщений»."
+    elif chat.type == "channel" and getattr(member, "can_post_messages", True) is False:
+        return None, "У бота нет права «Публикация сообщений». Включите его в настройках администратора канала."
+    return (f"@{chat.username}" if chat.username else str(chat.id)), ""
 
 
 def author_of(user: db.User | None) -> str:

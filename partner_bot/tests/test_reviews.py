@@ -395,6 +395,48 @@ async def past_buyers(conn, storage) -> None:
           "Никнейм: <i>не установлен</i>" in card, card)
     check("вместо него в подписи имя", "подпишут в канале: Безымянный" in card, card)
 
+    # канал задан ссылкой — раньше бот писал в «@https://t.me/…» и отзывы не уходили
+    for raw, want in (("https://t.me/moi_otzyvy", "@moi_otzyvy"), ("t.me/moi_otzyvy/12", "@moi_otzyvy"),
+                      ("@moi_otzyvy", "@moi_otzyvy"), ("moi_otzyvy", "@moi_otzyvy"),
+                      ("-1001234567890", -1001234567890), ("https://t.me/c/1234567890/5", -1001234567890)):
+        got, _ = svc.parse_channel(raw)
+        check(f"канал понят: {raw}", got == want, str(got))
+    bad, why = svc.parse_channel("https://t.me/+AbCdEf123")
+    check("ссылка-приглашение: объясняем, что переслать пост", bad is None and "Перешлите" in why, why)
+    await runtime.set_value(conn, "reviews_channel", "https://t.me/moi_otzyvy")
+    check("старое значение-ссылка тоже работает", svc.channel_target() == "@moi_otzyvy")
+    check("ссылка на канал в меню верная", keyboards.reviews_link() == "https://t.me/moi_otzyvy",
+          keyboards.reviews_link())
+
+    class ChanBot(FakeBot):
+        def __init__(self, status="administrator", can_post=True, exists=True):
+            super().__init__()
+            self.status, self.can_post, self.exists = status, can_post, exists
+
+        async def get_chat(self, target):
+            if not self.exists:
+                from aiogram.exceptions import TelegramBadRequest
+                raise TelegramBadRequest(method=None, message="chat not found")
+            from types import SimpleNamespace
+            return SimpleNamespace(id=-1001234567890, username="moi_otzyvy", type="channel")
+
+        async def get_me(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(id=42)
+
+        async def get_chat_member(self, chat_id, user_id):
+            from types import SimpleNamespace
+            return SimpleNamespace(status=self.status, can_post_messages=self.can_post)
+
+    stored, err = await svc.check_channel(ChanBot(), "@moi_otzyvy")
+    check("бот админ с правом публикации — канал принят", stored == "@moi_otzyvy" and not err, err)
+    stored, err = await svc.check_channel(ChanBot(status="member"), "@moi_otzyvy")
+    check("бот не админ — понятная ошибка", stored is None and "администратор" in err, err)
+    stored, err = await svc.check_channel(ChanBot(can_post=False), "@moi_otzyvy")
+    check("нет права публикации — понятная ошибка", stored is None and "Публикация" in err, err)
+    stored, err = await svc.check_channel(ChanBot(exists=False), "@moi_otzyvy")
+    check("бот не в канале — понятная ошибка", stored is None and "не видит" in err, err)
+
 
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):

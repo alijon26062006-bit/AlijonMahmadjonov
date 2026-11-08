@@ -1,6 +1,8 @@
 """Клиент ставит оценку и пишет отзыв; владелец решает, публиковать ли."""
 from __future__ import annotations
 
+import html
+
 import aiosqlite
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -129,7 +131,7 @@ async def cb_publish(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) 
         await call.answer("Не отправилось", show_alert=True)
         await call.message.answer(
             "❌ <b>Отзыв не ушёл в канал</b>\n\n"
-            f"<blockquote expandable>{result}</blockquote>\n\n"
+            f"<blockquote expandable>{html.escape(result)}</blockquote>\n\n"
             "<blockquote>Проверьте: канал указан в панели, бот добавлен "
             "в него администратором с правом писать.</blockquote>"
         )

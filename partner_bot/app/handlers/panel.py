@@ -631,10 +631,12 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "он не сможет проверить подписку.\n\n"
                         "<code>-</code> — убрать проверку:", "text"),
     "reviews_channel": ("📣 Канал отзывов",
-                        "Куда публиковать одобренные отзывы: <code>@kanal</code> "
-                        "или числовой ID.\n\n"
-                        "Бот должен быть в канале администратором с правом "
-                        "публиковать. Пришлите <code>-</code>, чтобы убрать:",
+                        "Куда публиковать одобренные отзывы. Пришлите "
+                        "<code>@kanal</code>, ссылку <code>t.me/kanal</code> "
+                        "или <b>перешлите сюда любой пост из канала</b> "
+                        "(так можно и с закрытым каналом).\n\n"
+                        "Сначала добавьте бота в канал администратором с правом "
+                        "«Публикация сообщений». Пришлите <code>-</code>, чтобы убрать:",
                         "text"),
     "supplier_rate_per_min": ("⏱ Запросов к поставщику в минуту",
                              "Сколько запросов в минуту разрешает поставщик "
@@ -799,14 +801,54 @@ async def cb_set_field(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
+@router.message(Panel.value, F.forward_origin)
+async def on_field_forward(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot,
+) -> None:
+    """Канал отзывов пересланным постом — подходит и для закрытого канала."""
+    data = await state.get_data()
+    if data.get("field") != "reviews_channel":
+        await message.answer("Пришлите значение текстом.")
+        return
+    chat = getattr(message.forward_origin, "chat", None)
+    if chat is None:
+        await message.answer("Перешлите пост именно из канала (не от человека).")
+        return
+    await _save_reviews_channel(message, state, conn, bot, chat.id)
+
+
+async def _save_reviews_channel(message: Message, state: FSMContext, conn: aiosqlite.Connection,
+                                bot: Bot, target) -> None:
+    stored, error = await reviews_service.check_channel(bot, target)
+    if stored is None:
+        await message.answer(f"❌ {esc(error)}")
+        return
+    await runtime.set_value(conn, "reviews_channel", stored)
+    await state.clear()
+    await message.answer(
+        f"✅ <b>Канал отзывов</b> → <b>{esc(stored)}</b>\n\n"
+        "Бот проверил: он в канале администратор и может публиковать. "
+        "Теперь «Опубликовать» отправит отзыв туда.",
+        reply_markup=back_kb("pn:reviews", "‹ К отзывам"),
+    )
+
+
 @router.message(Panel.value, F.text)
 async def on_field_value(
     message: Message, state: FSMContext, conn: aiosqlite.Connection,
-    provider=None,
+    provider=None, bot: Bot | None = None,
 ) -> None:
     data = await state.get_data()
     field = data.get("field", "")
     raw = (message.text or "").strip()
+
+    if field == "reviews_channel" and raw != "-" and bot is not None:
+        target, error = reviews_service.parse_channel(raw)
+        if target is None:
+            await message.answer(f"❌ {esc(error)}")
+            return
+        await _save_reviews_channel(message, state, conn, bot, target)
+        return
 
     # Своя цена пакета: ключ вида game_price:игра:пакет.
     if field.startswith("game_price:"):

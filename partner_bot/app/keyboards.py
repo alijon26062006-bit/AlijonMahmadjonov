@@ -100,9 +100,11 @@ def labeled(icon: str, text: str) -> str:
 def reviews_link() -> str:
     """Ссылка на канал отзывов. Канал из панели важнее ссылки из .env —
     иначе владельцу пришлось бы задавать одно и то же дважды."""
-    channel = (runtime.get("reviews_channel") or "").strip()
-    if channel and not channel.lstrip("-").isdigit():
-        return f"https://t.me/{channel.lstrip('@')}"
+    from app.services.reviews import parse_channel   # здесь: reviews сам импортирует keyboards
+
+    target, _ = parse_channel(runtime.get("reviews_channel") or "")
+    if isinstance(target, str):
+        return f"https://t.me/{target.lstrip('@')}"
     return settings.reviews_url
 
 
