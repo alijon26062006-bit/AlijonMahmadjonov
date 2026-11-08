@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aloqa</title>
+<meta name="description" content="Aloqa — мессенджер: чаты, истории, голосовые сообщения и звонки.">
+<meta name="theme-color" content="#F4F5FA">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script>
+  /* Apply saved theme before first paint to avoid a light/dark flash */
+  (function () {
+    var t = 'system';
+    try { t = (JSON.parse(localStorage.getItem('aloqa.v1')) || {}).settings.theme || 'system'; } catch (e) {}
+    if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Перейти к содержимому</a>
+<div id="app" class="app"></div>
+<div id="overlay"></div>
+<div id="callLayer"></div>
+<div id="storyLayer"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
