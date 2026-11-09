@@ -1,0 +1,14 @@
+{
+  "name": "aloqa-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted server for the Aloqa messenger: web app, API, real-time WebSocket delivery and temporary media storage.",
+  "main": "server.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  }
+}

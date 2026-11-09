@@ -575,3 +575,13 @@ select.inp { width: auto; flex: none; appearance: none; padding-right: 14px; cur
 .sheet .grab::after { content: ""; width: 40px; height: 5px; border-radius: 3px; background: var(--border); }
 .sheet h3 { touch-action: none; }
 .attach-panel, .emoji-panel, .recwrap { animation-timing-function: var(--ease-ios); animation-duration: 320ms; }
+
+/* ---------- Real media (online mode) ---------- */
+.pic { position: relative; background: var(--bg-subtle); }
+.pic img, .pic video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+.pic video { object-fit: contain; }
+.pic.expired { display: grid; place-items: center; align-content: center; gap: 6px; color: var(--text-2); font-size: 13px; font-weight: 600; aspect-ratio: 260 / 120; }
+.b.out .pic.expired { background: rgba(255, 255, 255, .15); color: rgba(255, 255, 255, .85); }
+.pic .upl { position: absolute; inset: auto 8px 8px auto; background: rgba(0, 0, 0, .55); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 10px; font-variant-numeric: tabular-nums; }
+a.file { color: inherit; border-radius: 12px; }
+a.file:hover b { text-decoration: underline; }

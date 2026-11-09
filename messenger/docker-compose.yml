@@ -1,0 +1,29 @@
+services:
+  aloqa:
+    build: .
+    restart: unless-stopped
+    environment:
+      TRUST_PROXY: "1"
+      MEDIA_TTL_HOURS: "${MEDIA_TTL_HOURS:-72}"   # сколько часов хранить фото/видео/голосовые
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-50}"       # максимальный размер файла
+    volumes:
+      - aloqa-data:/data
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on: [aloqa]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN:?Укажите DOMAIN в файле .env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  aloqa-data:
+  caddy-data:
+  caddy-config:

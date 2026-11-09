@@ -6,6 +6,7 @@
 
 const KEY = 'aloqa.v1';
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const NET = window.NET || { on: false };
 const isMobile = () => !matchMedia('(min-width: 900px)').matches;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -182,8 +183,10 @@ function seed() {
 
 /* ---------- State ---------- */
 let S = load() || seed();
-function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 ? s : null; } catch (e) { return null; } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable: keep in memory */ } }
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 && Array.isArray(s.chats) ? s : null; } catch (e) { return null; } }
+function save() {
+  if (NET.on) { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, settings: S.settings })); } catch (e) { /* ignore */ } return; }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable: keep in memory */ } }
 
 const UI = {
   route: {}, query: '', folder: 'all', callFilter: 'all', contactQuery: '',
@@ -209,9 +212,10 @@ function bodyText(m) {
   switch (m.kind) {
     case 'voice': return 'Голосовое сообщение · ' + dur(m.dur);
     case 'image': return m.caption || 'Фото';
+    case 'video': return m.caption || 'Видео';
     case 'file': return m.name;
     case 'location': return 'Геопозиция: ' + m.addr;
-    case 'contact': return 'Контакт: ' + person(m.cid).name;
+    case 'contact': return 'Контакт: ' + ((person(m.cid) || m.card || {}).name || '');
     case 'poll': return 'Опрос: ' + m.poll.q;
     case 'event': return 'Мероприятие: ' + m.event.title;
     default: return m.text;
@@ -221,7 +225,7 @@ function bodyPreview(m) {
   const K = { location: 'mapPin', contact: 'userCircle', poll: 'poll', event: 'calendar' };
   if (K[m.kind]) return `<span class="pv">${ic(K[m.kind], 14)}${esc(bodyText(m))}</span>`;
   if (m.kind === 'voice') return `<span class="pv brand">${ic('mic', 14)}Голосовое · ${dur(m.dur)}</span>`;
-  if (m.kind === 'image') return `<span class="pv">${ic('image', 14)}${esc(m.caption || 'Фото')}</span>`;
+  if (m.kind === 'image' || m.kind === 'video') return `<span class="pv">${ic(m.kind === 'video' ? 'video' : 'image', 14)}${esc(bodyText(m))}</span>`;
   if (m.kind === 'file') return `<span class="pv">${ic('file', 14)}${esc(m.name)}</span>`;
   return esc(m.text);
 }
@@ -281,7 +285,7 @@ function renderOnboarding() {
       </div>
       <form class="body" id="phoneForm" novalidate>
         <h1>Общайтесь<br>без <span>границ</span></h1>
-        <p class="lead">Быстрые сообщения, звонки и истории. Сквозное шифрование для каждого чата.</p>
+        <p class="lead">Быстрые сообщения, голосовые, фото и видео — через ваш собственный сервер.</p>
         <label class="lbl" for="phone">Номер телефона</label>
         <div class="phone-in">
           <label class="sr-only" for="cc">Код страны</label>
@@ -306,9 +310,11 @@ function renderOnboarding() {
         $('#phoneErr').innerHTML = `<p class="err">${ic('alert', 16)}Введите ${need()} цифр номера — без кода страны</p>`;
         inp.focus(); return;
       }
+      if (NET.on) return NET.phoneSubmit($('#phoneBtn'));
       busy($('#phoneBtn'), () => { OB.step = 2; renderOnboarding(); });
     });
   } else if (OB.step === 2) {
+    if (NET.on) return NET.renderPassStep();
     app.innerHTML = `<div class="ob"><div class="ob-in" id="main">
       <div class="top-nav"><button class="ib accent" type="button" id="obBack" aria-label="Назад">${ic('back', 26)}</button>${steps}</div>
       <form class="step-body" id="codeForm" novalidate>
@@ -403,6 +409,7 @@ function route() {
   const shell = $('#shell');
   if (r.chat) {
     const c = chatById(r.chat);
+    if (NET.on) NET.read(c.id);
     if (c.unread) { c.unread = 0; save(); renderChatList(); renderTabbar(); }
     if (r.info) renderInfo(c); else if (prev.chat !== r.chat || prev.info || !$('#thread')) renderConversation(c);
     shell.classList.add('show-main');
@@ -415,7 +422,7 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 function renderEmptyMain() {
-  $('#main').innerHTML = `<div class="main-empty"><div>${LOGO}<b>Выберите чат</b><p>Сообщения защищены сквозным шифрованием</p></div></div>`;
+  $('#main').innerHTML = `<div class="main-empty"><div>${LOGO}<b>Выберите чат</b><p>Или найдите друга по номеру во вкладке «Контакты»</p></div></div>`;
 }
 function renderTabbar() {
   const n = totalUnread(), t = UI.route.tab;
@@ -433,13 +440,13 @@ function renderTab() {
 /* ---------- Chats tab ---------- */
 function renderChatsTab() {
   $('#tabView').innerHTML = `
-    <header class="lh"><h1>Чаты</h1><div class="btns">
-      <button class="ib soft" type="button" data-act="new-story" aria-label="Новая история">${ic('camera', 22)}</button>
+    <header class="lh"><h1>${NET.on ? NET.title() : 'Чаты'}</h1><div class="btns">
+      ${NET.on ? '' : `<button class="ib soft" type="button" data-act="new-story" aria-label="Новая история">${ic('camera', 22)}</button>`}
       <a class="ib brand" href="#/contacts" aria-label="Новый чат">${ic('edit', 20)}</a></div></header>
     <div class="search" role="search">${ic('search', 20)}<label class="sr-only" for="chatSearch">Поиск по чатам</label>
       <input id="chatSearch" type="search" placeholder="Поиск по чатам и людям" autocomplete="off" value="${esc(UI.query)}">
       <button class="ib" type="button" data-act="clear-search" aria-label="Очистить поиск" ${UI.query ? '' : 'hidden'}>${ic('x', 18)}</button></div>
-    <div class="stories" id="stories" aria-label="Истории"></div>
+    ${NET.on ? '' : '<div class="stories" id="stories" aria-label="Истории"></div>'}
     <div class="chips" role="tablist" aria-label="Папки" id="chips"></div>
     <div class="list" id="chatList"></div>`;
   const s = $('#chatSearch');
@@ -467,7 +474,7 @@ function renderChatList() {
     return `<a class="row${c.pinned ? ' pinned' : ''}" href="#/chat/${c.id}" ${UI.route.chat === c.id ? 'aria-current="page"' : ''}>
       ${chatAv(c)}
       <span class="rc"><span class="r1"><span class="nm"><span>${esc(title)}</span>${c.verified ? `<span class="verified" title="Подтверждённый канал">${ic('verified', 16)}</span>` : ''}${c.muted ? `<span class="mute-i" title="Без звука">${ic('mute', 14)}</span>` : ''}</span>
-        ${mine && c.type !== 'channel' ? `<span class="ok" title="${m.status === 'read' ? 'Прочитано' : 'Отправлено'}">${ic(m.status === 'read' ? 'checks' : 'check', 16)}</span>` : ''}
+        ${mine && c.type !== 'channel' ? `<span class="ok" title="${m.status === 'read' ? 'Прочитано' : m.status === 'sending' ? 'Отправляется' : 'Отправлено'}">${m.status === 'sending' ? ic('clock', 14) : ic(m.status === 'read' ? 'checks' : 'check', 16)}</span>` : ''}
         <span class="tm${c.unread ? ' new' : ''}">${m ? listTime(m.ts) : ''}</span></span>
       <span class="r2"><span class="msg">${preview(c)}</span>${c.pinned && !c.unread ? `<span class="pin-i" title="Закреплён">${ic('pin', 16)}</span>` : ''}${c.unread ? `<span class="badge${c.muted ? ' muted' : ''}${c.unread > (UI.prevUnread[c.id] || 0) ? ' pop' : ''}"><span class="sr-only">Непрочитанных: </span>${c.unread}</span>` : ''}</span></span></a>`;
   }).join('');
@@ -482,6 +489,7 @@ function renderChatList() {
 
 /* ---------- Calls tab ---------- */
 function renderCallsTab() {
+  if (NET.on) { $('#tabView').innerHTML = `<header class="lh"><h1>Звонки</h1></header><div class="empty"><b>Звонки скоро</b>Голосовые и видеозвонки через ваш сервер появятся в следующем обновлении</div>`; return; }
   const list = S.calls.filter(c => UI.callFilter === 'all' || c.dir === 'missed');
   $('#tabView').innerHTML = `<header class="lh"><h1>Звонки</h1></header>
     <div class="seg" role="radiogroup" aria-label="Фильтр звонков" style="margin-top:0">
@@ -503,7 +511,7 @@ function renderCallsTab() {
 function renderContactsTab() {
   $('#tabView').innerHTML = `<header class="lh"><h1>Контакты</h1></header>
     <div class="search" role="search">${ic('search', 20)}<label class="sr-only" for="contactSearch">Поиск контактов</label>
-      <input id="contactSearch" type="search" placeholder="Поиск по имени или @username" autocomplete="off" value="${esc(UI.contactQuery)}"></div>
+      <input id="contactSearch" type="search" placeholder="${NET.on ? 'Имя или номер: +992 90 123 45 67' : 'Поиск по имени или @username'}" autocomplete="off" value="${esc(UI.contactQuery)}"></div>
     <div class="list" id="contactList"></div>`;
   const s = $('#contactSearch'); s.addEventListener('input', () => { UI.contactQuery = s.value; renderContactList(); });
   renderContactList();
@@ -512,10 +520,12 @@ function renderContactList() {
   const q = UI.contactQuery.trim().toLowerCase();
   const list = Object.entries(S.contacts).filter(([, p]) => !q || p.name.toLowerCase().includes(q) || (p.user && p.user.includes(q.replace('@', ''))))
     .sort((a, b) => (b[1].online - a[1].online) || a[1].name.localeCompare(b[1].name, 'ru'));
-  $('#contactList').innerHTML = `<button type="button" class="row" data-act="invite" style="width:100%;text-align:left"><span class="av" style="--s:48px;background:var(--brand-soft);color:var(--brand)">${ic('link', 22)}</span><span class="rc"><span class="nm" style="color:var(--brand)"><span>Пригласить друзей</span></span><span class="msg">Отправьте ссылку на Aloqa</span></span></button>
+  const digits = q.replace(/[^\d+]/g, ''), phoneQ = NET.on && /^\+?\d{9,15}$/.test(digits) ? (digits.startsWith('+') ? digits : '+' + digits) : '';
+  $('#contactList').innerHTML = (phoneQ ? `<button type="button" class="row" data-act="find-phone" data-phone="${esc(phoneQ)}" style="width:100%;text-align:left"><span class="av" style="--s:48px;background:var(--brand);color:#fff">${ic('search', 22)}</span><span class="rc"><span class="nm"><span>Найти ${esc(phoneQ)}</span></span><span class="msg">Открыть чат по номеру телефона</span></span></button>` : '')
+    + `<button type="button" class="row" data-act="invite" style="width:100%;text-align:left"><span class="av" style="--s:48px;background:var(--brand-soft);color:var(--brand)">${ic('link', 22)}</span><span class="rc"><span class="nm" style="color:var(--brand)"><span>Пригласить друзей</span></span><span class="msg">Отправьте ссылку на Aloqa</span></span></button>
     <p class="sect">${list.length} ${plural(list.length, 'контакт', 'контакта', 'контактов')}</p>`
     + (list.length ? list.map(([id, p]) => `<button type="button" class="row" data-act="open-contact" data-cid="${id}" style="width:100%;text-align:left">${av(p.ini, p.g, 48, p.online)}
-      <span class="rc"><span class="nm"><span>${esc(p.name)}</span></span><span class="msg${p.online ? ' sub-online' : ''}">${seenText(p)}</span></span></button>`).join('') : '<div class="empty"><b>Никого не нашли</b>Проверьте написание имени</div>');
+      <span class="rc"><span class="nm"><span>${esc(p.name)}</span></span><span class="msg${p.online ? ' sub-online' : ''}">${seenText(p)}</span></span></button>`).join('') : (NET.on && !q ? '<div class="empty"><b>Пока нет контактов</b>Введите номер телефона друга в поиске выше, чтобы начать чат</div>' : '<div class="empty"><b>Никого не нашли</b>' + (NET.on ? 'Введите полный номер с кодом страны' : 'Проверьте написание имени') + '</div>'));
 }
 
 /* ---------- Settings tab ---------- */
@@ -531,8 +541,8 @@ function renderSettingsTab() {
     <div class="card" style="margin-top:0">
       <div class="li"><span class="ico" style="background:#EF4444">${ic('bell', 16)}</span><span class="t"><b id="notifyLbl">Уведомления</b><small>Показывать новые сообщения</small></span>
         <button type="button" class="switch" role="switch" aria-checked="${S.settings.notify}" aria-labelledby="notifyLbl" data-act="toggle-notify"></button></div>
-      <div class="li"><span class="ico" style="background:#2563EB">${ic('shield', 16)}</span><span class="t"><b>Шифрование</b><small>Сквозное для всех личных чатов</small></span><span class="v">Включено</span></div>
-      <button type="button" class="li" data-act="reset-demo"><span class="ico" style="background:#0EA5A4">${ic('chat', 16)}</span><span class="t"><b>Сбросить демо-чаты</b><small>Вернуть исходные переписки</small></span><span class="v">${ic('chevron', 18)}</span></button>
+      <div class="li"><span class="ico" style="background:#2563EB">${ic('shield', 16)}</span><span class="t"><b>Защищённое соединение</b><small>HTTPS между телефоном и сервером</small></span><span class="v">Включено</span></div>
+      ${NET.on ? `<div class="li"><span class="ico" style="background:#0EA5A4">${ic('monitor', 16)}</span><span class="t"><b>Сервер</b><small>${esc(location.host)} · медиа хранятся ${NET.ttl} ч</small></span><span class="v">В сети</span></div>` : `<button type="button" class="li" data-act="reset-demo"><span class="ico" style="background:#0EA5A4">${ic('chat', 16)}</span><span class="t"><b>Сбросить демо-чаты</b><small>Вернуть исходные переписки</small></span><span class="v">${ic('chevron', 18)}</span></button>`}
     </div>
     <div class="card" style="margin-bottom:24px"><button type="button" class="li danger" data-act="logout">${ic('logout', 18)}Выйти</button></div>`;
 }
@@ -554,7 +564,7 @@ function renderConversation(c) {
     <header class="ch">
       <a class="ib only-mobile" href="#/chats" aria-label="Назад к чатам">${ic('back', 26)}</a>
       <a class="who" href="#/chat/${c.id}/info" aria-label="Информация: ${esc(chatTitle(c))}">${chatAv(c, 40)}<div><b>${esc(chatTitle(c))}</b><span id="convStatus">${headerStatus(c)}</span></div></a>
-      ${direct ? `<button class="ib" type="button" data-act="call" data-cid="${c.cid}" data-video="1" aria-label="Видеозвонок">${ic('video')}</button>
+      ${direct && !NET.on ? `<button class="ib" type="button" data-act="call" data-cid="${c.cid}" data-video="1" aria-label="Видеозвонок">${ic('video')}</button>
       <button class="ib" type="button" data-act="call" data-cid="${c.cid}" aria-label="Аудиозвонок">${ic('phone', 22)}</button>` : `<a class="ib" href="#/chat/${c.id}/info" aria-label="Информация">${ic('info', 22)}</a>`}
     </header>
     <div class="thread-box"><div class="thread" id="thread"><div class="thread-in" role="log" aria-live="polite" aria-relevant="additions" id="threadIn"></div></div>
@@ -574,21 +584,33 @@ function msgHTML(m, c, prev, next) {
   const out = m.from === 'me';
   const same = (a, b) => a && b && a.from === b.from && dayStart(a.ts) === dayStart(b.ts) && Math.abs(a.ts - b.ts) < 5 * 60e3;
   const first = !same(prev, m), last = !same(m, next);
-  const cls = ['b', out ? 'out' : 'in', first ? 'first' : '', last ? 'last' : '', m.kind === 'image' || m.kind === 'location' ? 'media' : '', UI.rendered.has(m.id) ? '' : 'enter'].join(' ');
+  const cls = ['b', out ? 'out' : 'in', first ? 'first' : '', last ? 'last' : '', m.kind === 'image' || m.kind === 'video' || m.kind === 'location' ? 'media' : '', UI.rendered.has(m.id) ? '' : 'enter'].join(' ');
   const author = c.type === 'group' && !out && first ? `<span class="author" style="color:${({ g2: '#E23E6B', g3: '#0E8F8E', g5: '#2563EB', g4: '#D9630B', g6: '#B21FC3', g7: '#15803D' })[person(m.from).g] || 'var(--brand)'}">${esc(person(m.from).name)}</span>` : '';
-  const st = out && c.type !== 'channel' ? `<span class="sr-only">${m.status === 'read' ? 'Прочитано' : 'Отправлено'}</span>${ic(m.status === 'read' ? 'checks' : 'check', 15)}` : '';
+  const st = out && c.type !== 'channel' ? `<span class="sr-only">${m.status === 'read' ? 'Прочитано' : m.status === 'sending' ? 'Отправляется' : 'Отправлено'}</span>${m.status === 'sending' ? ic('clock', 13) : ic(m.status === 'read' ? 'checks' : 'check', 15)}` : '';
   const meta = `<span class="mt">${hhmm(m.ts)}${st}</span>`;
   const q = m.reply ? `<span class="q"><b>${esc(m.reply.author)}</b><span>${esc(m.reply.text)}</span></span>` : '';
   let body;
-  if (m.kind === 'image') body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}<span class="pic" role="img" aria-label="${esc(m.caption || 'Фото')}">${hueGrad(m.hue || 250)}</span>${m.caption ? `<span class="cap">${esc(m.caption)}${meta}</span>` : meta}`;
+  if (m.kind === 'image' || m.kind === 'video') {
+    const label = esc(bodyText(m)), M = m.media;
+    const visual = !M ? `<span class="pic" role="img" aria-label="${label}">${hueGrad(m.hue || 250)}</span>`
+      : M.expired ? `<span class="pic expired">${ic(m.kind === 'video' ? 'video' : 'image', 28)}<small>${m.kind === 'video' ? 'Видео' : 'Фото'} удалено с сервера</small></span>`
+      : m.kind === 'video' ? `<span class="pic"><video src="${esc(M.url)}" controls playsinline preload="metadata" aria-label="${label}"></video>${m.uploading ? '<span class="upl">0%</span>' : ''}</span>`
+      : `<span class="pic"><img src="${esc(M.url)}" alt="${label}" loading="lazy">${m.uploading ? '<span class="upl">0%</span>' : ''}</span>`;
+    body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}${visual}${m.caption ? `<span class="cap">${esc(m.caption)}${meta}</span>` : meta}`;
+  }
   else if (m.kind === 'voice') {
     const h = m.wave || waveHeights(m.id);
-    body = `${author}<span class="voice" data-voice="${m.id}"><button type="button" class="play" data-act="play" data-id="${m.id}" aria-label="Воспроизвести голосовое, ${dur(m.dur)}">${ic('play', 18)}</button><span style="flex:1"><span class="wave">${h.map(x => `<i style="height:${x}px"></i>`).join('')}</span><small>${dur(m.dur)}</small></span></span>${meta}`;
-  } else if (m.kind === 'file') body = `${author}<span class="file"><span class="fi">${ic('file', 22)}</span><span><b>${esc(m.name)}</b><small>${esc(m.size)}</small></span></span>${meta}`;
+    if (m.media && m.media.expired) body = `${author}<span class="file"><span class="fi">${ic('mic', 22)}</span><span><b>Голосовое · ${dur(m.dur)}</b><small>Удалено с сервера</small></span></span>${meta}`;
+    else body = `${author}<span class="voice" data-voice="${m.id}"><button type="button" class="play" data-act="play" data-id="${m.id}" aria-label="Воспроизвести голосовое, ${dur(m.dur)}">${ic('play', 18)}</button><span style="flex:1"><span class="wave">${h.map(x => `<i style="height:${x}px"></i>`).join('')}</span><small>${dur(m.dur)}</small></span></span>${meta}`;
+  } else if (m.kind === 'file') {
+    const M = m.media, inner = `<span class="fi">${ic('file', 22)}</span><span><b>${esc(m.name)}</b><small>${esc(m.size)}${M && M.expired ? ' · удалён с сервера' : m.uploading ? ' · загрузка <span class="upl-t upl">0%</span>' : ''}</small></span>`;
+    body = `${author}${M && !M.expired && !m.uploading ? `<a class="file" href="${esc(M.url)}" download="${esc(m.name)}" target="_blank" rel="noopener">${inner}</a>` : `<span class="file">${inner}</span>`}${meta}`;
+  }
   else if (m.kind === 'location') body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}<a class="loc" href="https://www.openstreetmap.org/?mlat=${m.lat}&amp;mlon=${m.lon}#map=16/${m.lat}/${m.lon}" target="_blank" rel="noopener" aria-label="Открыть на карте: ${esc(m.addr)}">${MAP}<span class="loc-t"><b>Геопозиция</b><small>${esc(m.addr)}</small></span></a>${meta}`;
   else if (m.kind === 'contact') {
-    const p = person(m.cid);
-    body = `${author}<span class="cc">${av(p.ini, p.g, 44)}<span><b>${esc(p.name)}</b><small>${esc(p.phone)}</small></span></span><button type="button" class="cc-btn" data-act="open-contact" data-cid="${m.cid}">Написать</button>${meta}`;
+    const card = m.card || {}, p = person(m.cid) || { name: card.name || 'Контакт', phone: card.phone || '', g: card.color || 'g1', ini: String(card.name || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() };
+    const go = m.cid ? `data-act="open-contact" data-cid="${m.cid}"` : `data-act="find-phone" data-phone="${esc(p.phone)}"`;
+    body = `${author}<span class="cc">${av(p.ini, p.g, 44)}<span><b>${esc(p.name)}</b><small>${esc(p.phone)}</small></span></span><button type="button" class="cc-btn" ${go}>Написать</button>${meta}`;
   } else if (m.kind === 'poll') {
     const P = m.poll, total = P.opts.reduce((s, o) => s + o.v, 0), voted = P.my >= 0;
     body = `${author}<span class="poll"><b class="pq">${esc(P.q)}</b><small class="pk">${voted ? 'Вы проголосовали' : 'Опрос · выберите один вариант'}</small>${P.opts.map((o, i) => {
@@ -613,7 +635,7 @@ function renderThread(c, jump) {
     const d = dayStart(m.ts); if (d !== lastDay) { html += `<span class="date">${dayLabel(m.ts)}</span>`; lastDay = d; }
     html += msgHTML(m, c, c.messages[i - 1], c.messages[i + 1]);
   });
-  if (!c.messages.length) html = `<p class="sys">${c.type === 'direct' ? 'Напишите первое сообщение — оно будет зашифровано' : 'Сообщений пока нет'}</p>`;
+  if (!c.messages.length) html = `<p class="sys">${c.type === 'direct' ? 'Напишите первое сообщение' : 'Сообщений пока нет'}</p>`;
   if (c.blocked) html += `<p class="sys">Вы заблокировали этот контакт</p>`;
   if (UI.typing[c.id]) html += `<div class="typing" aria-label="${esc(firstName(UI.typing[c.id]))} печатает"><i></i><i></i><i></i></div>`;
   inEl.innerHTML = html;
@@ -655,7 +677,7 @@ function renderComposer(c) {
     <div class="emoji-panel" id="emojiPanel" hidden aria-label="Эмодзи">${EMOJI.map(e => `<button type="button" data-act="emoji-pick" data-e="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`;
   const ta = $('#msgInput');
   const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
-  ta.addEventListener('input', () => { UI.drafts[c.id] = ta.value; grow(); syncSend(); });
+  ta.addEventListener('input', () => { UI.drafts[c.id] = ta.value; grow(); syncSend(); if (NET.on && ta.value) NET.typing(c.id); });
   ta.addEventListener('pointerdown', () => { if (UI.attach) closePanels(); });
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(); } if (e.key === 'Escape' && UI.reply) setReply(null); });
   grow(); syncSend();
@@ -683,6 +705,7 @@ function sendText() {
   ta.value = ''; UI.drafts[c.id] = ''; ta.style.height = 'auto'; setReply(null); syncSend(); ta.focus();
 }
 function addMessage(c, m) {
+  if (NET.on && m.from === 'me') return NET.send(c, m);
   m.id = uid(); m.ts = Date.now(); if (m.from === 'me') m.status = 'sent';
   c.messages.push(m);
   const viewing = UI.route.chat === c.id && !UI.route.info && !document.hidden;
@@ -715,15 +738,20 @@ function scheduleReply(c) {
 /* ---------- Voice playback ---------- */
 function findMsg(id) { for (const c of S.chats) { const m = c.messages.find(x => x.id === id); if (m) return [c, m]; } return []; }
 function toggleVoice(id) {
-  if (UI.playing && UI.playing.id === id) { const p = UI.playing; if (p.paused) { p.start = performance.now() - p.pos * 1000; p.paused = false; loopVoice(); } else { p.paused = true; cancelAnimationFrame(p.raf); } paintVoice(); return; }
+  if (UI.playing && UI.playing.id === id) { const p = UI.playing; if (p.paused) { p.start = performance.now() - p.pos * 1000; p.paused = false; if (p.audio) p.audio.play(); loopVoice(); } else { p.paused = true; if (p.audio) p.audio.pause(); cancelAnimationFrame(p.raf); } paintVoice(); return; }
   stopVoice();
   const [, m] = findMsg(id); if (!m) return;
-  UI.playing = { id, dur: m.dur, pos: 0, start: performance.now(), paused: false }; loopVoice();
+  UI.playing = { id, dur: m.dur, pos: 0, start: performance.now(), paused: false };
+  if (m.media && m.media.url && !m.media.expired) {
+    const a = new Audio(m.media.url); UI.playing.audio = a;
+    a.play().catch(() => { stopVoice(); toast('Не удалось воспроизвести запись'); });
+  }
+  loopVoice();
 }
 function loopVoice() {
   const p = UI.playing; if (!p) return;
-  p.pos = (performance.now() - p.start) / 1000;
-  if (p.pos >= p.dur) { stopVoice(); return; }
+  p.pos = p.audio ? p.audio.currentTime : (performance.now() - p.start) / 1000;
+  if (p.pos >= p.dur || (p.audio && p.audio.ended)) { stopVoice(); return; }
   paintVoice(); p.raf = requestAnimationFrame(loopVoice);
 }
 function paintVoice() {
@@ -736,7 +764,7 @@ function paintVoice() {
   if (btn.dataset.state !== want) { btn.dataset.state = want; btn.innerHTML = ic(want, 18); btn.setAttribute('aria-label', p.paused ? 'Продолжить' : 'Пауза'); }
 }
 function stopVoice() {
-  const p = UI.playing; if (!p) return; cancelAnimationFrame(p.raf); UI.playing = null;
+  const p = UI.playing; if (!p) return; cancelAnimationFrame(p.raf); if (p.audio) p.audio.pause(); UI.playing = null;
   const el = $(`[data-voice="${p.id}"]`); if (!el) return;
   $$('.wave i', el).forEach(b => b.classList.remove('on')); $('small', el).textContent = dur(p.dur);
   const btn = $('.play', el); btn.dataset.state = 'play'; btn.innerHTML = ic('play', 18); btn.setAttribute('aria-label', 'Воспроизвести голосовое, ' + dur(p.dur));
@@ -758,12 +786,13 @@ function startRec() {
     <p class="sr-only" aria-live="polite">Идёт запись голосового сообщения</p>`;
   wrap.appendChild(r);
   UI.rec.t = setInterval(recTick, 100);
+  if (NET.on) NET.recStart(UI.rec);
   $('[data-act="rec-send"]', r).focus();
 }
 function recTick() {
   const R = UI.rec; if (!R || R.paused) return;
   R.elapsed += .1;
-  const target = Math.random() < .12 ? .04 : .2 + Math.random() * .8;
+  const target = R.level ? R.level() : (Math.random() < .12 ? .04 : .2 + Math.random() * .8);
   R.lvl = R.lvl * .45 + target * .55; R.wave.push(R.lvl);
   const w = $('#liveWave');
   if (w) { const i = document.createElement('i'); i.style.height = Math.max(3, Math.round(R.lvl * 34)) + 'px'; w.appendChild(i); if (w.children.length > 70) w.firstElementChild.remove(); }
@@ -771,6 +800,7 @@ function recTick() {
 }
 function toggleRecPause(btn) {
   const R = UI.rec; if (!R) return; R.paused = !R.paused;
+  if (R.mr && R.mr.state !== 'inactive') { if (R.paused) R.mr.pause(); else R.mr.resume(); }
   btn.innerHTML = ic(R.paused ? 'mic' : 'pause', 22);
   btn.setAttribute('aria-label', R.paused ? 'Продолжить запись' : 'Пауза'); btn.setAttribute('aria-pressed', R.paused);
   $('#recWrap').classList.toggle('paused', R.paused);
@@ -779,11 +809,11 @@ function stopRec(send) {
   const R = UI.rec; if (!R) return; clearInterval(R.t); UI.rec = null;
   const r = $('#recWrap'); if (r) r.remove();
   const comp = $('#composer'); if (comp) comp.hidden = false;
-  if (send) {
-    const n = 28, L = R.wave.length, wave = [];
-    for (let i = 0; i < n; i++) { const a = R.wave.slice(Math.floor(i * L / n), Math.floor((i + 1) * L / n)); const v = a.length ? a.reduce((s, x) => s + x, 0) / a.length : .08; wave.push(Math.round(5 + v * 23)); }
-    addMessage(chatById(UI.route.chat), { from: 'me', kind: 'voice', dur: Math.max(1, Math.round(R.elapsed)), wave });
-  }
+  const n = 28, L = R.wave.length, wave = [];
+  for (let i = 0; i < n; i++) { const a = R.wave.slice(Math.floor(i * L / n), Math.floor((i + 1) * L / n)); const v = a.length ? a.reduce((s, x) => s + x, 0) / a.length : .08; wave.push(Math.round(5 + v * 23)); }
+  const secs = Math.max(1, Math.round(R.elapsed));
+  if (NET.on) NET.recStop(R, send, secs, wave);
+  else if (send) addMessage(chatById(UI.route.chat), { from: 'me', kind: 'voice', dur: secs, wave });
   const sb = $('#sendBtn'); if (sb && UI.route.chat) sb.focus({ preventScroll: true });
 }
 
@@ -873,9 +903,9 @@ function renderInfo(c) {
   if (c.type === 'direct') {
     const p = person(c.cid);
     body = `<div class="hero">${av(p.ini, p.g, 104, p.online)}<h2>${esc(p.name)}</h2><p class="${p.online ? 'on' : ''}">${seenText(p)}</p></div>
-      <div class="acts"><a class="act" href="#/chat/${c.id}">${ic('chat', 22)}Чат</a>
-        <button type="button" class="act" data-act="call" data-cid="${c.cid}">${ic('phone', 22)}Звонок</button>
-        <button type="button" class="act" data-act="call" data-cid="${c.cid}" data-video="1">${ic('video', 22)}Видео</button>
+      <div class="acts" ${NET.on ? 'style="grid-template-columns:repeat(2,1fr)"' : ''}><a class="act" href="#/chat/${c.id}">${ic('chat', 22)}Чат</a>
+        ${NET.on ? '' : `<button type="button" class="act" data-act="call" data-cid="${c.cid}">${ic('phone', 22)}Звонок</button>
+        <button type="button" class="act" data-act="call" data-cid="${c.cid}" data-video="1">${ic('video', 22)}Видео</button>`}
         <button type="button" class="act" data-act="toggle-mute" aria-pressed="${!!c.muted}">${ic(c.muted ? 'mute' : 'bell', 22)}${c.muted ? 'Без звука' : 'Звук'}</button></div>
       <div class="card">
         <div class="li"><span class="ico" style="background:#16A34A">${ic('phone', 16)}</span><span class="t"><b>${esc(p.phone)}</b><small>Мобильный</small></span></div>
@@ -900,12 +930,12 @@ function renderInfo(c) {
       <div class="card">
         <div class="li"><span class="ico" style="background:#DC2626">${ic('bell', 16)}</span><span class="t"><b id="nLbl">Уведомления</b></span><button type="button" class="switch" role="switch" aria-labelledby="nLbl" aria-checked="${!c.muted}" data-act="toggle-mute"></button></div>
         <div class="li"><span class="ico" style="background:#0E8F8E">${ic('image', 16)}</span><span class="t"><b>Медиа и файлы</b></span><span class="v">${media}</span></div>
-        <div class="li"><span class="ico" style="background:#2563EB">${ic('lock', 16)}</span><span class="t"><b>Шифрование</b><small>Сообщения защищены</small></span></div>
+        <div class="li"><span class="ico" style="background:#2563EB">${ic('lock', 16)}</span><span class="t"><b>Защищённое соединение</b><small>HTTPS между телефоном и сервером</small></span></div>
       </div>
-      <div class="card" style="margin-bottom:8px">
+      ${NET.on ? '' : `<div class="card" style="margin-bottom:8px">
         <button type="button" class="li danger" data-act="clear-chat">Очистить историю</button>
         ${c.type === 'direct' ? `<button type="button" class="li danger" data-act="${c.blocked ? 'unblock' : 'block'}">${c.blocked ? 'Разблокировать' : 'Заблокировать'}</button>` : ''}
-      </div></div></div>`;
+      </div>`}</div></div>`;
 }
 
 /* =========================================================
@@ -965,7 +995,7 @@ function openCall(cid, video) {
   CALL = { cid, video, start: null, t: null, mute: false, cam: !!video, spk: false };
   const L = $('#callLayer');
   L.innerHTML = `<div class="call ringing" role="dialog" aria-modal="true" aria-label="Звонок: ${esc(p.name)}">
-    <div class="enc">${ic('lock', 14)} Сквозное шифрование</div>
+    <div class="enc">${ic('lock', 14)} Звонок Aloqa</div>
     <div class="pulse">${av(p.ini, p.g, 128)}</div>
     <h2>${esc(p.name)}</h2><div class="sub" id="callSub" aria-live="polite">${video ? 'Видеовызов…' : 'Вызов…'}</div>
     <div class="ctrls">
@@ -1060,19 +1090,20 @@ document.addEventListener('click', async e => {
     case 'story-next': nextStory(); break;
     case 'story-prev': prevStory(); break;
     case 'close-overlay': closeOverlay(); break;
-    case 'call': openCall(el.dataset.cid, !!el.dataset.video); break;
+    case 'call': if (NET.on) { toast('Звонки появятся в следующем обновлении сервера'); break; } openCall(el.dataset.cid, !!el.dataset.video); break;
     case 'call-end': endCall(); break;
     case 'call-mute': case 'call-cam': case 'call-spk': el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') !== 'true'); break;
     case 'call-filter': UI.callFilter = el.dataset.id; renderCallsTab(); $(`[data-act="call-filter"][data-id="${UI.callFilter}"]`).focus(); break;
     case 'call-new': location.hash = '#/contacts'; break;
-    case 'open-contact': location.hash = '#/chat/' + ensureDirect(el.dataset.cid).id; break;
-    case 'invite': copyText('https://aloqa.app/invite/' + uid(), 'Ссылка-приглашение скопирована'); break;
+    case 'open-contact': if (NET.on) NET.openDirect(el.dataset.cid); else location.hash = '#/chat/' + ensureDirect(el.dataset.cid).id; break;
+    case 'find-phone': NET.startChat(el.dataset.phone); break;
+    case 'invite': copyText(NET.on ? location.origin + location.pathname : 'https://aloqa.app/invite/' + uid(), 'Ссылка-приглашение скопирована'); break;
     case 'copy': copyText(el.dataset.text, 'Скопировано'); break;
     case 'theme': S.settings.theme = el.dataset.id; save(); applyTheme(); renderSettingsTab(); $(`[data-act="theme"][data-id="${el.dataset.id}"]`).focus(); break;
     case 'toggle-notify': S.settings.notify = !S.settings.notify; save(); el.setAttribute('aria-checked', S.settings.notify); break;
     case 'edit-name': editNameSheet(); break;
     case 'reset-demo': if (await confirmDialog({ title: 'Сбросить демо-чаты?', text: 'Все переписки вернутся к исходным. Ваше имя сохранится.', ok: 'Сбросить', danger: true })) { const u = S.user, st = S.settings; S = seed(); S.user = u; S.settings = st; save(); UI.route = {}; location.hash = '#/chats'; renderApp(); toast('Демо-чаты восстановлены'); } break;
-    case 'logout': if (await confirmDialog({ title: 'Выйти из Aloqa?', text: 'Переписки на этом устройстве будут удалены.', ok: 'Выйти', danger: true })) { try { localStorage.removeItem(KEY); } catch (err) { /* ignore */ } S = seed(); OB.step = 1; OB.phone = ''; UI.route = {}; $('#app').innerHTML = ''; history.replaceState(null, '', location.pathname); renderApp(); } break;
+    case 'logout': if (await confirmDialog({ title: 'Выйти из Aloqa?', text: 'Переписки на этом устройстве будут удалены.', ok: 'Выйти', danger: true })) { if (NET.on) { NET.logout(); break; } try { localStorage.removeItem(KEY); } catch (err) { /* ignore */ } S = seed(); OB.step = 1; OB.phone = ''; UI.route = {}; $('#app').innerHTML = ''; history.replaceState(null, '', location.pathname); renderApp(); } break;
     // conversation
     case 'send': if ($('#msgInput').value.trim()) sendText(); else startRec(); break;
     case 'rec-delete': stopRec(false); toast('Запись удалена'); break;
@@ -1081,28 +1112,29 @@ document.addEventListener('click', async e => {
     case 'emoji-pick': { const ta = $('#msgInput'); const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + el.dataset.e + ta.value.slice(ta.selectionEnd ?? s); ta.dispatchEvent(new Event('input')); ta.focus(); ta.selectionStart = ta.selectionEnd = s + el.dataset.e.length; break; }
     case 'to-bottom': { const th = $('#thread'); th.scrollTo({ top: th.scrollHeight, behavior: RM.matches ? 'auto' : 'smooth' }); UI.fabNew = 0; break; }
     case 'attach': toggleAttach(); break;
-    case 'att-photo': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360) }); break;
-    case 'att-camera': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360), caption: 'Снимок с камеры' }); break;
+    case 'att-photo': closePanels(); if (NET.on) { NET.pickFile(c, 'photo'); break; } addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360) }); break;
+    case 'att-camera': closePanels(); if (NET.on) { NET.pickFile(c, 'camera'); break; } addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360), caption: 'Снимок с камеры' }); break;
     case 'att-location': closePanels(); addMessage(c, { from: 'me', kind: 'location', lat: 38.5598, lon: 68.7870, addr: 'Душанбе, проспект Рудаки' }); break;
     case 'att-contact': closePanels(); contactSheet(); break;
-    case 'att-doc': closePanels(); addMessage(c, { from: 'me', kind: 'file', name: 'Макет_Aloqa.pdf', size: '2,4 МБ' }); break;
+    case 'att-doc': closePanels(); if (NET.on) { NET.pickFile(c, 'doc'); break; } addMessage(c, { from: 'me', kind: 'file', name: 'Макет_Aloqa.pdf', size: '2,4 МБ' }); break;
     case 'att-poll': closePanels(); pollSheet(); break;
     case 'att-event': closePanels(); eventSheet(); break;
     case 'pick-contact': closeOverlay(); addMessage(c, { from: 'me', kind: 'contact', cid: el.dataset.cid }); break;
-    case 'vote': { const [ch, m] = findMsg(el.dataset.id); if (!m || m.poll.my >= 0) break; m.poll.my = +el.dataset.i; m.poll.opts[m.poll.my].v++; save(); refreshChat(ch.id); break; }
-    case 'event-go': { const [ch, m] = findMsg(el.dataset.id); if (!m) break; m.event.me = !m.event.me; m.event.going += m.event.me ? 1 : -1; save(); refreshChat(ch.id); toast(m.event.me ? 'Вы идёте на мероприятие' : 'Участие отменено'); break; }
+    case 'vote': if (NET.on) { const [ch, m] = findMsg(el.dataset.id); if (m) NET.vote(ch, m, +el.dataset.i); break; } { const [ch, m] = findMsg(el.dataset.id); if (!m || m.poll.my >= 0) break; m.poll.my = +el.dataset.i; m.poll.opts[m.poll.my].v++; save(); refreshChat(ch.id); break; }
+    case 'event-go': if (NET.on) { const [ch, m] = findMsg(el.dataset.id); if (m) NET.rsvp(ch, m); break; } { const [ch, m] = findMsg(el.dataset.id); if (!m) break; m.event.me = !m.event.me; m.event.going += m.event.me ? 1 : -1; save(); refreshChat(ch.id); toast(m.event.me ? 'Вы идёте на мероприятие' : 'Участие отменено'); break; }
     case 'rec-pause': toggleRecPause(el); break;
     case 'play': toggleVoice(el.dataset.id); break;
     case 'cancel-reply': setReply(null); $('#msgInput').focus(); break;
     case 'm-reply': closeOverlay(); setTimeout(() => setReply(findMsg(el.dataset.id)[1]), 180); break;
     case 'm-copy': closeOverlay(); copyText(findMsg(el.dataset.id)[1].text, 'Текст скопирован'); break;
     case 'm-delete': {
-      closeOverlay(); const [ch, m] = findMsg(el.dataset.id); const idx = ch.messages.indexOf(m);
+      closeOverlay();
+      if (NET.on) { const [ch, m] = findMsg(el.dataset.id); if (m) NET.del(ch, m); break; } const [ch, m] = findMsg(el.dataset.id); const idx = ch.messages.indexOf(m);
       ch.messages.splice(idx, 1); save(); refreshChat(ch.id); renderChatList();
       toast('Сообщение удалено', 'Отменить', () => { ch.messages.splice(idx, 0, m); save(); refreshChat(ch.id); renderChatList(); }, 5000);
       break;
     }
-    case 'toggle-mute': c.muted = !c.muted; save(); renderChatList(); renderTabbar(); if (UI.route.info) renderInfo(c); else renderComposer(c); toast(c.muted ? 'Уведомления выключены' : 'Уведомления включены'); break;
+    case 'toggle-mute': c.muted = !c.muted; save(); if (NET.on) NET.mute(c); renderChatList(); renderTabbar(); if (UI.route.info) renderInfo(c); else renderComposer(c); toast(c.muted ? 'Уведомления выключены' : 'Уведомления включены'); break;
     case 'block': if (await confirmDialog({ title: `Заблокировать ${person(c.cid).name}?`, text: 'Контакт не сможет писать вам и звонить.', ok: 'Заблокировать', danger: true })) { c.blocked = true; delete UI.typing[c.id]; UI.replyToken[c.id] = -1; save(); renderInfo(c); toast('Контакт заблокирован', 'Отменить', () => { c.blocked = false; save(); route(); }); } break;
     case 'unblock': c.blocked = false; save(); if (UI.route.info) renderInfo(c); else { renderComposer(c); refreshChat(c.id); } toast('Контакт разблокирован'); break;
     case 'clear-chat': if (await confirmDialog({ title: 'Очистить историю?', text: 'Сообщения будут удалены только на этом устройстве.', ok: 'Очистить', danger: true })) { c.messages = []; save(); renderChatList(); renderInfo(c); toast('История очищена'); } break;
@@ -1117,7 +1149,7 @@ function editNameSheet() {
   openSheet('Изменить имя', `<h3>Изменить имя</h3><label class="lbl" for="nameEdit" style="margin-top:0">Имя и фамилия</label>
     <input class="inp" id="nameEdit" autocomplete="name" value="${esc(meName())}"><button type="button" class="btn primary block" id="nameSave" style="margin-top:14px">Сохранить</button>`, sh => {
     const inp = $('#nameEdit', sh); inp.focus(); inp.select();
-    const go = () => { const v = inp.value.trim(); if (!v) { inp.setAttribute('aria-invalid', 'true'); return; } S.user.name = v; save(); closeOverlay(); renderSettingsTab(); toast('Имя обновлено'); };
+    const go = () => { const v = inp.value.trim(); if (!v) { inp.setAttribute('aria-invalid', 'true'); return; } S.user.name = v; save(); if (NET.on) NET.profile(v, S.user.bio || ''); closeOverlay(); renderSettingsTab(); toast('Имя обновлено'); };
     $('#nameSave', sh).onclick = go; inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   });
 }
@@ -1254,4 +1286,4 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* not allowed in this context */ }
 }
 
-renderApp();
+if (window.NETBOOT) window.NETBOOT(); else renderApp();
