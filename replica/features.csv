@@ -1,0 +1,41 @@
+feature,area,priority,original,clone,notes
+Sign up with email or Google,onboarding,must,yes,no,S01
+Onboarding: connect calendar set hours pick username,onboarding,must,yes,no,S02 (layout unverified)
+Connect Google Calendar to read busy times,calendars,must,yes,no,S08; Google OAuth verification takes weeks
+Add booked meetings to the host's calendar,calendars,must,yes,no,S08 write calendar
+Set weekly availability with time zone,availability,must,yes,no,S07
+Date-specific hours (overrides),availability,must,yes,no,S07
+Create and edit an event type (name duration location description slug),event types,must,yes,no,S04
+Public booking page with open slots,booking page,must,yes,no,S10
+Book a slot as a guest without an account,booking page,must,yes,no,S11 S12 F04
+Time zone detection and selector on the booking page,booking page,must,yes,no,S10
+Confirmation email to host and guest with calendar invite,notifications,must,yes,no,F04
+Guest can cancel or reschedule from email links,booking page,must,yes,no,S13 S14 F05 F06
+Meetings list: upcoming and past with host cancel,meetings,must,yes,no,S15 F07
+Buffers before and after meetings,event types,should,yes,no,S05
+Minimum scheduling notice,event types,should,yes,no,S05
+Date range (rolling days / fixed range / indefinite),event types,should,yes,no,S05
+Daily weekly monthly max per event type,event types,should,yes,no,S05
+Custom questions on the booking form,booking page,should,yes,no,S06
+Custom confirmation page or redirect,booking page,should,yes,no,S06
+Email reminders before the meeting (workflows),notifications,should,yes,no,S16 F09
+Video link added to the invite (Google Meet / Zoom),integrations,should,yes,no,S04 official APIs only
+Public profile page listing event types,sharing,should,yes,no,S09
+Copy link and embed on a website (inline / pop-up),sharing,should,yes,no,S17 F10
+Multiple availability schedules,availability,should,yes,no,S07
+Connect Outlook / Microsoft 365 calendar,calendars,should,yes,no,S08 Microsoft Graph
+Group events (one host many invitees),event types,could,yes,no,S04 kind=group
+Collective events (pooled availability),team,could,yes,no,Standard plan and above per 3rd-party source
+Round robin across teammates,team,could,yes,no,Teams plan
+SMS reminders with invitee opt-in,notifications,could,yes,no,needs user's own Twilio account
+Take payment at booking (Stripe),payments,could,yes,no,unverified detail
+Mark invitee as no-show,meetings,could,yes,no,webhook names from 3rd-party source
+Secret event types (not on profile),event types,could,yes,no,S03
+Cancellation policy text,booking page,could,yes,no,shown not enforced
+Webhooks for bookings and cancellations,integrations,could,yes,no,invitee.created invitee.canceled
+Routing forms,team,could,yes,no,Teams plan
+Connect iCloud calendar,calendars,could,yes,no,S08
+Daily cap across all event types,availability,should,no,no,reported missing in the community (source 22). A fix not a parity item
+Marketplace of third-party apps,integrations,could,yes,skip,their partner network is not part of the product you can rebuild
+Callie AI assistant and Notetaker add-ons,ai,could,yes,skip,paid AI add-ons outside the scheduling loop
+Enterprise SSO SCIM and compliance audits,admin,could,yes,skip,an audit not a feature; revisit if the angle needs it
