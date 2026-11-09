@@ -5,6 +5,8 @@
    ========================================================= */
 
 const KEY = 'aloqa.v1';
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const isMobile = () => !matchMedia('(min-width: 900px)').matches;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -63,6 +65,7 @@ const I = {
   mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" fill="currentColor" fill-opacity=".18"/><circle cx="12" cy="10" r="3"/>',
   userCircle: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.7 19a6 6 0 0 1 10.6 0"/>',
   doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="currentColor" fill-opacity=".18"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
   poll: '<path d="M4 6h10"/><path d="M4 12h16"/><path d="M4 18h7"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>'
 };
@@ -185,7 +188,7 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e
 const UI = {
   route: {}, query: '', folder: 'all', callFilter: 'all', contactQuery: '',
   typing: {}, replyToken: {}, rendered: new Set(), reply: null, emoji: false,
-  playing: null, rec: null, story: null, drafts: {}
+  playing: null, rec: null, story: null, drafts: {}, prevUnread: {}, prevTotal: 0, fabNew: 0
 };
 const REPLIES = ['Звучит отлично!', 'Ха-ха, точно 😄', 'Давай обсудим вечером', 'Хорошо, договорились 👍', 'Сейчас посмотрю', 'Супер! Спасибо 🙌', 'Согласен(на) на все 100', 'Уже бегу 🏃'];
 const EMOJI = ['😀', '😂', '😍', '🥰', '😎', '🤔', '😭', '😅', '👍', '👏', '🙏', '🔥', '🎉', '❤️', '💜', '✨', '🤝', '🙌', '👋', '✅', '🚀', '☕', '🌙', '😴'];
@@ -417,11 +420,13 @@ function renderEmptyMain() {
 function renderTabbar() {
   const n = totalUnread(), t = UI.route.tab;
   const tab = (id, icon, label, extra = '') => `<a class="tab" href="#/${id}" ${t === id && !UI.route.chat ? 'aria-current="page"' : t === id ? 'aria-current="page"' : ''}>${ic(icon)}${extra}${label}</a>`;
-  $('#tabbar').innerHTML = tab('chats', 'chat', 'Чаты', n ? `<span class="badge" aria-label="${n} ${plural(n, 'непрочитанный чат', 'непрочитанных чата', 'непрочитанных чатов')}">${n}</span>` : '')
+  $('#tabbar').innerHTML = tab('chats', 'chat', 'Чаты', n ? `<span class="badge${n > UI.prevTotal ? ' pop' : ''}" aria-label="${n} ${plural(n, 'непрочитанный чат', 'непрочитанных чата', 'непрочитанных чатов')}">${n}</span>` : '')
     + tab('calls', 'phone', 'Звонки') + tab('contacts', 'users', 'Контакты') + tab('settings', 'settings', 'Настройки');
+  UI.prevTotal = n;
 }
 function renderTab() {
   const v = $('#tabView'); v.scrollTop = 0;
+  v.classList.remove('tab-enter'); void v.offsetWidth; v.classList.add('tab-enter');
   ({ chats: renderChatsTab, calls: renderCallsTab, contacts: renderContactsTab, settings: renderSettingsTab })[UI.route.tab]();
 }
 
@@ -456,6 +461,7 @@ function renderChatList() {
   const q = UI.query.trim().toLowerCase();
   const rows = sortedChats().filter(fn).filter(c => !q || chatTitle(c).toLowerCase().includes(q) || c.messages.some(m => bodyText(m).toLowerCase().includes(q)));
   if (!rows.length) { el.innerHTML = `<div class="empty"><b>${q ? 'Ничего не найдено' : 'Здесь пока пусто'}</b>${q ? 'Попробуйте другое имя или слово' : 'Начните новый чат из контактов'}</div>`; return; }
+  const before = {}; if (!RM.matches) $$('.row', el).forEach(r => { before[r.getAttribute('href')] = r.getBoundingClientRect().top; });
   el.innerHTML = rows.map(c => {
     const m = lastMsg(c), title = chatTitle(c), mine = m && m.from === 'me';
     return `<a class="row${c.pinned ? ' pinned' : ''}" href="#/chat/${c.id}" ${UI.route.chat === c.id ? 'aria-current="page"' : ''}>
@@ -463,8 +469,15 @@ function renderChatList() {
       <span class="rc"><span class="r1"><span class="nm"><span>${esc(title)}</span>${c.verified ? `<span class="verified" title="Подтверждённый канал">${ic('verified', 16)}</span>` : ''}${c.muted ? `<span class="mute-i" title="Без звука">${ic('mute', 14)}</span>` : ''}</span>
         ${mine && c.type !== 'channel' ? `<span class="ok" title="${m.status === 'read' ? 'Прочитано' : 'Отправлено'}">${ic(m.status === 'read' ? 'checks' : 'check', 16)}</span>` : ''}
         <span class="tm${c.unread ? ' new' : ''}">${m ? listTime(m.ts) : ''}</span></span>
-      <span class="r2"><span class="msg">${preview(c)}</span>${c.pinned && !c.unread ? `<span class="pin-i" title="Закреплён">${ic('pin', 16)}</span>` : ''}${c.unread ? `<span class="badge${c.muted ? ' muted' : ''}"><span class="sr-only">Непрочитанных: </span>${c.unread}</span>` : ''}</span></span></a>`;
+      <span class="r2"><span class="msg">${preview(c)}</span>${c.pinned && !c.unread ? `<span class="pin-i" title="Закреплён">${ic('pin', 16)}</span>` : ''}${c.unread ? `<span class="badge${c.muted ? ' muted' : ''}${c.unread > (UI.prevUnread[c.id] || 0) ? ' pop' : ''}"><span class="sr-only">Непрочитанных: </span>${c.unread}</span>` : ''}</span></span></a>`;
   }).join('');
+  S.chats.forEach(c => { UI.prevUnread[c.id] = c.unread || 0; });
+  $$('.row', el).forEach(r => {
+    const b0 = before[r.getAttribute('href')]; if (b0 == null) return;
+    const d = b0 - r.getBoundingClientRect().top; if (!d || Math.abs(d) > 1200) return;
+    r.style.transition = 'none'; r.style.transform = `translateY(${d}px)`; r.style.zIndex = d > 0 ? 1 : 0;
+    requestAnimationFrame(() => { r.style.transition = 'transform 360ms var(--ease-ios), background-color 150ms'; r.style.transform = ''; setTimeout(() => { r.style.zIndex = ''; }, 380); });
+  });
 }
 
 /* ---------- Calls tab ---------- */
@@ -544,9 +557,18 @@ function renderConversation(c) {
       ${direct ? `<button class="ib" type="button" data-act="call" data-cid="${c.cid}" data-video="1" aria-label="Видеозвонок">${ic('video')}</button>
       <button class="ib" type="button" data-act="call" data-cid="${c.cid}" aria-label="Аудиозвонок">${ic('phone', 22)}</button>` : `<a class="ib" href="#/chat/${c.id}/info" aria-label="Информация">${ic('info', 22)}</a>`}
     </header>
-    <div class="thread" id="thread"><div class="thread-in" role="log" aria-live="polite" aria-relevant="additions" id="threadIn"></div></div>
+    <div class="thread-box"><div class="thread" id="thread"><div class="thread-in" role="log" aria-live="polite" aria-relevant="additions" id="threadIn"></div></div>
+    <button type="button" class="fab-down" id="fabDown" data-act="to-bottom" aria-label="Прокрутить к последним сообщениям" hidden>${ic('chevronDown', 24)}<span class="badge" id="fabCount" hidden></span></button></div>
     <div id="composerWrap"></div></div>`;
+  UI.fabNew = 0;
   renderThread(c, true); renderComposer(c);
+  const th = $('#thread');
+  th.addEventListener('scroll', () => { if (th.scrollHeight - th.scrollTop - th.clientHeight < 80) UI.fabNew = 0; updateFab(); }, { passive: true });
+}
+function updateFab() {
+  const th = $('#thread'), f = $('#fabDown'); if (!th || !f) return;
+  f.hidden = th.scrollHeight - th.scrollTop - th.clientHeight < 240;
+  const cnt = $('#fabCount'); cnt.hidden = !UI.fabNew; cnt.textContent = UI.fabNew;
 }
 function msgHTML(m, c, prev, next) {
   const out = m.from === 'me';
@@ -583,6 +605,9 @@ function msgHTML(m, c, prev, next) {
 function renderThread(c, jump) {
   const inEl = $('#threadIn'), th = $('#thread'); if (!inEl) return;
   const nearBottom = th.scrollHeight - th.scrollTop - th.clientHeight < 120;
+  let anchor = null, anchorTop = 0;
+  if (!jump && !RM.matches) { const all = $$('.b[data-mid]', inEl); const last = all[all.length - 1]; if (last) { anchor = last.dataset.mid; anchorTop = last.getBoundingClientRect().top; } }
+  const fresh = c.messages.filter(m => !UI.rendered.has(m.id) && m.from !== 'me').length;
   let html = '', lastDay = null;
   c.messages.forEach((m, i) => {
     const d = dayStart(m.ts); if (d !== lastDay) { html += `<span class="date">${dayLabel(m.ts)}</span>`; lastDay = d; }
@@ -595,6 +620,16 @@ function renderThread(c, jump) {
   c.messages.forEach(m => UI.rendered.add(m.id));
   if (UI.playing) paintVoice();
   if (jump || nearBottom) th.scrollTop = th.scrollHeight;
+  else if (fresh) UI.fabNew += fresh;
+  if (anchor) {
+    const el = $(`.b[data-mid="${anchor}"]`, inEl);
+    const d = el ? anchorTop - el.getBoundingClientRect().top : 0;
+    if (d && Math.abs(d) < 700) {
+      inEl.style.transition = 'none'; inEl.style.transform = `translateY(${d}px)`; void inEl.offsetHeight;
+      inEl.style.transition = 'transform 320ms var(--ease-ios)'; inEl.style.transform = '';
+    }
+  }
+  updateFab();
 }
 function refreshChat(id) {
   if (UI.route.chat !== id || UI.route.info) return;
@@ -1044,6 +1079,7 @@ document.addEventListener('click', async e => {
     case 'rec-send': stopRec(true); break;
     case 'emoji': toggleEmoji(); break;
     case 'emoji-pick': { const ta = $('#msgInput'); const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + el.dataset.e + ta.value.slice(ta.selectionEnd ?? s); ta.dispatchEvent(new Event('input')); ta.focus(); ta.selectionStart = ta.selectionEnd = s + el.dataset.e.length; break; }
+    case 'to-bottom': { const th = $('#thread'); th.scrollTo({ top: th.scrollHeight, behavior: RM.matches ? 'auto' : 'smooth' }); UI.fabNew = 0; break; }
     case 'attach': toggleAttach(); break;
     case 'att-photo': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360) }); break;
     case 'att-camera': closePanels(); addMessage(c, { from: 'me', kind: 'image', hue: Math.floor(Math.random() * 360), caption: 'Снимок с камеры' }); break;
@@ -1113,5 +1149,109 @@ document.addEventListener('visibilitychange', () => {
 
 /* Keep relative times fresh */
 setInterval(() => { if (!S.user) return; renderChatList(); const c = UI.route.chat && chatById(UI.route.chat); if (c && !UI.route.info) { const st = $('#convStatus'); if (st) st.innerHTML = headerStatus(c); } }, 60e3);
+
+/* =========================================================
+   Native-like gestures
+   - swipe right on a conversation: go back (mobile)
+   - swipe left on a message: reply
+   ========================================================= */
+let G = null;
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || !e.isPrimary) return;
+  if (!$('#thread') || !e.target.closest('#main .conv') || e.target.closest('input, textarea, button, a, select, .composer, .recwrap, .attach-panel, .emoji-panel, .replybar')) return;
+  G = { x0: e.clientX, y0: e.clientY, t0: performance.now(), id: e.pointerId, mode: null, b: e.target.closest('.b'), dx: 0 };
+}, { passive: true });
+document.addEventListener('pointermove', e => {
+  if (!G || e.pointerId !== G.id) return;
+  const dx = e.clientX - G.x0, dy = e.clientY - G.y0; G.dx = dx;
+  if (!G.mode) {
+    if (Math.hypot(dx, dy) < 10) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.3) { G = null; return; }
+    const c = UI.route.chat && chatById(UI.route.chat);
+    if (dx > 0 && isMobile() && !UI.route.info) G.mode = 'back';
+    else if (dx < 0 && G.b && c && c.type !== 'channel' && !c.blocked && $('#msgInput')) G.mode = 'reply';
+    else { G = null; return; }
+    if (lp) { clearTimeout(lp.t); lp = null; }
+    if (G.mode === 'back') $('#shell').classList.add('dragging');
+    else { G.b.classList.add('dragging'); G.b.classList.remove('spring'); }
+  }
+  if (G.mode === 'back') {
+    const W = innerWidth, x = Math.max(0, dx);
+    $('#main').style.transform = `translateX(${x}px)`;
+    $('.pane-list').style.transform = `translateX(${-0.28 * W + 0.28 * x}px)`;
+    $('#shell').style.setProperty('--dimv', (0.22 * (1 - x / W)).toFixed(3));
+  } else {
+    const raw = Math.min(0, dx), x = raw < -64 ? -64 + (raw + 64) * 0.25 : raw;
+    G.b.style.transform = `translateX(${x}px)`;
+    let si = $('.swipe-ic', G.b);
+    if (!si) { si = document.createElement('span'); si.className = 'swipe-ic'; si.innerHTML = ic('reply', 18); G.b.appendChild(si); }
+    const p = Math.min(1, -x / 60); si.style.setProperty('--p', p.toFixed(2));
+    const hit = p >= 1; if (hit && !G.hit && navigator.vibrate) navigator.vibrate(10);
+    G.hit = hit; si.classList.toggle('hit', hit);
+  }
+}, { passive: true });
+function endGesture(e) {
+  if (!G || (e && e.pointerId !== G.id)) return;
+  const g = G; G = null; if (!g.mode) return;
+  if (g.mode === 'back') {
+    const shell = $('#shell'), main = $('#main'), list = $('.pane-list'), W = innerWidth;
+    const v = g.dx / Math.max(1, performance.now() - g.t0);
+    shell.classList.remove('dragging');
+    if (g.dx > W * 0.33 || (v > 0.45 && g.dx > 40)) {
+      const T = 'transform 260ms var(--ease-ios)';
+      main.style.transition = T; list.style.transition = T + ', opacity 260ms';
+      main.style.transform = 'translateX(100%)'; list.style.transform = 'translateX(0)'; shell.style.setProperty('--dimv', '0');
+      setTimeout(() => {
+        location.hash = '#/chats';
+        requestAnimationFrame(() => { [main, list].forEach(n => { n.style.transform = ''; n.style.transition = ''; }); shell.style.removeProperty('--dimv'); });
+      }, 250);
+    } else {
+      main.style.transform = ''; list.style.transform = ''; shell.style.removeProperty('--dimv');
+    }
+  } else {
+    const b = g.b, si = $('.swipe-ic', b);
+    b.classList.remove('dragging'); b.classList.add('spring'); b.style.transform = '';
+    if (si) { si.style.setProperty('--p', 0); setTimeout(() => si.remove(), 300); }
+    setTimeout(() => b.classList.remove('spring'), 480);
+    if (g.hit) { const m = findMsg(b.dataset.mid)[1]; if (m) setReply(m); }
+  }
+}
+document.addEventListener('pointerup', endGesture);
+document.addEventListener('pointercancel', endGesture);
+
+/* Material-style ripple on tappable surfaces */
+const RIPPLE = '.row, .li, .opt, .act, .tab, .chip, .po:not(.done), .ev-btn, .cc-btn, .btn, .seg button, .ib, .rbtn';
+document.addEventListener('pointerdown', e => {
+  if (RM.matches) return;
+  const att = e.target.closest('.att');
+  const t = att ? $('.c', att) : e.target.closest(RIPPLE);
+  if (!t || t.disabled || t.closest('.call, .sv')) return;
+  const r = t.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2.2;
+  const s = document.createElement('span'); s.className = 'ripple';
+  s.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+  t.classList.add('rp'); t.appendChild(s); setTimeout(() => s.remove(), 600);
+}, { passive: true });
+
+/* Drag a bottom sheet down to dismiss it */
+document.addEventListener('pointerdown', e => {
+  const sh = e.target.closest('.sheet'); if (!sh || !e.target.closest('.grab, h3')) return;
+  const y0 = e.clientY, t0 = performance.now(); let dy = 0;
+  const move = ev => { dy = Math.max(0, ev.clientY - y0); sh.style.transition = 'none'; sh.style.animation = 'none'; sh.style.transform = `translateY(${dy}px)`; };
+  const up = () => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    const v = dy / Math.max(1, performance.now() - t0);
+    if (dy > 110 || (v > 0.6 && dy > 30)) {
+      sh.style.transition = 'transform 220ms var(--ease-in)'; sh.style.transform = 'translateY(110%)';
+      const sc = $('#overlay .scrim'); if (sc) sc.classList.add('closing');
+      setTimeout(() => { $('#overlay').innerHTML = ''; if (lastFocus && document.contains(lastFocus)) lastFocus.focus(); }, 220);
+    } else { sh.style.transition = 'transform 420ms var(--ease-spring)'; sh.style.transform = ''; }
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+});
+
+/* Installable app (PWA) */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* not allowed in this context */ }
+}
 
 renderApp();
