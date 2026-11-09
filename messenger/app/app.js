@@ -238,6 +238,14 @@ function preview(c) {
 }
 const totalUnread = () => S.chats.filter(c => c.unread > 0 && !c.muted).length;
 function hueGrad(h) { return `<svg viewBox="0 0 260 182" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="gr${h}" x1="0" y1="0" x2=".6" y2="1"><stop offset="0" stop-color="hsl(${h} 90% 64%)"/><stop offset=".55" stop-color="hsl(${h + 20} 85% 72%)"/><stop offset="1" stop-color="hsl(${h + 120} 95% 80%)"/></linearGradient></defs><rect width="260" height="182" fill="url(#gr${h})"/><circle cx="196" cy="52" r="20" fill="#FFF3DC" opacity=".9"/><path d="M0 182 76 90l44 48 36-32 104 76z" fill="hsl(${h} 60% 25%)" opacity=".55"/><path d="M0 182 56 126l42 32 60-60 102 84z" fill="hsl(${h} 60% 16%)" opacity=".7"/></svg>`; }
+function resample(arr, n) { if (arr.length === n) return arr; return Array.from({ length: n }, (_, i) => arr[Math.min(arr.length - 1, Math.floor(i * arr.length / n))]); }
+const linkify = t => t.replace(/\b(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g, '<a class="lnk" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+function reactsHTML(m) {
+  const r = m.reacts; if (!r) return '';
+  const list = Object.entries(r).filter(([, ids]) => ids.length);
+  if (!list.length) return '';
+  return `<span class="rxs">${list.map(([e, ids]) => `<button type="button" class="rx${ids.includes('me') ? ' mine' : ''}" data-act="react" data-id="${m.id}" data-e="${e}" aria-label="Реакция ${e}: ${ids.length}${ids.includes('me') ? ', ваша' : ''}" aria-pressed="${ids.includes('me')}">${e}${ids.length > 1 ? `<span>${ids.length}</span>` : ''}</button>`).join('')}</span>`;
+}
 function waveHeights(id, n = 28) { let x = 0; for (const ch of id) x = (x * 31 + ch.charCodeAt(0)) >>> 0; const out = []; for (let i = 0; i < n; i++) { x = (x * 1103515245 + 12345) >>> 0; out.push(5 + (x % 23)); } return out; }
 
 /* ---------- Theme ---------- */
@@ -246,13 +254,14 @@ function applyTheme() {
   const t = S.settings.theme === 'system' ? (darkMQ.matches ? 'dark' : 'light') : S.settings.theme;
   document.documentElement.dataset.theme = t;
   const m = $('meta[name="theme-color"]'); if (m) m.content = t === 'dark' ? '#0E1016' : '#F4F5FA';
+  if (window.applyChatLook) applyChatLook();
 }
 darkMQ.addEventListener('change', applyTheme);
 
 /* ---------- Toast ---------- */
 let toastTimer;
-function toast(html, action, onAction, ms = 3500) {
-  const el = $('#toast');
+function toast(html, action, onAction, ms = 3500, top = false) {
+  const el = $('#toast'); el.classList.toggle('top', top || !!$('#callLayer').innerHTML); el.dataset.chat = '';
   el.innerHTML = `<div class="tt">${html}${action ? `<button type="button">${esc(action)}</button>` : ''}</div>`;
   if (action) $('button', el).onclick = () => { el.innerHTML = ''; onAction(); };
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.innerHTML = ''; }, ms);
@@ -409,6 +418,8 @@ function route() {
   const shell = $('#shell');
   if (r.chat) {
     const c = chatById(r.chat);
+    if (prev.chat !== r.chat) UI.pendingUnread = c.unread || 0;
+    const tt = $('#toast'); if (tt.dataset.chat === c.id) { tt.innerHTML = ''; tt.dataset.chat = ''; }
     if (NET.on) NET.read(c.id);
     if (c.unread) { c.unread = 0; save(); renderChatList(); renderTabbar(); }
     if (r.info) renderInfo(c); else if (prev.chat !== r.chat || prev.info || !$('#thread')) renderConversation(c);
@@ -489,7 +500,7 @@ function renderChatList() {
 
 /* ---------- Calls tab ---------- */
 function renderCallsTab() {
-  if (NET.on) { $('#tabView').innerHTML = `<header class="lh"><h1>Звонки</h1></header><div class="empty"><b>Звонки скоро</b>Голосовые и видеозвонки через ваш сервер появятся в следующем обновлении</div>`; return; }
+  if (NET.on) return RTC.renderCallsTab();
   const list = S.calls.filter(c => UI.callFilter === 'all' || c.dir === 'missed');
   $('#tabView').innerHTML = `<header class="lh"><h1>Звонки</h1></header>
     <div class="seg" role="radiogroup" aria-label="Фильтр звонков" style="margin-top:0">
@@ -538,6 +549,7 @@ function renderSettingsTab() {
     <div class="seg" role="radiogroup" aria-label="Тема оформления">
       ${[['system', 'monitor', 'Система'], ['light', 'sun', 'Светлая'], ['dark', 'moon', 'Тёмная']].map(([id, i, l]) => `<button type="button" role="radio" aria-checked="${th === id}" data-act="theme" data-id="${id}">${ic(i, 16)}${l}</button>`).join('')}
     </div>
+    <div class="card" style="margin-top:0;margin-bottom:12px"><button type="button" class="li" data-act="look"><span class="ico" style="background:#C026D3">${ic('image', 16)}</span><span class="t"><b>Обои, цвет и стекло</b><small>Фон чата, эффект движения, размер текста</small></span><span class="v">${ic('chevron', 18)}</span></button></div>
     <div class="card" style="margin-top:0">
       <div class="li"><span class="ico" style="background:#EF4444">${ic('bell', 16)}</span><span class="t"><b id="notifyLbl">Уведомления</b><small>Показывать новые сообщения</small></span>
         <button type="button" class="switch" role="switch" aria-checked="${S.settings.notify}" aria-labelledby="notifyLbl" data-act="toggle-notify"></button></div>
@@ -558,20 +570,22 @@ function headerStatus(c) {
 }
 function renderConversation(c) {
   stopVoice(); stopRec(false); UI.reply = null; UI.emoji = false; UI.attach = false;
-  UI.rendered = new Set(c.messages.map(m => m.id));
+  UI.rendered = new Set(c.messages.map(m => m.id)); UI.edit = null;
+  const nU = UI.pendingUnread || 0; UI.pendingUnread = 0;
+  UI.unreadFrom = nU && nU < c.messages.length ? c.messages[c.messages.length - nU].id : null;
   const direct = c.type === 'direct';
-  $('#main').innerHTML = `<div class="conv">
+  $('#main').innerHTML = `<div class="conv${lookClass()}">
     <header class="ch">
       <a class="ib only-mobile" href="#/chats" aria-label="Назад к чатам">${ic('back', 26)}</a>
       <a class="who" href="#/chat/${c.id}/info" aria-label="Информация: ${esc(chatTitle(c))}">${chatAv(c, 40)}<div><b>${esc(chatTitle(c))}</b><span id="convStatus">${headerStatus(c)}</span></div></a>
-      ${direct && !NET.on ? `<button class="ib" type="button" data-act="call" data-cid="${c.cid}" data-video="1" aria-label="Видеозвонок">${ic('video')}</button>
+      ${direct ? `<button class="ib" type="button" data-act="call" data-cid="${c.cid}" data-video="1" aria-label="Видеозвонок">${ic('video')}</button>
       <button class="ib" type="button" data-act="call" data-cid="${c.cid}" aria-label="Аудиозвонок">${ic('phone', 22)}</button>` : `<a class="ib" href="#/chat/${c.id}/info" aria-label="Информация">${ic('info', 22)}</a>`}
     </header>
-    <div class="thread-box"><div class="thread" id="thread"><div class="thread-in" role="log" aria-live="polite" aria-relevant="additions" id="threadIn"></div></div>
+    <div class="thread-box"><div class="wall" id="wall" aria-hidden="true"></div><div class="thread" id="thread"><div class="thread-in" role="log" aria-live="polite" aria-relevant="additions" id="threadIn"></div></div>
     <button type="button" class="fab-down" id="fabDown" data-act="to-bottom" aria-label="Прокрутить к последним сообщениям" hidden>${ic('chevronDown', 24)}<span class="badge" id="fabCount" hidden></span></button></div>
     <div id="composerWrap"></div></div>`;
   UI.fabNew = 0;
-  renderThread(c, true); renderComposer(c);
+  renderThread(c, true); renderComposer(c); afterConvRender();
   const th = $('#thread');
   th.addEventListener('scroll', () => { if (th.scrollHeight - th.scrollTop - th.clientHeight < 80) UI.fabNew = 0; updateFab(); }, { passive: true });
 }
@@ -587,19 +601,21 @@ function msgHTML(m, c, prev, next) {
   const cls = ['b', out ? 'out' : 'in', first ? 'first' : '', last ? 'last' : '', m.kind === 'image' || m.kind === 'video' || m.kind === 'location' ? 'media' : '', UI.rendered.has(m.id) ? '' : 'enter'].join(' ');
   const author = c.type === 'group' && !out && first ? `<span class="author" style="color:${({ g2: '#E23E6B', g3: '#0E8F8E', g5: '#2563EB', g4: '#D9630B', g6: '#B21FC3', g7: '#15803D' })[person(m.from).g] || 'var(--brand)'}">${esc(person(m.from).name)}</span>` : '';
   const st = out && c.type !== 'channel' ? `<span class="sr-only">${m.status === 'read' ? 'Прочитано' : m.status === 'sending' ? 'Отправляется' : 'Отправлено'}</span>${m.status === 'sending' ? ic('clock', 13) : ic(m.status === 'read' ? 'checks' : 'check', 15)}` : '';
-  const meta = `<span class="mt">${hhmm(m.ts)}${st}</span>`;
-  const q = m.reply ? `<span class="q"><b>${esc(m.reply.author)}</b><span>${esc(m.reply.text)}</span></span>` : '';
+  const meta = `<span class="mt">${m.edited ? '<span class="ed">изм.</span>' : ''}${hhmm(m.ts)}${st}</span>`;
+  const q = m.reply ? `<span class="q"${m.reply.id ? ` data-act="goto" data-id="${m.reply.id}" role="link"` : ''}><b>${esc(m.reply.author)}</b><span>${esc(m.reply.text)}</span></span>` : '';
+  const fw = m.fwd ? `<span class="fwd">${ic('send', 12)}Переслано от <b>${esc(m.fwd)}</b></span>` : '';
   let body;
   if (m.kind === 'image' || m.kind === 'video') {
     const label = esc(bodyText(m)), M = m.media;
-    const visual = !M ? `<span class="pic" role="img" aria-label="${label}">${hueGrad(m.hue || 250)}</span>`
+    const visual = !M ? `<span class="pic" role="img" aria-label="${label}" data-act="${m.kind === 'image' ? 'view' : ''}" data-id="${m.id}">${hueGrad(m.hue || 250)}</span>`
       : M.expired ? `<span class="pic expired">${ic(m.kind === 'video' ? 'video' : 'image', 28)}<small>${m.kind === 'video' ? 'Видео' : 'Фото'} удалено с сервера</small></span>`
       : m.kind === 'video' ? `<span class="pic"><video src="${esc(M.url)}" controls playsinline preload="metadata" aria-label="${label}"></video>${m.uploading ? '<span class="upl">0%</span>' : ''}</span>`
-      : `<span class="pic"><img src="${esc(M.url)}" alt="${label}" loading="lazy">${m.uploading ? '<span class="upl">0%</span>' : ''}</span>`;
+      : `<span class="pic" data-act="view" data-id="${m.id}"><img src="${esc(M.url)}" alt="${label}" loading="lazy">${m.uploading ? '<span class="upl">0%</span>' : ''}</span>`;
     body = `${author ? `<span style="padding:2px 8px 4px;display:block">${author}</span>` : ''}${visual}${m.caption ? `<span class="cap">${esc(m.caption)}${meta}</span>` : meta}`;
   }
   else if (m.kind === 'voice') {
-    const h = m.wave || waveHeights(m.id);
+    const n = Math.max(18, Math.min(44, Math.round(14 + m.dur * 1.1)));
+    const h = resample(m.wave || waveHeights(m.id, n), n);
     if (m.media && m.media.expired) body = `${author}<span class="file"><span class="fi">${ic('mic', 22)}</span><span><b>Голосовое · ${dur(m.dur)}</b><small>Удалено с сервера</small></span></span>${meta}`;
     else body = `${author}<span class="voice" data-voice="${m.id}"><button type="button" class="play" data-act="play" data-id="${m.id}" aria-label="Воспроизвести голосовое, ${dur(m.dur)}">${ic('play', 18)}</button><span style="flex:1"><span class="wave">${h.map(x => `<i style="height:${x}px"></i>`).join('')}</span><small>${dur(m.dur)}</small></span></span>${meta}`;
   } else if (m.kind === 'file') {
@@ -621,7 +637,15 @@ function msgHTML(m, c, prev, next) {
     const E = m.event, d = new Date(E.at);
     body = `${author}<span class="ev"><span class="ev-cal" aria-hidden="true"><small>${MON_SHORT[d.getMonth()]}</small><b>${d.getDate()}</b></span><span class="ev-t"><b>${esc(E.title)}</b><small>${d.getDate()} ${MON[d.getMonth()]}, ${WD_FULL[d.getDay()]} · ${hhmm(E.at)}</small><small>${E.going} ${plural(E.going, 'идёт', 'идут', 'идут')}</small></span></span><button type="button" class="ev-btn${E.me ? ' on' : ''}" data-act="event-go" data-id="${m.id}" aria-pressed="${!!E.me}">${E.me ? ic('check', 16) + 'Вы идёте' : 'Пойду'}</button>${meta}`;
   }
-  else body = `${author}${q}${esc(m.text).replace(/\n/g, '<br>')}${meta}`;
+  else if (m.kind === 'call') {
+    const C = m.call || {}, missed = !C.dur && !out, icn = C.video ? 'video' : 'phone';
+    const title = out ? (C.dur ? 'Исходящий' : C.status === 'declined' ? 'Звонок отклонён' : C.status === 'busy' ? 'Занято' : C.status === 'unavailable' ? 'Не в сети' : 'Нет ответа') + (C.dur ? (C.video ? ' видеозвонок' : ' звонок') : '')
+      : C.dur ? (C.video ? 'Входящий видеозвонок' : 'Входящий звонок') : (C.video ? 'Пропущенный видеозвонок' : 'Пропущенный звонок');
+    body = `<button type="button" class="callmsg${missed ? ' miss' : ''}" data-act="call" data-cid="${c.cid}" ${C.video ? 'data-video="1"' : ''} aria-label="${title}. Перезвонить"><span class="ci">${ic(icn, 20)}</span><span><b>${title}</b><small>${ic(out ? 'arrowOut' : 'arrowIn', 12)}${C.dur ? dur(C.dur) : hhmm(m.ts)}</small></span></button>${meta}`;
+  }
+  else body = `${author}${fw}${q}${linkify(esc(m.text)).replace(/\n/g, '<br>')}${meta}`;
+  const rx = reactsHTML(m);
+  if (rx) { const i = body.lastIndexOf(meta); body = body.slice(0, i) + rx + body.slice(i); }
   return `<div class="${cls}" data-mid="${m.id}" tabindex="0" aria-label="${out ? 'Вы' : esc(c.type === 'channel' ? chatTitle(c) : person(m.from).name)}, ${hhmm(m.ts)}">${body}</div>`;
 }
 function renderThread(c, jump) {
@@ -633,6 +657,7 @@ function renderThread(c, jump) {
   let html = '', lastDay = null;
   c.messages.forEach((m, i) => {
     const d = dayStart(m.ts); if (d !== lastDay) { html += `<span class="date">${dayLabel(m.ts)}</span>`; lastDay = d; }
+    if (UI.unreadFrom === m.id) html += '<div class="unread-div" id="unreadDiv"><span>Непрочитанные сообщения</span></div>';
     html += msgHTML(m, c, c.messages[i - 1], c.messages[i + 1]);
   });
   if (!c.messages.length) html = `<p class="sys">${c.type === 'direct' ? 'Напишите первое сообщение' : 'Сообщений пока нет'}</p>`;
@@ -641,7 +666,9 @@ function renderThread(c, jump) {
   inEl.innerHTML = html;
   c.messages.forEach(m => UI.rendered.add(m.id));
   if (UI.playing) paintVoice();
-  if (jump || nearBottom) th.scrollTop = th.scrollHeight;
+  const ud = jump && $('#unreadDiv');
+  if (ud) th.scrollTop = Math.max(0, ud.offsetTop - 90);
+  else if (jump || nearBottom) th.scrollTop = th.scrollHeight;
   else if (fresh) UI.fabNew += fresh;
   if (anchor) {
     const el = $(`.b[data-mid="${anchor}"]`, inEl);
@@ -684,21 +711,23 @@ function renderComposer(c) {
 }
 function syncSend() {
   const b = $('#sendBtn'), ta = $('#msgInput'); if (!b || !ta) return;
-  const has = ta.value.trim().length > 0, mode = has ? 'send' : 'mic';
+  const has = ta.value.trim().length > 0, mode = has ? (UI.edit ? 'check' : 'send') : 'mic';
   const cam = $('#camBtn'); if (cam) cam.hidden = has;
   if (b.dataset.mode === mode) return;
-  b.dataset.mode = mode; b.innerHTML = ic(mode, 22); b.setAttribute('aria-label', has ? 'Отправить' : 'Записать голосовое');
+  b.dataset.mode = mode; b.innerHTML = ic(mode, 22); b.setAttribute('aria-label', has ? (UI.edit ? 'Сохранить изменения' : 'Отправить') : 'Записать голосовое');
   b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
 }
 function setReply(m) {
   const bar = $('#replyBar'); if (!bar) return;
   const c = chatById(UI.route.chat);
-  UI.reply = m ? { author: m.from === 'me' ? meName() : (c.type === 'channel' ? chatTitle(c) : person(m.from).name), text: bodyText(m) } : null;
+  if (m) UI.edit = null;
+  UI.reply = m ? { id: m.id, author: m.from === 'me' ? meName() : (c.type === 'channel' ? chatTitle(c) : person(m.from).name), text: bodyText(m) } : null;
   bar.hidden = !m;
   bar.innerHTML = m ? `${ic('reply', 20)}<div class="rb"><b>${esc(UI.reply.author)}</b><span>${esc(UI.reply.text)}</span></div><button class="ib" type="button" data-act="cancel-reply" aria-label="Отменить ответ">${ic('x', 20)}</button>` : '';
   if (m) $('#msgInput').focus();
 }
 function sendText() {
+  if (UI.edit) return finishEdit();
   const ta = $('#msgInput'); const text = ta.value.trim(); if (!text) return;
   const c = chatById(UI.route.chat);
   addMessage(c, { from: 'me', kind: 'text', text, reply: UI.reply || undefined });
@@ -711,7 +740,7 @@ function addMessage(c, m) {
   const viewing = UI.route.chat === c.id && !UI.route.info && !document.hidden;
   if (m.from !== 'me' && !viewing) {
     c.unread = (c.unread || 0) + 1;
-    if (S.settings.notify && !c.muted) toast(`${chatAv(c, 32, false)}<span><b>${esc(chatTitle(c))}</b><br><span style="font-weight:500;opacity:.85">${esc(bodyText(m)).slice(0, 60)}</span></span>`, 'Открыть', () => { location.hash = '#/chat/' + c.id; }, 4000);
+    if (S.settings.notify && !c.muted) { toast(`${chatAv(c, 32, false)}<span><b>${esc(chatTitle(c))}</b><br><span style="font-weight:500;opacity:.85">${esc(bodyText(m)).slice(0, 60)}</span></span>`, 'Открыть', () => { location.hash = '#/chat/' + c.id; }, 4000, true); $('#toast').dataset.chat = c.id; }
   }
   save();
   if (UI.route.chat === c.id) refreshChat(c.id);
@@ -903,9 +932,9 @@ function renderInfo(c) {
   if (c.type === 'direct') {
     const p = person(c.cid);
     body = `<div class="hero">${av(p.ini, p.g, 104, p.online)}<h2>${esc(p.name)}</h2><p class="${p.online ? 'on' : ''}">${seenText(p)}</p></div>
-      <div class="acts" ${NET.on ? 'style="grid-template-columns:repeat(2,1fr)"' : ''}><a class="act" href="#/chat/${c.id}">${ic('chat', 22)}Чат</a>
-        ${NET.on ? '' : `<button type="button" class="act" data-act="call" data-cid="${c.cid}">${ic('phone', 22)}Звонок</button>
-        <button type="button" class="act" data-act="call" data-cid="${c.cid}" data-video="1">${ic('video', 22)}Видео</button>`}
+      <div class="acts"><a class="act" href="#/chat/${c.id}">${ic('chat', 22)}Чат</a>
+        <button type="button" class="act" data-act="call" data-cid="${c.cid}">${ic('phone', 22)}Звонок</button>
+        <button type="button" class="act" data-act="call" data-cid="${c.cid}" data-video="1">${ic('video', 22)}Видео</button>
         <button type="button" class="act" data-act="toggle-mute" aria-pressed="${!!c.muted}">${ic(c.muted ? 'mute' : 'bell', 22)}${c.muted ? 'Без звука' : 'Звук'}</button></div>
       <div class="card">
         <div class="li"><span class="ico" style="background:#16A34A">${ic('phone', 16)}</span><span class="t"><b>${esc(p.phone)}</b><small>Мобильный</small></span></div>
@@ -929,7 +958,8 @@ function renderInfo(c) {
     <div class="scroll">${body}
       <div class="card">
         <div class="li"><span class="ico" style="background:#DC2626">${ic('bell', 16)}</span><span class="t"><b id="nLbl">Уведомления</b></span><button type="button" class="switch" role="switch" aria-labelledby="nLbl" aria-checked="${!c.muted}" data-act="toggle-mute"></button></div>
-        <div class="li"><span class="ico" style="background:#0E8F8E">${ic('image', 16)}</span><span class="t"><b>Медиа и файлы</b></span><span class="v">${media}</span></div>
+        <button type="button" class="li" data-act="look"><span class="ico" style="background:#C026D3">${ic('image', 16)}</span><span class="t"><b>Обои и оформление</b></span><span class="v">${ic('chevron', 18)}</span></button>
+        <div class="li"><span class="ico" style="background:#0E8F8E">${ic('file', 16)}</span><span class="t"><b>Медиа и файлы</b></span><span class="v">${media}</span></div>
         <div class="li"><span class="ico" style="background:#2563EB">${ic('lock', 16)}</span><span class="t"><b>Защищённое соединение</b><small>HTTPS между телефоном и сервером</small></span></div>
       </div>
       ${NET.on ? '' : `<div class="card" style="margin-bottom:8px">
@@ -949,6 +979,7 @@ function openSheet(title, html, onOpen) {
   if (onOpen) onOpen($('#overlay .sheet'));
 }
 function closeOverlay() {
+  if ($('#overlay .mm')) return closeMsgMenu();
   const o = $('#overlay'); if (!o.innerHTML) return;
   $$('.scrim, .sheet, .dialog', o).forEach(e => e.classList.add('closing'));
   setTimeout(() => { o.innerHTML = ''; if (lastFocus && document.contains(lastFocus)) lastFocus.focus(); }, 170);
@@ -964,14 +995,7 @@ function confirmDialog({ title, text, ok, danger }) {
     $('#dlgNo').focus();
   });
 }
-function msgActions(mid) {
-  const [c, m] = findMsg(mid); if (!m) return;
-  const canReply = c.type !== 'channel' && !c.blocked;
-  openSheet('Действия с сообщением', `
-    ${canReply ? `<button type="button" class="opt" data-act="m-reply" data-id="${mid}"><span class="ico" style="background:#5B4BFF">${ic('reply', 20)}</span>Ответить</button>` : ''}
-    ${m.kind === 'text' ? `<button type="button" class="opt" data-act="m-copy" data-id="${mid}"><span class="ico" style="background:#0E8F8E">${ic('copy', 20)}</span>Копировать</button>` : ''}
-    <button type="button" class="opt danger" data-act="m-delete" data-id="${mid}"><span class="ico" style="background:#DC2626">${ic('trash', 20)}</span>Удалить у меня</button>`);
-}
+function msgActions(mid) { openMsgMenu(mid); }
 const STORY_G = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'];
 function newStorySheet() {
   let g = 'g1';
@@ -1090,7 +1114,7 @@ document.addEventListener('click', async e => {
     case 'story-next': nextStory(); break;
     case 'story-prev': prevStory(); break;
     case 'close-overlay': closeOverlay(); break;
-    case 'call': if (NET.on) { toast('Звонки появятся в следующем обновлении сервера'); break; } openCall(el.dataset.cid, !!el.dataset.video); break;
+    case 'call': if (NET.on) { RTC.start(el.dataset.cid, !!el.dataset.video); break; } openCall(el.dataset.cid, !!el.dataset.video); break;
     case 'call-end': endCall(); break;
     case 'call-mute': case 'call-cam': case 'call-spk': el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') !== 'true'); break;
     case 'call-filter': UI.callFilter = el.dataset.id; renderCallsTab(); $(`[data-act="call-filter"][data-id="${UI.callFilter}"]`).focus(); break;
@@ -1286,4 +1310,4 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* not allowed in this context */ }
 }
 
-if (window.NETBOOT) window.NETBOOT(); else renderApp();
+function boot() { if (window.NETBOOT) window.NETBOOT(); else renderApp(); }

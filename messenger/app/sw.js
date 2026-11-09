@@ -1,6 +1,6 @@
 /* Aloqa service worker: network-first with offline fallback to the cached app shell */
-const CACHE = 'aloqa-v4';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'net.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'aloqa-v5';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'net.js', 'features.js', 'calls.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));

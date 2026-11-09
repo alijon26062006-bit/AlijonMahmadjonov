@@ -73,7 +73,12 @@ window.NET = (() => {
     const meta = sm.meta || {}, me = sm.from === N.me;
     const m = { id: sm.id, chatId: sm.chatId, from: me ? 'me' : sm.from, ts: sm.ts, kind: sm.kind, text: sm.body || '', status: 'sent', media: sm.media || null };
     if (meta.reply) m.reply = meta.reply;
+    if (meta.fwd) m.fwd = meta.fwd;
+    if (sm.editedAt) m.edited = true;
+    m.reacts = {};
+    for (const [e, ids] of Object.entries(sm.reactions || {})) m.reacts[e] = ids.map(x => x === N.me ? 'me' : x);
     switch (sm.kind) {
+      case 'call': m.call = meta.call || {}; break;
       case 'voice': m.dur = meta.dur || 1; m.wave = meta.wave; break;
       case 'image': case 'video': m.caption = sm.body; m.hue = meta.hue || 250; break;
       case 'file': m.name = meta.name || 'Файл'; m.size = meta.size || ''; break;
@@ -91,7 +96,9 @@ window.NET = (() => {
   function toMeta(m) {
     const meta = {};
     if (m.reply) meta.reply = m.reply;
+    if (m.fwd) meta.fwd = m.fwd;
     switch (m.kind) {
+      case 'call': meta.call = m.call; break;
       case 'voice': meta.dur = m.dur; meta.wave = m.wave; break;
       case 'image': case 'video': meta.hue = m.hue; break;
       case 'file': meta.name = m.name; meta.size = m.size; break;
@@ -123,7 +130,7 @@ window.NET = (() => {
   function handle(d) {
     switch (d.type) {
       case 'init': {
-        N.me = d.me.id; N.ttl = d.mediaTtlHours || N.ttl; N.ready = true; N.backoff = 1000;
+        N.me = d.me.id; N.ttl = d.mediaTtlHours || N.ttl; N.ready = true; N.backoff = 1000; N.ice = d.iceServers || [];
         const keepSettings = S.settings;
         S.contacts = {}; d.profiles.forEach(addProfile);
         S.user = { id: d.me.id, name: d.me.name, phone: d.me.phone, user: d.me.username || '', bio: d.me.bio || '' };
@@ -181,6 +188,7 @@ window.NET = (() => {
         else addProfile(d.profile);
         renderChatList(); return;
       }
+      case 'call': if (window.RTC) RTC.onSignal(d.from, d.chatId, d.data || {}); return;
       case 'error': {
         if (d.ref && N.pending[d.ref]) delete N.pending[d.ref];
         toast(esc(d.message || 'Ошибка')); return;
@@ -193,7 +201,8 @@ window.NET = (() => {
     if (viewing) N.read(c.id);
     else {
       c.unread = (c.unread || 0) + 1;
-      if (S.settings.notify && !c.muted) toast(`${chatAv(c, 32, false)}<span><b>${esc(chatTitle(c))}</b><br><span style="font-weight:500;opacity:.85">${esc(bodyText(m)).slice(0, 60)}</span></span>`, 'Открыть', () => { location.hash = '#/chat/' + c.id; }, 4000);
+      if (S.settings.notify && !c.muted) toast(`${chatAv(c, 32, false)}<span><b>${esc(chatTitle(c))}</b><br><span style="font-weight:500;opacity:.85">${esc(bodyText(m)).slice(0, 60)}</span></span>`, 'Открыть', () => { location.hash = '#/chat/' + c.id; }, 4000, true);
+      $('#toast').dataset.chat = c.id;
       if (document.hidden && S.settings.notify && !c.muted && 'Notification' in window && Notification.permission === 'granted') {
         try { new Notification(chatTitle(c), { body: bodyText(m).slice(0, 120), icon: 'icons/icon-192.png', tag: c.id }); } catch (e) { /* ignore */ }
       }
@@ -220,6 +229,9 @@ window.NET = (() => {
   N.vote = (c, m, i) => { if (m.poll.my >= 0) return; m.poll.my = i; m.poll.opts[i].v++; refreshChat(c.id); sendWS({ type: 'vote', id: m.id, opt: i }); };
   N.rsvp = (c, m) => { m.event.me = !m.event.me; m.event.going += m.event.me ? 1 : -1; refreshChat(c.id); sendWS({ type: 'rsvp', id: m.id }); };
   N.profile = (name, bio) => sendWS({ type: 'profile', name, bio });
+  N.react = (id, emoji) => sendWS({ type: 'react', id, emoji: emoji || '' });
+  N.edit = (id, body) => sendWS({ type: 'edit', id, body });
+  N.signal = (to, chatId, data) => { if (N.ready && N.ws.readyState === 1) { N.ws.send(JSON.stringify({ type: 'call', to, chatId, data })); return true; } return false; };
   N.startChat = phone => { const ref = 'r' + (++N.refSeq); N.pending[ref] = true; sendWS({ type: 'start_chat', phone, ref }); };
   N.openDirect = cid => { const c = S.chats.find(x => x.type === 'direct' && x.cid === cid); if (c) location.hash = '#/chat/' + c.id; else if (person(cid)) N.startChat(person(cid).phone); };
   N.logout = async () => { try { await api('api/logout', {}); } catch (e) { /* ignore */ } setToken(null); location.hash = ''; location.reload(); };

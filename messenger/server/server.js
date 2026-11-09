@@ -45,10 +45,15 @@ db.exec(`
     sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL, body TEXT,
     meta TEXT NOT NULL DEFAULT '{}', reply_to TEXT, media_id TEXT, created_at INTEGER NOT NULL);
   CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, created_at);
+  CREATE TABLE IF NOT EXISTS reactions (
+    message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    emoji TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id, user_id));
   CREATE TABLE IF NOT EXISTS media (
     id TEXT PRIMARY KEY, key TEXT NOT NULL, owner TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL,
     created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
 `);
+/* Lightweight migrations for columns added after the first release */
+if (!db.prepare("SELECT 1 FROM pragma_table_info('messages') WHERE name = 'edited_at'").get()) db.exec('ALTER TABLE messages ADD COLUMN edited_at INTEGER');
 const Q = sql => db.prepare(sql);
 const sql = {
   userByPhone: Q('SELECT * FROM users WHERE phone = ?'),
@@ -80,7 +85,12 @@ const sql = {
   insertMedia: Q('INSERT INTO media (id, key, owner, mime, size, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'),
   mediaById: Q('SELECT * FROM media WHERE id = ?'),
   expiredMedia: Q('SELECT id FROM media WHERE expires_at <= ?'),
-  deleteMedia: Q('DELETE FROM media WHERE id = ?')
+  deleteMedia: Q('DELETE FROM media WHERE id = ?'),
+  reactionsOf: Q('SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at'),
+  myReaction: Q('SELECT emoji FROM reactions WHERE message_id = ? AND user_id = ?'),
+  setReaction: Q('INSERT INTO reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (message_id, user_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at'),
+  delReaction: Q('DELETE FROM reactions WHERE message_id = ? AND user_id = ?'),
+  editMessage: Q('UPDATE messages SET body = ?, edited_at = ? WHERE id = ?')
 };
 
 /* ---------- Helpers ---------- */
@@ -89,7 +99,7 @@ const uuid = () => crypto.randomUUID();
 const isUuid = s => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 const COLORS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7'];
-const KINDS = new Set(['text', 'image', 'video', 'voice', 'file', 'location', 'contact', 'poll', 'event']);
+const KINDS = new Set(['text', 'image', 'video', 'voice', 'file', 'location', 'contact', 'poll', 'event', 'call']);
 const SCRYPT = { N: 16384, r: 8, p: 1 };
 function hashPassword(p) {
   const salt = crypto.randomBytes(16);
@@ -126,7 +136,9 @@ function mediaInfo(id) {
 }
 function msgOut(r) {
   let meta = {}; try { meta = JSON.parse(r.meta); } catch { /* keep empty */ }
-  return { id: r.id, chatId: r.chat_id, from: r.sender_id, kind: r.kind, body: r.body || '', meta, replyTo: r.reply_to, media: mediaInfo(r.media_id), ts: r.created_at };
+  const reactions = {};
+  for (const x of sql.reactionsOf.all(r.id)) (reactions[x.emoji] = reactions[x.emoji] || []).push(x.user_id);
+  return { id: r.id, chatId: r.chat_id, from: r.sender_id, kind: r.kind, body: r.body || '', meta, replyTo: r.reply_to, media: mediaInfo(r.media_id), ts: r.created_at, editedAt: r.edited_at || null, reactions };
 }
 function chatOut(c, uid) {
   return {
@@ -134,6 +146,19 @@ function chatOut(c, uid) {
     members: sql.chatMembers.all(c.id).map(m => ({ id: m.user_id, role: m.role, lastRead: m.last_read, muted: !!m.muted })),
     messages: sql.recentMessages.all(c.id, HISTORY).map(msgOut)
   };
+}
+
+/* ---------- ICE servers for calls ---------- */
+function iceServers(uid) {
+  const urls = String(process.env.TURN_URLS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const list = [];
+  if (process.env.STUN_URLS !== '') list.push({ urls: String(process.env.STUN_URLS || 'stun:stun.l.google.com:19302').split(',').map(s => s.trim()) });
+  if (urls.length && process.env.TURN_SECRET) {
+    const username = `${Math.floor(now() / 1000) + 24 * 3600}:${uid}`;
+    const credential = crypto.createHmac('sha1', process.env.TURN_SECRET).update(username).digest('base64');
+    list.push({ urls, username, credential });
+  }
+  return list;
 }
 
 /* ---------- Real-time connections ---------- */
@@ -155,7 +180,7 @@ function handleSocket(ws, user) {
   if (first) toPartners(uid, { type: 'presence', userId: uid, online: true, lastSeen: now() });
   const fresh = sql.userById.get(uid);
   ws.send(JSON.stringify({
-    type: 'init', me: publicUser(fresh), mediaTtlHours: MEDIA_TTL_H,
+    type: 'init', me: publicUser(fresh), mediaTtlHours: MEDIA_TTL_H, iceServers: iceServers(uid),
     profiles: sql.partners.all(uid).map(publicUser),
     chats: sql.myChats.all(uid).map(c => chatOut(c, uid))
   }));
@@ -230,6 +255,34 @@ function handleSocket(ws, user) {
         } else return;
         sql.updateMeta.run(JSON.stringify(meta), m.id);
         toChat(m.chat_id, { type: 'update', message: msgOut(sql.messageById.get(m.id)) });
+        return;
+      }
+      case 'react': {
+        const m = sql.messageById.get(String(d.id));
+        if (!m || !member(m.chat_id)) return;
+        const emoji = typeof d.emoji === 'string' ? d.emoji.slice(0, 16) : '';
+        if (!emoji) sql.delReaction.run(m.id, uid);
+        else sql.setReaction.run(m.id, uid, emoji, now());
+        toChat(m.chat_id, { type: 'update', message: msgOut(m) });
+        return;
+      }
+      case 'edit': {
+        const m = sql.messageById.get(String(d.id));
+        const body = typeof d.body === 'string' ? d.body.trim().slice(0, 4000) : '';
+        if (!m || m.sender_id !== uid || m.kind !== 'text' || !body || now() - m.created_at > 48 * 3600e3) return reply(d.ref, { type: 'error', code: 'edit', message: 'Это сообщение уже нельзя изменить' });
+        sql.editMessage.run(body, now(), m.id);
+        toChat(m.chat_id, { type: 'update', message: msgOut(sql.messageById.get(m.id)) });
+        return;
+      }
+      case 'call': {
+        /* WebRTC signaling relay: offer / answer / ice / end / decline / busy */
+        const to = String(d.to || ''), data = d.data && typeof d.data === 'object' ? d.data : null;
+        if (!data || !sql.sharesChat.get(uid, to) || !member(d.chatId)) return;
+        if (!online.has(to)) {
+          if (data.kind === 'offer') reply(d.ref, { type: 'call', from: to, chatId: d.chatId, data: { kind: 'unavailable', callId: data.callId } });
+          return;
+        }
+        sendTo(to, { type: 'call', from: uid, chatId: d.chatId, data });
         return;
       }
       case 'start_chat': {
