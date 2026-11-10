@@ -1108,12 +1108,16 @@ class ShopBot:
             self.show(tg_id, "⚠️ " + _e(exc), [[("🎟 Ввести другой код", "gw")], [(tr(su["lang"], "home"), "h")]])
             return
         giveaway.announce(self.config, conn, su["user_id"], res)
+        left = int(res.get("left", 0))
+        more = (f"\n\nОсталось попыток сегодня: <b>{left}</b> · Имрӯз боз {left} кӯшиш." if left > 0
+                else "\n\nПопытки на сегодня закончились — новые завтра. · Фардо боз.")
+        rows = ([[("🎟 Ввести ещё код", "gw")]] if left > 0 else []) + home
         if res["prize"]:
             self.show(tg_id, f"🎉 <b>Вы выиграли: {_e(res['prize'])}!</b>\n\nКод <code>{_e(res['code'])}</code>. "
-                             "Мы свяжемся с вами и выдадим приз. · Табрик, шумо бурдед!", home, effect=EFFECT_PARTY)
+                             "Мы свяжемся с вами и выдадим приз. · Табрик, шумо бурдед!" + more, rows,
+                      effect=EFFECT_PARTY)
         else:
-            self.show(tg_id, f"🍀 Код <code>{_e(res['code'])}</code> — пусто.\nЗавтра будет новый шанс! "
-                             "· Холӣ, фардо боз кӯшиш кунед.", home)
+            self.show(tg_id, f"🍀 Код <code>{_e(res['code'])}</code> — пусто. · Холӣ." + more, rows)
 
     # ── Карта для возврата остатка (если проект закроется) — обязательна один раз ──
 
@@ -2032,7 +2036,7 @@ class ShopBot:
         elif head == "gw":   # «🎟 Проверить промокод» — ждём код
             self.state[tg_id] = {"step": "gw"}
             self.show(tg_id, "🎟 <b>Проверить промокод · Санҷиши рамз</b>\n\nНапишите промокод из нашего канала, "
-                             "например <code>DX-7K3P9A</code>.\nРамзро нависед. Один код в день · рӯзе як рамз.",
+                             "например <code>DX-7K3P9A</code>.\nРамзро нависед. 3 попытки в день · рӯзе 3 кӯшиш.",
                       [[(tr(lang, "home"), "h")]], edit=mid)
         elif head in ("ta", "tat", "tach", "tachx", "tapz", "tab", "tabx", "tban") and len(parts) == 1 \
                 and self.is_admin(tg_id):   # «ta:100» — сумма пополнения, не турнир

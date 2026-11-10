@@ -14,24 +14,27 @@ def test_generate_puts_prizes_on_random_codes(conn):
     assert all(r["code"].startswith("DX-") and len(r["code"]) == 9 for r in rows)
 
 
-def test_one_code_per_day_and_each_code_once(conn):
+def test_three_codes_per_day_and_each_code_once(conn):
     uid, _ = make_client(conn)
     other, _ = make_client(conn, login="shop2")
-    giveaway.generate(conn, 3, ["Приз"])
+    giveaway.generate(conn, 6, ["Приз"])
     codes = [r["code"] for r in conn.execute("SELECT code FROM giveaway_codes ORDER BY id")]
     res = giveaway.activate(conn, uid, codes[0].lower().replace("-", " "))
-    assert res["code"] == codes[0]
+    assert res["code"] == codes[0] and res["left"] == 2
+    assert giveaway.activate(conn, uid, codes[1])["left"] == 1
+    assert giveaway.activate(conn, uid, codes[2])["left"] == 0
     try:
-        giveaway.activate(conn, uid, codes[1])
-        raise AssertionError("второй код в тот же день")
+        giveaway.activate(conn, uid, codes[3])
+        raise AssertionError("4-й код в тот же день")
     except giveaway.GiveawayError as exc:
-        assert "завтра" in str(exc)
+        assert "3 попытки" in str(exc) and "завтра" in str(exc)
+    assert conn.execute("SELECT user_id FROM giveaway_codes WHERE code = ?", (codes[3],)).fetchone()[0] is None
     try:
         giveaway.activate(conn, other, codes[0])
         raise AssertionError("тот же код второй раз")
     except giveaway.GiveawayError as exc:
         assert "уже активировали" in str(exc)
-    assert giveaway.activate(conn, other, codes[1])["code"] == codes[1]
+    assert giveaway.activate(conn, other, codes[3])["code"] == codes[3]
 
 
 def test_wrong_codes_limited(conn):
@@ -93,3 +96,25 @@ def test_bot_button_and_activation(app, config, conn, supplier):
     assert "пусто" in bot.api.last_text() and code in bot.api.last_text()
     assert conn.execute("SELECT source FROM giveaway_codes WHERE code = ?", (code,)).fetchone()[0] == "bot"
     assert db is not None
+
+
+def test_only_winners_posted(conn, config):
+    """В канал — только выигрыши, пустые коды не публикуются."""
+    uid, _ = make_client(conn)
+    giveaway.generate(conn, 3, ["Ваучер"])
+    empty = conn.execute("SELECT code FROM giveaway_codes WHERE prize IS NULL LIMIT 1").fetchone()[0]
+    win = conn.execute("SELECT code FROM giveaway_codes WHERE prize IS NOT NULL").fetchone()[0]
+    config.shop_bot_token = "x"
+    api = FakeApi()
+    giveaway.announce(config, conn, uid, giveaway.activate(conn, uid, empty), api=api)
+    assert not [p for m, p in api.calls if m == "sendMessage"]
+    giveaway.announce(config, conn, uid, giveaway.activate(conn, uid, win), api=api)
+    assert len([p for m, p in api.calls if m == "sendMessage"]) == 1
+
+
+def test_admin_sees_all_codes_prizes_and_who(app, client, config, conn):
+    giveaway.generate(conn, 5, ["Ваучер на месяц"])
+    win = conn.execute("SELECT code FROM giveaway_codes WHERE prize IS NOT NULL").fetchone()[0]
+    web_login(client, config.admin_email, config.admin_password)
+    page = client.get("/admin/giveaway").text
+    assert win in page and "Ваучер на месяц" in page

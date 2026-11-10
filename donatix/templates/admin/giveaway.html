@@ -4,7 +4,7 @@
 {% block content %}
 <section class="page-hero"><h1>Розыгрыш промокодов</h1>
   <p>Сгенерируйте коды и задайте призы — бот сам разложит призы по случайным кодам, остальные будут пустыми.
-  Клиенты вводят код в Telegram-боте @DonatixShopbot — кнопка «🎟 Проверить промокод» на главном экране (1 код в день), каждая активация публикуется в канале.</p></section>
+  Клиенты вводят код в Telegram-боте @DonatixShopbot — кнопка «🎟 Проверить промокод» на главном экране (3 попытки в день на человека). В канал публикуются только победители.</p></section>
 
 <form class="card" method="post" action="/admin/giveaway" style="margin-bottom:14px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -38,13 +38,13 @@
         <button class="btn sm" name="action" value="{{ 'stop' if b.active else 'start' }}">{{ 'Остановить' if b.active else 'Включить' }}</button></form>
     </div>
   </div>
-  <details style="margin-top:10px"><summary class="small" style="cursor:pointer">Коды и победители</summary>
+  <details style="margin-top:10px" open><summary class="small" style="cursor:pointer">Все коды: приз и кто активировал</summary>
   <div class="small" style="display:grid;gap:4px;margin-top:8px">
-    {% for c in b.codes if c.prize or c.user_id %}
+    {% for c in b.codes %}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
       <span class="mono">{{ c.code }}</span>
       {% if c.prize %}<b>🎁 {{ c.prize }}</b>{% else %}<span class="muted">пусто</span>{% endif %}
-      {% if c.user_id %}· <a href="/admin/users/{{ c.user_id }}">{{ c.login }}</a> <span class="muted">{{ c.used_at | dt }} · {{ 'бот' if c.source == 'bot' else 'сайт' }}</span>
+      {% if c.user_id %}· <a href="/admin/users/{{ c.user_id }}">{{ c.login }}</a>{% if c.who.startswith('@') %} <b>{{ c.who }}</b>{% endif %} <span class="muted">{{ c.used_at | dt }} · {{ 'бот' if c.source == 'bot' else 'сайт' }}</span>
         {% if c.prize %}{% if c.given_at %}<span class="ok-text">✓ выдано</span>{% else %}
         <form method="post" action="/admin/giveaway" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="item" value="{{ c.id }}">
           <button class="btn sm primary" name="action" value="given">Выдано</button></form>{% endif %}{% endif %}

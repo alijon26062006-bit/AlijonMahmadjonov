@@ -1,7 +1,8 @@
 """Розыгрыш по промокодам: админ генерирует N случайных кодов и задаёт призы — бот сам раскладывает
 призы по случайным кодам, остальные пустые. Коды админ раздаёт (канал, сторис). Клиент вводит код
-в Telegram-боте (кнопка на главном экране): 1 код в день на человека, каждый код — один раз. Каждая активация
-публикуется в канале («код … активировал @user — выиграл …» / «пусто»). Приз выдаётся вручную:
+в Telegram-боте (кнопка на главном экране): 3 попытки (кода) в день на человека, каждый код — один раз.
+В канале публикуются только выигрыши («код … активировал @user — выиграл …»).
+В админке видны все коды, призы и аккаунт, который активировал каждый код. Приз выдаётся вручную:
 админ получает уведомление и отмечает «Выдано».
 """
 
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 
 ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"   # без 0/O, 1/I/L — чтобы не путали при вводе
 MAX_CODES = 1000
+PER_DAY = 3                                     # сколько кодов человек может активировать за день
 MAX_WRONG_PER_DAY = 15                          # неверных попыток в день — дальше ждать (перебор кодов)
 CHANNEL_KEY = "giveaway.channel"
 DEFAULT_CHANNEL = "@donatixtj"
@@ -129,11 +131,11 @@ def activate(conn: sqlite3.Connection, user_id: int, raw: str, *, tz_offset: int
         wrong = conn.execute("SELECT n FROM giveaway_wrong WHERE user_id = ? AND day = ?", (user_id, day)).fetchone()
         if wrong and wrong["n"] >= MAX_WRONG_PER_DAY:
             raise GiveawayError("Слишком много неверных кодов. Попробуйте завтра. · Имрӯз кӯшишҳо тамом шуд.")
-        done = conn.execute("SELECT code FROM giveaway_codes WHERE user_id = ? AND used_at >= ? LIMIT 1",
-                            (user_id, since)).fetchone()
-        if done:
-            raise GiveawayError(f"Сегодня вы уже активировали код {done['code']}. Новый — завтра. "
-                                "· Имрӯз шумо аллакай рамз фаъол кардед, фардо боз.")
+        done = conn.execute("SELECT COUNT(*) FROM giveaway_codes WHERE user_id = ? AND used_at >= ?",
+                            (user_id, since)).fetchone()[0]
+        if done >= PER_DAY:   # код не проверяем и не тратим — о нём ничего не узнать
+            raise GiveawayError(f"Сегодня вы уже использовали {PER_DAY} попытки. Новые — завтра. "
+                                f"· Имрӯз {PER_DAY} кӯшиш тамом шуд, фардо боз.")
         row = conn.execute("SELECT c.*, b.active FROM giveaway_codes c JOIN giveaway_batches b ON b.id = c.batch_id "
                            "WHERE c.code = ?", (code,)).fetchone()
         if row is None or not row["active"]:
@@ -149,7 +151,7 @@ def activate(conn: sqlite3.Connection, user_id: int, raw: str, *, tz_offset: int
                          (user_id, db.now(), source, row["id"]))
     if missing:
         raise GiveawayError("Такого промокода нет. Проверьте буквы и цифры. · Чунин рамз нест.")
-    return {"code": code, "prize": row["prize"]}
+    return {"code": code, "prize": row["prize"], "left": PER_DAY - done - 1}
 
 
 def who(conn: sqlite3.Connection, user_id: int) -> str:
@@ -185,7 +187,8 @@ def announce(config: Any, conn: sqlite3.Connection, user_id: int, result: dict, 
     login = (conn.execute("SELECT login FROM users WHERE id = ?", (user_id,)).fetchone() or {"login": "?"})["login"]
 
     def run() -> None:
-        if config.shop_bot_token and chat and chat != "-":
+        # В канал — только победители: пустые коды не публикуем
+        if result["prize"] and config.shop_bot_token and chat and chat != "-":
             try:
                 from .tgbot import TelegramApi
                 (api or TelegramApi(config.shop_bot_token))("sendMessage", chat_id=chat, text=text, parse_mode="HTML",
@@ -211,9 +214,11 @@ def batches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
                           "SUM(prize IS NOT NULL AND user_id IS NOT NULL) AS won FROM giveaway_codes WHERE batch_id = ?",
                           (b["id"],)).fetchone()
         codes = conn.execute("SELECT c.*, u.login FROM giveaway_codes c LEFT JOIN users u ON u.id = c.user_id "
-                             "WHERE c.batch_id = ? ORDER BY c.code", (b["id"],)).fetchall()
+                             "WHERE c.batch_id = ? ORDER BY c.prize IS NULL, c.user_id IS NULL, c.used_at DESC, c.code",
+                             (b["id"],)).fetchall()   # сверху призы, потом активированные
         out.append({**dict(b), "n": st["n"] or 0, "used": st["used"] or 0, "prizes": st["prizes"] or 0,
-                    "won": st["won"] or 0, "codes": [dict(c) for c in codes]})
+                    "won": st["won"] or 0,
+                    "codes": [{**dict(c), "who": who(conn, c["user_id"]) if c["user_id"] else ""} for c in codes]})
     return out
 
 
