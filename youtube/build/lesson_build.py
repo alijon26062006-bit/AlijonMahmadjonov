@@ -165,6 +165,8 @@ def main():
     if "--download" in sys.argv:
         manifest = json.load(open(os.path.join(HERE, f"{ep}_voice.json")))
         for i, v in manifest["lines"].items():
+            if not v.get("url"):  # фраза ещё не озвучена — останется оценка длительности
+                continue
             out = os.path.join(voice_dir, f"{int(i):02d}.wav")
             subprocess.run(["curl", "-sSfL", "-o", out, v["url"]], check=True)
             if manifest.get("trim_pauses"):

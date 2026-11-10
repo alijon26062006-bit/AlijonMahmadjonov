@@ -3,6 +3,7 @@ cd ~/course/youtube
 COMP=$1; EP=$2; OUT=out/$EP; mkdir -p $OUT
 EXE=/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
 TOTAL=$(python3 -c "import json,math;print(math.ceil(json.load(open('src/data/$EP.json'))['total']*30))")
+[ -n "$3" ] && TOTAL=$3  # превью: только первые N кадров
 i=0; s=0
 while [ $s -lt $TOTAL ]; do
   e=$(( s + 2699 )); [ $e -ge $TOTAL ] && e=$(( TOTAL - 1 ))
