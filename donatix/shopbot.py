@@ -1097,6 +1097,24 @@ class ShopBot:
     def _user(self, conn: sqlite3.Connection, su: sqlite3.Row) -> sqlite3.Row:
         return accounts.get_user(conn, su["user_id"])
 
+    def giveaway_try(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str) -> None:
+        """Промокод розыгрыша: 1 код в день; результат сразу, пост в канал — в фоне."""
+        from . import giveaway
+        tg_id = su["tg_id"]
+        home = [[(tr(su["lang"], "home"), "h")]]
+        try:
+            res = giveaway.activate(conn, su["user_id"], text, tz_offset=self.config.tz_offset, source="bot")
+        except giveaway.GiveawayError as exc:
+            self.show(tg_id, "⚠️ " + _e(exc), [[("🎟 Ввести другой код", "gw")], [(tr(su["lang"], "home"), "h")]])
+            return
+        giveaway.announce(self.config, conn, su["user_id"], res)
+        if res["prize"]:
+            self.show(tg_id, f"🎉 <b>Вы выиграли: {_e(res['prize'])}!</b>\n\nКод <code>{_e(res['code'])}</code>. "
+                             "Мы свяжемся с вами и выдадим приз. · Табрик, шумо бурдед!", home, effect=EFFECT_PARTY)
+        else:
+            self.show(tg_id, f"🍀 Код <code>{_e(res['code'])}</code> — пусто.\nЗавтра будет новый шанс! "
+                             "· Холӣ, фардо боз кӯшиш кунед.", home)
+
     # ── Карта для возврата остатка (если проект закроется) — обязательна один раз ──
 
     def refund_gate(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str | None = None,
@@ -1649,6 +1667,9 @@ class ShopBot:
                         else [(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
         if bottour.enabled(conn):
             rows.append([("🏆 Турнир друзей — призы", "tour", "success", bottour.badge(conn).get("emoji_id"))])
+        from . import giveaway
+        if giveaway.live(conn):
+            rows.append([("🎟 Проверить промокод", "gw", "success")])
         rows += [[(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
                  [(tr(lang, "support"), "sup")]]
         if self.is_admin(su["tg_id"]):
@@ -1978,6 +1999,9 @@ class ShopBot:
         elif step == "search":
             self.state.pop(tg_id, None)
             self.screen_games(conn, su, "games", 0, q=text[:40])
+        elif step == "gw":
+            self.state.pop(tg_id, None)
+            self.giveaway_try(conn, su, text)
         elif step == "receipt":
             self.show(tg_id, tr(lang, "need_receipt", id=st["pid"]))
         else:
@@ -2005,6 +2029,11 @@ class ShopBot:
             return
         elif head == "tour":
             self.screen_tour(conn, su, mid)
+        elif head == "gw":   # «🎟 Проверить промокод» — ждём код
+            self.state[tg_id] = {"step": "gw"}
+            self.show(tg_id, "🎟 <b>Проверить промокод · Санҷиши рамз</b>\n\nНапишите промокод из нашего канала, "
+                             "например <code>DX-7K3P9A</code>.\nРамзро нависед. Один код в день · рӯзе як рамз.",
+                      [[(tr(lang, "home"), "h")]], edit=mid)
         elif head in ("ta", "tat", "tach", "tachx", "tapz", "tab", "tabx", "tban") and len(parts) == 1 \
                 and self.is_admin(tg_id):   # «ta:100» — сумма пополнения, не турнир
             self.on_tour_admin(conn, su, head, mid)

@@ -1,0 +1,66 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Розыгрыш промокодов — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Розыгрыш промокодов</h1>
+  <p>Сгенерируйте коды и задайте призы — бот сам разложит призы по случайным кодам, остальные будут пустыми.
+  Клиенты вводят код в Telegram-боте @DonatixShopbot — кнопка «🎟 Проверить промокод» на главном экране (1 код в день), каждая активация публикуется в канале.</p></section>
+
+<form class="card" method="post" action="/admin/giveaway" style="margin-bottom:14px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3 style="margin-top:0">Новый розыгрыш</h3>
+  <div class="grid two" style="gap:12px">
+    <div><label for="gc">Сколько промокодов</label><input id="gc" name="count" inputmode="numeric" value="100" required></div>
+    <div><label for="gt">Название (для себя)</label><input id="gt" name="title" maxlength="80" placeholder="Розыгрыш ноября"></div>
+  </div>
+  <label for="gp">Призы — каждый с новой строки (один приз = один выигрышный код)</label>
+  <textarea id="gp" name="prizes" rows="4" placeholder="Ваучер на месяц FF СНГ&#10;Ваучер на неделю&#10;50 сомони на баланс"></textarea>
+  <p class="muted small">Призы выдаёте вручную: при выигрыше вам придёт уведомление, после выдачи нажмите «Выдано».</p>
+  <button class="btn primary" name="action" value="generate">{{ icon('gift', 18) }} Сгенерировать</button>
+</form>
+
+<form class="card" method="post" action="/admin/giveaway" style="margin-bottom:18px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="gch">Канал для публикаций (бот @DonatixShopbot должен быть в нём админом)</label>
+  <div style="display:flex;gap:8px"><input id="gch" name="channel" value="{{ channel }}" placeholder="@donatixtj или -100…">
+    <button class="btn" name="action" value="channel">Сохранить</button></div>
+  <p class="muted small"><code>-</code> — не публиковать.</p>
+</form>
+
+{% for b in batches %}
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+    <div><b>#{{ b.id }} {{ b.title }}</b> <span class="muted small">· {{ b.created_at | dt }}{% if not b.active %} · остановлен{% endif %}</span>
+      <div class="small">Кодов {{ b.n }} · активировали {{ b.used }} · призов {{ b.prizes }} (выиграли {{ b.won }})</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" type="button" data-copy-codes="{{ b.codes | map(attribute='code') | join('\n') }}">{{ icon('copy', 16) }} Скопировать все коды</button>
+      <form method="post" action="/admin/giveaway"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="item" value="{{ b.id }}">
+        <button class="btn sm" name="action" value="{{ 'stop' if b.active else 'start' }}">{{ 'Остановить' if b.active else 'Включить' }}</button></form>
+    </div>
+  </div>
+  <details style="margin-top:10px"><summary class="small" style="cursor:pointer">Коды и победители</summary>
+  <div class="small" style="display:grid;gap:4px;margin-top:8px">
+    {% for c in b.codes if c.prize or c.user_id %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
+      <span class="mono">{{ c.code }}</span>
+      {% if c.prize %}<b>🎁 {{ c.prize }}</b>{% else %}<span class="muted">пусто</span>{% endif %}
+      {% if c.user_id %}· <a href="/admin/users/{{ c.user_id }}">{{ c.login }}</a> <span class="muted">{{ c.used_at | dt }} · {{ 'бот' if c.source == 'bot' else 'сайт' }}</span>
+        {% if c.prize %}{% if c.given_at %}<span class="ok-text">✓ выдано</span>{% else %}
+        <form method="post" action="/admin/giveaway" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="item" value="{{ c.id }}">
+          <button class="btn sm primary" name="action" value="given">Выдано</button></form>{% endif %}{% endif %}
+      {% else %}<span class="muted">· ещё не активирован</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div></details>
+</div>
+{% else %}<p class="muted">Розыгрышей пока нет.</p>{% endfor %}
+<script>
+document.querySelectorAll('[data-copy-codes]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var t = b.dataset.copyCodes;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = '✓ Скопировано'; },
+      function () { var a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); b.textContent = '✓ Скопировано'; });
+  });
+});
+</script>
+{% endblock %}

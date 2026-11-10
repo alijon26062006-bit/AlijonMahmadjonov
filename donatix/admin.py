@@ -787,6 +787,37 @@ def smartpay_report(request: Request, q: str = "", period: str = "30", admin=Dep
                                                    "period": period})
 
 
+@router.get("/giveaway")
+def giveaway_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    """Розыгрыш по промокодам: сгенерировать коды с призами, кто что выиграл, «Выдано»."""
+    from . import giveaway
+    return render(request, "admin/giveaway.html", {"user": admin, "batches": giveaway.batches(conn),
+                                                   "channel": giveaway.channel(conn)})
+
+
+@router.post("/giveaway", dependencies=[Depends(check_csrf)])
+def giveaway_action(request: Request, action: str = Form(""), count: str = Form("100"), prizes: str = Form(""),
+                    title: str = Form(""), channel: str = Form(""), item: str = Form(""),
+                    admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import giveaway
+    try:
+        if action == "generate":
+            n = int(count.strip() or 0)
+            bid = giveaway.generate(conn, n, prizes.splitlines(), title)
+            flash(request, f"Готово: {n} промокодов, призов {len([p for p in prizes.splitlines() if p.strip()])} — "
+                           f"разложены по случайным кодам (розыгрыш #{bid}).")
+        elif action == "channel":
+            db.set_setting(conn, giveaway.CHANNEL_KEY, channel.strip()[:80] or "-")
+            flash(request, "Канал для публикаций сохранён.")
+        elif action == "given" and item.isdigit():
+            giveaway.mark_given(conn, int(item))
+        elif action in ("stop", "start") and item.isdigit():
+            giveaway.set_active(conn, int(item), action == "start")
+    except (ValueError, giveaway.GiveawayError) as exc:
+        flash(request, str(exc) or "Число кодов — цифрами.", "error")
+    return RedirectResponse("/admin/giveaway", status_code=303)
+
+
 @router.get("/refunds")
 def refunds_page(request: Request, only: str = "", fmt_: str = Query("", alias="format"), admin=Depends(admin_user),
                  conn=Depends(get_conn)):
