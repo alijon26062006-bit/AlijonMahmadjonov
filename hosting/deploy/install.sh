@@ -127,12 +127,29 @@ else
   say "3/5 Файл $APP_DIR/.env уже есть — оставляю как есть"
   DOMAIN=$(grep -E '^PUBLIC_URL=' "$APP_DIR/.env" | sed -E 's#^PUBLIC_URL=https?://##; s#/.*##')
   ADMIN=$(grep -E '^ADMIN_EMAIL=' "$APP_DIR/.env" | cut -d= -f2-)
-  if [[ -z "$DOMAIN" ]] || is_ip "$DOMAIN" || [[ "$DOMAIN" == 127.0.0.1* ]]; then
-    DOMAIN="${AVERIX_DOMAIN:-averix.dev}"
-    echo "  В настройках был IP вместо домена — исправляю на $DOMAIN"
-    sed -i -E "s#^PUBLIC_URL=.*#PUBLIC_URL=https://$DOMAIN#" "$APP_DIR/.env"
-  fi
 fi
+
+# ── Адрес сайта ──
+# Основной домен (averix.dev). Если его DNS ещё не указывает на этот сервер,
+# сайт временно работает на бесплатном адресе вида 1-2-3-4.sslip.io (с настоящим HTTPS).
+# Когда домен заработает, повторный запуск этой же команды сам переключит сайт на него.
+set_env() { if grep -qE "^$1=" "$APP_DIR/.env"; then sed -i -E "s#^$1=.*#$1=$2#" "$APP_DIR/.env"; else echo "$1=$2" >> "$APP_DIR/.env"; fi; }
+points_here() { local ip; for ip in $(getent ahostsv4 "$1" | awk '{print $1}' | sort -u); do [[ "$ip" == "$MY_IP" ]] && return 0; done; return 1; }
+MY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") print $(i + 1)}')
+[[ -z "$MY_IP" ]] && MY_IP=$(hostname -I | awk '{print $1}')
+MAIN_DOMAIN="${AVERIX_DOMAIN:-$(grep -E '^MAIN_DOMAIN=' "$APP_DIR/.env" | cut -d= -f2- || true)}"
+if [[ -z "$MAIN_DOMAIN" ]] || is_ip "$MAIN_DOMAIN"; then MAIN_DOMAIN=averix.dev; fi
+TEMP_DOMAIN="${MY_IP//./-}.sslip.io"
+if points_here "$MAIN_DOMAIN"; then
+  DOMAIN="$MAIN_DOMAIN"; TEMP=no
+else
+  DOMAIN="$TEMP_DOMAIN"; TEMP=yes
+  echo "  $MAIN_DOMAIN пока не указывает на этот сервер ($MY_IP) — запускаю сайт на временном адресе $DOMAIN"
+fi
+set_env MAIN_DOMAIN "$MAIN_DOMAIN"
+set_env PUBLIC_URL "https://$DOMAIN"
+SERVER_NAMES="$TEMP_DOMAIN"
+[[ "$TEMP" == no ]] && SERVER_NAMES="$MAIN_DOMAIN www.$MAIN_DOMAIN $TEMP_DOMAIN"
 
 # Порт панели: 8000, а если он занят другой программой — первый свободный после него.
 systemctl stop averix.service 2>/dev/null || true
@@ -174,7 +191,7 @@ systemctl restart averix.service
 cat > /etc/nginx/sites-available/averix <<NGINX
 server {
     listen 80;
-    server_name $DOMAIN;
+    server_name $SERVER_NAMES;
     client_max_body_size 1m;
     location / {
         proxy_pass http://127.0.0.1:$PORT;
@@ -191,18 +208,17 @@ ln -sf /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/averix
 nginx -t && systemctl reload nginx
 if command -v ufw >/dev/null && ufw status | grep -q active; then ufw allow 'Nginx Full' >/dev/null; fi
 
-MY_IPS=" $(hostname -I) "
-DNS_IPS=$(getent ahostsv4 "$DOMAIN" | awk '{print $1}' | sort -u | tr '\n' ' ')
-DNS_OK=no
-for ip in $DNS_IPS; do [[ "$MY_IPS" == *" $ip "* ]] && DNS_OK=yes; done
-if [[ "$DNS_OK" != yes ]]; then
-  echo "⚠ Домен $DOMAIN пока указывает на: ${DNS_IPS:-никуда}. IP этого сервера: $(hostname -I | awk '{print $1}')"
-  echo "  Добавьте у регистратора A-запись: @ → $(hostname -I | awk '{print $1}'), подождите 5–30 минут"
-  echo "  и запустите команду установки ещё раз — HTTPS выпустится сам."
-elif ! certbot certificates 2>/dev/null | grep -q "Domains: $DOMAIN"; then
-  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$ADMIN" --redirect || \
-    echo "⚠ HTTPS не выпущен. Запустите команду установки ещё раз через несколько минут."
+# HTTPS: для временного адреса — сразу; для основного домена — когда он указывает на сервер.
+# certbot запускается каждый раз: конфиг nginx выше перезаписан, и сертификат нужно подключить снова
+# (если он ещё действует, новый не выпускается).
+CERT_DOMAINS=(-d "$DOMAIN")
+if [[ "$TEMP" == no ]]; then
+  if points_here "www.$MAIN_DOMAIN"; then CERT_DOMAINS+=(-d "www.$MAIN_DOMAIN"); fi
+  CERT_DOMAINS+=(-d "$TEMP_DOMAIN")   # старый временный адрес продолжает работать
 fi
+certbot --nginx --cert-name averix "${CERT_DOMAINS[@]}" --non-interactive --agree-tos -m "$ADMIN" \
+  --redirect --keep-until-expiring --expand || \
+  echo "⚠ HTTPS не выпущен. Запустите команду установки ещё раз через несколько минут."
 
 say "5/5 Ежедневная резервная копия базы (хранится 14 дней)"
 cat > /etc/cron.daily/averix-backup <<CRON
@@ -220,6 +236,11 @@ done
 if [[ "$STARTED" == yes ]]; then
   echo
   echo "✅ Готово: https://$DOMAIN"
+  if [[ "$TEMP" == yes ]]; then
+    echo "   Это временный адрес: $MAIN_DOMAIN пока не указывает на IP $MY_IP."
+    echo "   Поставьте у регистратора A-записи @ и www → $MY_IP, подождите 10–30 минут"
+    echo "   и запустите эту же команду ещё раз — сайт сам переедет на https://$MAIN_DOMAIN"
+  fi
   echo "   1) Зарегистрируйтесь на сайте с email $ADMIN — вы станете администратором."
   echo "   2) Откройте Админку → «Готовность» и доведите все пункты до зелёного."
   echo "   3) Настройки: $APP_DIR/.env, после правки: systemctl restart averix"
