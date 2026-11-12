@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
+import base64
 import re
 import logging
 import secrets
 import threading
+import tempfile
 import time
 from pathlib import Path
 
@@ -17,6 +20,7 @@ from .notify import Notifier
 from .providers import ProviderError, Providers
 from .security import generate_root_password, root_password_problems, sha256
 from .panelkey import PanelKey
+from .rates import CURRENCY_NAMES, Rates
 from .ssh import SshAuthError, SshError, set_root_password
 from .validators import (HOST_RE, ValidationError, normalize_domain, validate_record, validate_server_name)
 
@@ -65,7 +69,11 @@ class Hosting:
         self.p = providers
         self.notify = notifier or Notifier(settings)
         self.provider_factory = None  # тесты подменяют; по умолчанию build_providers
-        self.panel_key = PanelKey(Path(settings.database_path).parent if settings.database_path != ":memory:" else "data")
+        # Папка для файлов панели (ключ SSH, чеки). Для базы в памяти (тесты) — временная.
+        self.files_dir = (Path(settings.database_path).parent if settings.database_path != ":memory:"
+                          else Path(tempfile.mkdtemp(prefix="averix-")))
+        self.panel_key = PanelKey(self.files_dir)
+        self.rates = Rates(db)
         self._ssh_key_name: tuple[int, str] | None = None
         # Реквизиты, оплата, контакты и ключи, сохранённые в админке, важнее .env.
         site = db.get_setting("site")
@@ -576,25 +584,94 @@ class Hosting:
         return self.db.one("SELECT * FROM users WHERE id = ?", (user["id"],))
 
     # ═══════════════════════ Пополнение баланса ═══════════════════════
-    def create_topup_request(self, user: dict, amount: float, method: str, reference: str, ip: str = "") -> dict:
-        if not self.s.payment_methods:
+    RECEIPT_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "heic": "image/heic", "pdf": "application/pdf"}
+
+    @staticmethod
+    def _receipt_kind(data: bytes) -> str | None:
+        """Тип файла по содержимому, а не по имени."""
+        if data[:3] == b"\xff\xd8\xff":
+            return "jpg"
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return "png"
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return "webp"
+        if data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"mif1", b"msf1", b"hevc"):
+            return "heic"
+        if data[:5] == b"%PDF-":
+            return "pdf"
+        return None
+
+    def payment_accounts(self) -> list[dict]:
+        if self.s.payment_accounts:
+            return self.s.payment_accounts
+        return [{"name": m, "number": "", "holder": ""} for m in self.s.payment_methods]
+
+    def pay_info(self) -> dict:
+        """Курс для пересчёта: сколько платить в валюте перевода за 1 единицу баланса."""
+        cur = (self.s.pay_currency or self.s.currency).upper()
+        rate = self.rates.get(self.s.currency.upper(), cur, self.s.exchange_rate)
+        return {"currency": cur, "currency_name": CURRENCY_NAMES.get(cur, cur), "rate": rate}
+
+    def create_topup_request(self, user: dict, amount: float, method: str, reference: str, ip: str = "",
+                             receipt: dict | None = None) -> dict:
+        methods = [a["name"] for a in self.payment_accounts()]
+        if not methods:
             raise ServiceError("Способы оплаты ещё не настроены. Напишите в поддержку.", 501)
-        if method not in self.s.payment_methods:
+        if method not in methods:
             raise ServiceError("Выберите способ оплаты", field="method")
         if not 1 <= amount <= 10000:
             raise ServiceError("Сумма от 1 до 10 000", field="amount")
         reference = reference.strip()[:200]
-        if not reference:
-            raise ServiceError("Укажите номер или время перевода, чтобы мы нашли платёж", field="reference")
+        data = kind = None
+        if receipt and receipt.get("data"):
+            try:
+                data = base64.b64decode(receipt["data"], validate=True)
+            except (ValueError, TypeError):
+                raise ServiceError("Не удалось прочитать файл чека", field="receipt") from None
+            if len(data) > 5 * 1024 * 1024:
+                raise ServiceError("Файл чека больше 5 МБ. Сделайте скриншот или фото поменьше.", field="receipt")
+            kind = self._receipt_kind(data)
+            if not kind:
+                raise ServiceError("Чек: нужно фото (JPG, PNG, HEIC) или PDF", field="receipt")
+        if not data and not reference:
+            raise ServiceError("Прикрепите чек об оплате", field="receipt")
         pending = self.db.one("SELECT COUNT(*) AS n FROM topup_requests WHERE user_id = ? AND status = 'pending'", (user["id"],))["n"]
         if pending >= 5:
             raise ServiceError("У вас уже 5 заявок на проверке. Дождитесь их подтверждения.", 429)
-        rid = self.db.run("INSERT INTO topup_requests(user_id, amount_cents, method, reference, created_at) VALUES (?,?,?,?,?)",
-                          (user["id"], cents(amount), method, reference, now()))
+        info = self.pay_info()
+        rate = (info["rate"] or {}).get("rate") or 0
+        pay_amount = round(amount * rate, 2) if rate else 0
+        rid = self.db.run(
+            "INSERT INTO topup_requests(user_id, amount_cents, method, reference, created_at, pay_amount, pay_currency, rate)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (user["id"], cents(amount), method, reference, now(), pay_amount, info["currency"] if rate else "", rate))
+        path = None
+        if data:
+            folder = self.files_dir / "receipts"
+            folder.mkdir(parents=True, exist_ok=True)
+            fname = f"{rid}-{secrets.token_hex(6)}.{kind}"
+            path = folder / fname
+            path.write_bytes(data)
+            os.chmod(path, 0o600)
+            self.db.run("UPDATE topup_requests SET receipt = ? WHERE id = ?", (fname, rid))
         self.db.audit(user["id"], "billing.topup_request", f"{rid}:{amount}", ip)
-        self.notify.admin(f"💳 Заявка на пополнение №{rid}: {amount:.2f} {self.s.currency} от {user['email']}\n"
-                          f"Способ: {method}\nПеревод: {reference}\nПодтвердите в админке.")
+        pay = f" ({pay_amount:,.2f} {info['currency_name']})".replace(",", " ") if pay_amount else ""
+        text = (f"💳 Заявка на пополнение №{rid}: {amount:.2f} {self.s.currency}{pay}\nКлиент: {user['email']}\n"
+                f"Способ: {method}" + (f"\nКомментарий: {reference}" if reference else "") + "\nПодтвердите в админке → Пополнения.")
+        if path:
+            self.notify.admin_file(text, path, self.RECEIPT_TYPES[kind])
+        else:
+            self.notify.admin(text)
         return self.db.one("SELECT * FROM topup_requests WHERE id = ?", (rid,))
+
+    def receipt_file(self, request_id: int) -> tuple[Path, str] | None:
+        row = self.db.one("SELECT receipt FROM topup_requests WHERE id = ?", (request_id,))
+        if not row or not row["receipt"] or "/" in row["receipt"]:
+            return None
+        path = self.files_dir / "receipts" / row["receipt"]
+        if not path.exists():
+            return None
+        return path, self.RECEIPT_TYPES.get(path.suffix.lstrip("."), "application/octet-stream")
 
     def decide_topup(self, admin: dict, request_id: int, approve: bool, note: str = "", ip: str = "") -> dict:
         with self.db.transaction():
@@ -663,6 +740,7 @@ class Hosting:
     # ═══════════════════════ Настройки сайта (админка) ═══════════════════════
     SITE_FIELDS = {
         "payment_methods": "list", "payment_instructions": "text",
+        "payment_accounts": "accounts", "pay_currency": "currency", "exchange_rate": "float",
         "company_name": "str", "company_details": "text",
         "support_telegram": "str", "support_email": "str", "support_phone": "str",
         "telegram_bot_token": "secret", "telegram_admin_chat_id": "str",
@@ -719,6 +797,33 @@ class Hosting:
             elif kind == "list":
                 items = v if isinstance(v, list) else str(v).split(",")
                 v = [str(x).strip()[:40] for x in items if str(x).strip()][:10]
+            elif kind == "accounts":
+                if not isinstance(v, list):
+                    raise ServiceError("Счета — список", field=f)
+                accs = []
+                for a in v[:10]:
+                    if not isinstance(a, dict):
+                        continue
+                    acc = {"name": str(a.get("name") or "").strip()[:40], "number": str(a.get("number") or "").strip()[:60],
+                           "holder": str(a.get("holder") or "").strip()[:80]}
+                    if not acc["name"] and not acc["number"]:
+                        continue
+                    if not acc["name"] or not acc["number"]:
+                        raise ServiceError("У каждого способа оплаты укажите название и номер", field=f)
+                    accs.append(acc)
+                v = accs
+                clean["payment_methods"] = [a["name"] for a in accs]
+            elif kind == "currency":
+                v = str(v).strip().upper()
+                if not re.fullmatch(r"[A-Z]{3}", v):
+                    raise ServiceError("Валюта — три буквы, например TJS", field=f)
+            elif kind == "float":
+                try:
+                    v = round(float(str(v).replace(",", ".") or 0), 4)
+                except ValueError:
+                    raise ServiceError("Курс — число, например 10.95", field=f) from None
+                if not 0 <= v <= 1_000_000:
+                    raise ServiceError("Недопустимый курс", field=f)
             elif kind == "int":
                 try:
                     v = int(v)
@@ -792,9 +897,10 @@ class Hosting:
         if self.p.registrar.name == "resellerclub" and s.rc_test:
             add("registrar_live", "Регистратор в боевом режиме", False,
                 "Сейчас тестовый сервер ResellerClub. Когда проверите покупку домена, выключите «Тестовый режим» в Настройках")
-        add("payments", "Приём оплаты", bool(s.payment_methods and s.payment_instructions) and not s.demo_payments,
+        add("payments", "Приём оплаты", bool(self.payment_accounts() and (s.payment_accounts or s.payment_instructions))
+            and not s.demo_payments,
             "Демо-пополнение включено: выключите DEMO_PAYMENTS в .env" if s.demo_payments
-            else ("Способы: " + ", ".join(s.payment_methods)) if s.payment_methods and s.payment_instructions
+            else ("Способы: " + ", ".join(a["name"] for a in self.payment_accounts())) if self.payment_accounts()
             else "Укажите способы оплаты и реквизиты: Админка → Настройки")
         add("telegram", "Уведомления вам в Telegram", s.telegram_bot_token and s.telegram_admin_chat_id,
             "Подключены" if s.telegram_bot_token else "Укажите бота и Chat ID: Админка → Настройки", required=False)

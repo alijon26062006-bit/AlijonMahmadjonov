@@ -46,6 +46,26 @@ class Notifier:
         except httpx.HTTPError as e:
             log.warning("telegram: %s", e.__class__.__name__)
 
+    def admin_file(self, text: str, path, mime: str) -> None:
+        """Сообщение владельцу с файлом (чек об оплате): фото — как фото, остальное — как документ."""
+        self.sent.append(("telegram_file", "admin", f"{text}\n[{path}]"))
+        if not (self.s.telegram_bot_token and self.s.telegram_admin_chat_id):
+            log.info("admin (file %s): %s", path, text)
+            return
+        self._run(self._telegram_file, text, str(path), mime)
+
+    def _telegram_file(self, text: str, path: str, mime: str) -> None:
+        as_photo = mime in ("image/jpeg", "image/png", "image/webp")
+        method, field = ("sendPhoto", "photo") if as_photo else ("sendDocument", "document")
+        try:
+            with open(path, "rb") as fh:
+                httpx.post(f"https://api.telegram.org/bot{self.s.telegram_bot_token}/{method}",
+                           data={"chat_id": self.s.telegram_admin_chat_id, "caption": f"{self.s.brand_name}\n{text}"[:1000]},
+                           files={field: (path.rsplit("/", 1)[-1], fh, mime)}, timeout=30)
+        except (httpx.HTTPError, OSError) as e:
+            log.warning("telegram file: %s", e.__class__.__name__)
+            self._telegram(text + "\n(чек не удалось приложить — смотрите в админке)")
+
     # ── клиенту ──
     def email(self, to: str, subject: str, body: str) -> None:
         self.sent.append(("email", to, f"{subject}\n{body}"))

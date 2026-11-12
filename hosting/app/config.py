@@ -66,6 +66,11 @@ class Settings:
     # Оплата вручную: клиент переводит деньги и оставляет заявку, админ подтверждает.
     payment_methods: list[str] = field(default_factory=list)
     payment_instructions: str = ""
+    # Счета для переводов: [{"name": "Алиф Моби", "number": "0000 0000 0000 0000", "holder": "Имя Ф."}]
+    payment_accounts: list[dict] = field(default_factory=list)
+    # Валюта, в которой клиент платит (баланс считается в CURRENCY), и курс: 0 — брать автоматически
+    pay_currency: str = "TJS"
+    exchange_rate: float = 0.0
 
     # Уведомления
     telegram_bot_token: str = ""

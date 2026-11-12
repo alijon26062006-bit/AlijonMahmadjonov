@@ -95,3 +95,14 @@ def test_split_phone():
 def test_missing_config():
     with pytest.raises(ProviderError):
         ResellerClub("", "k", "c")
+
+
+def test_balance(fake):
+    def handler(req):
+        if req.url.path.endswith("billing/reseller-balance.json"):
+            assert req.url.params["reseller-id"] == "111"
+            return httpx.Response(200, json={"sellingcurrencybalance": "42.50", "lockedbalance": "0.00",
+                                             "sellingcurrencysymbol": "USD"})
+        return fake(req)
+    rc = ResellerClub("111", "key", "222", test=True, transport=httpx.MockTransport(handler))
+    assert rc.balance() == {"amount": 42.5, "locked": 0.0, "currency": "USD"}

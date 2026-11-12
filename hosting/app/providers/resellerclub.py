@@ -136,6 +136,23 @@ class ResellerClub:
         except (ProviderError, ValueError, TypeError):
             return None
 
+    def balance(self) -> dict:
+        """Баланс счёта реселлера: с него списывается регистрация и продление доменов."""
+        reseller_id = dict(self.auth)["auth-userid"]
+        data = self._call("GET", "billing/reseller-balance.json", [("reseller-id", reseller_id)])
+        if not isinstance(data, dict):
+            raise ProviderError("Регистратор не вернул баланс", code="no_balance")
+        def num(key):
+            try:
+                return float(str(data.get(key)).replace(",", ""))
+            except (TypeError, ValueError):
+                return None
+        amount = num("sellingcurrencybalance")
+        if amount is None:
+            amount = num("accountingcurrencybalance")
+        return {"amount": amount, "locked": num("lockedbalance"),
+                "currency": data.get("sellingcurrencysymbol") or data.get("accountingcurrencysymbol") or "USD"}
+
     def ping(self) -> str:
         """Проверка ключа, разрешённого IP и номера клиента — для админки."""
         data = self._call("GET", "customers/details-by-id.json", [("customer-id", self.customer_id)])

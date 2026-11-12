@@ -31,8 +31,10 @@ def providers():
 
 @pytest.fixture
 def hosting(settings, db, providers):
-    return Hosting(settings, db, Catalog.load(), providers, run_async=lambda fn, *a: fn(*a), demo_password_delay=0,
-                   notifier=Notifier(settings, background=False))
+    h = Hosting(settings, db, Catalog.load(), providers, run_async=lambda fn, *a: fn(*a), demo_password_delay=0,
+                notifier=Notifier(settings, background=False))
+    h.rates.fetch = lambda base, quote: 10.9  # без интернета: 1 USD = 10.9 TJS
+    return h
 
 
 @pytest.fixture

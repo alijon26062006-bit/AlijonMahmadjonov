@@ -522,3 +522,33 @@ a.side-item { text-decoration: none; }
 /* Фирменный градиент кабинета, как на сайте */
 .btn-primary { background: linear-gradient(135deg, #2563EB 0%, #5B4BEB 55%, #7C3AED 100%); border-color: transparent; color: #fff; }
 .logo-mark { background: linear-gradient(135deg, #2563EB, #7C3AED); color: #fff; }
+
+/* Пополнение баланса */
+.pay { gap: 18px; }
+.pay-step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; align-items: start; }
+.pay-n { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff;
+  background: linear-gradient(135deg, #2563EB, #7C3AED); }
+.pay-body { display: grid; gap: 10px; min-width: 0; }
+.pay-body > b { font-size: 15px; padding-top: 5px; }
+.pay-box { display: grid; gap: 2px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--bg-2); padding: 6px 14px; }
+.pay-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label btn" "value btn"; gap: 2px 12px; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.pay-row:last-child { border-bottom: 0; }
+.pay-row > span { grid-area: label; color: var(--muted); font-size: 13px; }
+.pay-row > b { grid-area: value; overflow-wrap: anywhere; }
+.pay-row > .btn { grid-area: btn; }
+.pay-big { font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+.drop { display: grid; gap: 10px; justify-items: start; padding: 16px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: var(--bg-2); cursor: pointer; color: var(--muted); font-size: 14px; transition: border-color .2s, background-color .2s; }
+.drop:hover { border-color: var(--accent); }
+.drop.err { border-color: var(--bad); animation: shake .35s; }
+.drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drop img { max-width: 220px; max-height: 220px; border-radius: 8px; border: 1px solid var(--line); }
+.receipt-img { max-width: 100%; max-height: 70vh; border-radius: 10px; border: 1px solid var(--line); display: block; margin: 0 auto; }
+@media (max-width: 560px) {
+  .pay-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "value" "btn"; gap: 6px; }
+  .pay-row > .btn { justify-self: start; }
+  .pay-big { font-size: 20px; white-space: nowrap; }
+  .pay-step { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+  .pay-n { width: 28px; height: 28px; font-size: 13px; }
+}

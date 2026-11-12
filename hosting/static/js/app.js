@@ -927,40 +927,54 @@
     const b = await api("GET", "/api/billing");
     const main = $("#main");
     const days = b.monthly > 0 ? Math.floor(b.balance / b.monthly * 30) : null;
-    const manual = b.payment_methods.length > 0;
+    const accounts = b.payment_accounts || [];
+    const pay = b.pay || {}, rate = pay.rate && pay.rate.rate;
+    const fmtPay = (v) => `${Number(v).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${pay.currency_name || pay.currency || ""}`;
+    const rateNote = !rate ? "" : pay.rate.source === "manual" ? `Курс: 1 ${esc(AM.config.currency)} = ${rate} ${esc(pay.currency_name)}`
+      : `Курс: 1 ${esc(AM.config.currency)} = ${rate.toFixed(2)} ${esc(pay.currency_name)}${pay.rate.updated_at ? ` · обновлён ${AM.dateTime(pay.rate.updated_at)}` : ""}`;
+    const statusTag = (r) => `<span class="tag ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span>`;
     main.innerHTML = `<div class="view">
       <div class="page-head"><div><h2>Баланс</h2><p>Серверы продлеваются автоматически раз в месяц, домены — раз в год.</p></div></div>
-      <div class="grid-2" style="align-items:start">
-        <div class="card" style="display:grid;gap:8px">
-          <span style="color:var(--muted);font-size:13px;font-weight:600">На балансе</span>
-          <b style="font-family:var(--f-display);font-size:34px;font-weight:600" class="mono" id="balBig">${money(b.balance)}</b>
-          <span style="color:var(--muted);font-size:14px">${b.monthly > 0 ? `Серверы: ${money(b.monthly)} в месяц · хватит примерно на ${days} дн.` : "Активных серверов нет"}</span>
-        </div>
-        ${manual ? `<form class="card form" id="reqForm" novalidate>
-          <span style="color:var(--muted);font-size:13px;font-weight:600">Пополнить переводом</span>
-          ${b.payment_instructions ? `<div class="note" style="white-space:pre-wrap;display:block">${esc(b.payment_instructions)}</div>` : ""}
-          <div class="grid-2">
-            <div class="field"><label for="rqAmount">Сумма, ${esc(AM.config.currency)}</label><div class="input" id="rqAmountBox"><input id="rqAmount" inputmode="decimal" value="25"></div></div>
-            <div class="field"><label for="rqMethod">Способ</label><div class="input"><select id="rqMethod">${b.payment_methods.map((m) => `<option>${esc(m)}</option>`).join("")}</select></div></div>
-          </div>
-          <div class="field"><label for="rqRef">Номер или время перевода</label><div class="input" id="rqRefBox"><input id="rqRef" placeholder="Например: 12.11 в 14:05, с карты *1234"></div>
-            <span class="hint">После перевода отправьте заявку — мы проверим платёж и зачислим деньги.</span></div>
-          <div class="form-error" id="rqErr"></div>
-          <button class="btn btn-primary" type="submit" style="justify-self:start">Я перевёл, отправить заявку</button>
-        </form>` : ""}
-        ${b.demo_payments ? `<form class="card" style="display:grid;gap:12px" id="topForm" novalidate>
-          <span style="color:var(--muted);font-size:13px;font-weight:600">Демо‑пополнение</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">${[10, 25, 50, 100].map((v) => `<button class="btn btn-sm" type="button" data-amount="${v}">${money(v)}</button>`).join("")}</div>
-          <div style="display:flex;gap:8px"><div class="input" style="flex:1"><input id="topAmount" inputmode="decimal" value="25" aria-label="Сумма"></div>
-          <button class="btn" type="submit">Зачислить</button></div>
-          <span class="hint" style="font-size:12px;color:var(--muted)">Только для проверки: деньги зачисляются без оплаты. Перед запуском продаж выключите DEMO_PAYMENTS.</span>
-        </form>` : ""}
-        ${!manual && !b.demo_payments ? `<div class="card"><div class="banner"><span>Чтобы пополнить баланс, напишите в поддержку.</span></div></div>` : ""}
+      <div class="card" style="display:flex;gap:18px 32px;flex-wrap:wrap;align-items:flex-end">
+        <div style="display:grid;gap:4px"><span style="color:var(--muted);font-size:13px;font-weight:600">На балансе</span>
+          <b style="font-size:34px;font-weight:800" class="mono" id="balBig">${money(b.balance)}</b></div>
+        <span style="color:var(--muted);font-size:14px;padding-bottom:6px">${b.monthly > 0 ? `Серверы: ${money(b.monthly)} в месяц · хватит примерно на ${days} дн.` : "Активных серверов нет"}</span>
       </div>
-      ${b.requests.length ? `<div class="card table-scroll"><div class="card-head"><h4>Заявки на пополнение</h4></div>
-        <table class="table"><thead><tr><th>Дата</th><th>Способ</th><th>Перевод</th><th>Статус</th><th style="text-align:right">Сумма</th></tr></thead><tbody>
-        ${b.requests.map((r) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(r.created_at)}</td><td>${esc(r.method)}</td><td>${esc(r.reference)}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td>
-          <td><span class="tag ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></td><td class="num">${money(r.amount)}</td></tr>`).join("")}
+      ${accounts.length ? `<form class="card form pay" id="payForm" novalidate>
+        <div class="card-head" style="margin:0"><h4>Пополнить баланс</h4></div>
+        <div class="pay-step"><span class="pay-n">1</span><div class="pay-body"><b>Выберите способ оплаты</b>
+          <div class="choices" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${accounts.map((a, i) => `<label class="choice"><input type="radio" name="acc" value="${i}" ${i === 0 ? "checked" : ""}><b>${esc(a.name)}</b></label>`).join("")}</div></div></div>
+        <div class="pay-step"><span class="pay-n">2</span><div class="pay-body"><b>Сумма пополнения</b>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${[5, 10, 25, 50, 100].map((v) => `<button class="btn btn-sm" type="button" data-amount="${v}">${money(v)}</button>`).join("")}</div>
+          <div class="input" id="payAmountBox" style="max-width:220px"><span style="color:var(--muted)">${esc(AM.config.currency === "USD" ? "$" : AM.config.currency)}</span><input id="payAmount" inputmode="decimal" value="10" aria-label="Сумма"></div></div></div>
+        <div class="pay-step"><span class="pay-n">3</span><div class="pay-body"><b>Переведите</b>
+          <div class="pay-box">
+            ${rate ? `<div class="pay-row"><span>Сумма к переводу</span><b class="pay-big mono" id="payTotal"></b><button class="btn btn-sm" type="button" id="copyTotal"><svg class="icon"><use href="#i-copy"/></svg>Копировать</button></div>` : ""}
+            <div class="pay-row"><span id="payAccName">Номер</span><b class="pay-big mono" id="payNumber"></b><button class="btn btn-sm" type="button" id="copyNumber"><svg class="icon"><use href="#i-copy"/></svg>Копировать</button></div>
+            <div class="pay-row" id="payHolderRow"><span>Получатель</span><b id="payHolder"></b></div>
+          </div>
+          <span class="hint">${rateNote}${b.payment_instructions ? `<br>${esc(b.payment_instructions)}` : ""}</span></div></div>
+        <div class="pay-step"><span class="pay-n">4</span><div class="pay-body"><b>Прикрепите чек и отправьте</b>
+          <label class="drop" id="drop" for="receipt"><input id="receipt" type="file" accept="image/*,application/pdf">
+            <span id="dropText"><svg class="icon"><use href="#i-plus"/></svg> Фото или скриншот чека (JPG, PNG, PDF до 5 МБ)</span>
+            <img id="dropPreview" alt="" hidden></label>
+          <div class="input"><input id="payRef" placeholder="Комментарий, необязательно: например, с карты *1234" maxlength="200"></div>
+          <div class="form-error" id="payErr"></div>
+          <button class="btn btn-primary" type="submit" id="paySend" style="justify-self:start">Отправить чек</button>
+          <span class="hint">Мы проверим платёж и зачислим деньги на баланс. Обычно это занимает до часа в рабочее время.</span></div></div>
+      </form>` : ""}
+      ${b.demo_payments ? `<form class="card" style="display:grid;gap:12px" id="topForm" novalidate>
+        <span style="color:var(--muted);font-size:13px;font-weight:600">Демо‑пополнение</span>
+        <div style="display:flex;gap:8px"><div class="input" style="flex:1"><input id="topAmount" inputmode="decimal" value="25" aria-label="Сумма"></div>
+        <button class="btn" type="submit">Зачислить</button></div>
+        <span class="hint" style="font-size:12px;color:var(--muted)">Только для проверки: деньги зачисляются без оплаты. Перед запуском продаж выключите DEMO_PAYMENTS.</span>
+      </form>` : ""}
+      ${!accounts.length && !b.demo_payments ? `<div class="card"><div class="banner"><span>Способы оплаты ещё не настроены. Напишите в поддержку.</span></div></div>` : ""}
+      ${b.requests.length ? `<div class="card table-scroll"><div class="card-head"><h4>Мои заявки</h4></div>
+        <table class="table"><thead><tr><th>Дата</th><th>Способ</th><th>Чек</th><th>Статус</th><th style="text-align:right">Сумма</th></tr></thead><tbody>
+        ${b.requests.map((r) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(r.created_at)}</td><td>${esc(r.method)}${r.reference ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.reference)}</span>` : ""}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td>
+          <td>${r.has_receipt ? "✅" : "—"}</td><td>${statusTag(r)}</td>
+          <td class="num">${money(r.amount)}${r.pay_amount ? `<br><span style="color:var(--muted);font-size:12px">${fmtPay(r.pay_amount)}</span>` : ""}</td></tr>`).join("")}
         </tbody></table></div>` : ""}
       <div class="card table-scroll"><div class="card-head"><h4>История операций</h4></div>
         ${b.transactions.length ? `<table class="table"><thead><tr><th>Дата</th><th>Операция</th><th style="text-align:right">Сумма</th></tr></thead><tbody>
@@ -968,31 +982,73 @@
             <td class="num ${t.amount > 0 ? "plus" : "minus"}">${t.amount > 0 ? "+" : "−"}${money(Math.abs(t.amount))}</td></tr>`).join("")}
           </tbody></table>` : `<p style="color:var(--muted);font-size:14px">Операций пока нет.</p>`}
       </div></div>`;
-    $$("[data-amount]", main).forEach((x) => x.addEventListener("click", () => { $("#topAmount").value = x.dataset.amount; }));
+
     $("#topForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const amount = parseFloat(($("#topAmount") || {}).value?.replace(",", "."));
       if (!(amount > 0)) return AM.shake($("#topAmount").parentElement);
-      try {
-        await api("POST", "/api/billing/topup", { amount });
-        AM.toast(`Баланс пополнен на ${money(Math.min(amount, 500))}`);
-        render();
-      } catch (err) { AM.toast(err.error, "bad"); }
+      try { await api("POST", "/api/billing/topup", { amount }); AM.toast(`Баланс пополнен на ${money(Math.min(amount, 500))}`); render(); }
+      catch (err) { AM.toast(err.error, "bad"); }
     });
-    $("#reqForm")?.addEventListener("submit", async (e) => {
+    if (!accounts.length) return;
+
+    const form = $("#payForm");
+    let receipt = null;
+    const acc = () => accounts[+($("input[name=acc]:checked", form) || {}).value || 0];
+    const amount = () => parseFloat(($("#payAmount").value || "").replace(",", "."));
+    function update() {
+      const a = acc();
+      $("#payAccName").textContent = `Номер ${a.name}`;
+      $("#payNumber").textContent = a.number;
+      $("#payHolder").textContent = a.holder || "";
+      $("#payHolderRow").hidden = !a.holder;
+      if (rate && $("#payTotal")) {
+        const v = amount();
+        $("#payTotal").textContent = v > 0 ? fmtPay(Math.round(v * rate * 100) / 100) : "—";
+      }
+    }
+    form.addEventListener("change", update);
+    $("#payAmount").addEventListener("input", update);
+    $$("[data-amount]", form).forEach((x) => x.addEventListener("click", () => { $("#payAmount").value = x.dataset.amount; update(); }));
+    $("#copyNumber").addEventListener("click", () => AM.copy(acc().number.replace(/\s+/g, ""), "Номер скопирован"));
+    $("#copyTotal")?.addEventListener("click", () => {
+      const v = amount();
+      if (v > 0) AM.copy(String(Math.round(v * rate * 100) / 100), "Сумма скопирована");
+    });
+    $("#receipt").addEventListener("change", () => {
+      const f = $("#receipt").files[0];
+      receipt = null;
+      $("#dropPreview").hidden = true;
+      if (!f) { $("#dropText").textContent = "Фото или скриншот чека (JPG, PNG, PDF до 5 МБ)"; return; }
+      if (f.size > 5 * 1024 * 1024) { $("#payErr").textContent = "Файл больше 5 МБ. Сделайте скриншот чека."; AM.shake($("#drop")); return; }
+      $("#payErr").textContent = "";
+      const reader = new FileReader();
+      reader.onload = () => {
+        receipt = { data: String(reader.result).split(",")[1], name: f.name };
+        $("#dropText").textContent = `✅ ${f.name}`;
+        if (/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { $("#dropPreview").src = reader.result; $("#dropPreview").hidden = false; }
+      };
+      reader.readAsDataURL(f);
+    });
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      $("#rqErr").textContent = "";
-      const amount = parseFloat($("#rqAmount").value.replace(",", "."));
-      if (!(amount > 0)) return AM.shake($("#rqAmountBox"));
+      $("#payErr").textContent = "";
+      const v = amount();
+      if (!(v > 0)) return AM.shake($("#payAmountBox"));
+      if (!receipt) { $("#payErr").textContent = "Прикрепите фото или скриншот чека"; return AM.shake($("#drop")); }
+      const btn = $("#paySend"); btn.disabled = true; btn.textContent = "Отправляем…";
       try {
-        await api("POST", "/api/billing/requests", { amount, method: $("#rqMethod").value, reference: $("#rqRef").value });
-        AM.toast("Заявка отправлена. Зачислим после проверки платежа.");
+        await api("POST", "/api/billing/requests", { amount: v, method: acc().name, reference: $("#payRef").value,
+          receipt_data: receipt.data, receipt_name: receipt.name });
+        AM.toast("Чек отправлен. Зачислим после проверки платежа.");
         render();
       } catch (err) {
-        $("#rqErr").textContent = err.error;
-        AM.shake($(err.field === "reference" ? "#rqRefBox" : "#rqAmountBox"));
+        $("#payErr").textContent = err.error;
+        AM.shake($(err.field === "receipt" ? "#drop" : "#payAmountBox"));
+        btn.disabled = false; btn.textContent = "Отправить чек";
       }
     });
+    update();
   }
 
   // ═══════════ Админка ═══════════
@@ -1032,7 +1088,18 @@
             <span style="display:grid;gap:2px"><b style="color:var(--fg);font-size:14px">${esc(c.title)}${c.required ? "" : ` <span style="color:var(--muted);font-weight:500">· по желанию</span>`}</b>
             <span style="color:var(--muted);font-size:13px">${esc(c.detail)}</span></span></li>`).join("")}
         </ul>
-        <p style="color:var(--muted);font-size:13px;margin:14px 0 0">Настройки меняются в файле .env на сервере, после изменения перезапустите панель. Подробно — в README.</p>
+        <p style="color:var(--muted);font-size:13px;margin:14px 0 0">Ключи поставщиков, способы оплаты, реквизиты и уведомления — во вкладке «Настройки».</p>
+      </div>
+      <div class="card"><div class="card-head"><h4>Баланс поставщиков</h4></div>
+        <div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div class="kpi"><span>ResellerClub (домены)</span>
+            <b>${prov.registrar && prov.registrar.amount != null ? `${prov.registrar.amount.toFixed(2)} <small>${esc(prov.registrar.currency || "")}</small>` : "—"}</b>
+            <em>${prov.registrar ? (prov.registrar.error ? esc(prov.registrar.error) : prov.registrar.name === "demo" ? "демо‑режим: ключи в Настройках" : "с него списывается регистрация доменов") : ""}</em></div>
+          <div class="kpi"><span>Hetzner (серверы)</span>
+            <b>${prov.costs && prov.costs.hetzner_month != null ? "€" + prov.costs.hetzner_month.toFixed(2) + " <small>/ мес.</small>" : "—"}</b>
+            <em>постоплата: баланса в API нет, это расходы по текущим серверам</em></div>
+        </div>
+        ${prov.registrar && prov.registrar.amount != null && prov.registrar.amount < 30 ? `<div class="banner" style="margin-top:12px"><span>На счёте ResellerClub мало денег — пополните, иначе регистрация доменов не пройдёт.</span></div>` : ""}
       </div>
       ${prov.costs ? `<div class="card"><div class="card-head"><h4>Деньги за месяц</h4></div>
         <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -1054,10 +1121,12 @@
     const { requests } = await api("GET", "/api/admin/topups?status=all");
     const pending = requests.filter((r) => r.status === "pending"), done = requests.filter((r) => r.status !== "pending");
     const row = (r, actions) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(r.created_at)}</td><td>${esc(r.email)}</td><td>${esc(r.method)}</td>
-      <td>${esc(r.reference)}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td><td class="num">${money(r.amount)}</td>
+      <td>${r.receipt ? `<button class="btn btn-sm" type="button" data-receipt="${r.id}" data-pdf="${/\.pdf$/.test(r.receipt)}">🧾 Чек</button>` : ""}
+        ${esc(r.reference)}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td>
+      <td class="num">${money(r.amount)}${r.pay_amount ? `<br><span style="color:var(--muted);font-size:12px">${Number(r.pay_amount).toLocaleString("ru-RU", { minimumFractionDigits: 2 })} ${esc(r.pay_currency)}</span>` : ""}</td>
       <td style="text-align:right;white-space:nowrap">${actions ? `<button class="btn btn-sm btn-primary" type="button" data-approve="${r.id}">Зачислить</button>
         <button class="btn btn-sm" type="button" data-reject="${r.id}">Отклонить</button>` : `<span class="tag ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span>`}</td></tr>`;
-    const head = `<thead><tr><th>Дата</th><th>Клиент</th><th>Способ</th><th>Перевод</th><th style="text-align:right">Сумма</th><th></th></tr></thead>`;
+    const head = `<thead><tr><th>Дата</th><th>Клиент</th><th>Способ</th><th>Чек и комментарий</th><th style="text-align:right">Сумма</th><th></th></tr></thead>`;
     body.innerHTML = `<div class="view" style="gap:14px">
       <div class="card table-scroll"><div class="card-head"><h4>Ждут проверки</h4></div>
         ${pending.length ? `<table class="table">${head}<tbody>${pending.map((r) => row(r, true)).join("")}</tbody></table>`
@@ -1075,6 +1144,13 @@
         },
       }],
     });
+    $$("[data-receipt]", body).forEach((b) => b.addEventListener("click", () => {
+      const url = `/api/admin/topups/${b.dataset.receipt}/receipt`;
+      if (b.dataset.pdf === "true") { window.open(url, "_blank", "noopener"); return; }
+      modal({ title: `Чек к заявке №${b.dataset.receipt}`, html: `<img class="receipt-img" src="${url}" alt="Чек об оплате">
+        <a class="btn btn-sm" href="${url}" target="_blank" rel="noopener" style="justify-self:start">Открыть в полном размере</a>`,
+        actions: [{ label: "Закрыть" }] });
+    }));
     $$("[data-approve]", body).forEach((b) => b.addEventListener("click", () => decide(+b.dataset.approve, true)));
     $$("[data-reject]", body).forEach((b) => b.addEventListener("click", () => decide(+b.dataset.reject, false)));
   }
@@ -1155,9 +1231,13 @@
       <textarea id="st-${id}" rows="3" style="width:100%;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);padding:10px 12px;font:inherit;color:var(--fg);resize:vertical">${esc(value || "")}</textarea>${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
     const card = (title, inner, note = "") => `<div class="card form"><div class="card-head" style="margin:0"><h4>${title}</h4></div>${note ? `<p style="color:var(--muted);font-size:13px;margin:0">${note}</p>` : ""}${inner}</div>`;
     body.innerHTML = `<form class="view" id="stForm" novalidate style="gap:14px">
-      ${card("Приём оплаты", inp("payment_methods", "Способы оплаты через запятую", (st.payment_methods || []).join(", "), "Например: Алиф Моби, Душанбе Сити, Корти Милли")
-        + area("payment_instructions", "Реквизиты для перевода", st.payment_instructions, "Клиент увидит этот текст на странице «Баланс»"),
-        "Клиент переводит деньги и отправляет заявку, вы подтверждаете во вкладке «Пополнения».")}
+      ${card("Приём оплаты", `<div class="table-scroll"><table class="table"><thead><tr><th>Способ</th><th>Номер карты / телефона</th><th>Получатель</th><th></th></tr></thead>
+          <tbody id="accRows"></tbody></table></div>
+        <button class="btn btn-sm" type="button" id="accAdd" style="justify-self:start"><svg class="icon"><use href="#i-plus"/></svg>Добавить способ</button>
+        <div class="grid-2">${inp("pay_currency", "Валюта перевода", st.pay_currency, "TJS — сомони, UZS — сум, KZT — тенге", 'maxlength="3"')}
+        ${inp("exchange_rate", "Свой курс за 1 " + esc(AM.config.currency), st.exchange_rate || "", "Пусто — курс берётся автоматически и обновляется каждые 6 часов", 'inputmode="decimal" placeholder="авто"')}</div>
+        ${area("payment_instructions", "Дополнительная подсказка клиенту", st.payment_instructions, "Необязательно: например, «В комментарии к переводу укажите ваш email»")}`,
+        "Клиент выбирает способ, копирует номер, видит сумму в сомони, переводит и прикрепляет чек. Заявка с чеком приходит во вкладку «Пополнения» и вам в Telegram.")}
       ${card("Компания и поддержка", `<div class="grid-2">${inp("company_name", "Название ИП или компании", st.company_name)}${inp("support_telegram", "Telegram поддержки", st.support_telegram, "Без @, например averix_support")}
         ${inp("support_email", "Email поддержки", st.support_email)}${inp("support_phone", "Телефон поддержки", st.support_phone)}</div>`
         + area("company_details", "Реквизиты (ИНН, адрес, банк)", st.company_details, "Попадут в оферту и подвал сайта"))}
@@ -1173,12 +1253,23 @@
       <div class="form-error" id="stErr"></div>
       <button class="btn btn-primary" type="submit" id="stSave" style="justify-self:start">Сохранить настройки</button>
     </form>`;
+    const accRow = (a = {}) => `<tr><td><div class="input" style="height:38px;min-width:130px"><input class="a-name" value="${esc(a.name || "")}" placeholder="Алиф Моби" aria-label="Способ"></div></td>
+      <td><div class="input" style="height:38px;min-width:190px"><input class="a-number" value="${esc(a.number || "")}" placeholder="0000 0000 0000 0000" aria-label="Номер"></div></td>
+      <td><div class="input" style="height:38px;min-width:150px"><input class="a-holder" value="${esc(a.holder || "")}" placeholder="Имя Ф." aria-label="Получатель"></div></td>
+      <td style="text-align:right"><button class="icon-btn a-del" type="button" aria-label="Удалить способ"><svg class="icon"><use href="#i-trash"/></svg></button></td></tr>`;
+    const accounts = (st.payment_accounts && st.payment_accounts.length) ? st.payment_accounts : (st.payment_methods || []).map((n) => ({ name: n }));
+    $("#accRows").innerHTML = (accounts.length ? accounts : [{}]).map(accRow).join("");
+    const wireAcc = () => $$(".a-del", body).forEach((b) => { b.onclick = () => b.closest("tr").remove(); });
+    wireAcc();
+    $("#accAdd").addEventListener("click", () => { $("#accRows").insertAdjacentHTML("beforeend", accRow()); wireAcc(); $("#accRows tr:last-child .a-name").focus(); });
     $("#stForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       $("#stErr").textContent = "";
       const btn = $("#stSave"); btn.disabled = true; btn.textContent = "Проверяем и сохраняем…";
       const data = {};
-      ["payment_methods", "payment_instructions", "company_name", "company_details", "support_telegram", "support_email", "support_phone",
+      data.payment_accounts = $$("#accRows tr", body).map((tr) => ({ name: $(".a-name", tr).value, number: $(".a-number", tr).value, holder: $(".a-holder", tr).value }))
+        .filter((a) => a.name.trim() || a.number.trim());
+      ["pay_currency", "exchange_rate", "payment_instructions", "company_name", "company_details", "support_telegram", "support_email", "support_phone",
         "telegram_bot_token", "telegram_admin_chat_id", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
         "hetzner_token", "rc_user_id", "rc_api_key", "rc_customer_id"].forEach((f) => { data[f] = $(`#st-${f}`).value; });
       data.rc_test = $("#st-rc_test").checked;

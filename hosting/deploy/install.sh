@@ -201,7 +201,7 @@ cat > /etc/nginx/sites-available/averix <<NGINX
 server {
     listen 80;
     server_name $SERVER_NAMES;
-    client_max_body_size 1m;
+    client_max_body_size 8m;   # фото чеков до 5 МБ
     location / {
         proxy_pass http://127.0.0.1:$PORT;
         proxy_set_header Host \$host;

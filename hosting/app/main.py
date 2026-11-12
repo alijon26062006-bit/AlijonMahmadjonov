@@ -102,7 +102,9 @@ class ProfileIn(BaseModel):
 class TopupRequestIn(BaseModel):
     amount: float = Field(gt=0, le=10000)
     method: str = Field(max_length=80)
-    reference: str = Field(max_length=200)
+    reference: str = Field(default="", max_length=200)
+    receipt_data: str | None = Field(default=None, max_length=7_200_000)  # base64, до ~5 МБ
+    receipt_name: str = Field(default="", max_length=200)
 
 
 class DecideIn(BaseModel):
@@ -180,7 +182,7 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
-            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+            "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
         if path.startswith("/api/"):
             resp.headers.setdefault("Cache-Control", "no-store")
         return resp
@@ -395,18 +397,21 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
                     "ORDER BY id DESC LIMIT 50", (user["id"],))
         monthly = db.one("SELECT COALESCE(SUM(price_cents), 0) AS s FROM servers WHERE user_id = ? AND deleted_at IS NULL",
                          (user["id"],))["s"]
-        reqs = db.all("SELECT id, amount_cents, method, reference, status, admin_note, created_at FROM topup_requests"
+        reqs = db.all("SELECT id, amount_cents, method, reference, status, admin_note, created_at, pay_amount, pay_currency,"
+                      " receipt != '' AS has_receipt FROM topup_requests"
                       " WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],))
         return {"balance": user["balance_cents"] / 100, "monthly": monthly / 100,
                 "transactions": [{**t, "amount": t["amount_cents"] / 100} for t in tx],
                 "requests": [{**r, "amount": r["amount_cents"] / 100} for r in reqs],
-                "demo_payments": settings.demo_payments, "payment_methods": settings.payment_methods,
-                "payment_instructions": settings.payment_instructions}
+                "demo_payments": settings.demo_payments, "payment_methods": [a["name"] for a in hosting.payment_accounts()],
+                "payment_accounts": hosting.payment_accounts(), "payment_instructions": settings.payment_instructions,
+                "pay": hosting.pay_info()}
 
     @app.post("/api/billing/requests")
     def topup_request(body: TopupRequestIn, request: Request, user: dict = Depends(current_user)):
         limit(f"topupreq:{user['id']}", 10, 3600)
-        r = hosting.create_topup_request(user, body.amount, body.method, body.reference, ip_of(request))
+        r = hosting.create_topup_request(user, body.amount, body.method, body.reference, ip_of(request),
+                                         receipt={"data": body.receipt_data, "name": body.receipt_name} if body.receipt_data else None)
         return {"request": {**r, "amount": r["amount_cents"] / 100}}
 
     @app.post("/api/billing/topup")
@@ -463,6 +468,16 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         r = hosting.decide_topup(admin, rid, body.approve, body.note, ip_of(request))
         return {"request": {**r, "amount": r["amount_cents"] / 100}}
 
+    @app.get("/api/admin/topups/{rid}/receipt")
+    def admin_receipt(rid: int, _: dict = Depends(admin_user)):
+        found = hosting.receipt_file(rid)
+        if not found:
+            raise ServiceError("Чек не найден", 404)
+        path, mime = found
+        resp = FileResponse(path, media_type=mime, content_disposition_type="inline")
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
+
     @app.get("/api/admin/catalog")
     def admin_catalog(_: dict = Depends(admin_user)):
         return hosting.catalog.to_dict()
@@ -490,9 +505,15 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         vps = hosting.p.vps
         active = db.all("SELECT plan, location, price_cents FROM servers WHERE deleted_at IS NULL")
         revenue = sum(r["price_cents"] for r in active) / 100
+        registrar = {"name": hosting.p.registrar.name}
+        if hasattr(hosting.p.registrar, "balance"):
+            try:
+                registrar.update(hosting.p.registrar.balance())
+            except ProviderError as e:
+                registrar["error"] = e.message
         if vps.name != "hetzner":
             return {"provider": vps.name, "server_types": [], "note": "Демо-режим: вставьте токен Hetzner в Настройках",
-                    "costs": {"servers": len(active), "revenue": revenue, "hetzner_month": None}}
+                    "costs": {"servers": len(active), "revenue": revenue, "hetzner_month": None}, "registrar": registrar}
         types = vps.server_types()
         prices = {}
         for st in types:
@@ -513,6 +534,7 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
                 cost += price
         return {"provider": "hetzner", "plans": plans,
                 "costs": {"servers": len(active), "revenue": revenue, "hetzner_month": round(cost, 2), "unknown": unknown},
+                "registrar": registrar,
                 "server_types": [{"name": t["name"], "cores": t["cores"], "memory": t["memory"], "disk": t["disk"],
                                   "deprecated": bool(t.get("deprecation"))} for t in types]}
 

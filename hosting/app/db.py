@@ -140,6 +140,10 @@ MIGRATIONS = [
     ("domains", "registrar_order_id", "TEXT NOT NULL DEFAULT ''"),
     ("domains", "custom_ns", "TEXT NOT NULL DEFAULT ''"),
     ("domains", "reminded_at", "INTEGER NOT NULL DEFAULT 0"),
+    ("topup_requests", "pay_amount", "REAL NOT NULL DEFAULT 0"),
+    ("topup_requests", "pay_currency", "TEXT NOT NULL DEFAULT ''"),
+    ("topup_requests", "rate", "REAL NOT NULL DEFAULT 0"),
+    ("topup_requests", "receipt", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 
