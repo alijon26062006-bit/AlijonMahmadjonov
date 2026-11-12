@@ -714,6 +714,7 @@ class Hosting:
                 providers = self._build(candidate)
                 if "hetzner_token" in clean and candidate.vps_provider == "hetzner":
                     providers.vps.server_types()
+                    providers.vps.check_write()
                 if candidate.registrar == "resellerclub" and any(k in clean for k in ("rc_user_id", "rc_api_key", "rc_customer_id", "rc_test")):
                     providers.registrar.ping()
             except ProviderError as e:
@@ -743,6 +744,7 @@ class Hosting:
         try:
             if self.p.vps.name == "hetzner":
                 types = self.p.vps.server_types()
+                self.p.vps.check_write()
                 names = {t["name"] for t in types}
                 missing = [p["server_type"] for p in self.catalog.plans if p.get("enabled", True) and p["server_type"] not in names]
                 add("vps", "Серверы: Hetzner", not missing,

@@ -63,7 +63,16 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
     ask_secret HETZNER "Вставьте токен Hetzner"
     if [[ -z "$HETZNER" ]]; then echo "  Пусто — серверы будут в демо-режиме (без настоящих заказов)."; break; fi
     CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $HETZNER" https://api.hetzner.cloud/v1/locations || true)
-    if [[ "$CODE" == "200" ]]; then echo "  ✅ Токен работает"; break; fi
+    if [[ "$CODE" == "200" ]]; then
+      # Пустой запрос на создание ничего не создаёт: read-only токен получит 403, нормальный — 422.
+      WCODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $HETZNER" \
+        -H "Content-Type: application/json" -d '{}' https://api.hetzner.cloud/v1/servers || true)
+      if [[ "$WCODE" == "403" ]]; then
+        echo "  ❌ У токена только право на чтение. Создайте новый токен с правами Read & Write."
+        HETZNER=""; continue
+      fi
+      echo "  ✅ Токен работает"; break
+    fi
     echo "  ❌ Hetzner не принял токен (ответ $CODE). Проверьте, что скопировали его целиком."
     HETZNER=""
   done

@@ -12,6 +12,7 @@ class FakeHetzner:
     def __init__(self):
         self.calls = []
         self.rrsets = {}
+        self.read_only = False
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path.removeprefix("/v1")
@@ -20,6 +21,10 @@ class FakeHetzner:
         assert request.headers["Authorization"] == "Bearer test-token"
         m = request.method
 
+        if m == "POST" and path == "/servers" and self.read_only:
+            return httpx.Response(403, json={"error": {"code": "forbidden", "message": "insufficient permissions"}})
+        if m == "POST" and path == "/servers" and not (body or {}).get("name"):
+            return httpx.Response(422, json={"error": {"code": "invalid_input", "message": "missing name"}})
         if m == "POST" and path == "/servers":
             return httpx.Response(201, json={
                 "server": {"id": 42, "status": "initializing",
@@ -168,3 +173,13 @@ def test_cpu_normalized_per_core():
     # По документации Hetzner: 100 = одно ядро; у 4-ядерного сервера 400 = полная загрузка.
     from app.services import normalize_cpu
     assert normalize_cpu([[1, 200.0], [2, 400.0], [3, 450.0]], 4) == [[1, 50.0], [2, 100.0], [3, 100.0]]
+
+
+def test_check_write_detects_read_only_token(client, fake):
+    vps = HetznerVps(client)
+    vps.check_write()  # Read & Write: Hetzner ругается на пустые поля, это нормально
+    assert fake.calls[-1][:3] == ("POST", "/servers", {})
+    fake.read_only = True
+    with pytest.raises(ProviderError) as e:
+        vps.check_write()
+    assert "Read & Write" in e.value.message

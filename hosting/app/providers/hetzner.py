@@ -184,6 +184,19 @@ class HetznerVps:
             out[name] = [[float(t), float(v)] for t, v in (ts.get("values") or []) if v not in (None, "NaN")]
         return Metrics(step=int(m.get("step") or step), series=out)
 
+    def check_write(self) -> None:
+        """Проверка, что у токена есть право на запись (Read & Write).
+
+        Пустой запрос на создание сервера ничего не создаёт: токен «только чтение» получает
+        forbidden, а нормальный токен — invalid_input (не хватает обязательных полей).
+        """
+        try:
+            self.c.request("POST", "/servers", json={})
+        except ProviderError as e:
+            if e.code in ("forbidden", "unauthorized"):
+                raise ProviderError("У токена Hetzner только право на чтение. Создайте новый токен с правами Read & Write",
+                                    code=e.code, status=400) from None
+
     # Для админки: что реально доступно в проекте и почём.
     def server_types(self) -> list[dict]:
         return self.c.request("GET", "/server_types", params={"per_page": 50}).get("server_types", [])
