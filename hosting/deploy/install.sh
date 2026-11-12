@@ -22,6 +22,17 @@ ask() { local var="$1" prompt="$2" def="${3:-}" val; read -r -p "$prompt${def:+ 
 ask_secret() { local var="$1" prompt="$2" val; read -r -s -p "$prompt (ввод скрыт): " val </dev/tty; echo; printf -v "$var" '%s' "$val"; }
 ask_required() { local var="$1" prompt="$2" val=""; while [[ -z "$val" ]]; do read -r -p "$prompt: " val </dev/tty; done; printf -v "$var" '%s' "$val"; }
 
+is_ip() { [[ "$1" =~ ^[0-9]+(\.[0-9]+){3}$ || "$1" == *:* ]]; }
+ask_domain() {
+  while true; do
+    ask_required DOMAIN "Домен сайта, например averix.dev (не IP-адрес; A-запись домена должна указывать на IP этого сервера)"
+    DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"; DOMAIN="${DOMAIN,,}"
+    if is_ip "$DOMAIN"; then echo "  ❌ Это IP-адрес. Нужен домен, например averix.dev"; continue; fi
+    if [[ "$DOMAIN" != *.* ]]; then echo "  ❌ Похоже, это не домен. Пример: averix.dev"; continue; fi
+    break
+  done
+}
+
 if [[ $EUID -ne 0 ]]; then echo "Запустите от root: sudo bash deploy/install.sh"; exit 1; fi
 if [[ ! -f "$SRC_DIR/run.py" ]]; then echo "Не найден код панели рядом со скриптом (run.py)"; exit 1; fi
 if ! : </dev/tty 2>/dev/null; then echo "Нужен интерактивный терминал: запустите команду в SSH-сессии"; exit 1; fi
@@ -53,8 +64,7 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
     echo "  ❌ Hetzner не принял токен (ответ $CODE). Проверьте, что скопировали его целиком."
     HETZNER=""
   done
-  ask_required DOMAIN "Домен сайта, например averix.tj (его A-запись должна указывать на IP этого сервера)"
-  DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
+  ask_domain
   ask_required ADMIN "Ваш email (станет администратором)"
   ask BRAND "Название хостинга" "Averix"
   ask RC_USER "ResellerClub: Reseller ID (Enter — домены в демо-режиме)"
@@ -116,7 +126,22 @@ else
   say "3/5 Файл $APP_DIR/.env уже есть — оставляю как есть"
   DOMAIN=$(grep -E '^PUBLIC_URL=' "$APP_DIR/.env" | sed -E 's#^PUBLIC_URL=https?://##; s#/.*##')
   ADMIN=$(grep -E '^ADMIN_EMAIL=' "$APP_DIR/.env" | cut -d= -f2-)
+  if [[ -z "$DOMAIN" ]] || is_ip "$DOMAIN" || [[ "$DOMAIN" == 127.0.0.1* ]]; then
+    echo "  В настройках указан не домен ($DOMAIN). Исправим."
+    ask_domain
+    sed -i -E "s#^PUBLIC_URL=.*#PUBLIC_URL=https://$DOMAIN#" "$APP_DIR/.env"
+  fi
 fi
+
+# Порт панели: 8000, а если он занят другой программой — первый свободный после него.
+systemctl stop averix.service 2>/dev/null || true
+PORT=$(grep -E '^PANEL_PORT=' "$APP_DIR/.env" | cut -d= -f2- || true)
+if [[ -z "$PORT" ]]; then
+  PORT=8000
+  while ss -ltnH "( sport = :$PORT )" | grep -q .; do PORT=$((PORT + 1)); done
+  echo "PANEL_PORT=$PORT" >> "$APP_DIR/.env"
+fi
+[[ "$PORT" != 8000 ]] && echo "  Порт 8000 занят другой программой — панель будет на порту $PORT"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chmod 600 "$APP_DIR/.env"
 
@@ -130,7 +155,7 @@ Wants=network-online.target
 [Service]
 User=$APP_USER
 WorkingDirectory=$APP_DIR
-ExecStart=$APP_DIR/.venv/bin/uvicorn run:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=$APP_DIR/.venv/bin/uvicorn run:app --host 127.0.0.1 --port $PORT --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -151,7 +176,7 @@ server {
     server_name $DOMAIN;
     client_max_body_size 1m;
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:$PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -161,12 +186,21 @@ server {
 }
 NGINX
 ln -sf /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/averix
-[[ -e /etc/nginx/sites-enabled/default ]] && unlink /etc/nginx/sites-enabled/default
+# Другие сайты на этом сервере не трогаем: наш блок отвечает только за свой домен.
 nginx -t && systemctl reload nginx
 if command -v ufw >/dev/null && ufw status | grep -q active; then ufw allow 'Nginx Full' >/dev/null; fi
-if ! certbot certificates 2>/dev/null | grep -q "Domains: $DOMAIN"; then
+
+MY_IPS=" $(hostname -I) "
+DNS_IPS=$(getent ahostsv4 "$DOMAIN" | awk '{print $1}' | sort -u | tr '\n' ' ')
+DNS_OK=no
+for ip in $DNS_IPS; do [[ "$MY_IPS" == *" $ip "* ]] && DNS_OK=yes; done
+if [[ "$DNS_OK" != yes ]]; then
+  echo "⚠ Домен $DOMAIN пока указывает на: ${DNS_IPS:-никуда}. IP этого сервера: $(hostname -I | awk '{print $1}')"
+  echo "  Добавьте у регистратора A-запись: @ → $(hostname -I | awk '{print $1}'), подождите 5–30 минут"
+  echo "  и запустите команду установки ещё раз — HTTPS выпустится сам."
+elif ! certbot certificates 2>/dev/null | grep -q "Domains: $DOMAIN"; then
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$ADMIN" --redirect || \
-    echo "⚠ HTTPS не выпущен. Проверьте, что DNS-запись A для $DOMAIN указывает на IP этого сервера, и запустите: certbot --nginx -d $DOMAIN"
+    echo "⚠ HTTPS не выпущен. Запустите команду установки ещё раз через несколько минут."
 fi
 
 say "5/5 Ежедневная резервная копия базы (хранится 14 дней)"
@@ -177,8 +211,12 @@ find $APP_DIR/backups -name 'hosting-*.db' -mtime +14 -delete
 CRON
 chmod +x /etc/cron.daily/averix-backup
 
-sleep 2
-if systemctl is-active --quiet averix.service; then
+STARTED=no
+for _ in $(seq 1 20); do
+  if curl -fs -o /dev/null "http://127.0.0.1:$PORT/api/config"; then STARTED=yes; break; fi
+  sleep 1
+done
+if [[ "$STARTED" == yes ]]; then
   echo
   echo "✅ Готово: https://$DOMAIN"
   echo "   1) Зарегистрируйтесь на сайте с email $ADMIN — вы станете администратором."
@@ -186,6 +224,9 @@ if systemctl is-active --quiet averix.service; then
   echo "   3) Настройки: $APP_DIR/.env, после правки: systemctl restart averix"
   echo "   Логи: journalctl -u averix -f"
 else
-  echo "⚠ Панель не запустилась. Смотрите: journalctl -u averix -n 50"
+  echo "⚠ Панель не запустилась. Последние строки журнала (пришлите их скриншотом):"
+  echo "────────────────────────────────────────"
+  journalctl -u averix -n 25 --no-pager | cut -c1-220
+  echo "────────────────────────────────────────"
   exit 1
 fi
