@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AM Cloud — VPS, выделенные серверы и домены</title>
+<meta name="description" content="VPS/VDS, выделенные серверы и регистрация доменов в одном месте. Быстрый запуск и удобное управление.">
+<meta name="theme-color" content="#080F24">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/css/home.css">
+</head>
+<body data-check-url="/app#/domains/new?buy=">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#C7D2FE"/></linearGradient>
+  </defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.4-6 8-6s6.5 2 8 6"/></symbol>
+  <symbol id="i-nvme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10M17 10.5h1M17 13.5h1M10 10h4v4h-4z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-support" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19c0 1.5-1.5 2.5-4 2.5h-2"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/></symbol>
+</svg>
+
+<header class="header" id="header">
+  <div class="container header-row">
+    <a class="brand" href="/" aria-label="AM Cloud — на главную">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="url(#g-brand)" stroke-width="2.2" stroke-linecap="round"><path d="M6 8.5h12M6 15.5h12"/><circle cx="8" cy="8.5" r=".4" fill="#fff"/><circle cx="8" cy="15.5" r=".4" fill="#fff"/></svg>
+      </span>
+      <span>AM Cloud<small data-i18n="tagline">хостинг и домены</small></span>
+    </a>
+
+    <nav class="nav" aria-label="Основное меню" data-i18n-aria="navLabel">
+      <ul>
+        <li><a href="/" aria-current="page" data-i18n="navHome">Главная</a></li>
+        <li><a href="#vps" data-i18n="navVps">VPS/VDS</a></li>
+        <li><a href="#dedicated" data-i18n="navDedicated">Выделенные серверы</a></li>
+        <li><a href="#domains" data-i18n="navDomains">Домены</a></li>
+        <li><a href="#support" data-i18n="navSupport">Поддержка</a></li>
+      </ul>
+    </nav>
+
+    <div class="header-actions">
+      <div class="lang" role="group" aria-label="Язык сайта">
+        <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+        <button type="button" data-lang="tj" aria-pressed="false">TJ</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <a class="btn btn-sm btn-login" href="/app"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span data-i18n="login">Войти</span></a>
+      <button class="burger" type="button" id="burger" aria-expanded="false" aria-controls="drawer" aria-label="Открыть меню" data-i18n-aria="menu"><span></span></button>
+    </div>
+  </div>
+
+  <div class="drawer" id="drawer" data-open="false">
+    <ul>
+      <li><a href="/" aria-current="page" data-i18n="navHome">Главная</a></li>
+      <li><a href="#vps" data-i18n="navVps">VPS/VDS</a></li>
+      <li><a href="#dedicated" data-i18n="navDedicated">Выделенные серверы</a></li>
+      <li><a href="#domains" data-i18n="navDomains">Домены</a></li>
+      <li><a href="#support" data-i18n="navSupport">Поддержка</a></li>
+    </ul>
+    <div class="drawer-foot">
+      <div class="lang" role="group" aria-label="Язык сайта">
+        <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+        <button type="button" data-lang="tj" aria-pressed="false">TJ</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <a class="btn btn-sm btn-login" href="/app"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span data-i18n="login">Войти</span></a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="pill"><b>NVMe</b><span data-i18n="pill">Сервер готов примерно за 60 секунд</span></p>
+          <h1 id="hero-title" data-i18n-html="title">Мощные <span class="grad-text">серверы</span> для ваших проектов</h1>
+          <p class="lead" data-i18n="lead">VPS, выделенные серверы и регистрация доменов — всё в одном месте. Быстрый запуск и удобное управление.</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="#vps"><span data-i18n="ctaServer">Выбрать сервер</span><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-outline" href="#domain-input"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="ctaDomain">Найти домен</span></a>
+          </div>
+
+          <div class="domain" id="domains">
+            <form class="domain-form" id="domainForm" role="search" novalidate>
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+              <label class="sr-only" for="domain-input" data-i18n="searchLabel">Поиск домена</label>
+              <input id="domain-input" name="domain" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+                     placeholder="Введите домен, например example.com" data-i18n-ph="placeholder">
+              <button class="btn btn-primary" type="submit" data-i18n="check">Проверить</button>
+            </form>
+            <div class="zones">
+              <button class="zone" type="button" data-zone="com">.com</button>
+              <button class="zone" type="button" data-zone="net">.net</button>
+              <button class="zone" type="button" data-zone="org">.org</button>
+              <button class="zone" type="button" data-zone="tj">.tj</button>
+              <button class="zone" type="button" data-zone="kz">.kz</button>
+            </div>
+            <p class="domain-note" id="domainNote" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="visual" id="visual" aria-hidden="true">
+          <div class="stage">
+            <div class="glow"></div>
+            <div class="viewport">
+              <div class="scene" id="scene"><div class="float"><div class="floor"><i></i><i></i><i></i></div><div class="b3 cab rack-b" style="width:196px;height:300px;transform:translate3d(-80px,140px,20px)"><div class="f bk" style="width:196px;height:300px;left:0px;top:0px;transform:rotateY(180deg) translateZ(100.0px)"></div><div class="f rt" style="width:200px;height:300px;left:-2.0px;top:0px;transform:rotateY(90deg) translateZ(98.0px)"></div><div class="f lf" style="width:200px;height:300px;left:-2.0px;top:0px;transform:rotateY(-90deg) translateZ(98.0px)"></div><div class="f tp" style="width:196px;height:200px;left:0px;top:50.0px;transform:rotateX(90deg) translateZ(150.0px)"></div><div class="f bt" style="width:196px;height:200px;left:0px;top:50.0px;transform:rotateX(-90deg) translateZ(150.0px)"></div></div><div class="b3 cab-frame" style="width:196px;height:300px;transform:translate3d(-80px,140px,120.0px)"></div><div class="b3 unit" style="width:172px;height:34px;transform:translate3d(-68px,178px,30.0px)"><div class="f fr" style="width:172px;height:34px;left:0px;top:0px;transform:translateZ(88.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b blink"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:176px;height:34px;left:-2.0px;top:0px;transform:rotateY(90deg) translateZ(86.0px)"></div><div class="f tp" style="width:172px;height:176px;left:0px;top:-71.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:172px;height:72px;transform:translate3d(-68px,221px,30.0px)"><div class="f fr" style="width:172px;height:72px;left:0px;top:0px;transform:translateZ(88.0px)"><span class="bays two"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b"></i><i class="led p blink2"></i><i class="led g"></i></span></div><div class="f rt" style="width:176px;height:72px;left:-2.0px;top:0px;transform:rotateY(90deg) translateZ(86.0px)"></div><div class="f tp" style="width:172px;height:176px;left:0px;top:-52.0px;transform:rotateX(90deg) translateZ(36.0px)"></div></div><div class="b3 unit" style="width:172px;height:34px;transform:translate3d(-68px,302px,30.0px)"><div class="f fr" style="width:172px;height:34px;left:0px;top:0px;transform:translateZ(88.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b blink"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:176px;height:34px;left:-2.0px;top:0px;transform:rotateY(90deg) translateZ(86.0px)"></div><div class="f tp" style="width:172px;height:176px;left:0px;top:-71.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:172px;height:34px;transform:translate3d(-68px,345px,30.0px)"><div class="f fr" style="width:172px;height:34px;left:0px;top:0px;transform:translateZ(88.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:176px;height:34px;left:-2.0px;top:0px;transform:rotateY(90deg) translateZ(86.0px)"></div><div class="f tp" style="width:172px;height:176px;left:0px;top:-71.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 cab rack-a" style="width:230px;height:400px;transform:translate3d(120px,40px,0px)"><div class="f bk" style="width:230px;height:400px;left:0px;top:0px;transform:rotateY(180deg) translateZ(112.0px)"></div><div class="f rt" style="width:224px;height:400px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(115.0px)"></div><div class="f lf" style="width:224px;height:400px;left:3.0px;top:0px;transform:rotateY(-90deg) translateZ(115.0px)"></div><div class="f tp" style="width:230px;height:224px;left:0px;top:88.0px;transform:rotateX(90deg) translateZ(200.0px)"></div><div class="f bt" style="width:230px;height:224px;left:0px;top:88.0px;transform:rotateX(-90deg) translateZ(200.0px)"></div></div><div class="b3 cab-frame" style="width:230px;height:400px;transform:translate3d(120px,40px,112.0px)"></div><div class="b3 unit" style="width:206px;height:34px;transform:translate3d(132px,78px,10.0px)"><div class="f fr" style="width:206px;height:34px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b blink"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:34px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-83.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:206px;height:34px;transform:translate3d(132px,121px,10.0px)"><div class="f fr" style="width:206px;height:34px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b"></i><i class="led p blink2"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:34px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-83.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:206px;height:72px;transform:translate3d(132px,164px,10.0px)"><div class="f fr" style="width:206px;height:72px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays two"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b blink"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:72px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-64.0px;transform:rotateX(90deg) translateZ(36.0px)"></div></div><div class="b3 unit" style="width:206px;height:34px;transform:translate3d(132px,245px,10.0px)"><div class="f fr" style="width:206px;height:34px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:34px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-83.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:206px;height:34px;transform:translate3d(132px,288px,10.0px)"><div class="f fr" style="width:206px;height:34px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b blink"></i><i class="led p blink2"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:34px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-83.0px;transform:rotateX(90deg) translateZ(17.0px)"></div></div><div class="b3 unit" style="width:206px;height:72px;transform:translate3d(132px,331px,10.0px)"><div class="f fr" style="width:206px;height:72px;left:0px;top:0px;transform:translateZ(100.0px)"><span class="bays two"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="strip"></span><span class="leds"><i class="led b"></i><i class="led p"></i><i class="led g"></i></span></div><div class="f rt" style="width:200px;height:72px;left:3.0px;top:0px;transform:rotateY(90deg) translateZ(103.0px)"></div><div class="f tp" style="width:206px;height:200px;left:0px;top:-64.0px;transform:rotateX(90deg) translateZ(36.0px)"></div></div></div></div>
+            </div>
+          </div>
+          <article class="vps-card">
+            <div class="vps-top">
+              <span class="vps-ic"><svg class="icon" style="color:#fff"><use href="#i-server"/></svg></span>
+              <div class="vps-name"><b>VPS Pro</b><span data-i18n="cardLoc">Франкфурт · Ubuntu 24.04</span></div>
+              <span class="status"><i></i><span data-i18n="online">Работает</span></span>
+            </div>
+            <dl class="metrics">
+              <div class="metric"><dt>CPU</dt><dd class="bar"><i style="--w:38%"></i></dd><dd class="val">4 vCPU</dd></div>
+              <div class="metric"><dt>RAM</dt><dd class="bar"><i style="--w:56%"></i></dd><dd class="val" data-i18n="ram">8 ГБ</dd></div>
+              <div class="metric"><dt>SSD</dt><dd class="bar"><i style="--w:27%"></i></dd><dd class="val" data-i18n="ssd">160 ГБ NVMe</dd></div>
+            </dl>
+            <div class="vps-foot"><span data-i18n="uptime">Аптайм</span><b data-i18n="uptimeVal">47 дн. 6 ч</b></div>
+          </article>
+        </div>
+      </div>
+
+      <ul class="perks">
+        <li class="perk">
+          <span class="perk-ic"><svg class="icon" aria-hidden="true"><use href="#i-nvme"/></svg></span>
+          <div><h3 data-i18n="p1t">SSD NVMe</h3><p data-i18n="p1d">Быстрые диски во всех тарифах</p></div>
+        </li>
+        <li class="perk">
+          <span class="perk-ic"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></span>
+          <div><h3 data-i18n="p2t">Защита серверов</h3><p data-i18n="p2d">Защита от DDoS и изоляция KVM</p></div>
+        </li>
+        <li class="perk">
+          <span class="perk-ic"><svg class="icon" aria-hidden="true"><use href="#i-support"/></svg></span>
+          <div><h3 data-i18n="p3t">Техническая поддержка</h3><p data-i18n="p3d">Отвечаем на русском, таджикском и английском</p></div>
+        </li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script src="/static/js/home.js"></script>
+</body>
+</html>

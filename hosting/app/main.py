@@ -409,5 +409,10 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     def app_page():
         return FileResponse(STATIC / "app.html")
 
+    # Новая главная собирается по разделам; когда будет готова целиком, займёт место "/".
+    @app.get("/new", include_in_schema=False)
+    def new_home():
+        return FileResponse(STATIC / "home.html")
+
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
