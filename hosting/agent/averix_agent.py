@@ -3,14 +3,14 @@
 
 Раз в 30 секунд отправляет в панель: память, диск, нагрузку и топ процессов.
 Только чтение /proc, без сторонних библиотек. Ничего не принимает извне и не выполняет команд.
-Настройки: /etc/amcloud-agent.conf (PANEL_URL, SERVER_ID, TOKEN).
+Настройки: /etc/averix-agent.conf (PANEL_URL, SERVER_ID, TOKEN).
 """
 import json
 import os
 import time
 import urllib.request
 
-CONF = "/etc/amcloud-agent.conf"
+CONF = "/etc/averix-agent.conf"
 INTERVAL = 30
 
 

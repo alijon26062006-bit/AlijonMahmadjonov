@@ -30,7 +30,7 @@ def _bool(raw: str | None, default: bool) -> bool:
 
 @dataclass
 class Settings:
-    brand_name: str = "AM Cloud"
+    brand_name: str = "Averix"
     secret_key: str = field(default_factory=lambda: secrets.token_urlsafe(48))
     database_path: str = str(BASE_DIR / "data" / "hosting.db")
     currency: str = "USD"
@@ -92,7 +92,7 @@ class Settings:
         if not os.path.isabs(db_path):
             db_path = str(BASE_DIR / db_path)
         s = cls(
-            brand_name=env("BRAND_NAME") or "AM Cloud",
+            brand_name=env("BRAND_NAME") or "Averix",
             database_path=db_path,
             currency=env("CURRENCY") or "USD",
             admin_email=(env("ADMIN_EMAIL") or "").strip().lower(),

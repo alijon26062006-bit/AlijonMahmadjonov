@@ -5,15 +5,15 @@ import base64
 
 from .config import BASE_DIR
 
-AGENT_PATH = BASE_DIR / "agent" / "amcloud_agent.py"
+AGENT_PATH = BASE_DIR / "agent" / "averix_agent.py"
 
 UNIT = """[Unit]
-Description=AM Cloud metrics agent
+Description=Averix metrics agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /usr/local/bin/amcloud-agent
+ExecStart=/usr/bin/python3 /usr/local/bin/averix-agent
 Restart=always
 RestartSec=15
 DynamicUser=no
@@ -35,19 +35,19 @@ def build_user_data(panel_url: str, server_id: int, agent_token: str) -> str:
     return f"""#cloud-config
 ssh_pwauth: true
 write_files:
-  - path: /usr/local/bin/amcloud-agent
+  - path: /usr/local/bin/averix-agent
     permissions: "0755"
     encoding: b64
     content: {_b64(agent)}
-  - path: /etc/amcloud-agent.conf
+  - path: /etc/averix-agent.conf
     permissions: "0600"
     encoding: b64
     content: {_b64(conf)}
-  - path: /etc/systemd/system/amcloud-agent.service
+  - path: /etc/systemd/system/averix-agent.service
     permissions: "0644"
     encoding: b64
     content: {_b64(UNIT)}
 runcmd:
   - [systemctl, daemon-reload]
-  - [systemctl, enable, --now, amcloud-agent.service]
+  - [systemctl, enable, --now, averix-agent.service]
 """

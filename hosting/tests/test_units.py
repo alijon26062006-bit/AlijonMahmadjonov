@@ -76,7 +76,7 @@ def test_validate_record_errors(args, field):
 def test_cloud_init_contains_agent_and_config():
     ud = build_user_data("https://panel.example.com", 7, "tok123")
     assert ud.startswith("#cloud-config") and "ssh_pwauth: true" in ud
-    assert "amcloud-agent.service" in ud and "tok123" not in ud  # токен только внутри base64
+    assert "averix-agent.service" in ud and "tok123" not in ud  # токен только внутри base64
     import base64
     import re
     blobs = [base64.b64decode(b).decode() for b in re.findall(r"content: (\S+)", ud)]

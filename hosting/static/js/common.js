@@ -88,7 +88,7 @@
     const [config, catalog] = await Promise.all([AM.api("GET", "/api/config"), AM.api("GET", "/api/catalog")]);
     AM.config = config; AM.catalog = catalog;
     AM.$$("[data-brand]").forEach((el) => { el.textContent = config.brand; });
-    document.title = document.title.replace("AM Cloud", config.brand);
+    document.title = document.title.replace("Averix", config.brand);
     return { config, catalog };
   };
 })();

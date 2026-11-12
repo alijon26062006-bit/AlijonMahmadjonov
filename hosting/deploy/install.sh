@@ -5,28 +5,31 @@
 #
 # Что делает:
 #   1) ставит Python, nginx и certbot;
-#   2) копирует панель в /opt/amcloud и ставит зависимости;
-#   3) спрашивает домен и ключи и создаёт /opt/amcloud/.env (существующий .env не трогает);
+#   2) копирует панель в /opt/averix и ставит зависимости;
+#   3) спрашивает домен и ключи и создаёт /opt/averix/.env (существующий .env не трогает);
 #   4) включает автозапуск (systemd), nginx и бесплатный HTTPS (Let's Encrypt);
 #   5) включает ежедневную резервную копию базы.
 # Повторный запуск безопасен: обновляет код и перезапускает панель.
 set -euo pipefail
 
-APP_DIR=/opt/amcloud
-APP_USER=amcloud
+APP_DIR=/opt/averix
+APP_USER=averix
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 say() { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
-ask() { local var="$1" prompt="$2" def="${3:-}" val; read -r -p "$prompt${def:+ [$def]}: " val; printf -v "$var" '%s' "${val:-$def}"; }
-ask_secret() { local var="$1" prompt="$2" val; read -r -s -p "$prompt (ввод скрыт, Enter — пропустить): " val; echo; printf -v "$var" '%s' "$val"; }
+# Вопросы читаются с клавиатуры (/dev/tty) — так установщик работает и при запуске через «curl | bash».
+ask() { local var="$1" prompt="$2" def="${3:-}" val; read -r -p "$prompt${def:+ [$def]}: " val </dev/tty; printf -v "$var" '%s' "${val:-$def}"; }
+ask_secret() { local var="$1" prompt="$2" val; read -r -s -p "$prompt (ввод скрыт): " val </dev/tty; echo; printf -v "$var" '%s' "$val"; }
+ask_required() { local var="$1" prompt="$2" val=""; while [[ -z "$val" ]]; do read -r -p "$prompt: " val </dev/tty; done; printf -v "$var" '%s' "$val"; }
 
-if [[ $EUID -ne 0 ]]; then echo "Запустите с sudo: sudo bash deploy/install.sh"; exit 1; fi
-if [[ ! -f "$SRC_DIR/run.py" ]]; then echo "Запускайте из папки hosting (рядом должен быть run.py)"; exit 1; fi
+if [[ $EUID -ne 0 ]]; then echo "Запустите от root: sudo bash deploy/install.sh"; exit 1; fi
+if [[ ! -f "$SRC_DIR/run.py" ]]; then echo "Не найден код панели рядом со скриптом (run.py)"; exit 1; fi
+if ! : </dev/tty 2>/dev/null; then echo "Нужен интерактивный терминал: запустите команду в SSH-сессии"; exit 1; fi
 
 say "1/5 Ставлю системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip nginx certbot python3-certbot-nginx sqlite3 rsync >/dev/null
+apt-get install -y -qq python3 python3-venv python3-pip nginx certbot python3-certbot-nginx sqlite3 rsync curl >/dev/null
 
 say "2/5 Копирую панель в $APP_DIR"
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
@@ -40,10 +43,20 @@ python3 -m venv "$APP_DIR/.venv"
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
   say "3/5 Настройка (потом можно поменять в $APP_DIR/.env)"
-  ask DOMAIN "Домен панели, например my.example.com"
-  ask ADMIN "Ваш email (станет администратором)"
-  ask BRAND "Название хостинга" "AM Cloud"
-  ask_secret HETZNER "Токен Hetzner Cloud (Read & Write)"
+  echo "Токен Hetzner: console.hetzner.com → ваш проект → Security → API tokens → Generate (Read & Write)."
+  HETZNER=""
+  for attempt in 1 2 3; do
+    ask_secret HETZNER "Вставьте токен Hetzner"
+    if [[ -z "$HETZNER" ]]; then echo "  Пусто — серверы будут в демо-режиме (без настоящих заказов)."; break; fi
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $HETZNER" https://api.hetzner.cloud/v1/locations || true)
+    if [[ "$CODE" == "200" ]]; then echo "  ✅ Токен работает"; break; fi
+    echo "  ❌ Hetzner не принял токен (ответ $CODE). Проверьте, что скопировали его целиком."
+    HETZNER=""
+  done
+  ask_required DOMAIN "Домен сайта, например averix.tj (его A-запись должна указывать на IP этого сервера)"
+  DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
+  ask_required ADMIN "Ваш email (станет администратором)"
+  ask BRAND "Название хостинга" "Averix"
   ask RC_USER "ResellerClub: Reseller ID (Enter — домены в демо-режиме)"
   RC_KEY=""; RC_CUST=""
   if [[ -n "$RC_USER" ]]; then
@@ -108,9 +121,9 @@ chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chmod 600 "$APP_DIR/.env"
 
 say "4/5 Автозапуск, nginx и HTTPS"
-cat > /etc/systemd/system/amcloud.service <<UNIT
+cat > /etc/systemd/system/averix.service <<UNIT
 [Unit]
-Description=AM Cloud hosting panel
+Description=Averix hosting panel
 After=network-online.target
 Wants=network-online.target
 
@@ -129,10 +142,10 @@ ReadWritePaths=$APP_DIR/data $APP_DIR/backups
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now amcloud.service
-systemctl restart amcloud.service
+systemctl enable --now averix.service
+systemctl restart averix.service
 
-cat > /etc/nginx/sites-available/amcloud <<NGINX
+cat > /etc/nginx/sites-available/averix <<NGINX
 server {
     listen 80;
     server_name $DOMAIN;
@@ -147,7 +160,7 @@ server {
     }
 }
 NGINX
-ln -sf /etc/nginx/sites-available/amcloud /etc/nginx/sites-enabled/amcloud
+ln -sf /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/averix
 [[ -e /etc/nginx/sites-enabled/default ]] && unlink /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 if command -v ufw >/dev/null && ufw status | grep -q active; then ufw allow 'Nginx Full' >/dev/null; fi
@@ -157,22 +170,22 @@ if ! certbot certificates 2>/dev/null | grep -q "Domains: $DOMAIN"; then
 fi
 
 say "5/5 Ежедневная резервная копия базы (хранится 14 дней)"
-cat > /etc/cron.daily/amcloud-backup <<CRON
+cat > /etc/cron.daily/averix-backup <<CRON
 #!/bin/sh
 sqlite3 $APP_DIR/data/hosting.db ".backup '$APP_DIR/backups/hosting-\$(date +%F).db'"
 find $APP_DIR/backups -name 'hosting-*.db' -mtime +14 -delete
 CRON
-chmod +x /etc/cron.daily/amcloud-backup
+chmod +x /etc/cron.daily/averix-backup
 
 sleep 2
-if systemctl is-active --quiet amcloud.service; then
+if systemctl is-active --quiet averix.service; then
   echo
   echo "✅ Готово: https://$DOMAIN"
   echo "   1) Зарегистрируйтесь на сайте с email $ADMIN — вы станете администратором."
   echo "   2) Откройте Админку → «Готовность» и доведите все пункты до зелёного."
-  echo "   3) Настройки: $APP_DIR/.env, после правки: systemctl restart amcloud"
-  echo "   Логи: journalctl -u amcloud -f"
+  echo "   3) Настройки: $APP_DIR/.env, после правки: systemctl restart averix"
+  echo "   Логи: journalctl -u averix -f"
 else
-  echo "⚠ Панель не запустилась. Смотрите: journalctl -u amcloud -n 50"
+  echo "⚠ Панель не запустилась. Смотрите: journalctl -u averix -n 50"
   exit 1
 fi
