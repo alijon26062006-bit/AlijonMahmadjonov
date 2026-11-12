@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/static/css/home.css">
 </head>
-<body data-check-url="/app#/domains/new?buy=">
+<body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
     <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#C7D2FE"/></linearGradient>
@@ -23,6 +23,11 @@
   <symbol id="i-nvme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10M17 10.5h1M17 13.5h1M10 10h4v4h-4z"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
   <symbol id="i-support" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19c0 1.5-1.5 2.5-4 2.5h-2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-tg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l6 2.5L18 7l-7 7.5 7.5 5.5z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/></symbol>
 </svg>
 
@@ -88,7 +93,7 @@
             <a class="btn btn-outline" href="#domain-input"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="ctaDomain">Найти домен</span></a>
           </div>
 
-          <div class="domain" id="domains">
+          <div class="domain" id="domain-search">
             <form class="domain-form" id="domainForm" role="search" novalidate>
               <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
               <label class="sr-only" for="domain-input" data-i18n="searchLabel">Поиск домена</label>
@@ -146,7 +151,127 @@
       </ul>
     </div>
   </section>
+<section class="section" id="vps" aria-labelledby="vps-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="vpsEyebrow">VPS/VDS на NVMe</p>
+        <h2 id="vps-title" data-i18n="vpsTitle">Тарифы без скрытых платежей</h2>
+        <p data-i18n="vpsLead">Оплата помесячно с баланса. Root‑доступ, IPv4 и IPv6, защита от DDoS — в каждом тарифе.</p>
+      </div>
+      <div class="plans" id="plans" aria-live="polite">
+        <article class="plan skeleton"></article><article class="plan skeleton"></article><article class="plan skeleton"></article><article class="plan skeleton"></article>
+      </div>
+      <p class="locations"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span data-i18n="dcLabel">Дата‑центры:</span> <span id="dcList">Фалькенштейн, Нюрнберг, Хельсинки</span></p>
+    </div>
+  </section>
+
+  <section class="section" id="panel" aria-labelledby="panel-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="panelEyebrow">Личный кабинет</p>
+        <h2 id="panel-title" data-i18n="panelTitle">Управляйте сервером сами, без писем в поддержку</h2>
+      </div>
+      <div class="features">
+        <article class="feature">
+          <div class="mock mock-pw" aria-hidden="true">
+            <span class="mock-input">••••••••••••••••<i></i></span>
+            <span class="mock-meter"><i></i><i></i><i></i><i></i></span>
+            <span class="mock-ok">✓ chpasswd</span>
+          </div>
+          <h3 data-i18n="f1t">Root‑пароль в два клика</h3>
+          <p data-i18n="f1d">Задайте свой пароль или сгенерируйте новый. Он уходит на сервер по SSH и не хранится у нас.</p>
+        </article>
+        <article class="feature">
+          <div class="mock mock-chart" aria-hidden="true">
+            <svg viewBox="0 0 200 70" preserveAspectRatio="none"><defs><linearGradient id="mc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5B4BEB" stop-opacity=".45"/><stop offset="1" stop-color="#5B4BEB" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0 50 L20 44 L40 48 L60 30 L80 36 L100 22 L120 30 L140 18 L160 26 L180 14 L200 20 L200 70 L0 70Z" fill="url(#mc)"/>
+              <path d="M0 50 L20 44 L40 48 L60 30 L80 36 L100 22 L120 30 L140 18 L160 26 L180 14 L200 20" fill="none" stroke="#7C8CFF" stroke-width="2"/>
+              <path d="M0 60 L25 58 L50 59 L75 54 L100 56 L125 52 L150 55 L175 50 L200 52" fill="none" stroke="#38BDF8" stroke-width="2" stroke-dasharray="4 3"/></svg>
+          </div>
+          <h3 data-i18n="f2t">Графики нагрузки</h3>
+          <p data-i18n="f2d">Процессор, память, сеть и диск за час, сутки и неделю. Плюс процессы, которые грузят сервер.</p>
+        </article>
+        <article class="feature">
+          <div class="mock mock-dns" aria-hidden="true">
+            <span><b class="t-a">A</b>@<em>203.0.113.24</em></span>
+            <span><b class="t-mx">MX</b>@<em>10 mail</em></span>
+            <span><b class="t-txt">TXT</b>@<em>v=spf1 -all</em></span>
+          </div>
+          <h3 data-i18n="f3t">DNS‑записи с проверкой</h3>
+          <p data-i18n="f3d">A, AAAA, CNAME, MX, TXT, SRV, CAA. Ошибку в формате панель покажет до публикации.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="domains" aria-labelledby="domains-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="domEyebrow">Домены</p>
+        <h2 id="domains-title" data-i18n="domTitle">Найдите имя для проекта</h2>
+        <p data-i18n="domLead">Уже есть домен? Добавьте его в кабинет бесплатно и ведите DNS у нас.</p>
+      </div>
+      <div class="dom-grid">
+        <div class="dom-results card-box" id="domResults" aria-live="polite">
+          <p class="dom-empty" data-i18n="domEmpty">Введите имя в поиске на первом экране — здесь появятся свободные зоны и цены.</p>
+        </div>
+        <div class="card-box">
+          <h3 class="box-title" data-i18n="priceTitle">Цены на регистрацию</h3>
+          <table class="price-table"><thead><tr><th data-i18n="zone">Зона</th><th data-i18n="perYear">За год</th></tr></thead><tbody id="zoneTable"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="dedicated" aria-labelledby="ded-title">
+    <div class="container">
+      <div class="ded">
+        <div>
+          <p class="eyebrow" data-i18n="dedEyebrow">Выделенные серверы</p>
+          <h2 id="ded-title" data-i18n="dedTitle">Целый физический сервер под ваш проект</h2>
+          <p data-i18n="dedLead">Для нагруженных сайтов, баз данных и игровых серверов. Подберём процессор, память и диски под задачу и назовём цену до оплаты.</p>
+        </div>
+        <a class="btn btn-primary" id="dedCta" href="/app"><span data-i18n="dedCta">Оставить заявку</span><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="support" aria-labelledby="faq-title">
+    <div class="container faq-grid">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="faqEyebrow">Вопросы и поддержка</p>
+        <h2 id="faq-title" data-i18n="faqTitle">Частые вопросы</h2>
+        <p data-i18n="faqLead">Не нашли ответ? Напишите нам — отвечаем на русском, таджикском и английском.</p>
+        <div class="contacts" id="contacts"></div>
+      </div>
+      <div class="faq">
+        <details><summary data-i18n="q1">Как быстро будет готов сервер?</summary><p data-i18n="a1">Обычно примерно через минуту после заказа. IP‑адрес и доступ появятся в личном кабинете.</p></details>
+        <details><summary data-i18n="q2">Как оплатить?</summary><p data-i18n="a2">Пополните баланс в личном кабинете: переведите деньги удобным способом и отправьте заявку. Серверы и домены оплачиваются с баланса.</p></details>
+        <details><summary data-i18n="q3">Что будет, если закончатся деньги на балансе?</summary><p data-i18n="a3">Мы заранее напишем на почту. Если не пополнить баланс, сервер выключится через несколько дней после окончания оплаты, а данные сохранятся.</p></details>
+        <details><summary data-i18n="q4">Можно ли самому сменить root‑пароль?</summary><p data-i18n="a4">Да, в личном кабинете: задайте свой пароль или сгенерируйте новый. Мы пароль не храним.</p></details>
+        <details><summary data-i18n="q5">Есть ли защита от DDoS?</summary><p data-i18n="a5">Да, базовая защита от DDoS‑атак включена во все тарифы бесплатно.</p></details>
+        <details><summary data-i18n="q6">Можно ли подключить домен, купленный в другом месте?</summary><p data-i18n="a6">Да. Добавьте домен в кабинет и пропишите наши неймсерверы у своего регистратора — DNS будет работать у нас.</p></details>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g-brand)" stroke-width="2.2" stroke-linecap="round"><path d="M6 8.5h12M6 15.5h12"/></svg></span><span id="footBrand">AM Cloud</span></a>
+        <p data-i18n="footTag">VPS, выделенные серверы и домены в одном кабинете.</p>
+      </div>
+      <nav aria-label="Услуги"><h3 data-i18n="footServices">Услуги</h3>
+        <a href="#vps" data-i18n="navVps">VPS/VDS</a><a href="#dedicated" data-i18n="navDedicated">Выделенные серверы</a><a href="#domains" data-i18n="navDomains">Домены</a></nav>
+      <nav aria-label="Документы"><h3 data-i18n="footDocs">Документы</h3>
+        <a href="/legal/offer" data-i18n="docOffer">Публичная оферта</a><a href="/legal/privacy" data-i18n="docPrivacy">Конфиденциальность</a><a href="/legal/rules" data-i18n="docRules">Правила использования</a></nav>
+      <div><h3 data-i18n="footContacts">Контакты</h3><div class="foot-contacts" id="footContacts"></div></div>
+    </div>
+    <p class="copy">© <span id="year">2026</span> <span id="footCompany">AM Cloud</span></p>
+  </div>
+</footer>
 
 <script src="/static/js/home.js"></script>
 </body>

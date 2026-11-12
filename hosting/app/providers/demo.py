@@ -9,7 +9,7 @@ import socket
 import threading
 import time
 
-from .base import CreatedServer, Metrics, ProviderError, ServerState
+from .base import CreatedServer, Metrics, ProviderError, RegisteredDomain, ServerState
 
 YEAR = 365 * 24 * 3600
 
@@ -132,12 +132,13 @@ class DemoDns:
 
 
 class DemoRegistrar:
-    """Проверка занятости через DNS: если у домена есть NS-сервер или адрес — считаем занятым."""
+    """Проверка занятости через DNS: если у домена есть адрес — считаем занятым."""
 
     name = "demo"
 
     def __init__(self, resolve: bool = True):
         self.resolve = resolve
+        self.nameservers: dict[str, list[str]] = {}
 
     def check(self, domain: str) -> bool:
         if self.resolve:
@@ -150,8 +151,21 @@ class DemoRegistrar:
         # Без ответа DNS решаем детерминированно, чтобы результат не «прыгал».
         return _seed("free", domain) % 4 != 0
 
-    def register(self, domain: str, years: int) -> int:
-        return int(time.time()) + years * YEAR
+    def check_many(self, label: str, zones: list[str]) -> dict[str, bool]:
+        return {f"{label}.{z}": self.check(f"{label}.{z}") for z in zones}
 
-    def renew(self, domain: str, years: int, current_expiry: int) -> int:
+    def ensure_contact(self, user: dict) -> str:
+        return user.get("registrar_contact_id") or f"demo-{user['id']}"
+
+    def register(self, domain: str, years: int, contact_id: str, nameservers: list[str]) -> RegisteredDomain:
+        self.nameservers[domain] = list(nameservers)
+        return RegisteredDomain(order_id=f"demo-{_seed('order', domain) % 10**8}", expires_at=int(time.time()) + years * YEAR)
+
+    def renew(self, domain: str, order_id: str, years: int, current_expiry: int) -> int:
         return max(current_expiry, int(time.time())) + years * YEAR
+
+    def set_nameservers(self, domain: str, order_id: str, nameservers: list[str]) -> None:
+        self.nameservers[domain] = list(nameservers)
+
+    def ping(self) -> str:
+        return "демо-режим: домены не регистрируются у реестра"

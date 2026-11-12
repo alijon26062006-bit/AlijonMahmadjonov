@@ -164,9 +164,17 @@ def test_domains_and_dns(api, providers):
     assert providers.dns.zones["example.org"][("@", "A")]["values"] == ["203.0.113.25"]
 
 
-def test_register_domain_charges(api):
+PROFILE = {"name": "Alijon M", "phone": "+992 900123456", "country": "tj", "city": "Dushanbe",
+           "address": "Rudaki 1", "zipcode": "734000"}
+
+
+def test_register_domain_charges(api, providers):
     api.signup()
     topup(api, 50)
+    need = api.post("/api/domains", {"domain": "brand-new-name-xyz.com", "purchase": True})
+    assert need.status_code == 400 and need.json()["field"] == "profile"
+    assert api.get("/api/billing").json()["balance"] == 50  # без профиля деньги не списываются
+    assert api.post("/api/profile", PROFILE).status_code == 200
     r = api.post("/api/domains", {"domain": "brand-new-name-xyz.com", "purchase": True})
     if r.status_code == 409:  # детерминированная «занятость» демо-регистратора
         r = api.post("/api/domains", {"domain": "brand-new-name-abc.com", "purchase": True})

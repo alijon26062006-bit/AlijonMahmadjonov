@@ -9,13 +9,15 @@ from typing import Literal
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .catalog import Catalog, cents
 from .config import BASE_DIR, Settings
 from .db import Database
+from .legal import render_legal
+from .notify import Notifier
 from .providers import ProviderError, build_providers
 from .security import (SESSION_COOKIE, SESSION_TTL, RateLimiter, create_session, destroy_session, hash_password,
                        load_session, verify_password)
@@ -87,6 +89,36 @@ class AmountIn(BaseModel):
     note: str = Field(default="", max_length=200)
 
 
+class ProfileIn(BaseModel):
+    name: str = Field(default="", max_length=120)
+    company: str = Field(default="", max_length=120)
+    phone: str = Field(default="", max_length=40)
+    country: str = Field(default="", max_length=2)
+    city: str = Field(default="", max_length=120)
+    address: str = Field(default="", max_length=120)
+    zipcode: str = Field(default="", max_length=20)
+
+
+class TopupRequestIn(BaseModel):
+    amount: float = Field(gt=0, le=10000)
+    method: str = Field(max_length=80)
+    reference: str = Field(max_length=200)
+
+
+class DecideIn(BaseModel):
+    approve: bool
+    note: str = Field(default="", max_length=200)
+
+
+class NameserversIn(BaseModel):
+    nameservers: list[str] | None = Field(default=None, max_length=13)
+
+
+class CatalogIn(BaseModel):
+    plans: list[dict] = Field(max_length=50)
+    tlds: list[dict] = Field(max_length=200)
+
+
 def create_app(settings: Settings | None = None, db: Database | None = None, hosting: Hosting | None = None,
                start_billing: bool = True) -> FastAPI:
     settings = settings or Settings.from_env()
@@ -94,7 +126,7 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         log.warning("Настройки: %s", problem)
     db = db or Database(settings.database_path)
     catalog = Catalog.load()
-    hosting = hosting or Hosting(settings, db, catalog, build_providers(settings))
+    hosting = hosting or Hosting(settings, db, catalog, build_providers(settings), notifier=Notifier(settings))
     limiter = RateLimiter()
 
     @asynccontextmanager
@@ -181,7 +213,8 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
 
     def user_view(u: dict) -> dict:
         return {"id": u["id"], "email": u["email"], "name": u["name"], "is_admin": bool(u["is_admin"]),
-                "balance": u["balance_cents"] / 100, "csrf": u.get("csrf")}
+                "verified": bool(u.get("verified")), "balance": u["balance_cents"] / 100, "csrf": u.get("csrf"),
+                "profile": {f: u.get(f) or "" for f in Hosting.PROFILE_FIELDS}}
 
     def set_cookie(resp: Response, token: str) -> None:
         resp.set_cookie(SESSION_COOKIE, token, max_age=SESSION_TTL, httponly=True, samesite="lax",
@@ -192,11 +225,14 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     def config():
         return {"brand": settings.brand_name, "currency": settings.currency, "demo_payments": settings.demo_payments,
                 "vps_provider": settings.vps_provider, "dns_provider": settings.dns_provider,
-                "registrar": settings.registrar, "nameservers": settings.nameservers}
+                "registrar": settings.registrar, "nameservers": settings.nameservers,
+                "payment_methods": settings.payment_methods, "payment_instructions": settings.payment_instructions,
+                "support": {"telegram": settings.support_telegram, "email": settings.support_email, "phone": settings.support_phone},
+                "company": settings.company_name, "new_user_server_limit": settings.new_user_server_limit}
 
     @app.get("/api/catalog")
     def get_catalog():
-        return catalog.public()
+        return hosting.catalog.public()
 
     @app.get("/api/domains/check")
     def check(name: str, request: Request):
@@ -223,6 +259,9 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         token, _ = create_session(db, uid, ip_of(request))
         set_cookie(response, token)
         db.audit(uid, "user.register", email, ip_of(request))
+        hosting.notify.admin(f"👤 Новый клиент: {email}")
+        hosting.notify.email(email, f"Добро пожаловать в {settings.brand_name}",
+                             "Аккаунт создан. В личном кабинете можно заказать сервер, зарегистрировать домен и настроить DNS.")
         return {"ok": True}
 
     @app.post("/api/auth/login")
@@ -247,6 +286,12 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     @app.get("/api/me")
     def me(user: dict = Depends(current_user)):
         return user_view(user)
+
+    @app.post("/api/profile")
+    def profile(body: ProfileIn, request: Request, user: dict = Depends(current_user)):
+        updated = hosting.update_profile(user, body.model_dump())
+        db.audit(user["id"], "user.profile", "", ip_of(request))
+        return user_view({**updated, "csrf": user["csrf"]})
 
     # ═══════════ Серверы ═══════════
     @app.get("/api/servers")
@@ -333,6 +378,11 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         hosting.delete_record(user, hosting.get_domain(user, did), rid, ip_of(request))
         return {"ok": True}
 
+    @app.post("/api/domains/{did}/nameservers")
+    def nameservers(did: int, body: NameserversIn, request: Request, user: dict = Depends(current_user)):
+        limit(f"ns:{user['id']}", 20, 3600)
+        return {"domain": hosting.set_nameservers(user, hosting.get_domain(user, did), body.nameservers, ip_of(request))}
+
     @app.post("/api/domains/{did}/auto-renew")
     def auto_renew(did: int, body: FlagIn, user: dict = Depends(current_user)):
         hosting.set_auto_renew(hosting.get_domain(user, did), body.value)
@@ -345,9 +395,19 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
                     "ORDER BY id DESC LIMIT 50", (user["id"],))
         monthly = db.one("SELECT COALESCE(SUM(price_cents), 0) AS s FROM servers WHERE user_id = ? AND deleted_at IS NULL",
                          (user["id"],))["s"]
+        reqs = db.all("SELECT id, amount_cents, method, reference, status, admin_note, created_at FROM topup_requests"
+                      " WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],))
         return {"balance": user["balance_cents"] / 100, "monthly": monthly / 100,
                 "transactions": [{**t, "amount": t["amount_cents"] / 100} for t in tx],
-                "demo_payments": settings.demo_payments}
+                "requests": [{**r, "amount": r["amount_cents"] / 100} for r in reqs],
+                "demo_payments": settings.demo_payments, "payment_methods": settings.payment_methods,
+                "payment_instructions": settings.payment_instructions}
+
+    @app.post("/api/billing/requests")
+    def topup_request(body: TopupRequestIn, request: Request, user: dict = Depends(current_user)):
+        limit(f"topupreq:{user['id']}", 10, 3600)
+        r = hosting.create_topup_request(user, body.amount, body.method, body.reference, ip_of(request))
+        return {"request": {**r, "amount": r["amount_cents"] / 100}}
 
     @app.post("/api/billing/topup")
     def topup(body: AmountIn, request: Request, user: dict = Depends(current_user)):
@@ -362,11 +422,12 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     @app.get("/api/admin/overview")
     def admin_overview(_: dict = Depends(admin_user)):
         users = db.all(
-            "SELECT u.id, u.email, u.name, u.balance_cents, u.is_admin, u.created_at,"
+            "SELECT u.id, u.email, u.name, u.balance_cents, u.is_admin, u.verified, u.created_at,"
             " (SELECT COUNT(*) FROM servers s WHERE s.user_id = u.id AND s.deleted_at IS NULL) AS servers,"
             " (SELECT COUNT(*) FROM domains d WHERE d.user_id = u.id) AS domains"
             " FROM users u ORDER BY u.id DESC LIMIT 200")
         totals = db.one("SELECT (SELECT COUNT(*) FROM users) AS users,"
+                        " (SELECT COUNT(*) FROM topup_requests WHERE status = 'pending') AS pending_topups,"
                         " (SELECT COUNT(*) FROM servers WHERE deleted_at IS NULL) AS servers,"
                         " (SELECT COUNT(*) FROM domains) AS domains,"
                         " (SELECT COALESCE(SUM(price_cents),0) FROM servers WHERE deleted_at IS NULL) AS mrr")
@@ -383,6 +444,38 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
         db.audit(admin["id"], "admin.credit", f"{uid}:{body.amount}", ip_of(request))
         return {"ok": True}
 
+    @app.post("/api/admin/users/{uid}/verify")
+    def admin_verify(uid: int, body: FlagIn, request: Request, admin: dict = Depends(admin_user)):
+        if not db.one("SELECT 1 FROM users WHERE id = ?", (uid,)):
+            raise ServiceError("Пользователь не найден", 404)
+        db.run("UPDATE users SET verified = ? WHERE id = ?", (int(body.value), uid))
+        db.audit(admin["id"], "admin.verify", f"{uid}:{int(body.value)}", ip_of(request))
+        return {"ok": True}
+
+    @app.get("/api/admin/topups")
+    def admin_topups(status: str = "pending", _: dict = Depends(admin_user)):
+        rows = db.all("SELECT t.*, u.email FROM topup_requests t JOIN users u ON u.id = t.user_id"
+                      " WHERE (? = 'all' OR t.status = ?) ORDER BY t.id DESC LIMIT 100", (status, status))
+        return {"requests": [{**r, "amount": r["amount_cents"] / 100} for r in rows]}
+
+    @app.post("/api/admin/topups/{rid}")
+    def admin_decide(rid: int, body: DecideIn, request: Request, admin: dict = Depends(admin_user)):
+        r = hosting.decide_topup(admin, rid, body.approve, body.note, ip_of(request))
+        return {"request": {**r, "amount": r["amount_cents"] / 100}}
+
+    @app.get("/api/admin/catalog")
+    def admin_catalog(_: dict = Depends(admin_user)):
+        return hosting.catalog.to_dict()
+
+    @app.post("/api/admin/catalog")
+    def admin_catalog_save(body: CatalogIn, request: Request, admin: dict = Depends(admin_user)):
+        return hosting.update_catalog(admin, body.plans, body.tlds, ip_of(request))
+
+    @app.get("/api/admin/readiness")
+    def admin_readiness(_: dict = Depends(admin_user)):
+        checks = hosting.readiness()
+        return {"checks": checks, "ready": all(c["ok"] for c in checks if c["required"])}
+
     @app.get("/api/admin/provider")
     def admin_provider(_: dict = Depends(admin_user)):
         vps = hosting.p.vps
@@ -395,7 +488,7 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
                 prices.setdefault(st["name"], {})[p["location"]] = float(p["price_monthly"]["gross"])
         plans = [{"plan": p["id"], "server_type": p["server_type"], "our_price": p["price_month"],
                   "hetzner_price": prices.get(p["server_type"], {}),
-                  "exists": p["server_type"] in prices} for p in catalog.plans]
+                  "exists": p["server_type"] in prices} for p in hosting.catalog.plans]
         return {"provider": "hetzner", "plans": plans,
                 "server_types": [{"name": t["name"], "cores": t["cores"], "memory": t["memory"], "disk": t["disk"],
                                   "deprecated": bool(t.get("deprecation"))} for t in types]}
@@ -403,16 +496,19 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     # ═══════════ Страницы ═══════════
     @app.get("/", include_in_schema=False)
     def index():
-        return FileResponse(STATIC / "index.html")
+        return FileResponse(STATIC / "home.html")
+
+    @app.get("/legal/{doc}", include_in_schema=False)
+    def legal(doc: str):
+        page = render_legal(doc, settings)
+        if page is None:
+            raise ServiceError("Документ не найден", 404)
+        return HTMLResponse(page)
 
     @app.get("/app", include_in_schema=False)
     def app_page():
         return FileResponse(STATIC / "app.html")
 
-    # Новая главная собирается по разделам; когда будет готова целиком, займёт место "/".
-    @app.get("/new", include_in_schema=False)
-    def new_home():
-        return FileResponse(STATIC / "home.html")
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

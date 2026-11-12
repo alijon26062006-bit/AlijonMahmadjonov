@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 import secrets
 import threading
@@ -11,10 +12,11 @@ from .catalog import Catalog, cents
 from .cloudinit import build_user_data
 from .config import Settings
 from .db import Database, now
+from .notify import Notifier
 from .providers import ProviderError, Providers
 from .security import generate_root_password, root_password_problems, sha256
 from .ssh import SshError, set_root_password
-from .validators import ValidationError, normalize_domain, validate_record, validate_server_name
+from .validators import (HOST_RE, ValidationError, normalize_domain, validate_record, validate_server_name)
 
 log = logging.getLogger("hosting")
 
@@ -54,11 +56,19 @@ class _Cache:
 
 class Hosting:
     def __init__(self, settings: Settings, db: Database, catalog: Catalog, providers: Providers,
-                 run_async=None, demo_password_delay: float = 1.5):
+                 run_async=None, demo_password_delay: float = 1.5, notifier: Notifier | None = None):
         self.s = settings
         self.db = db
         self.catalog = catalog
         self.p = providers
+        self.notify = notifier or Notifier(settings)
+        # Цены и тарифы, изменённые в админке, важнее catalog.json.
+        override = db.get_setting("catalog")
+        if override:
+            try:
+                self.catalog = Catalog.from_dict(json.loads(override))
+            except (ValueError, KeyError) as e:
+                log.error("catalog override ignored: %s", e)
         self.cache = _Cache()
         self.demo_password_delay = demo_password_delay
         # Тесты подменяют на синхронный вызов.
@@ -117,8 +127,8 @@ class Hosting:
     def order_server(self, user: dict, *, plan_id: str, location: str, image: str, name: str,
                      root_password: str | None, ip: str = "") -> tuple[dict, str | None]:
         plan = self.catalog.plan(plan_id)
-        if not plan:
-            raise ServiceError("Такого тарифа нет", field="plan")
+        if not plan or not plan.get("enabled", True):
+            raise ServiceError("Этот тариф сейчас не продаётся", field="plan")
         if not self.catalog.location(location):
             raise ServiceError("Такой локации нет", field="location")
         if not self.catalog.image(image):
@@ -133,6 +143,12 @@ class Hosting:
                 raise ServiceError("Пароль: " + ", ".join(problems), field="root_password")
         if self.db.one("SELECT 1 FROM servers WHERE user_id = ? AND name = ? AND deleted_at IS NULL", (user["id"], name)):
             raise ServiceError("Сервер с таким именем уже есть", field="name")
+        if not user.get("verified") and not user.get("is_admin"):
+            active = self.db.one("SELECT COUNT(*) AS n FROM servers WHERE user_id = ? AND deleted_at IS NULL", (user["id"],))["n"]
+            if active >= self.s.new_user_server_limit:
+                raise ServiceError(
+                    f"Новым аккаунтам доступно серверов: {self.s.new_user_server_limit}. Чтобы заказать больше, "
+                    "напишите в поддержку — мы подтвердим аккаунт.", 403)
 
         price = cents(plan["price_month"])
         if not self.db.charge(user["id"], price, f"Сервер {name} ({plan['name']}), 1 месяц"):
@@ -155,10 +171,18 @@ class Hosting:
             self.db.run("UPDATE servers SET deleted_at = ?, status = 'failed' WHERE id = ?", (now(), sid))
             self.db.credit(user["id"], price, "refund", f"Возврат: сервер {name} не создан")
             self.db.audit(user["id"], "server.create_failed", f"{sid}:{e.code}", ip)
+            self.notify.admin(f"⚠️ Не создан сервер {name} ({plan['name']}, {location}) для {user['email']}: {e.message}. "
+                              "Деньги возвращены клиенту.")
             raise ServiceError(f"Не удалось создать сервер: {e.message}", 502) from None
         self.db.run("UPDATE servers SET provider_id = ?, status = ?, ipv4 = ?, ipv6 = ? WHERE id = ?",
                     (created.provider_id, created.status, created.ipv4, created.ipv6, sid))
         self.db.audit(user["id"], "server.create", str(sid), ip)
+        self.notify.admin(f"🟢 Новый сервер {name}: {plan['name']}, {location}, {image}. Клиент {user['email']}, "
+                          f"{price / 100:.2f} {self.s.currency}/мес.")
+        self.notify.email(user["email"], f"Сервер {name} создаётся",
+                          f"Ваш сервер {name} ({plan['name']}) создаётся и будет готов примерно через минуту.\n"
+                          f"IPv4: {created.ipv4 or 'появится в личном кабинете'}\nЛогин: root\n"
+                          "Пароль мы не отправляем по почте: он показан в кабинете при заказе или задан вами.")
         row = self.db.one("SELECT * FROM servers WHERE id = ?", (sid,))
         if root_password:
             self.run_async(self._apply_initial_password, sid, created.root_password, root_password)
@@ -314,7 +338,7 @@ class Hosting:
         name = raw.strip().lower()
         name = name.removeprefix("https://").removeprefix("http://").split("/")[0]
         label = name.split(".")[0]
-        zones = [t["zone"] for t in self.catalog.tlds]
+        zones = [t["zone"] for t in self.catalog.tlds if t.get("enabled", True)]
         if "." in name and name.split(".", 1)[1] in zones:
             first = name.split(".", 1)[1]
             zones = [first] + [z for z in zones if z != first]
@@ -322,19 +346,22 @@ class Hosting:
             normalize_domain(f"{label}.com")
         except ValidationError:
             raise ServiceError("Имя: латиница, цифры и дефис, например mysite", field="domain") from None
-        out = []
-        for z in zones:
-            d = f"{label}.{z}"
-            taken_here = self.db.one("SELECT 1 FROM domains WHERE name = ?", (d,))
-            free = not taken_here and self.p.registrar.check(d)
-            out.append({"domain": d, "zone": z, "available": free, "price": self.catalog.tld(z)["price_year"]})
-        return out
+        taken_here = {r["name"] for r in self.db.all(
+            f"SELECT name FROM domains WHERE name IN ({','.join('?' * len(zones))})", [f"{label}.{z}" for z in zones])}
+        try:
+            free = self.p.registrar.check_many(label, [z for z in zones if f"{label}.{z}" not in taken_here])
+        except ProviderError as e:
+            raise ServiceError(f"Регистратор не ответил: {e.message}", 502) from None
+        return [{"domain": f"{label}.{z}", "zone": z, "available": free.get(f"{label}.{z}", False),
+                 "price": self.catalog.tld(z)["price_year"]} for z in zones]
 
     def domain_view(self, row: dict) -> dict:
         n = self.db.one("SELECT COUNT(*) AS n FROM dns_records WHERE domain_id = ?", (row["id"],))["n"]
+        custom = json.loads(row["custom_ns"]) if row.get("custom_ns") else []
         return {"id": row["id"], "name": row["name"], "kind": row["kind"], "expires_at": row["expires_at"],
                 "auto_renew": bool(row["auto_renew"]), "status": row["status"], "records": n,
-                "price": row["price_cents"] / 100, "nameservers": self.s.nameservers}
+                "price": row["price_cents"] / 100, "nameservers": custom or self.s.nameservers,
+                "default_nameservers": self.s.nameservers, "custom_ns": bool(custom)}
 
     def list_domains(self, user: dict) -> list[dict]:
         rows = self.db.all("SELECT * FROM domains WHERE user_id = ? ORDER BY name", (user["id"],))
@@ -355,21 +382,34 @@ class Hosting:
             raise ServiceError("Этот домен уже добавлен в панель", 409, field="domain")
         price = 0
         expires = None
+        order_id = ""
         if register:
             zone = domain.split(".", 1)[1]
             tld = self.catalog.tld(zone)
-            if not tld:
+            if not tld or not tld.get("enabled", True):
                 raise ServiceError(f"Зону .{zone} мы пока не регистрируем", field="domain")
-            if not self.p.registrar.check(domain):
-                raise ServiceError("Домен уже занят", 409, field="domain")
+            missing = profile_missing(user)
+            if missing:
+                raise ServiceError("Чтобы зарегистрировать домен, заполните данные владельца в профиле: "
+                                   + ", ".join(missing), 400, field="profile")
+            try:
+                if not self.p.registrar.check(domain):
+                    raise ServiceError("Домен уже занят", 409, field="domain")
+                contact = self.p.registrar.ensure_contact(user)
+            except ProviderError as e:
+                raise ServiceError(f"Регистратор: {e.message}", 502) from None
+            if contact != user.get("registrar_contact_id"):
+                self.db.run("UPDATE users SET registrar_contact_id = ? WHERE id = ?", (contact, user["id"]))
             price = cents(tld["price_year"])
             if not self.db.charge(user["id"], price, f"Регистрация домена {domain}, 1 год"):
                 raise ServiceError("Недостаточно средств на балансе", 402)
             try:
-                expires = self.p.registrar.register(domain, 1)
+                reg = self.p.registrar.register(domain, 1, contact, self.s.nameservers)
             except ProviderError as e:
                 self.db.credit(user["id"], price, "refund", f"Возврат: домен {domain} не зарегистрирован")
-                raise ServiceError(e.message, 502) from None
+                self.notify.admin(f"⚠️ Не зарегистрирован домен {domain} для {user['email']}: {e.message}. Деньги возвращены.")
+                raise ServiceError(f"Регистратор: {e.message}", 502) from None
+            expires, order_id = reg.expires_at, reg.order_id
         try:
             self.p.dns.ensure_zone(domain)
         except ProviderError as e:
@@ -378,9 +418,16 @@ class Hosting:
             else:
                 raise ServiceError(f"Не удалось создать DNS-зону: {e.message}", 502) from None
         did = self.db.run(
-            "INSERT INTO domains(user_id, name, kind, price_cents, expires_at, auto_renew, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (user["id"], domain, "registered" if register else "external", price, expires, 1, "active", now()))
+            "INSERT INTO domains(user_id, name, kind, price_cents, expires_at, auto_renew, status, created_at,"
+            " registrar, registrar_order_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (user["id"], domain, "registered" if register else "external", price, expires, 1, "active", now(),
+             self.p.registrar.name if register else "", order_id))
         self.db.audit(user["id"], "domain.register" if register else "domain.add", domain, ip)
+        if register:
+            self.notify.admin(f"🌐 Зарегистрирован домен {domain} для {user['email']} ({price / 100:.2f} {self.s.currency}).")
+            self.notify.email(user["email"], f"Домен {domain} зарегистрирован",
+                              f"Домен {domain} зарегистрирован на 1 год, до {_date(expires)}.\n"
+                              "DNS-записи можно настроить в личном кабинете. Обычно домен начинает открываться в течение часа.")
         return self.domain_view(self.db.one("SELECT * FROM domains WHERE id = ?", (did,)))
 
     def records(self, domain_row: dict) -> list[dict]:
@@ -438,6 +485,184 @@ class Hosting:
     def set_auto_renew(self, domain_row: dict, value: bool) -> None:
         self.db.run("UPDATE domains SET auto_renew = ? WHERE id = ?", (int(value), domain_row["id"]))
 
+    def set_nameservers(self, user: dict, domain_row: dict, nameservers: list[str] | None, ip: str = "") -> dict:
+        """None — вернуть наши неймсерверы; список — свои (например, Cloudflare)."""
+        if domain_row["kind"] != "registered":
+            raise ServiceError("Неймсерверы меняются у регистратора, где куплен домен", 400)
+        if nameservers is None:
+            ns, stored = self.s.nameservers, ""
+        else:
+            ns = [n.strip().lower().rstrip(".") for n in nameservers if n.strip()]
+            if not 2 <= len(ns) <= 13:
+                raise ServiceError("Укажите от 2 до 13 неймсерверов", field="nameservers")
+            if len(set(ns)) != len(ns) or not all(HOST_RE.match(n) for n in ns):
+                raise ServiceError("Неймсервер — это имя хоста, например ns1.example.com", field="nameservers")
+            stored = json.dumps(ns)
+        try:
+            self.p.registrar.set_nameservers(domain_row["name"], domain_row["registrar_order_id"], ns)
+        except ProviderError as e:
+            raise ServiceError(f"Регистратор: {e.message}", 502) from None
+        self.db.run("UPDATE domains SET custom_ns = ? WHERE id = ?", (stored, domain_row["id"]))
+        self.db.audit(user["id"], "domain.nameservers", f"{domain_row['name']}:{','.join(ns)}", ip)
+        return self.domain_view(self.db.one("SELECT * FROM domains WHERE id = ?", (domain_row["id"],)))
+
+    # ═══════════════════════ Профиль ═══════════════════════
+    PROFILE_FIELDS = ("name", "company", "phone", "country", "city", "address", "zipcode")
+
+    def update_profile(self, user: dict, data: dict) -> dict:
+        clean = {}
+        for f in self.PROFILE_FIELDS:
+            v = str(data.get(f) or "").strip()
+            if len(v) > 120:
+                raise ServiceError("Слишком длинное значение", field=f)
+            clean[f] = v
+        clean["country"] = clean["country"].upper()
+        if clean["country"] and not re.fullmatch(r"[A-Z]{2}", clean["country"]):
+            raise ServiceError("Страна — двухбуквенный код, например TJ, UZ, KZ, RU", field="country")
+        if clean["phone"]:
+            digits = re.sub(r"[^\d ]", "", clean["phone"]).split()
+            if len(digits) < 2 or not (1 <= len(digits[0]) <= 3) or not 5 <= len("".join(digits[1:])) <= 13:
+                raise ServiceError("Телефон: код страны и номер через пробел, например +992 900123456", field="phone")
+            clean["phone"] = f"{digits[0]} {''.join(digits[1:])}"
+        changed_contact = any(clean[f] != (user.get(f) or "") for f in self.PROFILE_FIELDS)
+        sets = ", ".join(f"{f} = ?" for f in self.PROFILE_FIELDS)
+        # Данные владельца изменились — при следующей регистрации у регистратора создастся новый контакт.
+        self.db.run(f"UPDATE users SET {sets}{', registrar_contact_id = ' + chr(39) * 2 if changed_contact else ''} WHERE id = ?",
+                    (*[clean[f] for f in self.PROFILE_FIELDS], user["id"]))
+        return self.db.one("SELECT * FROM users WHERE id = ?", (user["id"],))
+
+    # ═══════════════════════ Пополнение баланса ═══════════════════════
+    def create_topup_request(self, user: dict, amount: float, method: str, reference: str, ip: str = "") -> dict:
+        if not self.s.payment_methods:
+            raise ServiceError("Способы оплаты ещё не настроены. Напишите в поддержку.", 501)
+        if method not in self.s.payment_methods:
+            raise ServiceError("Выберите способ оплаты", field="method")
+        if not 1 <= amount <= 10000:
+            raise ServiceError("Сумма от 1 до 10 000", field="amount")
+        reference = reference.strip()[:200]
+        if not reference:
+            raise ServiceError("Укажите номер или время перевода, чтобы мы нашли платёж", field="reference")
+        pending = self.db.one("SELECT COUNT(*) AS n FROM topup_requests WHERE user_id = ? AND status = 'pending'", (user["id"],))["n"]
+        if pending >= 5:
+            raise ServiceError("У вас уже 5 заявок на проверке. Дождитесь их подтверждения.", 429)
+        rid = self.db.run("INSERT INTO topup_requests(user_id, amount_cents, method, reference, created_at) VALUES (?,?,?,?,?)",
+                          (user["id"], cents(amount), method, reference, now()))
+        self.db.audit(user["id"], "billing.topup_request", f"{rid}:{amount}", ip)
+        self.notify.admin(f"💳 Заявка на пополнение №{rid}: {amount:.2f} {self.s.currency} от {user['email']}\n"
+                          f"Способ: {method}\nПеревод: {reference}\nПодтвердите в админке.")
+        return self.db.one("SELECT * FROM topup_requests WHERE id = ?", (rid,))
+
+    def decide_topup(self, admin: dict, request_id: int, approve: bool, note: str = "", ip: str = "") -> dict:
+        with self.db.transaction():
+            req = self.db.one("SELECT * FROM topup_requests WHERE id = ?", (request_id,))
+            if not req:
+                raise ServiceError("Заявка не найдена", 404)
+            if req["status"] != "pending":
+                raise ServiceError("Заявка уже обработана", 409)
+            self.db.run("UPDATE topup_requests SET status = ?, admin_note = ?, decided_at = ?, decided_by = ? WHERE id = ?",
+                        ("approved" if approve else "rejected", note[:200], now(), admin["id"], request_id))
+            if approve:
+                self.db.credit(req["user_id"], req["amount_cents"], "topup", f"Пополнение: {req['method']}")
+        user = self.db.one("SELECT email FROM users WHERE id = ?", (req["user_id"],))
+        amount = req["amount_cents"] / 100
+        self.db.audit(admin["id"], "admin.topup_" + ("approve" if approve else "reject"), f"{request_id}:{amount}", ip)
+        if approve:
+            self.notify.email(user["email"], "Баланс пополнен",
+                              f"Мы зачислили {amount:.2f} {self.s.currency} на ваш баланс ({req['method']}).")
+        else:
+            self.notify.email(user["email"], "Платёж не найден",
+                              f"Мы не нашли перевод на {amount:.2f} {self.s.currency} ({req['method']}, {req['reference']})."
+                              + (f"\nКомментарий: {note}" if note else "") + "\nНапишите в поддержку, мы разберёмся.")
+        return self.db.one("SELECT * FROM topup_requests WHERE id = ?", (request_id,))
+
+    # ═══════════════════════ Цены и тарифы (админка) ═══════════════════════
+    def update_catalog(self, admin: dict, plans: list[dict], tlds: list[dict], ip: str = "") -> dict:
+        current = {p["id"]: p for p in self.catalog.plans}
+        new_plans = []
+        for p in plans:
+            pid = str(p.get("id", ""))
+            if pid not in current:
+                raise ServiceError(f"Неизвестный тариф {pid}")
+            try:
+                price = round(float(p["price_month"]), 2)
+            except (KeyError, TypeError, ValueError):
+                raise ServiceError(f"Цена тарифа {pid} — число", field=pid) from None
+            if not 0.5 <= price <= 10000:
+                raise ServiceError(f"Цена тарифа {pid}: от 0.5 до 10 000", field=pid)
+            st = str(p.get("server_type") or current[pid]["server_type"]).strip()
+            if not re.fullmatch(r"[a-z0-9-]{2,30}", st):
+                raise ServiceError(f"Тип сервера {pid}: латиница и цифры, например cx23", field=pid)
+            new_plans.append({**current[pid], "price_month": price, "server_type": st, "enabled": bool(p.get("enabled", True)),
+                              "featured": bool(p.get("featured", current[pid].get("featured", False)))})
+        if len(new_plans) != len(current):
+            raise ServiceError("Нужно передать все тарифы")
+        new_tlds = []
+        seen = set()
+        for t in tlds:
+            zone = str(t.get("zone", "")).strip().lower().lstrip(".")
+            if not re.fullmatch(r"[a-z]{2,24}(\.[a-z]{2,24})?", zone) or zone in seen:
+                raise ServiceError(f"Некорректная зона «{zone}»", field="tlds")
+            try:
+                price = round(float(t["price_year"]), 2)
+            except (KeyError, TypeError, ValueError):
+                raise ServiceError(f"Цена зоны .{zone} — число", field="tlds") from None
+            if not 0.5 <= price <= 10000:
+                raise ServiceError(f"Цена зоны .{zone}: от 0.5 до 10 000", field="tlds")
+            seen.add(zone)
+            new_tlds.append({"zone": zone, "price_year": price, "enabled": bool(t.get("enabled", True))})
+        data = {**self.catalog.to_dict(), "plans": new_plans, "tlds": new_tlds}
+        self.db.set_setting("catalog", json.dumps(data, ensure_ascii=False))
+        self.catalog = Catalog.from_dict(data)
+        self.db.audit(admin["id"], "admin.catalog", f"{len(new_plans)} plans, {len(new_tlds)} tlds", ip)
+        return data
+
+    # ═══════════════════════ Готовность к продажам ═══════════════════════
+    def readiness(self) -> list[dict]:
+        s = self.s
+        checks = []
+
+        def add(key, title, ok, detail, required=True):
+            checks.append({"key": key, "title": title, "ok": bool(ok), "detail": detail, "required": required})
+
+        add("secret", "Секретный ключ сессий", s.secret_key and len(s.secret_key) >= 32 and _env_has("SECRET_KEY"),
+            "Задан в .env" if _env_has("SECRET_KEY") else "Задайте SECRET_KEY, иначе после перезапуска все выйдут из кабинета")
+        add("https", "Сайт работает по HTTPS", s.public_url.startswith("https://") and s.cookie_secure,
+            f"PUBLIC_URL={s.public_url}, COOKIE_SECURE={'да' if s.cookie_secure else 'нет'}")
+        try:
+            if self.p.vps.name == "hetzner":
+                types = self.p.vps.server_types()
+                names = {t["name"] for t in types}
+                missing = [p["server_type"] for p in self.catalog.plans if p.get("enabled", True) and p["server_type"] not in names]
+                add("vps", "Серверы: Hetzner", not missing,
+                    "Ключ работает" + (f", но нет типов: {', '.join(missing)} — поправьте тарифы" if missing else ""))
+            else:
+                add("vps", "Серверы: Hetzner", False, "Демо-режим. Задайте VPS_PROVIDER=hetzner и HETZNER_TOKEN")
+        except ProviderError as e:
+            add("vps", "Серверы: Hetzner", False, e.message)
+        add("dns", "DNS: Hetzner", self.p.dns.name == "hetzner",
+            "Подключено" if self.p.dns.name == "hetzner" else "Демо-режим. Задайте DNS_PROVIDER=hetzner")
+        try:
+            detail = self.p.registrar.ping()
+            add("registrar", "Домены: регистратор", self.p.registrar.name != "demo", detail)
+        except ProviderError as e:
+            add("registrar", "Домены: регистратор", False, e.message)
+        if self.p.registrar.name == "resellerclub" and s.rc_test:
+            add("registrar_live", "Регистратор в боевом режиме", False,
+                "Сейчас тестовый сервер ResellerClub. Когда всё проверите, поставьте RESELLERCLUB_TEST=false")
+        add("payments", "Приём оплаты", bool(s.payment_methods and s.payment_instructions) and not s.demo_payments,
+            "Демо-пополнение включено: выключите DEMO_PAYMENTS" if s.demo_payments
+            else ("Способы: " + ", ".join(s.payment_methods)) if s.payment_methods else "Задайте PAYMENT_METHODS и PAYMENT_INSTRUCTIONS")
+        add("telegram", "Уведомления вам в Telegram", s.telegram_bot_token and s.telegram_admin_chat_id,
+            "Подключены" if s.telegram_bot_token else "Задайте TELEGRAM_BOT_TOKEN и TELEGRAM_ADMIN_CHAT_ID", required=False)
+        add("email", "Письма клиентам", s.smtp_host and s.smtp_from,
+            f"Через {s.smtp_host}" if s.smtp_host else "Задайте SMTP_HOST, SMTP_FROM и пароль", required=False)
+        add("company", "Реквизиты для документов", s.company_name and s.company_details,
+            s.company_name or "Задайте COMPANY_NAME и COMPANY_DETAILS — они попадут в оферту")
+        add("support", "Контакты поддержки", s.support_telegram or s.support_email or s.support_phone,
+            ", ".join(x for x in (s.support_telegram and "@" + s.support_telegram, s.support_email, s.support_phone) if x)
+            or "Задайте SUPPORT_TELEGRAM или SUPPORT_EMAIL")
+        return checks
+
     # ═══════════════════════ Биллинг ═══════════════════════
     def run_billing(self) -> dict:
         """Продление серверов и доменов. Вызывается раз в несколько минут."""
@@ -462,15 +687,21 @@ class Hosting:
                 self.db.run("UPDATE servers SET suspended = 1 WHERE id = ?", (s["id"],))
                 self.db.audit(s["user_id"], "server.suspend", str(s["id"]))
                 stats["suspended"] += 1
+                owner = self.db.one("SELECT email FROM users WHERE id = ?", (s["user_id"],))
+                self.notify.email(owner["email"], f"Сервер {s['name']} приостановлен",
+                                  f"Оплата сервера {s['name']} закончилась {_date(s['paid_until'])}, на балансе не хватило денег, "
+                                  "поэтому мы его выключили. Данные сохранены. Пополните баланс — сервер включится автоматически.")
+                self.notify.admin(f"⏸ Приостановлен сервер {s['name']} клиента {owner['email']} за неуплату.")
 
         for d in self.db.all("SELECT * FROM domains WHERE kind = 'registered' AND status != 'expired' AND expires_at <= ?",
                              (t + 7 * 86400,)):
             if d["auto_renew"] and self.db.charge(d["user_id"], d["price_cents"], f"Продление домена {d['name']}, 1 год"):
                 try:
-                    exp = self.p.registrar.renew(d["name"], 1, d["expires_at"])
+                    exp = self.p.registrar.renew(d["name"], d["registrar_order_id"], 1, d["expires_at"])
                 except ProviderError as e:
                     self.db.credit(d["user_id"], d["price_cents"], "refund", f"Возврат: продление {d['name']} не прошло")
                     log.warning("renew %s: %s", d["name"], e.message)
+                    self.notify.admin(f"⚠️ Не продлён домен {d['name']}: {e.message}. Деньги возвращены клиенту, проверьте вручную.")
                     continue
                 self.db.run("UPDATE domains SET expires_at = ? WHERE id = ?", (exp, d["id"]))
                 stats["domains_renewed"] += 1
@@ -478,9 +709,56 @@ class Hosting:
                 self.db.run("UPDATE domains SET status = 'expired' WHERE id = ?", (d["id"],))
                 stats["domains_expired"] += 1
 
+        stats["reminders"] = self._reminders(t)
         self.db.run("DELETE FROM agent_metrics WHERE ts < ?", (t - 8 * 86400,))
         self.db.run("DELETE FROM sessions WHERE expires_at < ?", (t,))
         return stats
+
+    def _reminders(self, t: int) -> int:
+        """Письмо за 3 дня до продления сервера и за 14 дней до продления домена, если на балансе не хватает."""
+        sent = 0
+        rows = self.db.all(
+            "SELECT s.id, s.name, s.price_cents, s.paid_until, u.email, u.balance_cents FROM servers s JOIN users u ON u.id = s.user_id"
+            " WHERE s.deleted_at IS NULL AND s.suspended = 0 AND s.paid_until BETWEEN ? AND ? AND s.reminded_at < s.paid_until - ?",
+            (t, t + 3 * 86400, 3 * 86400))
+        for r in rows:
+            if r["balance_cents"] < r["price_cents"]:
+                self.notify.email(r["email"], f"Пополните баланс для сервера {r['name']}",
+                                  f"{_date(r['paid_until'])} нужно продлить сервер {r['name']} за {r['price_cents'] / 100:.2f} "
+                                  f"{self.s.currency}, а на балансе {r['balance_cents'] / 100:.2f}. Без продления сервер выключится "
+                                  f"через {self.s.grace_days} дн. после этой даты.")
+                sent += 1
+            self.db.run("UPDATE servers SET reminded_at = ? WHERE id = ?", (t, r["id"]))
+        rows = self.db.all(
+            "SELECT d.id, d.name, d.price_cents, d.expires_at, d.auto_renew, u.email, u.balance_cents FROM domains d"
+            " JOIN users u ON u.id = d.user_id WHERE d.kind = 'registered' AND d.status = 'active'"
+            " AND d.expires_at BETWEEN ? AND ? AND d.reminded_at < d.expires_at - ?",
+            (t, t + 14 * 86400, 14 * 86400))
+        for r in rows:
+            if not r["auto_renew"] or r["balance_cents"] < r["price_cents"]:
+                why = "автопродление выключено" if not r["auto_renew"] else (
+                    f"на балансе {r['balance_cents'] / 100:.2f}, а продление стоит {r['price_cents'] / 100:.2f} {self.s.currency}")
+                self.notify.email(r["email"], f"Домен {r['name']} скоро истекает",
+                                  f"Регистрация домена {r['name']} заканчивается {_date(r['expires_at'])}, а {why}. "
+                                  "После окончания домен перестанет открываться, а потом его может занять кто-то другой.")
+                sent += 1
+            self.db.run("UPDATE domains SET reminded_at = ? WHERE id = ?", (t, r["id"]))
+        return sent
+
+
+def profile_missing(user: dict) -> list[str]:
+    """Что нужно заполнить, чтобы регистратор принял владельца домена."""
+    names = {"name": "имя", "phone": "телефон", "country": "страна", "city": "город", "address": "адрес", "zipcode": "индекс"}
+    return [label for f, label in names.items() if not (user.get(f) or "").strip()]
+
+
+def _date(ts: int | None) -> str:
+    return time.strftime("%d.%m.%Y", time.localtime(ts)) if ts else "—"
+
+
+def _env_has(name: str) -> bool:
+    import os
+    return bool(os.environ.get(name))
 
 
 def _downsample(points: list[list[float]], step: int) -> list[list[float]]:

@@ -1,13 +1,13 @@
 /* Layout: тёмная «серверная» — глобус дата-центров в шапке, дальше домены, тарифы и окно панели клиента как главный экспонат. */
 :root {
-  --bg: #0A0E1A;
-  --bg-2: #0E1424;
-  --surface: #121A2E;
-  --surface-2: #18213A;
-  --line: #222C47;
+  --bg: #080F24;
+  --bg-2: #0B1530;
+  --surface: #101A3A;
+  --surface-2: #16224A;
+  --line: #20305E;
   --fg: #E8ECF6;
-  --muted: #8C96B2;
-  --accent: #6F8CFF;
+  --muted: #94A0C3;
+  --accent: #4F7DF5;
   --accent-ink: #0A0E1A;
   --amber: #FFB547;
   --series-2: #4FD1C5;
@@ -15,11 +15,11 @@
   --warn: #FFB547;
   --bad: #FF6B6B;
   --globe-dot: #5B6FB8;
-  --glow: rgba(111, 140, 255, .18);
+  --glow: rgba(37, 99, 235, .22);
   --shadow: 0 24px 60px -24px rgba(0, 0, 0, .7);
 
-  --f-display: "Unbounded", "Manrope", system-ui, sans-serif;
-  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --r-sm: 8px;
@@ -32,7 +32,7 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #F3F5FB; --bg-2: #EAEEF8; --surface: #FFFFFF; --surface-2: #F1F4FB; --line: #D8DEEC;
-    --fg: #0D1424; --muted: #57617F; --accent: #3D5BEA; --accent-ink: #FFFFFF; --amber: #D98600;
+    --fg: #0D1424; --muted: #57617F; --accent: #2563EB; --accent-ink: #FFFFFF; --amber: #D98600;
     --series-2: #0E9488; --ok: #11995D; --warn: #C27400; --bad: #D33A3A; --globe-dot: #8E9DD0;
     --glow: rgba(61, 91, 234, .12); --shadow: 0 24px 60px -28px rgba(20, 30, 70, .35);
     color-scheme: light;
@@ -40,7 +40,7 @@
 }
 :root[data-theme="light"] {
   --bg: #F3F5FB; --bg-2: #EAEEF8; --surface: #FFFFFF; --surface-2: #F1F4FB; --line: #D8DEEC;
-  --fg: #0D1424; --muted: #57617F; --accent: #3D5BEA; --accent-ink: #FFFFFF; --amber: #D98600;
+  --fg: #0D1424; --muted: #57617F; --accent: #2563EB; --accent-ink: #FFFFFF; --amber: #D98600;
   --series-2: #0E9488; --ok: #11995D; --warn: #C27400; --bad: #D33A3A; --globe-dot: #8E9DD0;
   --glow: rgba(61, 91, 234, .12); --shadow: 0 24px 60px -28px rgba(20, 30, 70, .35);
   color-scheme: light;
@@ -61,7 +61,7 @@ body::before {
   content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
   z-index: 60; background: var(--bg);
 }
-h1, h2, h3 { font-family: var(--f-display); font-weight: 600; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
 p { margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -518,3 +518,7 @@ a.side-item { text-decoration: none; }
 .side-item .icon { width: 14px; height: 14px; }
 .step.fail .dot { border-color: var(--bad); background: var(--bad); animation: none; }
 .kpi > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* Фирменный градиент кабинета, как на сайте */
+.btn-primary { background: linear-gradient(135deg, #2563EB 0%, #5B4BEB 55%, #7C3AED 100%); border-color: transparent; color: #fff; }
+.logo-mark { background: linear-gradient(135deg, #2563EB, #7C3AED); color: #fff; }

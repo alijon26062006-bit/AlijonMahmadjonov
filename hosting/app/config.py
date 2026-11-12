@@ -53,8 +53,36 @@ class Settings:
         "hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com", "helium.ns.hetzner.de",
     ])
 
-    # Регистратор доменов: пока только "demo" (подключается реселлерский договор).
+    # Регистратор доменов: "demo" или "resellerclub" (ResellerClub и другие панели на LogicBoxes).
     registrar: str = "demo"
+    rc_user_id: str = ""
+    rc_api_key: str = ""
+    rc_customer_id: str = ""
+    rc_test: bool = True
+
+    # Ограничение для новых клиентов, пока админ не подтвердил аккаунт (защита от спамеров).
+    new_user_server_limit: int = 1
+
+    # Оплата вручную: клиент переводит деньги и оставляет заявку, админ подтверждает.
+    payment_methods: list[str] = field(default_factory=list)
+    payment_instructions: str = ""
+
+    # Уведомления
+    telegram_bot_token: str = ""
+    telegram_admin_chat_id: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_tls: bool = True
+
+    # Реквизиты и контакты (документы, подвал сайта, письма)
+    company_name: str = ""
+    company_details: str = ""
+    support_email: str = ""
+    support_telegram: str = ""
+    support_phone: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -77,6 +105,26 @@ class Settings:
             hetzner_token=env("HETZNER_TOKEN") or "",
             hetzner_api_url=(env("HETZNER_API_URL") or "https://api.hetzner.cloud/v1").rstrip("/"),
             registrar=(env("REGISTRAR") or "demo").lower(),
+            rc_user_id=(env("RESELLERCLUB_USER_ID") or "").strip(),
+            rc_api_key=(env("RESELLERCLUB_API_KEY") or "").strip(),
+            rc_customer_id=(env("RESELLERCLUB_CUSTOMER_ID") or "").strip(),
+            rc_test=_bool(env("RESELLERCLUB_TEST"), True),
+            new_user_server_limit=int(env("NEW_USER_SERVER_LIMIT") or 1),
+            payment_methods=[m.strip() for m in (env("PAYMENT_METHODS") or "").split(",") if m.strip()],
+            payment_instructions=(env("PAYMENT_INSTRUCTIONS") or "").replace("\\n", "\n"),
+            telegram_bot_token=env("TELEGRAM_BOT_TOKEN") or "",
+            telegram_admin_chat_id=env("TELEGRAM_ADMIN_CHAT_ID") or "",
+            smtp_host=env("SMTP_HOST") or "",
+            smtp_port=int(env("SMTP_PORT") or 587),
+            smtp_user=env("SMTP_USER") or "",
+            smtp_password=env("SMTP_PASSWORD") or "",
+            smtp_from=env("SMTP_FROM") or "",
+            smtp_tls=_bool(env("SMTP_TLS"), True),
+            company_name=env("COMPANY_NAME") or "",
+            company_details=(env("COMPANY_DETAILS") or "").replace("\\n", "\n"),
+            support_email=env("SUPPORT_EMAIL") or "",
+            support_telegram=(env("SUPPORT_TELEGRAM") or "").lstrip("@"),
+            support_phone=env("SUPPORT_PHONE") or "",
         )
         if env("SECRET_KEY"):
             s.secret_key = env("SECRET_KEY")  # type: ignore[assignment]
@@ -94,4 +142,8 @@ class Settings:
             problems.append(f"Неизвестный VPS_PROVIDER={self.vps_provider}")
         if self.dns_provider not in ("demo", "hetzner"):
             problems.append(f"Неизвестный DNS_PROVIDER={self.dns_provider}")
+        if self.registrar not in ("demo", "resellerclub"):
+            problems.append(f"Неизвестный REGISTRAR={self.registrar}")
+        if self.registrar == "resellerclub" and not (self.rc_user_id and self.rc_api_key and self.rc_customer_id):
+            problems.append("REGISTRAR=resellerclub, но не заданы RESELLERCLUB_USER_ID/API_KEY/CUSTOMER_ID")
         return problems

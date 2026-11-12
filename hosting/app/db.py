@@ -95,6 +95,25 @@ CREATE TABLE IF NOT EXISTS agent_metrics (
 );
 CREATE INDEX IF NOT EXISTS agent_ts ON agent_metrics(server_id, ts);
 
+CREATE TABLE IF NOT EXISTS topup_requests (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    amount_cents INTEGER NOT NULL,
+    method       TEXT NOT NULL,
+    reference    TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+    admin_note   TEXT NOT NULL DEFAULT '',
+    created_at   INTEGER NOT NULL,
+    decided_at   INTEGER,
+    decided_by   INTEGER
+);
+CREATE INDEX IF NOT EXISTS topup_status ON topup_requests(status);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
     id         INTEGER PRIMARY KEY,
     user_id    INTEGER,
@@ -104,6 +123,24 @@ CREATE TABLE IF NOT EXISTS audit (
     created_at INTEGER NOT NULL
 );
 """
+
+
+# Колонки, добавленные после первой версии: старые базы дополняются при запуске.
+MIGRATIONS = [
+    ("users", "verified", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "phone", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "company", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "country", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "city", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "address", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "zipcode", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "registrar_contact_id", "TEXT NOT NULL DEFAULT ''"),
+    ("servers", "reminded_at", "INTEGER NOT NULL DEFAULT 0"),
+    ("domains", "registrar", "TEXT NOT NULL DEFAULT ''"),
+    ("domains", "registrar_order_id", "TEXT NOT NULL DEFAULT ''"),
+    ("domains", "custom_ns", "TEXT NOT NULL DEFAULT ''"),
+    ("domains", "reminded_at", "INTEGER NOT NULL DEFAULT 0"),
+]
 
 
 def now() -> int:
@@ -125,6 +162,10 @@ class Database:
             self._shared = self._connect()
         with self.conn() as c:
             c.executescript(SCHEMA)
+            for table, column, ddl in MIGRATIONS:
+                cols = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+                if column not in cols:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def _connect(self) -> sqlite3.Connection:
         c = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None, timeout=30)
@@ -166,6 +207,15 @@ class Database:
         self.run("INSERT INTO audit(user_id, action, target, ip, created_at) VALUES (?,?,?,?,?)",
                  (user_id, action, target, ip, now()))
 
+    # ── настройки (цены и тарифы, изменённые в админке) ──
+    def get_setting(self, key: str) -> str | None:
+        row = self.one("SELECT value FROM settings WHERE key = ?", (key,))
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        self.run("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                 (key, value))
+
     # ── деньги ──
     def charge(self, user_id: int, cents: int, description: str) -> bool:
         """Списывает сумму, если хватает баланса. Атомарно."""
@@ -189,17 +239,24 @@ class Database:
 
 
 class _Tx:
+    """Транзакция; вложенные вызовы (например, credit внутри decide) входят во внешнюю."""
+
     def __init__(self, db: Database):
         self.db = db
 
     def __enter__(self):
         self.db._lock.acquire()
-        self.db.conn().execute("BEGIN IMMEDIATE")
+        depth = getattr(self.db, "_tx_depth", 0)
+        if depth == 0:
+            self.db.conn().execute("BEGIN IMMEDIATE")
+        self.db._tx_depth = depth + 1
         return self.db
 
     def __exit__(self, exc_type, exc, tb):
         try:
-            self.db.conn().execute("ROLLBACK" if exc_type else "COMMIT")
+            self.db._tx_depth -= 1
+            if self.db._tx_depth == 0:
+                self.db.conn().execute("ROLLBACK" if exc_type else "COMMIT")
         finally:
             self.db._lock.release()
         return False

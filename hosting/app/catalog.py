@@ -17,8 +17,14 @@ class Catalog:
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Catalog":
-        data = json.loads((path or BASE_DIR / "catalog.json").read_text(encoding="utf-8"))
+        return cls.from_dict(json.loads((path or BASE_DIR / "catalog.json").read_text(encoding="utf-8")))
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Catalog":
         return cls(data["plans"], data["locations"], data["images"], data["tlds"])
+
+    def to_dict(self) -> dict:
+        return {"plans": self.plans, "locations": self.locations, "images": self.images, "tlds": self.tlds}
 
     def plan(self, plan_id: str) -> dict | None:
         return next((p for p in self.plans if p["id"] == plan_id), None)
@@ -33,7 +39,9 @@ class Catalog:
         return next((t for t in self.tlds if t["zone"] == zone), None)
 
     def public(self) -> dict:
-        return {"plans": self.plans, "locations": self.locations, "images": self.images, "tlds": self.tlds}
+        """То, что видят покупатели: только включённые тарифы и зоны."""
+        return {"plans": [p for p in self.plans if p.get("enabled", True)], "locations": self.locations,
+                "images": self.images, "tlds": [t for t in self.tlds if t.get("enabled", True)]}
 
 
 def cents(amount: float) -> int:

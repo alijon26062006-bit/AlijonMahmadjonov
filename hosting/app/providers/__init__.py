@@ -5,6 +5,7 @@ from ..config import Settings
 from .base import DnsProvider, ProviderError, Registrar, VpsProvider
 from .demo import DemoDns, DemoRegistrar, DemoVps
 from .hetzner import HetznerClient, HetznerDns, HetznerVps
+from .resellerclub import ResellerClub
 
 __all__ = ["Providers", "ProviderError", "build_providers"]
 
@@ -22,4 +23,8 @@ def build_providers(settings: Settings) -> Providers:
         client = HetznerClient(settings.hetzner_token, settings.hetzner_api_url)
     vps = HetznerVps(client) if settings.vps_provider == "hetzner" else DemoVps()
     dns = HetznerDns(client) if settings.dns_provider == "hetzner" else DemoDns()
-    return Providers(vps=vps, dns=dns, registrar=DemoRegistrar())
+    if settings.registrar == "resellerclub":
+        registrar = ResellerClub(settings.rc_user_id, settings.rc_api_key, settings.rc_customer_id, test=settings.rc_test)
+    else:
+        registrar = DemoRegistrar()
+    return Providers(vps=vps, dns=dns, registrar=registrar)

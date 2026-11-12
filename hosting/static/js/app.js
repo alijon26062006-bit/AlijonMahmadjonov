@@ -128,7 +128,8 @@
       else if (parts[0] === "domains" && parts[1]) await viewDomain(+parts[1]);
       else if (parts[0] === "domains") viewDomains();
       else if (parts[0] === "billing") await viewBilling();
-      else if (parts[0] === "admin" && me.is_admin) await viewAdmin();
+      else if (parts[0] === "profile") viewProfile(q);
+      else if (parts[0] === "admin" && me.is_admin) await viewAdmin(parts[1]);
       else viewServers();
     } catch (e) {
       if (e.status === 401) { me = null; return renderAuth(); }
@@ -197,6 +198,7 @@
       </div></div>
       <div><h4>Аккаунт</h4><div class="side-list">
         <a class="side-item" href="#/billing" aria-current="${parts[0] === "billing"}"><svg class="icon"><use href="#i-wallet"/></svg>Баланс<small>${money(me.balance)}</small></a>
+        <a class="side-item" href="#/profile" aria-current="${parts[0] === "profile"}"><svg class="icon"><use href="#i-user"/></svg>Профиль</a>
         ${me.is_admin ? `<a class="side-item" href="#/admin" aria-current="${parts[0] === "admin"}"><svg class="icon"><use href="#i-shield"/></svg>Админка</a>` : ""}
       </div></div>
       <div class="balance"><span>${esc(me.email)}</span><b class="mono">${money(me.balance)}</b><span>на балансе</span></div>`;
@@ -722,7 +724,11 @@
                 try {
                   const d = (await api("POST", "/api/domains", { domain: r.domain, purchase: true })).domain;
                   AM.toast(`${d.name} зарегистрирован`); location.hash = `#/domains/${d.id}`;
-                } catch (err) { AM.toast(err.error, "bad"); if (err.status === 402) location.hash = "#/billing"; }
+                } catch (err) {
+                  AM.toast(err.error, "bad");
+                  if (err.status === 402) location.hash = "#/billing";
+                  if (err.field === "profile") location.hash = `#/profile?need=domain&next=${encodeURIComponent("#/domains/new?buy=" + r.domain)}`;
+                }
               },
             }],
           }));
@@ -763,8 +769,10 @@
       ${d.status === "expired" ? `<div class="banner bad"><span>Срок регистрации истёк ${AM.date(d.expires_at)}.</span></div>` : ""}
       <div class="dns-head">
         <div class="card"><span>${reg ? "Оплачен до" : "Регистрация"}</span><b>${reg ? AM.date(d.expires_at) : "у вашего регистратора"}</b></div>
-        <div class="card"><span>Неймсерверы ${reg ? "" : "— пропишите у регистратора"}</span><b>${d.nameservers.map(esc).join("<br>")}</b>
-          <button class="btn btn-sm btn-ghost" type="button" id="nsCopy" style="justify-self:start;padding:0;height:auto;border:0"><svg class="icon"><use href="#i-copy"/></svg>Скопировать</button></div>
+        <div class="card"><span>Неймсерверы ${reg ? (d.custom_ns ? "— свои" : "— наши") : "— пропишите у регистратора"}</span><b>${d.nameservers.map(esc).join("<br>")}</b>
+          <div style="display:flex;gap:14px">
+          <button class="btn btn-sm btn-ghost" type="button" id="nsCopy" style="justify-self:start;padding:0;height:auto;border:0"><svg class="icon"><use href="#i-copy"/></svg>Скопировать</button>
+          ${reg ? `<button class="btn btn-sm btn-ghost" type="button" id="nsEdit" style="padding:0;height:auto;border:0">Изменить</button>` : ""}</div></div>
         ${reg ? `<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div style="display:grid;gap:4px"><span>Автопродление</span><b id="renewText">${d.auto_renew ? "Включено" : "Выключено"}</b></div>
           <button class="toggle" type="button" role="switch" id="renew" aria-checked="${d.auto_renew}" aria-label="Автопродление"></button></div>`
           : `<div class="card"><span>Изменения DNS</span><b>Применяются за 1–60 минут</b></div>`}
@@ -785,6 +793,20 @@
       </div></div>`;
 
     $("#nsCopy").addEventListener("click", () => AM.copy(d.nameservers.join("\n"), "Неймсерверы скопированы"));
+    $("#nsEdit")?.addEventListener("click", () => modal({
+      title: `Неймсерверы ${d.name}`,
+      html: `<p>Свои неймсерверы нужны, если DNS домена ведётся в другом месте, например в Cloudflare. Тогда DNS‑записи в нашей панели перестанут действовать.</p>
+        <div class="field"><label for="nsList">По одному в строке, от 2 до 13</label>
+        <textarea id="nsList" rows="4" style="width:100%;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);padding:10px 12px;font-family:var(--f-mono);font-size:14px;color:var(--fg);resize:vertical">${esc(d.nameservers.join("\n"))}</textarea></div>`,
+      actions: [
+        { label: "Вернуть наши", onClick: async () => { try { await api("POST", `/api/domains/${id}/nameservers`, { nameservers: null }); AM.toast("Вернули наши неймсерверы"); render(); } catch (e) { AM.toast(e.error, "bad"); return false; } } },
+        { label: "Сохранить", kind: "btn-primary", onClick: async (m) => {
+          const list = $("#nsList", m).value.split(/[\s,]+/).filter(Boolean);
+          try { await api("POST", `/api/domains/${id}/nameservers`, { nameservers: list }); AM.toast("Неймсерверы обновлены у регистратора"); render(); }
+          catch (e) { AM.toast(e.error, "bad"); return false; }
+        } },
+      ],
+    }));
     const tbody = $("#dnsBody");
     const count = () => { $("#recCount").textContent = `· ${records.length}`; };
     function addRow(r, isNew) {
@@ -858,29 +880,88 @@
     });
   }
 
+  // ═══════════ Профиль ═══════════
+  function viewProfile(q) {
+    const main = $("#main");
+    const p = me.profile;
+    const field = (id, label, value, hint = "", attrs = "") => `<div class="field"><label for="pf-${id}">${label}</label>
+      <div class="input" id="pf-${id}-box"><input id="pf-${id}" value="${esc(value)}" ${attrs}></div>${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
+    main.innerHTML = `<div class="view">
+      <div class="page-head"><div><h2>Профиль</h2><p>${esc(me.email)}${me.verified ? ` · <span class="tag tag-ok">аккаунт подтверждён</span>` : ""}</p></div></div>
+      ${q.get("need") === "domain" ? `<div class="banner"><span>Чтобы зарегистрировать домен, заполните данные владельца. Их требует регистратор.</span></div>` : ""}
+      <form class="card form" id="pfForm" novalidate style="max-width:720px">
+        <div class="card-head" style="margin:0"><h4>Данные владельца доменов</h4></div>
+        <p style="color:var(--muted);font-size:14px;margin:0">Указывайте настоящие данные: по правилам реестров домен с ложными данными могут отключить.</p>
+        <div class="grid-2">
+          ${field("name", "Имя и фамилия (латиницей)", p.name, "Как в паспорте, например Alijon Mahmadjonov", 'autocomplete="name"')}
+          ${field("company", "Компания", p.company, "Необязательно", 'autocomplete="organization"')}
+          ${field("phone", "Телефон", p.phone ? "+" + p.phone : "", "Код страны и номер через пробел: +992 900123456", 'autocomplete="tel" inputmode="tel"')}
+          ${field("country", "Страна (код)", p.country, "Две буквы: TJ, UZ, KZ, RU", 'maxlength="2" autocomplete="country"')}
+          ${field("city", "Город", p.city, "", 'autocomplete="address-level2"')}
+          ${field("zipcode", "Индекс", p.zipcode, "", 'autocomplete="postal-code"')}
+        </div>
+        ${field("address", "Адрес", p.address, "Улица и дом", 'autocomplete="street-address"')}
+        <div class="form-error" id="pfErr"></div>
+        <button class="btn btn-primary" type="submit" style="justify-self:start">Сохранить</button>
+      </form></div>`;
+    $("#pfForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("#pfErr").textContent = "";
+      const body = {};
+      ["name", "company", "phone", "country", "city", "zipcode", "address"].forEach((f) => { body[f] = $(`#pf-${f}`).value; });
+      try {
+        me = await api("POST", "/api/profile", body);
+        AM.toast("Профиль сохранён");
+        if (q.get("next")) location.hash = q.get("next"); else render();
+      } catch (err) {
+        $("#pfErr").textContent = err.error;
+        AM.shake($(`#pf-${err.field}-box`));
+      }
+    });
+  }
+
   // ═══════════ Баланс ═══════════
+  const REQ_STATUS = { pending: ["На проверке", "tag-warn"], approved: ["Зачислено", "tag-ok"], rejected: ["Отклонено", "tag-bad"] };
+
   async function viewBilling() {
     const b = await api("GET", "/api/billing");
     const main = $("#main");
     const days = b.monthly > 0 ? Math.floor(b.balance / b.monthly * 30) : null;
+    const manual = b.payment_methods.length > 0;
     main.innerHTML = `<div class="view">
       <div class="page-head"><div><h2>Баланс</h2><p>Серверы продлеваются автоматически раз в месяц, домены — раз в год.</p></div></div>
-      <div class="grid-2">
+      <div class="grid-2" style="align-items:start">
         <div class="card" style="display:grid;gap:8px">
           <span style="color:var(--muted);font-size:13px;font-weight:600">На балансе</span>
           <b style="font-family:var(--f-display);font-size:34px;font-weight:600" class="mono" id="balBig">${money(b.balance)}</b>
           <span style="color:var(--muted);font-size:14px">${b.monthly > 0 ? `Серверы: ${money(b.monthly)} в месяц · хватит примерно на ${days} дн.` : "Активных серверов нет"}</span>
         </div>
-        <form class="card" style="display:grid;gap:12px" id="topForm" novalidate>
-          <span style="color:var(--muted);font-size:13px;font-weight:600">Пополнить</span>
-          ${b.demo_payments ? `
-            <div style="display:flex;gap:8px;flex-wrap:wrap">${[10, 25, 50, 100].map((v) => `<button class="btn btn-sm" type="button" data-amount="${v}">${money(v)}</button>`).join("")}</div>
-            <div style="display:flex;gap:8px"><div class="input" style="flex:1"><input id="topAmount" inputmode="decimal" value="25" aria-label="Сумма"></div>
-            <button class="btn btn-primary" type="submit">Пополнить</button></div>
-            <span class="hint" style="font-size:12px;color:var(--muted)">Демо‑режим: деньги зачисляются без оплаты. Для продажи подключите платёжную систему.</span>`
-            : `<div class="banner"><span>Онлайн‑оплата подключается. Чтобы пополнить баланс, напишите в поддержку.</span></div>`}
-        </form>
+        ${manual ? `<form class="card form" id="reqForm" novalidate>
+          <span style="color:var(--muted);font-size:13px;font-weight:600">Пополнить переводом</span>
+          ${b.payment_instructions ? `<div class="note" style="white-space:pre-wrap;display:block">${esc(b.payment_instructions)}</div>` : ""}
+          <div class="grid-2">
+            <div class="field"><label for="rqAmount">Сумма, ${esc(AM.config.currency)}</label><div class="input" id="rqAmountBox"><input id="rqAmount" inputmode="decimal" value="25"></div></div>
+            <div class="field"><label for="rqMethod">Способ</label><div class="input"><select id="rqMethod">${b.payment_methods.map((m) => `<option>${esc(m)}</option>`).join("")}</select></div></div>
+          </div>
+          <div class="field"><label for="rqRef">Номер или время перевода</label><div class="input" id="rqRefBox"><input id="rqRef" placeholder="Например: 12.11 в 14:05, с карты *1234"></div>
+            <span class="hint">После перевода отправьте заявку — мы проверим платёж и зачислим деньги.</span></div>
+          <div class="form-error" id="rqErr"></div>
+          <button class="btn btn-primary" type="submit" style="justify-self:start">Я перевёл, отправить заявку</button>
+        </form>` : ""}
+        ${b.demo_payments ? `<form class="card" style="display:grid;gap:12px" id="topForm" novalidate>
+          <span style="color:var(--muted);font-size:13px;font-weight:600">Демо‑пополнение</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${[10, 25, 50, 100].map((v) => `<button class="btn btn-sm" type="button" data-amount="${v}">${money(v)}</button>`).join("")}</div>
+          <div style="display:flex;gap:8px"><div class="input" style="flex:1"><input id="topAmount" inputmode="decimal" value="25" aria-label="Сумма"></div>
+          <button class="btn" type="submit">Зачислить</button></div>
+          <span class="hint" style="font-size:12px;color:var(--muted)">Только для проверки: деньги зачисляются без оплаты. Перед запуском продаж выключите DEMO_PAYMENTS.</span>
+        </form>` : ""}
+        ${!manual && !b.demo_payments ? `<div class="card"><div class="banner"><span>Чтобы пополнить баланс, напишите в поддержку.</span></div></div>` : ""}
       </div>
+      ${b.requests.length ? `<div class="card table-scroll"><div class="card-head"><h4>Заявки на пополнение</h4></div>
+        <table class="table"><thead><tr><th>Дата</th><th>Способ</th><th>Перевод</th><th>Статус</th><th style="text-align:right">Сумма</th></tr></thead><tbody>
+        ${b.requests.map((r) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(r.created_at)}</td><td>${esc(r.method)}</td><td>${esc(r.reference)}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td>
+          <td><span class="tag ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></td><td class="num">${money(r.amount)}</td></tr>`).join("")}
+        </tbody></table></div>` : ""}
       <div class="card table-scroll"><div class="card-head"><h4>История операций</h4></div>
         ${b.transactions.length ? `<table class="table"><thead><tr><th>Дата</th><th>Операция</th><th style="text-align:right">Сумма</th></tr></thead><tbody>
           ${b.transactions.map((t) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(t.created_at)}</td><td>${esc(t.description)}</td>
@@ -888,7 +969,7 @@
           </tbody></table>` : `<p style="color:var(--muted);font-size:14px">Операций пока нет.</p>`}
       </div></div>`;
     $$("[data-amount]", main).forEach((x) => x.addEventListener("click", () => { $("#topAmount").value = x.dataset.amount; }));
-    $("#topForm").addEventListener("submit", async (e) => {
+    $("#topForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const amount = parseFloat(($("#topAmount") || {}).value?.replace(",", "."));
       if (!(amount > 0)) return AM.shake($("#topAmount").parentElement);
@@ -898,37 +979,150 @@
         render();
       } catch (err) { AM.toast(err.error, "bad"); }
     });
+    $("#reqForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("#rqErr").textContent = "";
+      const amount = parseFloat($("#rqAmount").value.replace(",", "."));
+      if (!(amount > 0)) return AM.shake($("#rqAmountBox"));
+      try {
+        await api("POST", "/api/billing/requests", { amount, method: $("#rqMethod").value, reference: $("#rqRef").value });
+        AM.toast("Заявка отправлена. Зачислим после проверки платежа.");
+        render();
+      } catch (err) {
+        $("#rqErr").textContent = err.error;
+        AM.shake($(err.field === "reference" ? "#rqRefBox" : "#rqAmountBox"));
+      }
+    });
   }
 
   // ═══════════ Админка ═══════════
-  async function viewAdmin() {
-    const [o, prov] = await Promise.all([api("GET", "/api/admin/overview"), api("GET", "/api/admin/provider").catch((e) => ({ error: e.error }))]);
+  const ADMIN_TABS = [["overview", "Готовность"], ["topups", "Пополнения"], ["prices", "Цены"], ["clients", "Клиенты"], ["log", "Журнал"]];
+
+  async function viewAdmin(tab = "overview") {
+    if (!ADMIN_TABS.some(([k]) => k === tab)) tab = "overview";
+    const o = await api("GET", "/api/admin/overview");
     const main = $("#main");
     const t = o.totals;
     main.innerHTML = `<div class="view">
-      <div class="page-head"><div><h2>Админка</h2><p>Клиенты, выручка и провайдер.</p></div></div>
+      <div class="page-head"><div><h2>Админка</h2><p>Всё, что нужно, чтобы продавать.</p></div></div>
       <div class="kpis">
         <div class="kpi"><span>Клиенты</span><b>${t.users}</b></div><div class="kpi"><span>Серверы</span><b>${t.servers}</b></div>
         <div class="kpi"><span>Домены</span><b>${t.domains}</b></div><div class="kpi"><span>Выручка в месяц</span><b>${money(t.mrr)}</b></div>
       </div>
-      <div class="card table-scroll"><div class="card-head"><h4>Провайдер: ${esc(prov.provider || "ошибка")}</h4></div>
+      <div class="tabs" role="tablist">${ADMIN_TABS.map(([k, label]) => `<a role="tab" href="#/admin/${k}" aria-selected="${k === tab}" style="padding:10px 14px;font-weight:600;font-size:14px;text-decoration:none;color:${k === tab ? "var(--fg)" : "var(--muted)"};border-bottom:2px solid ${k === tab ? "var(--accent)" : "transparent"};margin-bottom:-1px">${label}${k === "topups" && t.pending_topups ? ` <span class="tag tag-warn">${t.pending_topups}</span>` : ""}</a>`).join("")}</div>
+      <div id="adminBody"><div class="loading-line"></div></div></div>`;
+    const body = $("#adminBody");
+    if (tab === "overview") await adminOverview(body);
+    else if (tab === "topups") await adminTopups(body);
+    else if (tab === "prices") await adminPrices(body);
+    else if (tab === "clients") adminClients(body, o.users);
+    else adminLog(body, o.audit);
+  }
+
+  async function adminOverview(body) {
+    const [r, prov] = await Promise.all([api("GET", "/api/admin/readiness"), api("GET", "/api/admin/provider").catch((e) => ({ error: e.error }))]);
+    const done = r.checks.filter((c) => c.ok).length;
+    body.innerHTML = `<div class="view" style="gap:14px">
+      <div class="card">
+        <div class="card-head"><h4>Готовность к продажам · ${done} из ${r.checks.length}</h4>
+          ${r.ready ? `<span class="tag tag-ok">Можно продавать</span>` : `<span class="tag tag-warn">Есть что настроить</span>`}</div>
+        <ul class="rules" style="gap:12px">
+          ${r.checks.map((c) => `<li class="${c.ok ? "ok" : ""}" style="align-items:flex-start"><span class="ck" style="margin-top:2px;${!c.ok && c.required ? "border-color:var(--warn)" : ""}"><svg><use href="#i-check"/></svg></span>
+            <span style="display:grid;gap:2px"><b style="color:var(--fg);font-size:14px">${esc(c.title)}${c.required ? "" : ` <span style="color:var(--muted);font-weight:500">· по желанию</span>`}</b>
+            <span style="color:var(--muted);font-size:13px">${esc(c.detail)}</span></span></li>`).join("")}
+        </ul>
+        <p style="color:var(--muted);font-size:13px;margin:14px 0 0">Настройки меняются в файле .env на сервере, после изменения перезапустите панель. Подробно — в README.</p>
+      </div>
+      <div class="card table-scroll"><div class="card-head"><h4>Тарифы у Hetzner</h4></div>
         ${prov.error ? `<div class="banner bad"><span>${esc(prov.error)}</span></div>` : prov.note ? `<p style="color:var(--muted);font-size:14px">${esc(prov.note)}</p>` : `
-        <table class="table"><thead><tr><th>Тариф</th><th>Тип Hetzner</th><th>Есть у Hetzner</th><th style="text-align:right">Наша цена</th><th style="text-align:right">Цена Hetzner (fsn1)</th></tr></thead><tbody>
-          ${prov.plans.map((p) => `<tr><td>${esc(p.plan)}</td><td class="mono">${esc(p.server_type)}</td><td>${p.exists ? `<span class="tag tag-ok">да</span>` : `<span class="tag tag-warn">нет — поправьте catalog.json</span>`}</td>
+        <table class="table"><thead><tr><th>Тариф</th><th>Тип Hetzner</th><th>Есть у Hetzner</th><th style="text-align:right">Наша цена</th><th style="text-align:right">Себестоимость (fsn1)</th></tr></thead><tbody>
+          ${prov.plans.map((p) => `<tr><td>${esc(p.plan)}</td><td class="mono">${esc(p.server_type)}</td><td>${p.exists ? `<span class="tag tag-ok">да</span>` : `<span class="tag tag-warn">нет — смените тип во вкладке «Цены»</span>`}</td>
             <td class="num">${money(p.our_price)}</td><td class="num">${p.hetzner_price.fsn1 != null ? "€" + p.hetzner_price.fsn1.toFixed(2) : "—"}</td></tr>`).join("")}
         </tbody></table>`}
-      </div>
-      <div class="card table-scroll"><div class="card-head"><h4>Клиенты</h4></div>
-        <table class="table"><thead><tr><th>Email</th><th>Серверы</th><th>Домены</th><th style="text-align:right">Баланс</th><th></th></tr></thead><tbody>
-          ${o.users.map((u) => `<tr><td>${esc(u.email)} ${u.is_admin ? `<span class="tag tag-warn">админ</span>` : ""}</td><td class="mono">${u.servers}</td><td class="mono">${u.domains}</td>
-            <td class="num">${money(u.balance)}</td><td style="text-align:right"><button class="btn btn-sm" type="button" data-credit="${u.id}" data-email="${esc(u.email)}">Пополнить</button></td></tr>`).join("")}
-        </tbody></table></div>
-      <div class="card table-scroll"><div class="card-head"><h4>Журнал действий</h4></div>
-        <table class="table"><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>IP</th></tr></thead><tbody>
-          ${o.audit.map((a) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(a.created_at)}</td><td>${esc(a.email || "система")}</td><td class="mono">${esc(a.action)}</td><td class="mono">${esc(a.target)}</td><td class="mono">${esc(a.ip)}</td></tr>`).join("")}
-        </tbody></table></div>
+      </div></div>`;
+  }
+
+  async function adminTopups(body) {
+    const { requests } = await api("GET", "/api/admin/topups?status=all");
+    const pending = requests.filter((r) => r.status === "pending"), done = requests.filter((r) => r.status !== "pending");
+    const row = (r, actions) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(r.created_at)}</td><td>${esc(r.email)}</td><td>${esc(r.method)}</td>
+      <td>${esc(r.reference)}${r.admin_note ? `<br><span style="color:var(--muted);font-size:13px">${esc(r.admin_note)}</span>` : ""}</td><td class="num">${money(r.amount)}</td>
+      <td style="text-align:right;white-space:nowrap">${actions ? `<button class="btn btn-sm btn-primary" type="button" data-approve="${r.id}">Зачислить</button>
+        <button class="btn btn-sm" type="button" data-reject="${r.id}">Отклонить</button>` : `<span class="tag ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span>`}</td></tr>`;
+    const head = `<thead><tr><th>Дата</th><th>Клиент</th><th>Способ</th><th>Перевод</th><th style="text-align:right">Сумма</th><th></th></tr></thead>`;
+    body.innerHTML = `<div class="view" style="gap:14px">
+      <div class="card table-scroll"><div class="card-head"><h4>Ждут проверки</h4></div>
+        ${pending.length ? `<table class="table">${head}<tbody>${pending.map((r) => row(r, true)).join("")}</tbody></table>`
+          : `<p style="color:var(--muted);font-size:14px">Новых заявок нет. Когда клиент отправит заявку, придёт уведомление в Telegram.</p>`}</div>
+      ${done.length ? `<div class="card table-scroll"><div class="card-head"><h4>Обработанные</h4></div><table class="table">${head}<tbody>${done.map((r) => row(r, false)).join("")}</tbody></table></div>` : ""}
     </div>`;
-    $$("[data-credit]", main).forEach((b) => b.addEventListener("click", () => modal({
+    const decide = (id, approve) => modal({
+      title: approve ? "Зачислить платёж?" : "Отклонить заявку?",
+      html: `<p>${approve ? "Сначала убедитесь, что деньги действительно пришли." : "Клиент получит письмо, что платёж не найден."}</p>
+        <div class="field"><label for="dnNote">Комментарий для клиента</label><div class="input"><input id="dnNote" placeholder="${approve ? "Необязательно" : "Например: перевод не найден"}"></div></div>`,
+      actions: [{ label: "Отмена" }, {
+        label: approve ? "Зачислить" : "Отклонить", kind: approve ? "btn-primary" : "btn-danger", onClick: async (m) => {
+          try { await api("POST", `/api/admin/topups/${id}`, { approve, note: $("#dnNote", m).value }); AM.toast(approve ? "Зачислено" : "Отклонено"); render(); }
+          catch (e) { AM.toast(e.error, "bad"); return false; }
+        },
+      }],
+    });
+    $$("[data-approve]", body).forEach((b) => b.addEventListener("click", () => decide(+b.dataset.approve, true)));
+    $$("[data-reject]", body).forEach((b) => b.addEventListener("click", () => decide(+b.dataset.reject, false)));
+  }
+
+  async function adminPrices(body) {
+    const cat = await api("GET", "/api/admin/catalog");
+    body.innerHTML = `<form class="view" id="priceForm" novalidate style="gap:14px">
+      <div class="card table-scroll"><div class="card-head"><h4>Тарифы серверов</h4></div>
+        <table class="table"><thead><tr><th>Продаётся</th><th>Тариф</th><th>Ресурсы</th><th>Тип Hetzner</th><th>Цена в месяц</th></tr></thead><tbody>
+        ${cat.plans.map((p) => `<tr data-plan="${esc(p.id)}"><td><input type="checkbox" class="pl-on" ${p.enabled !== false ? "checked" : ""} aria-label="Продаётся"></td>
+          <td><b>${esc(p.name)}</b></td><td style="color:var(--muted);font-size:13px">${p.cpu} vCPU · ${p.ram_gb} ГБ · ${p.disk_gb} ГБ</td>
+          <td><div class="input" style="height:36px;width:110px"><input class="pl-type" value="${esc(p.server_type)}" aria-label="Тип Hetzner"></div></td>
+          <td><div class="input" style="height:36px;width:110px"><input class="pl-price" inputmode="decimal" value="${p.price_month}" aria-label="Цена"></div></td></tr>`).join("")}
+        </tbody></table></div>
+      <div class="card table-scroll"><div class="card-head"><h4>Доменные зоны</h4><button class="btn btn-sm" type="button" id="addZone">Добавить зону</button></div>
+        <table class="table"><thead><tr><th>Продаётся</th><th>Зона</th><th>Цена за год</th><th></th></tr></thead><tbody id="zoneRows">
+        ${cat.tlds.map((t) => zoneRow(t)).join("")}
+        </tbody></table>
+        <p style="color:var(--muted);font-size:13px;margin:10px 0 0">Добавляйте только зоны, которые поддерживает ваш регистратор, и ставьте цену выше его закупочной.</p></div>
+      <div class="form-error" id="prErr"></div>
+      <button class="btn btn-primary" type="submit" style="justify-self:start">Сохранить цены</button>
+    </form>`;
+    function zoneRow(t) {
+      return `<tr><td><input type="checkbox" class="z-on" ${t.enabled !== false ? "checked" : ""} aria-label="Продаётся"></td>
+        <td><div class="input" style="height:36px;width:120px"><span style="color:var(--muted)">.</span><input class="z-zone" value="${esc(t.zone)}" aria-label="Зона"></div></td>
+        <td><div class="input" style="height:36px;width:110px"><input class="z-price" inputmode="decimal" value="${t.price_year}" aria-label="Цена"></div></td>
+        <td style="text-align:right"><button class="icon-btn z-del" type="button" aria-label="Удалить зону"><svg class="icon"><use href="#i-trash"/></svg></button></td></tr>`;
+    }
+    const wire = () => $$(".z-del", body).forEach((b) => { b.onclick = () => b.closest("tr").remove(); });
+    wire();
+    $("#addZone").addEventListener("click", () => { $("#zoneRows").insertAdjacentHTML("beforeend", zoneRow({ zone: "", price_year: 10, enabled: true })); wire(); $("#zoneRows tr:last-child .z-zone").focus(); });
+    $("#priceForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("#prErr").textContent = "";
+      const num = (v) => parseFloat(String(v).replace(",", "."));
+      const plans = $$("tr[data-plan]", body).map((tr) => ({ id: tr.dataset.plan, enabled: $(".pl-on", tr).checked, server_type: $(".pl-type", tr).value.trim(), price_month: num($(".pl-price", tr).value) }));
+      const tlds = $$("#zoneRows tr", body).map((tr) => ({ zone: $(".z-zone", tr).value.trim(), enabled: $(".z-on", tr).checked, price_year: num($(".z-price", tr).value) })).filter((z) => z.zone);
+      try { await api("POST", "/api/admin/catalog", { plans, tlds }); AM.catalog = await api("GET", "/api/catalog"); AM.toast("Цены сохранены и уже на сайте"); }
+      catch (err) { $("#prErr").textContent = err.error; }
+    });
+  }
+
+  function adminClients(body, users) {
+    body.innerHTML = `<div class="card table-scroll"><table class="table"><thead><tr><th>Email</th><th>Серверы</th><th>Домены</th><th>Подтверждён</th><th style="text-align:right">Баланс</th><th></th></tr></thead><tbody>
+      ${users.map((u) => `<tr><td>${esc(u.email)} ${u.is_admin ? `<span class="tag tag-warn">админ</span>` : ""}<br><span style="color:var(--muted);font-size:12px">с ${AM.date(u.created_at)}</span></td>
+        <td class="mono">${u.servers}</td><td class="mono">${u.domains}</td>
+        <td><button class="toggle" type="button" role="switch" data-verify="${u.id}" aria-checked="${!!u.verified}" aria-label="Подтверждён"></button></td>
+        <td class="num">${money(u.balance)}</td><td style="text-align:right"><button class="btn btn-sm" type="button" data-credit="${u.id}" data-email="${esc(u.email)}">Пополнить</button></td></tr>`).join("")}
+      </tbody></table>
+      <p style="color:var(--muted);font-size:13px;margin:10px 0 0">Неподтверждённые клиенты могут держать серверов: ${AM.config.new_user_server_limit}. Подтверждайте тех, кого проверили, — это защищает от спамеров, из‑за которых Hetzner может заблокировать весь ваш аккаунт.</p></div>`;
+    $$("[data-verify]", body).forEach((b) => b.addEventListener("click", async () => {
+      const v = b.getAttribute("aria-checked") !== "true";
+      try { await api("POST", `/api/admin/users/${b.dataset.verify}/verify`, { value: v }); b.setAttribute("aria-checked", String(v)); }
+      catch (e) { AM.toast(e.error, "bad"); }
+    }));
+    $$("[data-credit]", body).forEach((b) => b.addEventListener("click", () => modal({
       title: `Пополнить баланс ${b.dataset.email}`,
       html: `<div class="field"><label for="crAmount">Сумма</label><div class="input"><input id="crAmount" inputmode="decimal" value="10"></div></div>
         <div class="field"><label for="crNote">Комментарий</label><div class="input"><input id="crNote" placeholder="Оплата наличными"></div></div>`,
@@ -941,6 +1135,12 @@
         },
       }],
     })));
+  }
+
+  function adminLog(body, audit) {
+    body.innerHTML = `<div class="card table-scroll"><table class="table"><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>IP</th></tr></thead><tbody>
+      ${audit.map((a) => `<tr><td class="mono" style="white-space:nowrap">${AM.dateTime(a.created_at)}</td><td>${esc(a.email || "система")}</td><td class="mono">${esc(a.action)}</td><td class="mono">${esc(a.target)}</td><td class="mono">${esc(a.ip)}</td></tr>`).join("")}
+    </tbody></table></div>`;
   }
 
   render();

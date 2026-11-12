@@ -7,12 +7,14 @@ from app.db import Database
 from app.main import create_app
 from app.providers import Providers
 from app.providers.demo import DemoDns, DemoRegistrar, DemoVps
+from app.notify import Notifier
 from app.services import Hosting
 
 
 @pytest.fixture
 def settings():
-    return Settings(admin_email="boss@example.com", demo_payments=True)
+    return Settings(admin_email="boss@example.com", demo_payments=True,
+                    payment_methods=["Алиф", "Душанбе Сити"], payment_instructions="Карта 0000 0000 0000 0000")
 
 
 @pytest.fixture
@@ -29,7 +31,8 @@ def providers():
 
 @pytest.fixture
 def hosting(settings, db, providers):
-    return Hosting(settings, db, Catalog.load(), providers, run_async=lambda fn, *a: fn(*a), demo_password_delay=0)
+    return Hosting(settings, db, Catalog.load(), providers, run_async=lambda fn, *a: fn(*a), demo_password_delay=0,
+                   notifier=Notifier(settings, background=False))
 
 
 @pytest.fixture
