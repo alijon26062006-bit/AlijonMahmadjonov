@@ -1,0 +1,28 @@
+{
+  "plans": [
+    {"id": "start", "name": "Start", "server_type": "cx23", "cpu": 2, "ram_gb": 4,  "disk_gb": 40,  "traffic_tb": 20, "price_month": 7.90},
+    {"id": "base",  "name": "Base",  "server_type": "cx33", "cpu": 4, "ram_gb": 8,  "disk_gb": 80,  "traffic_tb": 20, "price_month": 13.90, "featured": true},
+    {"id": "pro",   "name": "Pro",   "server_type": "cx43", "cpu": 8, "ram_gb": 16, "disk_gb": 160, "traffic_tb": 20, "price_month": 26.90},
+    {"id": "ultra", "name": "Ultra", "server_type": "cx53", "cpu": 16, "ram_gb": 32, "disk_gb": 320, "traffic_tb": 20, "price_month": 49.90}
+  ],
+  "locations": [
+    {"id": "fsn1", "name": "Фалькенштейн", "country": "Германия", "lat": 50.48, "lon": 12.37},
+    {"id": "nbg1", "name": "Нюрнберг", "country": "Германия", "lat": 49.45, "lon": 11.08},
+    {"id": "hel1", "name": "Хельсинки", "country": "Финляндия", "lat": 60.17, "lon": 24.94}
+  ],
+  "images": [
+    {"id": "ubuntu-24.04", "name": "Ubuntu 24.04"},
+    {"id": "ubuntu-22.04", "name": "Ubuntu 22.04"},
+    {"id": "debian-12", "name": "Debian 12"},
+    {"id": "rocky-9", "name": "Rocky Linux 9"},
+    {"id": "alma-9", "name": "AlmaLinux 9"}
+  ],
+  "tlds": [
+    {"zone": "com", "price_year": 12.99},
+    {"zone": "net", "price_year": 14.50},
+    {"zone": "org", "price_year": 13.50},
+    {"zone": "io", "price_year": 39.00},
+    {"zone": "dev", "price_year": 16.00},
+    {"zone": "app", "price_year": 18.00}
+  ]
+}

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AM Cloud — VPS и домены</title>
+<meta name="description" content="Облачные NVMe-серверы с root-доступом, регистрация доменов и управление DNS в одном кабинете.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.5L21 8H6.2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-reboot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></symbol>
+</svg>
+<header class="topbar">
+  <div class="wrap">
+    <a class="logo" href="/"><span class="logo-mark"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg></span><span data-brand>AM Cloud</span></a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#vps">VPS</a>
+      <a href="#domains">Домены</a>
+      <a href="#features">Возможности</a>
+    </nav>
+    <div class="top-actions">
+      <button class="btn btn-ghost btn-sm" type="button" id="themeBtn" aria-label="Сменить тему">Тема</button>
+      <a class="btn btn-primary btn-sm" href="/app" id="cabinetBtn">Личный кабинет</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow">VPS · Домены · DNS</span>
+        <h1>
+          <span class="line"><span>Серверы, которыми</span></span>
+          <span class="line"><span>управляешь <em>сам</em>,</span></span>
+          <span class="line"><span>а не через тикеты</span></span>
+        </h1>
+        <p class="hero-sub">NVMe‑серверы в Германии и Финляндии с root‑доступом. Смена root‑пароля, графики нагрузки и DNS‑записи прямо в личном кабинете.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#vps">Выбрать сервер</a>
+          <a class="btn" href="#domains">Найти домен</a>
+        </div>
+        <div class="hero-stats">
+          <div><b class="mono">~1 мин</b><span>до готового сервера</span></div>
+          <div><b class="mono">IPv4 + IPv6</b><span>в каждом тарифе</span></div>
+          <div><b class="mono" id="dcCount">3</b><span>дата‑центра</span></div>
+        </div>
+      </div>
+      <div class="globe-box" id="globeBox">
+        <div class="globe-fallback" id="globeFallback"></div>
+        <div class="globe-labels" id="globeLabels"></div>
+        <span class="globe-hint">потяни, чтобы повернуть</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="domains" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Регистрация доменов</span>
+        <h2>Проверь имя за секунду</h2>
+        <p>Уже есть домен? Добавьте его в кабинет бесплатно и управляйте DNS‑записями у нас.</p>
+      </div>
+      <div class="domain-box">
+        <form class="search-row" id="domainForm">
+          <label class="search-field" for="domainInput">
+            <svg class="icon" style="color:var(--muted)"><use href="#i-search"/></svg>
+            <input id="domainInput" placeholder="mysite" autocomplete="off" spellcheck="false" aria-label="Имя домена">
+          </label>
+          <button class="btn btn-primary" type="submit">Проверить</button>
+        </form>
+        <div class="tld-chips" id="tldChips"></div>
+        <div class="results" id="results" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="vps" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">VPS на NVMe</span>
+        <h2>Тарифы без сюрпризов в счёте</h2>
+        <p>Оплата помесячно с баланса. Сервер готов примерно через минуту после заказа.</p>
+      </div>
+      <div class="plans" id="plans"></div>
+    </div>
+  </section>
+
+  <section class="section" id="features" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">В личном кабинете</span>
+        <h2>Всё управление — в одном окне</h2>
+      </div>
+      <div class="features">
+        <div class="principle">
+          <h3>Root‑пароль без поддержки</h3>
+          <p>Задайте свой пароль или сгенерируйте новый. Пароль уходит на сервер по SSH и не хранится в нашей базе.</p>
+        </div>
+        <div class="principle">
+          <h3>Графики нагрузки</h3>
+          <p>Процессор, память, сеть и диск за час, сутки и неделю. Плюс топ процессов, которые грузят сервер.</p>
+        </div>
+        <div class="principle">
+          <h3>DNS‑записи</h3>
+          <p>A, AAAA, CNAME, MX, TXT, SRV и CAA с проверкой формата. Изменения публикуются на неймсерверы сразу.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><span data-brand>AM Cloud</span> · VPS и домены</span>
+    <a href="/app" style="color:var(--muted)">Личный кабинет</a>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/globe.js"></script>
+<script src="/static/js/landing.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _load_dotenv(path: Path) -> None:
+def load_dotenv(path: Path) -> None:
     """Минимальный загрузчик .env, чтобы не тянуть лишнюю зависимость."""
     if not path.exists():
         return
@@ -22,82 +22,76 @@ def _load_dotenv(path: Path) -> None:
         os.environ.setdefault(key.strip(), value)
 
 
-def _bool(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
-    if raw is None or raw == "":
+def _bool(raw: str | None, default: bool) -> bool:
+    if raw is None or raw.strip() == "":
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _templates(raw: str) -> dict[str, int]:
-    out: dict[str, int] = {}
-    for part in raw.split(","):
-        if "=" in part:
-            name, vmid = part.split("=", 1)
-            if vmid.strip().isdigit():
-                out[name.strip()] = int(vmid.strip())
-    return out
 
 
 @dataclass
 class Settings:
     brand_name: str = "AM Cloud"
-    secret_key: str = ""
-    database_path: str = "data/hosting.db"
-    currency: str = "$"
+    secret_key: str = field(default_factory=lambda: secrets.token_urlsafe(48))
+    database_path: str = str(BASE_DIR / "data" / "hosting.db")
+    currency: str = "USD"
     admin_email: str = ""
     cookie_secure: bool = False
+    # Публичный адрес панели: агент на серверах клиентов шлёт сюда память и процессы.
+    public_url: str = "http://127.0.0.1:8000"
+    # Пополнение баланса кнопкой без оплаты — только для показа и разработки.
+    demo_payments: bool = True
+    # Через сколько дней после окончания оплаты сервер выключается.
+    grace_days: int = 3
+    billing_interval_sec: int = 600
 
+    # Серверы и DNS: "demo" — симуляция, "hetzner" — Hetzner Cloud API.
     vps_provider: str = "demo"
-    proxmox_url: str = ""
-    proxmox_node: str = "pve"
-    proxmox_token: str = ""
-    proxmox_templates: dict[str, int] = field(default_factory=dict)
-    proxmox_verify_tls: bool = True
-    proxmox_ip_pool: str = ""
-    proxmox_gateway: str = ""
-    proxmox_bridge: str = "vmbr0"
-
     dns_provider: str = "demo"
-    powerdns_url: str = ""
-    powerdns_api_key: str = ""
-    powerdns_server_id: str = "localhost"
-    nameservers: list[str] = field(default_factory=list)
+    hetzner_token: str = ""
+    hetzner_api_url: str = "https://api.hetzner.cloud/v1"
+    nameservers: list[str] = field(default_factory=lambda: [
+        "hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com", "helium.ns.hetzner.de",
+    ])
+
+    # Регистратор доменов: пока только "demo" (подключается реселлерский договор).
+    registrar: str = "demo"
 
     @classmethod
     def from_env(cls) -> "Settings":
-        _load_dotenv(BASE_DIR / ".env")
+        load_dotenv(BASE_DIR / ".env")
         env = os.environ.get
-        secret = env("SECRET_KEY", "")
-        if not secret:
-            # Без ключа сессии сбросятся при перезапуске — для разработки это нормально.
-            secret = secrets.token_urlsafe(48)
-        db_path = env("DATABASE_PATH", "data/hosting.db")
+        db_path = env("DATABASE_PATH") or "data/hosting.db"
         if not os.path.isabs(db_path):
             db_path = str(BASE_DIR / db_path)
-        return cls(
-            brand_name=env("BRAND_NAME", "AM Cloud") or "AM Cloud",
-            secret_key=secret,
+        s = cls(
+            brand_name=env("BRAND_NAME") or "AM Cloud",
             database_path=db_path,
-            currency=env("CURRENCY", "$") or "$",
-            admin_email=(env("ADMIN_EMAIL", "") or "").strip().lower(),
-            cookie_secure=_bool("COOKIE_SECURE", False),
-            vps_provider=(env("VPS_PROVIDER", "demo") or "demo").lower(),
-            proxmox_url=(env("PROXMOX_URL", "") or "").rstrip("/"),
-            proxmox_node=env("PROXMOX_NODE", "pve") or "pve",
-            proxmox_token=env("PROXMOX_TOKEN", "") or "",
-            proxmox_templates=_templates(env("PROXMOX_TEMPLATES", "") or ""),
-            proxmox_verify_tls=_bool("PROXMOX_VERIFY_TLS", True),
-            proxmox_ip_pool=env("PROXMOX_IP_POOL", "") or "",
-            proxmox_gateway=env("PROXMOX_GATEWAY", "") or "",
-            proxmox_bridge=env("PROXMOX_BRIDGE", "vmbr0") or "vmbr0",
-            dns_provider=(env("DNS_PROVIDER", "demo") or "demo").lower(),
-            powerdns_url=(env("POWERDNS_URL", "") or "").rstrip("/"),
-            powerdns_api_key=env("POWERDNS_API_KEY", "") or "",
-            powerdns_server_id=env("POWERDNS_SERVER_ID", "localhost") or "localhost",
-            nameservers=[
-                ns.strip().rstrip(".").lower()
-                for ns in (env("NAMESERVERS", "ns1.amcloud.example,ns2.amcloud.example") or "").split(",")
-                if ns.strip()
-            ],
+            currency=env("CURRENCY") or "USD",
+            admin_email=(env("ADMIN_EMAIL") or "").strip().lower(),
+            cookie_secure=_bool(env("COOKIE_SECURE"), False),
+            public_url=(env("PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/"),
+            demo_payments=_bool(env("DEMO_PAYMENTS"), True),
+            grace_days=int(env("GRACE_DAYS") or 3),
+            vps_provider=(env("VPS_PROVIDER") or "demo").lower(),
+            dns_provider=(env("DNS_PROVIDER") or "demo").lower(),
+            hetzner_token=env("HETZNER_TOKEN") or "",
+            hetzner_api_url=(env("HETZNER_API_URL") or "https://api.hetzner.cloud/v1").rstrip("/"),
+            registrar=(env("REGISTRAR") or "demo").lower(),
         )
+        if env("SECRET_KEY"):
+            s.secret_key = env("SECRET_KEY")  # type: ignore[assignment]
+        if env("NAMESERVERS"):
+            s.nameservers = [n.strip().rstrip(".").lower() for n in env("NAMESERVERS").split(",") if n.strip()]  # type: ignore[union-attr]
+        return s
+
+    def validate(self) -> list[str]:
+        """Проблемы конфигурации, о которых стоит предупредить при запуске."""
+        problems = []
+        uses_hetzner = "hetzner" in (self.vps_provider, self.dns_provider)
+        if uses_hetzner and not self.hetzner_token:
+            problems.append("VPS_PROVIDER/DNS_PROVIDER=hetzner, но HETZNER_TOKEN пуст")
+        if self.vps_provider not in ("demo", "hetzner"):
+            problems.append(f"Неизвестный VPS_PROVIDER={self.vps_provider}")
+        if self.dns_provider not in ("demo", "hetzner"):
+            problems.append(f"Неизвестный DNS_PROVIDER={self.dns_provider}")
+        return problems
