@@ -1,0 +1,1528 @@
+<title>AM Cloud Concept</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: тёмная «серверная» — глобус дата-центров в шапке, дальше домены, тарифы и окно панели клиента как главный экспонат. */
+:root {
+  --bg: #0A0E1A;
+  --bg-2: #0E1424;
+  --surface: #121A2E;
+  --surface-2: #18213A;
+  --line: #222C47;
+  --fg: #E8ECF6;
+  --muted: #8C96B2;
+  --accent: #6F8CFF;
+  --accent-ink: #0A0E1A;
+  --amber: #FFB547;
+  --series-2: #4FD1C5;
+  --ok: #3DD68C;
+  --warn: #FFB547;
+  --bad: #FF6B6B;
+  --globe-dot: #5B6FB8;
+  --glow: rgba(111, 140, 255, .18);
+  --shadow: 0 24px 60px -24px rgba(0, 0, 0, .7);
+
+  --f-display: "Unbounded", "Manrope", system-ui, sans-serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F3F5FB; --bg-2: #EAEEF8; --surface: #FFFFFF; --surface-2: #F1F4FB; --line: #D8DEEC;
+    --fg: #0D1424; --muted: #57617F; --accent: #3D5BEA; --accent-ink: #FFFFFF; --amber: #D98600;
+    --series-2: #0E9488; --ok: #11995D; --warn: #C27400; --bad: #D33A3A; --globe-dot: #8E9DD0;
+    --glow: rgba(61, 91, 234, .12); --shadow: 0 24px 60px -28px rgba(20, 30, 70, .35);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F3F5FB; --bg-2: #EAEEF8; --surface: #FFFFFF; --surface-2: #F1F4FB; --line: #D8DEEC;
+  --fg: #0D1424; --muted: #57617F; --accent: #3D5BEA; --accent-ink: #FFFFFF; --amber: #D98600;
+  --series-2: #0E9488; --ok: #11995D; --warn: #C27400; --bad: #D33A3A; --globe-dot: #8E9DD0;
+  --glow: rgba(61, 91, 234, .12); --shadow: 0 24px 60px -28px rgba(20, 30, 70, .35);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 60; background: var(--bg);
+}
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.eyebrow {
+  font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.section { padding-block: 72px; }
+.section-head { display: grid; gap: 10px; margin-bottom: 32px; max-width: 640px; }
+.section-head h2 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem); }
+.section-head p { color: var(--muted); }
+
+/* ── Кнопки ─────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 42px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); font-weight: 600; font-size: 14px;
+  transition: transform .15s var(--ease-out), background .2s, border-color .2s, box-shadow .2s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 24px -10px var(--accent); }
+.btn-primary:hover { box-shadow: 0 10px 30px -8px var(--accent); }
+.btn-sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.btn-ghost { background: transparent; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+.icon { width: 16px; height: 16px; flex: none; }
+
+/* ── Шапка ──────────────────────────────────── */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.topbar .wrap { display: flex; align-items: center; gap: 20px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; font-family: var(--f-display); font-weight: 700; font-size: 17px; text-decoration: none; color: var(--fg); }
+.logo-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; color: var(--accent-ink); }
+.nav { display: flex; gap: 4px; margin-left: 12px; }
+.nav a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 8px; transition: color .2s, background .2s; }
+.nav a:hover { color: var(--fg); background: var(--surface); }
+.top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.cart { position: relative; }
+.cart-count {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  background: var(--amber); color: #1A1200; font-size: 11px; font-weight: 700; display: grid; place-items: center;
+}
+.cart-count.bump { animation: bump .45s var(--ease-spring); }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.45); } 100% { transform: scale(1); } }
+@media (max-width: 820px) { .nav { display: none; } }
+@media (max-width: 460px) { .top-actions .btn-ghost { display: none; } }
+
+/* ── Hero ───────────────────────────────────── */
+.hero { position: relative; padding-block: 48px 40px; overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: -20% -10% auto auto; width: 70%; height: 120%;
+  background: radial-gradient(closest-side, var(--glow), transparent 70%); pointer-events: none;
+}
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 24px; align-items: center; position: relative; }
+.hero-copy { display: grid; gap: 22px; min-width: 0; }
+.hero h1 { font-size: clamp(2rem, 1.2rem + 3.2vw, 3.6rem); line-height: 1.06; }
+.hero h1 .line { display: block; overflow: hidden; }
+.hero h1 .line > span { display: inline-block; animation: rise .9s var(--ease-out) both; }
+.hero h1 .line:nth-child(2) > span { animation-delay: .08s; }
+.hero h1 .line:nth-child(3) > span { animation-delay: .16s; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+@keyframes rise { from { transform: translateY(105%); } to { transform: translateY(0); } }
+.hero-sub { color: var(--muted); font-size: 17px; max-width: 30em; animation: fade .8s .25s var(--ease-out) both; }
+@keyframes fade { from { opacity: .001; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.hero-cta { display: flex; gap: 10px; flex-wrap: wrap; animation: fade .8s .35s var(--ease-out) both; }
+.hero-stats { display: flex; gap: 28px; flex-wrap: wrap; padding-top: 6px; animation: fade .8s .45s var(--ease-out) both; }
+.hero-stats div { display: grid; gap: 2px; }
+.hero-stats b { font-family: var(--f-display); font-size: 22px; font-weight: 600; }
+.hero-stats span { color: var(--muted); font-size: 13px; }
+
+.globe-box { position: relative; aspect-ratio: 1 / 1; width: 100%; max-width: 620px; justify-self: center; }
+.globe-box canvas { width: 100% !important; height: 100% !important; display: block; cursor: grab; touch-action: pan-y; }
+.globe-box canvas:active { cursor: grabbing; }
+.globe-fallback { position: absolute; inset: 12%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--surface-2), var(--bg-2)); border: 1px solid var(--line); }
+.globe-labels { position: absolute; inset: 0; pointer-events: none; }
+.g-label {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); white-space: nowrap;
+  font-family: var(--f-mono); font-size: 11px; padding: 4px 8px; border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line);
+  transition: opacity .25s; display: flex; gap: 6px; align-items: center;
+}
+.g-label i { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.g-label span { color: var(--muted); }
+.globe-hint { position: absolute; bottom: 4%; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--muted); font-family: var(--f-mono); white-space: nowrap; }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .globe-box { max-width: 460px; order: -1; margin-bottom: -24px; }
+}
+
+/* ── Поиск доменов ─────────────────────────── */
+.domain-box {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px;
+  box-shadow: var(--shadow); display: grid; gap: 18px;
+}
+.search-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.search-field { flex: 1 1 260px; display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); transition: border-color .2s, box-shadow .2s; min-width: 0; }
+.search-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+.search-field input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 17px; font-family: var(--f-mono); }
+.search-row .btn { height: 52px; padding: 0 26px; }
+.tld-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.tld-chip { font-family: var(--f-mono); font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.tld-chip b { color: var(--fg); font-weight: 500; }
+.results { display: grid; gap: 8px; }
+.result {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
+  padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid transparent;
+  animation: slideIn .45s var(--ease-out) both;
+}
+.result.free { border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
+.result .dn { font-family: var(--f-mono); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result .dn b { color: var(--accent); font-weight: 500; }
+.result .price { font-family: var(--f-mono); font-size: 14px; color: var(--muted); }
+.result .price s { opacity: .6; margin-right: 6px; }
+.result.taken { opacity: .6; }
+.result.loading { height: 50px; background: linear-gradient(90deg, var(--bg-2) 0%, var(--surface-2) 50%, var(--bg-2) 100%); background-size: 200% 100%; animation: shimmer 1s linear infinite; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes slideIn { from { opacity: .001; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+.tag-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.tag-bad { color: var(--muted); background: var(--surface-2); }
+.tag-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+@media (max-width: 560px) {
+  .result { grid-template-columns: minmax(0, 1fr) auto; }
+  .result .price { grid-column: 1; grid-row: 2; }
+  .result .btn, .result .tag-bad { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+/* ── Тарифы ─────────────────────────────────── */
+.billing { display: inline-flex; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); position: relative; margin-bottom: 26px; }
+.billing button { position: relative; z-index: 1; border: 0; background: transparent; height: 36px; padding: 0 16px; border-radius: 9px; font-weight: 600; font-size: 14px; color: var(--muted); transition: color .25s; }
+.billing button[aria-pressed="true"] { color: var(--accent-ink); }
+.billing .pill { position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 9px; background: var(--accent); transition: transform .35s var(--ease-out), width .35s var(--ease-out); }
+.billing small { font-size: 11px; color: var(--amber); margin-left: 4px; }
+.billing button[aria-pressed="true"] small { color: inherit; }
+.plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; perspective: 1100px; }
+@media (max-width: 1000px) { .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .plans { grid-template-columns: minmax(0, 1fr); } }
+.plan {
+  --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 50%;
+  position: relative; display: grid; gap: 18px; align-content: start; padding: 22px; border-radius: var(--r-lg);
+  background: var(--surface); border: 1px solid var(--line);
+  transform: rotateX(var(--rx)) rotateY(var(--ry)); transform-style: preserve-3d;
+  transition: transform .5s var(--ease-out), border-color .25s, box-shadow .25s;
+}
+.plan.tilting { transition: transform .08s linear, border-color .25s, box-shadow .25s; }
+.plan::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(420px circle at var(--mx) var(--my), color-mix(in srgb, var(--accent) 16%, transparent), transparent 45%);
+}
+.plan:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--shadow); }
+.plan:hover::after { opacity: 1; }
+.plan.featured { border-color: var(--accent); }
+.plan .badge { position: absolute; top: -11px; left: 22px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.plan h3 { font-size: 17px; transform: translateZ(30px); }
+.plan .cost { display: flex; align-items: baseline; gap: 6px; transform: translateZ(40px); }
+.plan .cost b { font-family: var(--f-display); font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plan .cost span { color: var(--muted); font-size: 13px; }
+.specs { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; transform: translateZ(20px); }
+.specs li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+.specs li span { color: var(--muted); }
+.specs li b { font-family: var(--f-mono); font-weight: 500; }
+.plan .btn { transform: translateZ(30px); }
+
+/* ── Панель клиента (макет) ─────────────────── */
+.window {
+  border-radius: 20px; border: 1px solid var(--line); background: var(--bg-2); overflow: hidden; box-shadow: var(--shadow);
+}
+.window-bar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.window-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.window-bar .url { margin-left: 12px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding: 3px 12px; border-radius: 6px; background: var(--bg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 620px; }
+.side { border-right: 1px solid var(--line); padding: 16px 12px; display: grid; gap: 18px; align-content: start; background: var(--surface); }
+.side h4 { margin: 0 8px 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-family: var(--f-mono); font-weight: 500; }
+.side-list { display: grid; gap: 2px; }
+.side-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent;
+  padding: 9px 10px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); position: relative; transition: background .2s, color .2s;
+}
+.side-item:hover { background: var(--surface-2); color: var(--fg); }
+.side-item[aria-current="true"] { background: var(--surface-2); color: var(--fg); }
+.side-item[aria-current="true"]::before { content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.side-item small { margin-left: auto; font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); }
+.led { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; position: relative; }
+.led.on { background: var(--ok); }
+.led.on::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ok); opacity: 0; animation: ping 2s var(--ease-out) infinite; }
+.led.busy { background: var(--warn); animation: blink .6s steps(2) infinite; }
+@keyframes ping { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes blink { 50% { opacity: .3; } }
+.balance { margin: 0 4px; padding: 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); display: grid; gap: 4px; }
+.balance span { font-size: 12px; color: var(--muted); }
+.balance b { font-family: var(--f-display); font-size: 20px; font-weight: 600; }
+
+.main { padding: 22px; display: grid; gap: 18px; align-content: start; min-width: 0; }
+.view { display: grid; gap: 18px; min-width: 0; animation: viewIn .4s var(--ease-out); }
+@keyframes viewIn { from { opacity: .001; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.srv-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.srv-title { display: grid; gap: 8px; min-width: 0; }
+.srv-title h3 { font-size: 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.meta { display: flex; gap: 8px 18px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.meta .mono { color: var(--fg); }
+.copy { border: 0; background: transparent; color: var(--muted); padding: 2px; border-radius: 4px; display: inline-flex; vertical-align: middle; }
+.copy:hover { color: var(--fg); }
+.status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-body); font-size: 12px; font-weight: 700; padding: 4px 10px 4px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); transition: color .3s, border-color .3s; }
+.status.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+.status.busy { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.status.off { color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); position: relative; overflow-x: auto; scrollbar-width: none; }
+.tabs button { border: 0; background: transparent; padding: 10px 14px; font-weight: 600; font-size: 14px; color: var(--muted); transition: color .2s; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--fg); }
+.tabs .ink { position: absolute; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; transition: transform .35s var(--ease-out), width .35s var(--ease-out); left: 0; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); display: grid; gap: 4px; min-width: 0; }
+.kpi .k-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.kpi b { font-family: var(--f-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.kpi b small { font-size: 13px; color: var(--muted); }
+.kpi canvas { width: 100%; height: 38px; display: block; }
+.kpi em { font-style: normal; font-size: 11px; font-family: var(--f-mono); color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-head h4 { margin: 0; font-size: 14px; font-weight: 700; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.ranges { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--bg-2); border: 1px solid var(--line); }
+.ranges button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--muted); font-family: var(--f-mono); transition: background .2s, color .2s; }
+.ranges button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); }
+.chart-wrap { position: relative; }
+.chart-wrap canvas { width: 100%; height: 220px; display: block; }
+.tip {
+  position: absolute; top: 0; pointer-events: none; font-size: 12px; padding: 8px 10px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--line); box-shadow: var(--shadow); display: grid; gap: 2px; transition: opacity .15s; white-space: nowrap;
+}
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--f-mono); color: var(--ok); }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.bar { height: 8px; border-radius: 4px; background: var(--bg-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .8s var(--ease-out); }
+.row-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 8px; }
+.row-line span { color: var(--muted); }
+.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
+.proc td { padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.proc td:last-child { text-align: right; font-family: var(--f-mono); }
+.proc tr:last-child td { border-bottom: 0; }
+.offline { padding: 30px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 14px; display: grid; gap: 12px; justify-items: center; }
+
+/* Root-пароль */
+.pw-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .pw-grid { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field .hint { font-size: 12px; color: var(--muted); }
+.input {
+  display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 6px 0 12px; border-radius: 10px;
+  background: var(--bg-2); border: 1px solid var(--line); transition: border-color .2s, box-shadow .2s; min-width: 0;
+}
+.input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+.input.err { border-color: var(--bad); animation: shake .35s; }
+.input input, .input select { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-family: var(--f-mono); font-size: 14px; height: 100%; }
+.input select { font-family: var(--f-body); font-weight: 600; }
+.icon-btn { border: 0; background: transparent; width: 32px; height: 32px; border-radius: 7px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.icon-btn:hover { background: var(--surface-2); color: var(--fg); }
+@keyframes shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+.form { display: grid; gap: 14px; }
+.meter { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.meter i { height: 5px; border-radius: 3px; background: var(--line); transition: background .3s, transform .3s var(--ease-spring); }
+.meter i.lit { transform: scaleY(1.4); }
+.meter-label { font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; }
+.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.rules li { display: flex; align-items: center; gap: 10px; color: var(--muted); transition: color .25s; }
+.rules li .ck { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; transition: background .25s, border-color .25s, transform .3s var(--ease-spring); flex: none; }
+.rules li .ck svg { width: 11px; height: 11px; stroke: var(--accent-ink); stroke-dasharray: 16; stroke-dashoffset: 16; transition: stroke-dashoffset .3s .05s; }
+.rules li.ok { color: var(--fg); }
+.rules li.ok .ck { background: var(--ok); border-color: var(--ok); transform: scale(1.08); }
+.rules li.ok .ck svg { stroke-dashoffset: 0; }
+.note { font-size: 13px; color: var(--muted); padding: 12px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); display: flex; gap: 10px; }
+.note svg { color: var(--accent); margin-top: 2px; }
+.stepper { display: grid; gap: 0; }
+.step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; position: relative; padding-bottom: 18px; }
+.step:last-child { padding-bottom: 0; }
+.step::before { content: ""; position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--line); }
+.step:last-child::before { display: none; }
+.step .dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; background: var(--surface); transition: border-color .3s, background .3s; position: relative; z-index: 1; }
+.step .dot svg { width: 14px; height: 14px; stroke: var(--accent-ink); opacity: 0; transition: opacity .2s; }
+.step b { font-size: 14px; display: block; }
+.step span { font-size: 12px; color: var(--muted); }
+.step.run .dot { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+.step.done .dot { border-color: var(--ok); background: var(--ok); }
+.step.done .dot svg { opacity: 1; }
+.step.done::before { background: var(--ok); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* DNS */
+.dns-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .dns-head { grid-template-columns: minmax(0, 1fr); } }
+.dns-head .card { display: grid; gap: 4px; }
+.dns-head span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.dns-head b { font-family: var(--f-mono); font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
+.toggle { position: relative; width: 38px; height: 22px; border-radius: 11px; border: 0; background: var(--line); transition: background .25s; flex: none; padding: 0; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .3s var(--ease-spring); }
+.toggle[aria-checked="true"] { background: var(--ok); }
+.toggle[aria-checked="true"]::after { transform: translateX(16px); }
+.table-scroll { overflow-x: auto; }
+.dns { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+.dns th { text-align: left; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); font-family: var(--f-mono); }
+.dns td { padding: 0 10px; height: 46px; border-bottom: 1px solid var(--line); font-family: var(--f-mono); vertical-align: middle; }
+.dns td.val { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dns tr { transition: background .6s; }
+.dns tr.new { animation: flash 1.6s var(--ease-out); }
+.dns tr.gone td { animation: collapse .35s var(--ease-out) forwards; }
+@keyframes flash { 0% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
+@keyframes collapse { to { opacity: 0; height: 0; padding-top: 0; padding-bottom: 0; } }
+.rtype { display: inline-block; min-width: 54px; text-align: center; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+.t-A { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.t-AAAA { color: var(--series-2); background: color-mix(in srgb, var(--series-2) 14%, transparent); }
+.t-CNAME { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+.t-MX { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.t-TXT { color: var(--muted); background: var(--surface-2); }
+.add-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 2fr) 110px auto; gap: 8px; align-items: start; margin-top: 14px; }
+@media (max-width: 900px) { .add-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .add-row .wide { grid-column: 1 / -1; } }
+.err-text { font-size: 12px; color: var(--bad); min-height: 18px; margin-top: 6px; }
+
+/* Принципы */
+.principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .principles { grid-template-columns: minmax(0, 1fr); } }
+.principle { padding: 20px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); display: grid; gap: 10px; align-content: start; }
+.principle h3 { font-size: 15px; font-family: var(--f-body); font-weight: 700; }
+.principle p { color: var(--muted); font-size: 14px; }
+.principle .demo { height: 64px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden; }
+.timing { font-family: var(--f-mono); font-size: 12px; color: var(--accent); }
+.demo-ball { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); animation: slide 2.4s var(--ease-out) infinite alternate; }
+.demo-ball.linear { background: var(--muted); animation-timing-function: linear; }
+@keyframes slide { from { transform: translateX(-70px); } to { transform: translateX(70px); } }
+
+footer { border-top: 1px solid var(--line); padding-block: 28px; color: var(--muted); font-size: 13px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Тосты */
+.toasts {
+  position: fixed; z-index: 80; display: grid; gap: 8px;
+  right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; animation: toastIn .4s var(--ease-spring); }
+.toast.out { animation: toastOut .3s var(--ease-out) forwards; }
+.toast .led { margin: 0 2px; }
+@keyframes toastIn { from { transform: translateY(16px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes toastOut { to { transform: translateX(30px); opacity: 0; } }
+
+.anno { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 11px; color: var(--amber); border: 1px dashed color-mix(in srgb, var(--amber) 55%, transparent); padding: 3px 8px; border-radius: 6px; }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, 1fr); padding: 12px; gap: 10px; }
+  .side-list { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .side-item { width: auto; white-space: nowrap; flex: none; border: 1px solid var(--line); }
+  .side-item[aria-current="true"]::before { display: none; }
+  .side-item[aria-current="true"] { border-color: var(--accent); }
+  .side h4, .balance { display: none; }
+  .main { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.5L21 8H6.2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-reboot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+</svg>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="logo" href="#top"><span class="logo-mark"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h16M4 16h16"/><circle cx="8" cy="8" r=".6"/><circle cx="8" cy="16" r=".6"/></svg></span>AM Cloud</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#vps">VPS</a>
+      <a href="#domains">Домены</a>
+      <a href="#panel">Панель</a>
+      <a href="#motion">Анимация</a>
+    </nav>
+    <div class="top-actions">
+      <button class="btn btn-ghost btn-sm" type="button" id="themeBtn" aria-label="Сменить тему">Тема</button>
+      <button class="btn btn-sm cart" type="button" aria-label="Корзина"><svg class="icon"><use href="#i-cart"/></svg><span class="cart-count" id="cartCount">0</span></button>
+      <a class="btn btn-primary btn-sm" href="#panel">Личный кабинет</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow">VPS · Домены · DNS</span>
+        <h1>
+          <span class="line"><span>Серверы, которыми</span></span>
+          <span class="line"><span>управляешь <em>сам</em>,</span></span>
+          <span class="line"><span>а не через тикеты</span></span>
+        </h1>
+        <p class="hero-sub">NVMe‑серверы с root‑доступом за 55 секунд. Смена root‑пароля, графики нагрузки и DNS‑записи прямо в личном кабинете.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#vps">Выбрать сервер</a>
+          <a class="btn" href="#domains">Найти домен</a>
+        </div>
+        <div class="hero-stats">
+          <div><b class="mono">99.98%</b><span>аптайм за 12 мес.</span></div>
+          <div><b class="mono">55 с</b><span>до готового сервера</span></div>
+          <div><b class="mono">5</b><span>дата‑центров</span></div>
+        </div>
+      </div>
+      <div class="globe-box" id="globeBox">
+        <div class="globe-fallback" id="globeFallback"></div>
+        <div class="globe-labels" id="globeLabels"></div>
+        <span class="globe-hint">потяни, чтобы повернуть</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ДОМЕНЫ -->
+  <section class="section" id="domains" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Регистрация доменов</span>
+        <h2>Проверь имя за секунду</h2>
+        <p>Результаты появляются по очереди, как ответы реестров. Свободные зоны подсвечены.</p>
+      </div>
+      <div class="domain-box">
+        <form class="search-row" id="domainForm">
+          <label class="search-field" for="domainInput">
+            <svg class="icon" style="color:var(--muted)"><use href="#i-search"/></svg>
+            <input id="domainInput" value="alijon" autocomplete="off" spellcheck="false" aria-label="Имя домена">
+          </label>
+          <button class="btn btn-primary" type="submit">Проверить</button>
+        </form>
+        <div class="tld-chips" id="tldChips"></div>
+        <div class="results" id="results" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ТАРИФЫ -->
+  <section class="section" id="vps" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">VPS на NVMe</span>
+        <h2>Тарифы без сюрпризов в счёте</h2>
+        <p>Наведи курсор на карточку: она наклоняется в 3D. Это единственное место, кроме глобуса, где объём уместен.</p>
+      </div>
+      <div class="billing" id="billing">
+        <span class="pill" aria-hidden="true"></span>
+        <button type="button" aria-pressed="true" data-period="m">Помесячно</button>
+        <button type="button" aria-pressed="false" data-period="y">На год <small>−20%</small></button>
+      </div>
+      <div class="plans" id="plans"></div>
+    </div>
+  </section>
+
+  <!-- ПАНЕЛЬ -->
+  <section class="section" id="panel" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Личный кабинет</span>
+        <h2>Панель клиента</h2>
+        <p>Рабочий макет: переключай серверы и домены, перезагружай, смотри живые графики, меняй root‑пароль и правь DNS. Все данные здесь примерные.</p>
+      </div>
+      <div class="window">
+        <div class="window-bar"><i></i><i></i><i></i><span class="url" id="panelUrl">my.amcloud.example/servers/web-01</span></div>
+        <div class="app">
+          <aside class="side">
+            <div>
+              <h4>Серверы</h4>
+              <div class="side-list" id="srvList"></div>
+            </div>
+            <div>
+              <h4>Домены</h4>
+              <div class="side-list" id="domList"></div>
+            </div>
+            <div class="balance"><span>Баланс</span><b class="mono">$ 48.20</b><span>хватит на 2 мес. 4 дня</span></div>
+          </aside>
+          <div class="main" id="main"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ПРИНЦИПЫ -->
+  <section class="section" id="motion" style="padding-top:24px">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Правила движения</span>
+        <h2>Как анимировать, чтобы было дорого, а не шумно</h2>
+      </div>
+      <div class="principles">
+        <div class="principle">
+          <div class="demo"><span class="demo-ball"></span></div>
+          <h3>Мягкое торможение</h3>
+          <p>Всё входит быстро и тормозит в конце. Линейное движение выглядит механически, его оставляем только для спиннеров.</p>
+          <span class="timing">cubic-bezier(.2,.8,.2,1)</span>
+        </div>
+        <div class="principle">
+          <div class="demo"><span class="led on"></span><span class="led busy"></span><span class="led"></span></div>
+          <h3>Движение = состояние</h3>
+          <p>Пульсирует только то, что живое: работающий сервер, идущая перезагрузка, публикация DNS. Неподвижное значит «ничего не происходит».</p>
+          <span class="timing">ping 2 s · blink 0.6 s</span>
+        </div>
+        <div class="principle">
+          <div class="demo"><span class="timing">150 мс · 250 мс · 400 мс</span></div>
+          <h3>Три скорости</h3>
+          <p>150 мс на нажатия и наведение, 250 мс на переключатели и вкладки, 400 мс на смену экранов. Дольше 600 мс пользователь начинает ждать.</p>
+          <span class="timing">prefers-reduced-motion → выкл.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>AM Cloud · концепт интерфейса</span>
+    <span class="mono">IP и домены в макете из документационных диапазонов</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const token = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const themeListeners = [];
+  const onTheme = (fn) => themeListeners.push(fn);
+  const fireTheme = () => requestAnimationFrame(() => themeListeners.forEach((f) => f()));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", fireTheme);
+  new MutationObserver(fireTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  $("#themeBtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme") ||
+      (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+
+  /* ── Тосты ───────────────────────────────── */
+  function toast(text, kind = "on") {
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = `<span class="led ${kind}"></span><span></span>`;
+    el.lastChild.textContent = text;
+    $("#toasts").appendChild(el);
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 3200);
+  }
+
+  function copyText(text) {
+    const done = () => toast(`Скопировано: ${text}`);
+    try {
+      navigator.clipboard.writeText(text).then(done, () => toast("Выдели и скопируй вручную", "busy"));
+    } catch { toast("Выдели и скопируй вручную", "busy"); }
+  }
+
+  function tween(from, to, ms, fn, ease = (t) => 1 - Math.pow(1 - t, 3)) {
+    if (reduced) { fn(to); return; }
+    const s = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - s) / ms);
+      fn(from + (to - from) * ease(t));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* ── 3D-глобус ───────────────────────────── */
+  const DCS = [
+    { name: "Франкфурт", lat: 50.11, lon: 8.68, ping: "34 мс" },
+    { name: "Амстердам", lat: 52.37, lon: 4.9, ping: "38 мс", left: true },
+    { name: "Стамбул", lat: 41.01, lon: 28.98, ping: "41 мс" },
+    { name: "Ташкент", lat: 41.31, lon: 69.24, ping: "9 мс" },
+    { name: "Алматы", lat: 43.24, lon: 76.89, ping: "12 мс" },
+  ];
+  const LINKS = [[0, 1], [0, 2], [2, 3], [3, 4], [0, 3], [1, 4]];
+
+  function initGlobe() {
+    const box = $("#globeBox");
+    if (!window.THREE) return;
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+    catch { return; }
+    $("#globeFallback").hidden = true;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    box.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    camera.position.set(0, 0, 4.4);
+
+    const tilt = new THREE.Group();
+    tilt.rotation.x = 0.8;
+    tilt.rotation.z = -0.12;
+    scene.add(tilt);
+    const globe = new THREE.Group();
+    tilt.add(globe);
+    const baseY = (-62 - 90) * Math.PI / 180;
+    globe.rotation.y = baseY;
+
+    const ll = (lat, lon, r = 1) => {
+      const phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180;
+      return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th));
+    };
+
+    // круглая текстура точки
+    const dotCanvas = document.createElement("canvas");
+    dotCanvas.width = dotCanvas.height = 64;
+    const dc = dotCanvas.getContext("2d");
+    dc.fillStyle = "#fff"; dc.beginPath(); dc.arc(32, 32, 28, 0, Math.PI * 2); dc.fill();
+    const dotTex = new THREE.CanvasTexture(dotCanvas);
+
+    // окклюдер — прячет заднюю сторону
+    const occMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    globe.add(new THREE.Mesh(new THREE.SphereGeometry(0.985, 64, 48), occMat));
+
+    // сфера из точек (фибоначчи)
+    const N = 2600, pos = [];
+    const g = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y), t = g * i;
+      pos.push(Math.cos(t) * r, y, Math.sin(t) * r);
+    }
+    const dotGeo = new THREE.BufferGeometry();
+    dotGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    const dotMat = new THREE.PointsMaterial({ size: 0.022, map: dotTex, alphaTest: 0.5, transparent: true, opacity: 0 });
+    globe.add(new THREE.Points(dotGeo, dotMat));
+
+    // орбиты со «спутниками»
+    const orbitMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.35 });
+    const satMat = new THREE.PointsMaterial({ size: 0.05, map: dotTex, alphaTest: 0.5, transparent: true });
+    const orbits = [];
+    [[1.32, 1.1, 0.3], [1.48, -0.5, 1.2]].forEach(([r, rx, rz]) => {
+      const pts = [];
+      for (let i = 0; i <= 128; i++) { const a = i / 128 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)); }
+      const grp = new THREE.Group(); grp.rotation.set(rx, 0, rz);
+      grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), orbitMat));
+      const satGeo = new THREE.BufferGeometry();
+      satGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Array(9).fill(0), 3));
+      const sats = new THREE.Points(satGeo, satMat);
+      grp.add(sats);
+      tilt.add(grp);
+      orbits.push({ r, sats, phase: Math.random() * 6 });
+    });
+
+    // дата-центры
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0xffb547 });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffb547, transparent: true, side: THREE.DoubleSide });
+    const markers = DCS.map((dc) => {
+      const p = ll(dc.lat, dc.lon, 1.002);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 12), markerMat);
+      m.position.copy(p);
+      globe.add(m);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.04, 32), ringMat.clone());
+      ring.position.copy(p);
+      ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), p.clone().normalize());
+      globe.add(ring);
+      const label = document.createElement("div");
+      label.className = "g-label";
+      label.innerHTML = `<i></i>${dc.name} <span>${dc.ping}</span>`;
+      $("#globeLabels").appendChild(label);
+      return { m, ring, label, left: !!dc.left, off: Math.random() };
+    });
+
+    // дуги и пакеты
+    const arcMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.85 });
+    const packetMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const arcs = LINKS.map(([a, b], i) => {
+      const A = ll(DCS[a].lat, DCS[a].lon), B = ll(DCS[b].lat, DCS[b].lon);
+      const mid = A.clone().add(B).multiplyScalar(0.5);
+      const h = 1 + A.distanceTo(B) * 0.55;
+      mid.normalize().multiplyScalar(h);
+      const curve = new THREE.QuadraticBezierCurve3(A, mid, B);
+      const pts = curve.getPoints(80);
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      geo.setDrawRange(0, reduced ? 81 : 0);
+      globe.add(new THREE.Line(geo, arcMat));
+      const packet = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), packetMat);
+      globe.add(packet);
+      return { curve, geo, packet, delay: 0.5 + i * 0.18, speed: 0.22 + (i % 3) * 0.06, off: i * 0.37 };
+    });
+
+    function applyColors() {
+      occMat.color.set(token("--bg"));
+      dotMat.color.set(token("--globe-dot"));
+      orbitMat.color.set(token("--globe-dot"));
+      satMat.color.set(token("--accent"));
+      arcMat.color.set(token("--accent"));
+      packetMat.color.set(token("--fg"));
+      markerMat.color.set(token("--amber"));
+      markers.forEach((mk) => mk.ring.material.color.set(token("--amber")));
+    }
+    applyColors();
+    onTheme(applyColors);
+
+    // размер
+    let W = 1, H = 1;
+    const resize = () => {
+      const r = box.getBoundingClientRect();
+      W = Math.max(1, r.width); H = Math.max(1, r.height);
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H; camera.updateProjectionMatrix();
+    };
+    new ResizeObserver(resize).observe(box);
+    resize();
+
+    // перетаскивание + параллакс
+    let dragging = false, lastX = 0, lastY = 0, velY = 0, userY = 0, userX = 0, targetX = 0, px = 0, py = 0;
+    const cv = renderer.domElement;
+    cv.addEventListener("pointerdown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener("pointermove", (e) => {
+      const r = box.getBoundingClientRect();
+      px = (e.clientX - r.left) / r.width - 0.5; py = (e.clientY - r.top) / r.height - 0.5;
+      if (!dragging) return;
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      velY = dx * 0.005; userY += velY;
+      targetX = Math.max(-0.5, Math.min(0.5, targetX + dy * 0.004));
+    });
+    const end = () => { dragging = false; };
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
+    cv.addEventListener("pointerleave", () => { px = py = 0; });
+
+    let visible = true;
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(box);
+
+    const t0 = performance.now();
+    const tmp = new THREE.Vector3(), camDir = new THREE.Vector3();
+    const easeOut = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+
+    function frame(now) {
+      requestAnimationFrame(frame);
+      if (!visible || document.hidden) return;
+      const t = (now - t0) / 1000;
+      const intro = reduced ? 1 : easeOut(t / 1.6);
+
+      // инерция вращения
+      if (!dragging) { velY *= 0.94; userY += velY; }
+      const auto = reduced ? 0 : t * 0.06;
+      userX += (targetX - userX) * 0.08;
+      globe.rotation.y = baseY + auto + userY + px * 0.25;
+      tilt.rotation.x = 0.8 + userX + py * 0.12;
+      const s = 0.82 + 0.18 * intro;
+      tilt.scale.setScalar(s);
+      dotMat.opacity = intro;
+
+      orbits.forEach((o, k) => {
+        const arr = o.sats.geometry.attributes.position.array;
+        for (let j = 0; j < 3; j++) {
+          const a = o.phase + (reduced ? 0 : t * (0.35 + k * 0.12)) + j * 2.1;
+          arr[j * 3] = Math.cos(a) * o.r; arr[j * 3 + 1] = 0; arr[j * 3 + 2] = Math.sin(a) * o.r;
+        }
+        o.sats.geometry.attributes.position.needsUpdate = true;
+      });
+
+      markers.forEach((mk) => {
+        const p = reduced ? 0.5 : ((t * 0.6 + mk.off) % 1);
+        mk.ring.scale.setScalar(1 + p * 2.2);
+        mk.ring.material.opacity = (1 - p) * 0.9;
+      });
+
+      arcs.forEach((a) => {
+        const grow = reduced ? 1 : easeOut((t - a.delay) / 1.1);
+        a.geo.setDrawRange(0, Math.floor(grow * 81));
+        if (grow >= 1) {
+          a.packet.visible = true;
+          a.packet.position.copy(a.curve.getPoint(reduced ? 0.5 : ((t * a.speed + a.off) % 1)));
+        } else a.packet.visible = false;
+      });
+
+      renderer.render(scene, camera);
+
+      // подписи дата-центров
+      camDir.copy(camera.position).normalize();
+      markers.forEach((mk) => {
+        mk.m.getWorldPosition(tmp);
+        const facing = tmp.clone().normalize().dot(camDir);
+        tmp.project(camera);
+        const x = (tmp.x + 1) / 2 * W, y = (1 - tmp.y) / 2 * H;
+        mk.label.style.transform = mk.left ? `translate(${x - 12}px, ${y}px) translate(-100%, -50%)` : `translate(${x}px, ${y - 10}px) translate(-50%, -100%)`;
+        mk.label.style.opacity = intro > 0.9 && facing > 0.25 ? 1 : 0;
+      });
+    }
+    requestAnimationFrame(frame);
+  }
+  initGlobe();
+
+  /* ── Домены ──────────────────────────────── */
+  const TLDS = [
+    { z: ".tj", p: 25, old: 30 }, { z: ".com", p: 12.99 }, { z: ".uz", p: 15 },
+    { z: ".net", p: 14.5 }, { z: ".kz", p: 18 }, { z: ".io", p: 39 },
+  ];
+  $("#tldChips").innerHTML = TLDS.map((t) => `<span class="tld-chip"><b>${t.z}</b> $${t.p}</span>`).join("");
+  let cart = 0;
+  const hash = (s) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+
+  function searchDomains(e) {
+    e && e.preventDefault();
+    const input = $("#domainInput");
+    let name = input.value.trim().toLowerCase().replace(/^https?:\/\//, "").split(".")[0].replace(/[^a-z0-9-]/g, "");
+    const box = $("#results");
+    if (!name) { input.parentElement.classList.remove("err"); void input.offsetWidth; input.parentElement.classList.add("err"); return; }
+    input.value = name;
+    box.innerHTML = TLDS.slice(0, 4).map(() => `<div class="result loading"></div>`).join("");
+    setTimeout(() => {
+      box.innerHTML = "";
+      TLDS.forEach((t, i) => {
+        const free = hash(name + t.z) % 3 !== 0;
+        const row = document.createElement("div");
+        row.className = `result ${free ? "free" : "taken"}`;
+        row.style.animationDelay = `${i * 70}ms`;
+        row.innerHTML = `
+          <span class="dn">${name}<b>${t.z}</b></span>
+          <span class="price">${free ? `${t.old ? `<s>$${t.old}</s>` : ""}$${t.p}/год` : "занят"}</span>
+          ${free ? `<button class="btn btn-sm" type="button">В корзину</button>` : `<span class="tag tag-bad">Занят</span>`}`;
+        if (free) {
+          const b = $("button", row);
+          b.addEventListener("click", () => {
+            const added = b.dataset.added === "1";
+            b.dataset.added = added ? "0" : "1";
+            b.innerHTML = added ? "В корзину" : `<svg class="icon" style="stroke:currentColor"><use href="#i-check"/></svg>В корзине`;
+            b.classList.toggle("btn-primary", !added);
+            cart += added ? -1 : 1;
+            const c = $("#cartCount"); c.textContent = cart; c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
+            if (!added) toast(`${name}${t.z} добавлен в корзину`);
+          });
+        }
+        box.appendChild(row);
+      });
+    }, reduced ? 0 : 650);
+  }
+  $("#domainForm").addEventListener("submit", searchDomains);
+  searchDomains();
+
+  /* ── Тарифы ──────────────────────────────── */
+  const PLANS = [
+    { n: "Start", cpu: 1, ram: 1, disk: 20, bw: 1, p: 4.9 },
+    { n: "Base", cpu: 2, ram: 4, disk: 60, bw: 2, p: 11 },
+    { n: "Pro", cpu: 4, ram: 8, disk: 120, bw: 4, p: 22, f: true },
+    { n: "Ultra", cpu: 8, ram: 16, disk: 240, bw: 8, p: 44 },
+  ];
+  $("#plans").innerHTML = PLANS.map((p) => `
+    <article class="plan ${p.f ? "featured" : ""}">
+      ${p.f ? `<span class="badge">Чаще берут</span>` : ""}
+      <h3>${p.n}</h3>
+      <div class="cost"><b data-m="${p.p}">$${p.p.toFixed(2)}</b><span>/ мес.</span></div>
+      <ul class="specs">
+        <li><span>vCPU</span><b>${p.cpu}</b></li>
+        <li><span>RAM</span><b>${p.ram} ГБ</b></li>
+        <li><span>NVMe</span><b>${p.disk} ГБ</b></li>
+        <li><span>Трафик</span><b>${p.bw} ТБ</b></li>
+      </ul>
+      <button class="btn ${p.f ? "btn-primary" : ""}" type="button">Заказать</button>
+    </article>`).join("");
+  $$(".plan .btn").forEach((b, i) => b.addEventListener("click", () => toast(`Тариф ${PLANS[i].n}: дальше выбор ОС и локации`)));
+
+  const bill = $("#billing"), pill = $(".pill", bill);
+  const placePill = () => {
+    const on = $("button[aria-pressed=true]", bill);
+    pill.style.width = on.offsetWidth + "px";
+    pill.style.transform = `translateX(${on.offsetLeft - 4}px)`;
+  };
+  $$("button", bill).forEach((b) => b.addEventListener("click", () => {
+    $$("button", bill).forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    placePill();
+    const yearly = b.dataset.period === "y";
+    $$(".plan .cost b").forEach((el) => {
+      const m = +el.dataset.m, to = yearly ? m * 0.8 : m;
+      const from = parseFloat(el.textContent.replace("$", ""));
+      tween(from, to, 500, (v) => { el.textContent = "$" + v.toFixed(2); });
+    });
+  }));
+  placePill();
+  addEventListener("resize", placePill);
+  document.fonts?.ready.then(placePill);
+
+  if (matchMedia("(hover: hover)").matches && !reduced) {
+    $$(".plan").forEach((card) => {
+      card.addEventListener("pointermove", (e) => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        card.classList.add("tilting");
+        card.style.setProperty("--ry", `${(x - 0.5) * 14}deg`);
+        card.style.setProperty("--rx", `${(0.5 - y) * 12}deg`);
+        card.style.setProperty("--mx", `${x * 100}%`);
+        card.style.setProperty("--my", `${y * 100}%`);
+      });
+      card.addEventListener("pointerleave", () => {
+        card.classList.remove("tilting");
+        card.style.setProperty("--rx", "0deg"); card.style.setProperty("--ry", "0deg");
+      });
+    });
+  }
+
+  /* ── Панель клиента ──────────────────────── */
+  const SERVERS = [
+    { id: "web-01", plan: "Pro", os: "Ubuntu 24.04", dc: "Франкфурт", ip: "203.0.113.24", ip6: "2001:db8:4f::24", state: "on", cpu: 38, ram: 5.1, ramT: 8, disk: 64, diskT: 120, traffic: 1.24, trafficT: 4, seed: 3 },
+    { id: "db-01", plan: "Base", os: "Debian 12", dc: "Амстердам", ip: "203.0.113.57", ip6: "2001:db8:4f::57", state: "on", cpu: 61, ram: 3.3, ramT: 4, disk: 41, diskT: 60, traffic: 0.38, trafficT: 2, seed: 7 },
+    { id: "dev-01", plan: "Start", os: "AlmaLinux 9", dc: "Ташкент", ip: "198.51.100.12", ip6: "2001:db8:9a::12", state: "off", cpu: 0, ram: 0, ramT: 1, disk: 7, diskT: 20, traffic: 0.02, trafficT: 1, seed: 11 },
+  ];
+  const DOMAINS = [
+    { id: "alijon.tj", exp: "14.03.2027", renew: true, records: [
+      { t: "A", n: "@", v: "203.0.113.24", ttl: 3600 },
+      { t: "A", n: "www", v: "203.0.113.24", ttl: 3600 },
+      { t: "AAAA", n: "@", v: "2001:db8:4f::24", ttl: 3600 },
+      { t: "MX", n: "@", v: "10 mail.alijon.tj", ttl: 3600 },
+      { t: "TXT", n: "@", v: "v=spf1 ip4:203.0.113.24 -all", ttl: 3600 },
+      { t: "CNAME", n: "shop", v: "alijon.tj", ttl: 1800 },
+    ] },
+    { id: "shop-dushanbe.com", exp: "02.09.2027", renew: false, records: [
+      { t: "A", n: "@", v: "203.0.113.57", ttl: 3600 },
+      { t: "CNAME", n: "www", v: "shop-dushanbe.com", ttl: 3600 },
+    ] },
+  ];
+  const ledFor = (s) => (s === "on" ? "on" : s === "busy" ? "busy" : "");
+  const stateText = { on: "Работает", busy: "Перезагрузка…", off: "Выключен" };
+  let current = { kind: "srv", id: "web-01" };
+  let tab = "stats";
+
+  function renderSide() {
+    $("#srvList").innerHTML = SERVERS.map((s) => `
+      <button class="side-item" type="button" data-kind="srv" data-id="${s.id}" aria-current="${current.kind === "srv" && current.id === s.id}">
+        <span class="led ${ledFor(s.state)}"></span>${s.id}<small>${s.plan}</small></button>`).join("");
+    $("#domList").innerHTML = DOMAINS.map((d) => `
+      <button class="side-item" type="button" data-kind="dom" data-id="${d.id}" aria-current="${current.kind === "dom" && current.id === d.id}">
+        <span class="led on" style="background:var(--accent)"></span>${d.id}</button>`).join("");
+    $$(".side-item").forEach((b) => b.addEventListener("click", () => {
+      current = { kind: b.dataset.kind, id: b.dataset.id };
+      if (current.kind === "srv" && tab === "dns") tab = "stats";
+      renderSide(); renderMain();
+    }));
+  }
+
+  // ---- данные графиков
+  function rng(seed) { let s = seed * 9301 + 49297; return () => ((s = (s * 9301 + 49297) % 233280) / 233280); }
+  const RANGES = { "1h": { n: 60, live: true, label: (i, n) => `${n - 1 - i} мин назад` }, "24h": { n: 96, label: (i, n) => `${Math.round((n - 1 - i) * 15 / 60)} ч назад` }, "7d": { n: 84, label: (i, n) => `${Math.round((n - 1 - i) * 2 / 24)} дн. назад` } };
+  let range = "1h";
+  function makeSeries(srv, n) {
+    const r = rng(srv.seed + n);
+    const cpu = [], ram = [], net = [], io = [];
+    let c = srv.cpu, m = srv.ram / srv.ramT * 100, nt = 40, d = 20;
+    for (let i = 0; i < n; i++) {
+      if (srv.state === "off") { cpu.push(0); ram.push(0); net.push(0); io.push(0); continue; }
+      c = Math.max(3, Math.min(97, c + (r() - 0.5) * 14 + Math.sin(i / 7) * 3));
+      m = Math.max(10, Math.min(95, m + (r() - 0.5) * 3));
+      nt = Math.max(2, nt + (r() - 0.5) * 30 + (r() > 0.93 ? 70 : 0) * (r() > .5 ? 1 : -.4));
+      d = Math.max(1, Math.min(100, d + (r() - 0.5) * 16));
+      cpu.push(c); ram.push(m); net.push(Math.min(400, nt)); io.push(d);
+    }
+    return { cpu, ram, net, io };
+  }
+  let series = null, liveTimer = null, lastPush = 0, chartRaf = 0, hoverI = -1;
+
+  function setupCanvas(cv) {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) {
+      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w: r.width, h: r.height };
+  }
+  function withAlpha(hex, a) {
+    const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+  function spark(cv, data, color, max) {
+    if (!cv) return;
+    const { ctx, w, h } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, h);
+    const pts = data.slice(-30), step = w / (pts.length - 1);
+    const y = (v) => h - 3 - (v / max) * (h - 6);
+    ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(i * step, y(v)) : ctx.moveTo(0, y(v))));
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    const gr = ctx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, withAlpha(color, .25)); gr.addColorStop(1, withAlpha(color, 0));
+    ctx.fillStyle = gr; ctx.fill();
+    const lx = (pts.length - 1) * step, ly = y(pts[pts.length - 1]);
+    ctx.beginPath(); ctx.arc(lx - 2, ly, 2.6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  }
+
+  function drawMain(shift = 0) {
+    const cv = $("#bigChart"); if (!cv || !series) return;
+    const { ctx, w, h } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, h);
+    const padL = 34, padR = 8, padT = 10, padB = 22;
+    const cw = w - padL - padR, ch = h - padT - padB;
+    const muted = token("--muted"), line = token("--line");
+    ctx.font = `11px ${token("--f-mono") || "monospace"}`;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [0, 25, 50, 75, 100].forEach((v) => {
+      const y = padT + ch - v / 100 * ch;
+      ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.setLineDash(v === 0 ? [] : [3, 4]);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.fillText(v + "%", padL - 6, y);
+    });
+    ctx.setLineDash([]);
+    const n = series.cpu.length, step = cw / (n - 2);
+    const xs = (i) => padL + (i - shift) * step;
+    ctx.save(); ctx.beginPath(); ctx.rect(padL, 0, cw, h); ctx.clip();
+    [["ram", token("--series-2")], ["cpu", token("--accent")]].forEach(([k, col]) => {
+      const d = series[k];
+      ctx.beginPath();
+      d.forEach((v, i) => { const x = xs(i), y = padT + ch - v / 100 * ch; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+      ctx.lineTo(xs(n - 1), padT + ch); ctx.lineTo(xs(0), padT + ch); ctx.closePath();
+      const gr = ctx.createLinearGradient(0, padT, 0, padT + ch); gr.addColorStop(0, withAlpha(col, .22)); gr.addColorStop(1, withAlpha(col, 0));
+      ctx.fillStyle = gr; ctx.fill();
+    });
+    ctx.restore();
+    // подписи времени
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = muted;
+    const labs = { "1h": ["−60 мин", "−45", "−30", "−15", "сейчас"], "24h": ["−24 ч", "−18", "−12", "−6", "сейчас"], "7d": ["−7 дн.", "−5", "−3", "−1", "сейчас"] }[range];
+    labs.forEach((l, i) => { const x = padL + cw * i / 4; ctx.textAlign = i === 0 ? "left" : i === 4 ? "right" : "center"; ctx.fillText(l, x, h - padB + 6); });
+    // курсор
+    const tip = $("#tip");
+    if (hoverI >= 0 && hoverI < n) {
+      const x = xs(hoverI);
+      ctx.strokeStyle = muted; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ch); ctx.stroke(); ctx.setLineDash([]);
+      [["cpu", token("--accent")], ["ram", token("--series-2")]].forEach(([k, col]) => {
+        const y = padT + ch - series[k][hoverI] / 100 * ch;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fillStyle = token("--surface"); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+      });
+      tip.style.opacity = 1;
+      tip.innerHTML = `<span style="color:var(--muted)">${RANGES[range].label(hoverI, n)}</span><span>CPU <b class="mono">${series.cpu[hoverI].toFixed(1)}%</b></span><span>RAM <b class="mono">${series.ram[hoverI].toFixed(1)}%</b></span>`;
+      const tw = tip.offsetWidth;
+      tip.style.left = Math.min(w - tw, Math.max(0, x + 12 > w - tw ? x - tw - 12 : x + 12)) + "px";
+    } else if (tip) tip.style.opacity = 0;
+  }
+
+  function updateKpis() {
+    const s = SERVERS.find((x) => x.id === current.id);
+    if (!s || !series || !$("#kCpu")) return;
+    const last = (a) => a[a.length - 1];
+    $("#kCpu").innerHTML = `${last(series.cpu).toFixed(0)}<small>%</small>`;
+    $("#kRam").innerHTML = `${(last(series.ram) / 100 * s.ramT).toFixed(1)}<small> / ${s.ramT} ГБ</small>`;
+    $("#kNet").innerHTML = `${last(series.net).toFixed(0)}<small> Мбит/с</small>`;
+    $("#kIo").innerHTML = `${(last(series.io) * 4.2).toFixed(0)}<small> IOPS</small>`;
+    spark($("#sCpu"), series.cpu, token("--accent"), 100);
+    spark($("#sRam"), series.ram, token("--series-2"), 100);
+    spark($("#sNet"), series.net, token("--amber"), Math.max(50, ...series.net.slice(-30)) * 1.1);
+    spark($("#sIo"), series.io, token("--ok"), 110);
+  }
+
+  function stopLive() { clearInterval(liveTimer); cancelAnimationFrame(chartRaf); liveTimer = null; }
+  function startLive(srv) {
+    stopLive();
+    const loop = (now) => {
+      const shift = RANGES[range].live && !reduced && srv.state === "on" ? Math.min(1, (now - lastPush) / 1000) : 1;
+      drawMain(shift);
+      chartRaf = requestAnimationFrame(loop);
+    };
+    if (RANGES[range].live && srv.state === "on") {
+      liveTimer = setInterval(() => {
+        const r = Math.random;
+        const push = (k, v) => { series[k].push(v); series[k].shift(); };
+        const L = (k) => series[k][series[k].length - 1];
+        push("cpu", Math.max(3, Math.min(97, L("cpu") + (r() - 0.5) * 14)));
+        push("ram", Math.max(10, Math.min(95, L("ram") + (r() - 0.5) * 2.5)));
+        push("net", Math.max(2, Math.min(400, L("net") + (r() - 0.5) * 40)));
+        push("io", Math.max(1, Math.min(100, L("io") + (r() - 0.5) * 18)));
+        lastPush = performance.now();
+        updateKpis();
+      }, 1000);
+    }
+    lastPush = performance.now();
+    chartRaf = requestAnimationFrame(loop);
+  }
+
+  function loadSeries(srv, animate) {
+    const n = RANGES[range].n + 1;
+    const next = makeSeries(srv, n);
+    if (!animate || !series || series.cpu.length !== n || reduced) { series = next; updateKpis(); return; }
+    const from = JSON.parse(JSON.stringify(series));
+    tween(0, 1, 450, (t) => {
+      ["cpu", "ram", "net", "io"].forEach((k) => { series[k] = next[k].map((v, i) => from[k][i] + (v - from[k][i]) * t); });
+      updateKpis();
+    });
+  }
+
+  function renderMain() {
+    stopLive();
+    const main = $("#main");
+    if (current.kind === "dom") return renderDomain(main);
+    const s = SERVERS.find((x) => x.id === current.id);
+    $("#panelUrl").textContent = `my.amcloud.example/servers/${s.id}`;
+    main.innerHTML = `
+      <div class="view">
+        <div class="srv-head">
+          <div class="srv-title">
+            <h3>${s.id} <span class="status ${s.state}" id="status"><span class="led ${ledFor(s.state)}"></span><span>${stateText[s.state]}</span></span></h3>
+            <div class="meta">
+              <span>IPv4 <span class="mono">${s.ip}</span> <button class="copy" type="button" data-copy="${s.ip}" aria-label="Скопировать IP"><svg class="icon"><use href="#i-copy"/></svg></button></span>
+              <span>${s.os}</span><span>${s.dc}</span><span>${s.plan}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-sm" type="button" id="btnTerm"><svg class="icon"><use href="#i-term"/></svg>Консоль</button>
+            <button class="btn btn-sm" type="button" id="btnReboot" ${s.state !== "on" ? "disabled" : ""}><svg class="icon"><use href="#i-reboot"/></svg>Перезагрузить</button>
+            <button class="btn btn-sm" type="button" id="btnPower"><svg class="icon"><use href="#i-power"/></svg>${s.state === "off" ? "Включить" : "Выключить"}</button>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button role="tab" type="button" data-tab="stats" aria-selected="${tab === "stats"}">Аналитика</button>
+          <button role="tab" type="button" data-tab="root" aria-selected="${tab === "root"}">Root‑пароль</button>
+          <span class="ink" aria-hidden="true"></span>
+        </div>
+        <div id="tabBody"></div>
+      </div>`;
+    $$("[data-copy]", main).forEach((b) => b.addEventListener("click", () => copyText(b.dataset.copy)));
+    $("#btnTerm").addEventListener("click", () => toast("Откроется веб‑консоль (noVNC) в новой вкладке"));
+    $("#btnReboot").addEventListener("click", () => power(s, "reboot"));
+    $("#btnPower").addEventListener("click", () => power(s, s.state === "off" ? "start" : "stop"));
+    $$(".tabs button", main).forEach((b) => b.addEventListener("click", () => { tab = b.dataset.tab; renderTab(s); }));
+    renderTab(s);
+  }
+
+  function moveInk() {
+    const on = $(".tabs button[aria-selected=true]"), ink = $(".tabs .ink");
+    if (!on || !ink) return;
+    ink.style.width = on.offsetWidth + "px"; ink.style.transform = `translateX(${on.offsetLeft}px)`;
+  }
+
+  function power(s, action) {
+    const set = (st) => { s.state = st; renderSide(); renderMain(); };
+    if (action === "reboot") {
+      set("busy"); toast(`${s.id}: перезагрузка отправлена`, "busy");
+      setTimeout(() => { set("on"); toast(`${s.id} снова в сети`); }, 2600);
+    } else if (action === "stop") {
+      set("busy"); setTimeout(() => { set("off"); toast(`${s.id} выключен`, ""); }, 1400);
+    } else {
+      set("busy"); setTimeout(() => { s.cpu = 22; s.ram = s.ramT * 0.3; set("on"); toast(`${s.id} запущен`); }, 1800);
+    }
+  }
+
+  function renderTab(s) {
+    $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+    requestAnimationFrame(moveInk);
+    const body = $("#tabBody");
+    stopLive();
+    if (tab === "stats") {
+      if (s.state !== "on") {
+        body.innerHTML = `<div class="offline view"><b>${s.state === "busy" ? "Сервер перезагружается" : "Сервер выключен"}</b><span>Графики появятся, когда сервер снова будет в сети.</span>${s.state === "off" ? `<button class="btn btn-primary btn-sm" type="button" id="offStart">Включить</button>` : ""}</div>`;
+        $("#offStart")?.addEventListener("click", () => power(s, "start"));
+        return;
+      }
+      body.innerHTML = `
+        <div class="view">
+          <div class="kpis">
+            <div class="kpi"><div class="k-top"><span>CPU</span><em>${PLANS.find((p) => p.n === s.plan).cpu} vCPU</em></div><b id="kCpu"></b><canvas id="sCpu"></canvas></div>
+            <div class="kpi"><div class="k-top"><span>Память</span><em>RAM</em></div><b id="kRam"></b><canvas id="sRam"></canvas></div>
+            <div class="kpi"><div class="k-top"><span>Сеть</span><em>eth0 ↓↑</em></div><b id="kNet"></b><canvas id="sNet"></canvas></div>
+            <div class="kpi"><div class="k-top"><span>Диск</span><em>/dev/vda</em></div><b id="kIo"></b><canvas id="sIo"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h4>Нагрузка <span class="live" ${RANGES[range].live ? "" : "hidden"}><span class="led on"></span>в реальном времени</span></h4>
+              <div class="legend"><span><i style="background:var(--accent)"></i>CPU</span><span><i style="background:var(--series-2)"></i>RAM</span></div>
+              <div class="ranges" id="ranges">
+                ${Object.keys(RANGES).map((k) => `<button type="button" data-r="${k}" aria-pressed="${k === range}">${k.replace("h", "ч").replace("d", "д")}</button>`).join("")}
+              </div>
+            </div>
+            <div class="chart-wrap"><canvas id="bigChart"></canvas><div class="tip" id="tip" style="opacity:0"></div></div>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-head"><h4>Ресурсы</h4></div>
+              <div class="row-line"><span>Диск NVMe</span><b class="mono">${s.disk} / ${s.diskT} ГБ</b></div>
+              <div class="bar" style="margin-bottom:16px"><i style="width:0" data-w="${s.disk / s.diskT * 100}"></i></div>
+              <div class="row-line"><span>Трафик за ноябрь</span><b class="mono">${s.traffic} / ${s.trafficT} ТБ</b></div>
+              <div class="bar"><i style="width:0;background:var(--amber)" data-w="${s.traffic / s.trafficT * 100}"></i></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h4>Топ процессов</h4><span class="mono" style="font-size:12px;color:var(--muted)">через агент</span></div>
+              <table class="proc"><tbody>
+                <tr><td>nginx: worker</td><td>12.4% · 210 МБ</td></tr>
+                <tr><td>php-fpm8.3</td><td>9.8% · 640 МБ</td></tr>
+                <tr><td>postgres</td><td>6.1% · 1.2 ГБ</td></tr>
+                <tr><td>node /srv/app</td><td>3.7% · 380 МБ</td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>`;
+      loadSeries(s, false);
+      requestAnimationFrame(() => $$(".bar > i", body).forEach((i) => { i.style.width = i.dataset.w + "%"; }));
+      $$("#ranges button").forEach((b) => b.addEventListener("click", () => {
+        if (b.dataset.r === range) return;
+        const prevN = RANGES[range].n; range = b.dataset.r;
+        $$("#ranges button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        $(".live", body).hidden = !RANGES[range].live;
+        loadSeries(s, prevN === RANGES[range].n);
+        startLive(s);
+      }));
+      const cv = $("#bigChart");
+      cv.addEventListener("pointermove", (e) => {
+        const r = cv.getBoundingClientRect(), padL = 34, cw = r.width - padL - 8;
+        const n = series.cpu.length, step = cw / (n - 2);
+        hoverI = Math.max(1, Math.min(n - 1, Math.round((e.clientX - r.left - padL) / step + 1)));
+      });
+      cv.addEventListener("pointerleave", () => { hoverI = -1; });
+      startLive(s);
+    } else {
+      renderRoot(body, s);
+    }
+  }
+
+  // ---- Root-пароль
+  function renderRoot(body, s) {
+    body.innerHTML = `
+      <div class="view pw-grid">
+        <form class="card form" id="pwForm" novalidate>
+          <div class="card-head" style="margin:0"><h4>Новый root‑пароль для ${s.id}</h4><span class="anno">агент на сервере · chpasswd</span></div>
+          <div class="field">
+            <label for="pw1">Новый пароль</label>
+            <div class="input" id="pw1Box">
+              <input id="pw1" type="password" autocomplete="new-password" spellcheck="false">
+              <button class="icon-btn" type="button" id="pwShow" aria-label="Показать пароль"><svg class="icon"><use href="#i-eye"/></svg></button>
+              <button class="icon-btn" type="button" id="pwGen" aria-label="Сгенерировать пароль"><svg class="icon"><use href="#i-dice"/></svg></button>
+              <button class="icon-btn" type="button" id="pwCopy" aria-label="Скопировать пароль"><svg class="icon"><use href="#i-copy"/></svg></button>
+            </div>
+            <div class="meter" id="meter"><i></i><i></i><i></i><i></i></div>
+            <div class="meter-label"><span id="meterText" style="color:var(--muted)">Введите пароль</span><span class="mono" id="entropy" style="color:var(--muted)"></span></div>
+          </div>
+          <div class="field">
+            <label for="pw2">Повторите пароль</label>
+            <div class="input" id="pw2Box"><input id="pw2" type="password" autocomplete="new-password"></div>
+            <span class="hint" id="matchHint">&nbsp;</span>
+          </div>
+          <div class="field">
+            <label for="otp">Код подтверждения</label>
+            <div class="input" id="otpBox"><input id="otp" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+            <span class="hint">6 цифр из приложения 2FA или Telegram. Для примера подойдут любые.</span>
+          </div>
+          <button class="btn btn-primary" type="submit" id="pwSubmit" disabled>Сменить пароль</button>
+        </form>
+        <div style="display:grid;gap:12px">
+          <div class="card">
+            <div class="card-head"><h4>Требования</h4></div>
+            <ul class="rules" id="rules">
+              ${[["len", "Не короче 12 символов"], ["low", "Строчные буквы a–z"], ["up", "Заглавные буквы A–Z"], ["dig", "Цифры 0–9"], ["sym", "Символы !@#$%^&*"]]
+                .map(([k, t]) => `<li data-r="${k}"><span class="ck"><svg><use href="#i-check"/></svg></span>${t}</li>`).join("")}
+            </ul>
+          </div>
+          <div class="card" id="progressCard" hidden>
+            <div class="card-head"><h4>Применение</h4></div>
+            <div class="stepper" id="stepper">
+              ${[["Проверка кода", "2FA и права на сервер"], ["Передача на сервер", "по зашифрованному каналу агенту"], ["Пароль применён", "старые SSH‑сессии остаются активны"]]
+                .map(([a, b]) => `<div class="step"><span class="dot"><svg><use href="#i-check"/></svg></span><div><b>${a}</b><span>${b}</span></div></div>`).join("")}
+            </div>
+          </div>
+          <div class="note"><svg class="icon"><use href="#i-shield"/></svg><span>Пароль не сохраняется в базе панели. Он уходит на сервер один раз, а в журнале остаётся только запись «пароль изменён» с датой и IP.</span></div>
+        </div>
+      </div>`;
+    const pw1 = $("#pw1"), pw2 = $("#pw2"), otp = $("#otp");
+    const tests = { len: (p) => p.length >= 12, low: (p) => /[a-z]/.test(p), up: (p) => /[A-Z]/.test(p), dig: (p) => /\d/.test(p), sym: (p) => /[^A-Za-z0-9]/.test(p) };
+    const labels = [["Очень слабый", "--bad"], ["Слабый", "--bad"], ["Средний", "--warn"], ["Хороший", "--ok"], ["Отличный", "--ok"]];
+    function check() {
+      const p = pw1.value;
+      let passed = 0;
+      $$("#rules li").forEach((li) => { const ok = tests[li.dataset.r](p); li.classList.toggle("ok", ok); passed += ok; });
+      let pool = 0; if (/[a-z]/.test(p)) pool += 26; if (/[A-Z]/.test(p)) pool += 26; if (/\d/.test(p)) pool += 10; if (/[^A-Za-z0-9]/.test(p)) pool += 32;
+      const bits = p ? Math.round(p.length * Math.log2(pool || 1)) : 0;
+      const score = !p ? -1 : bits < 40 ? 0 : bits < 56 ? 1 : bits < 72 ? 2 : bits < 96 ? 3 : 4;
+      const col = score >= 0 ? token(labels[score][1]) : "";
+      const segs = score < 0 ? 0 : Math.max(1, score);
+      $$("#meter i").forEach((i, k) => { i.style.background = k < segs ? col : ""; i.classList.toggle("lit", k < segs); });
+      $("#meterText").textContent = score < 0 ? "Введите пароль" : labels[score][0];
+      $("#meterText").style.color = score < 0 ? "var(--muted)" : `var(${labels[score][1]})`;
+      $("#entropy").textContent = p ? `≈ ${bits} бит` : "";
+      const match = p && pw2.value === p;
+      $("#matchHint").textContent = pw2.value ? (match ? "Пароли совпадают" : "Пароли не совпадают") : " ";
+      $("#matchHint").style.color = pw2.value ? (match ? "var(--ok)" : "var(--bad)") : "";
+      $("#pwSubmit").disabled = !(passed === 5 && match && /^\d{6}$/.test(otp.value) && s.state === "on");
+    }
+    [pw1, pw2, otp].forEach((i) => i.addEventListener("input", check));
+    otp.addEventListener("input", () => { otp.value = otp.value.replace(/\D/g, "").slice(0, 6); check(); });
+    $("#pwShow").addEventListener("click", () => { const t = pw1.type === "password" ? "text" : "password"; pw1.type = t; pw2.type = t; });
+    $("#pwGen").addEventListener("click", () => {
+      const sets = ["abcdefghijkmnopqrstuvwxyz", "ABCDEFGHJKLMNPQRSTUVWXYZ", "23456789", "!@#$%^&*-_=+"];
+      const all = sets.join(""), buf = new Uint32Array(20); crypto.getRandomValues(buf);
+      let out = sets.map((set, i) => set[buf[i] % set.length]);
+      for (let i = 4; i < 20; i++) out.push(all[buf[i] % all.length]);
+      const sh = new Uint32Array(20); crypto.getRandomValues(sh);
+      out = out.map((c, i) => [sh[i], c]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+      const pw = out.join("");
+      pw1.type = pw2.type = "text";
+      // эффект «набора»
+      let k = 0;
+      const typer = () => { k += 2; pw1.value = pw.slice(0, k); check(); if (k < pw.length && !reduced) requestAnimationFrame(typer); else { pw1.value = pw; pw2.value = pw; check(); } };
+      typer();
+    });
+    $("#pwCopy").addEventListener("click", () => { if (pw1.value) copyText(pw1.value); });
+    $("#pwForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      if ($("#pwSubmit").disabled) return;
+      $("#pwSubmit").disabled = true;
+      const card = $("#progressCard"); card.hidden = false;
+      const steps = $$("#stepper .step");
+      steps.forEach((st) => st.classList.remove("run", "done"));
+      let i = 0;
+      const next = () => {
+        if (i > 0) { steps[i - 1].classList.remove("run"); steps[i - 1].classList.add("done"); }
+        if (i === steps.length) {
+          toast(`Root‑пароль ${s.id} изменён`);
+          pw1.value = pw2.value = otp.value = ""; pw1.type = pw2.type = "password"; check();
+          return;
+        }
+        steps[i].classList.add("run"); i++;
+        setTimeout(next, reduced ? 50 : 900);
+      };
+      next();
+    });
+    check();
+  }
+
+  // ---- DNS
+  const isIPv4 = (v) => /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(v);
+  const isIPv6 = (v) => /^[0-9a-f:]+$/i.test(v) && v.includes(":") && v.split("::").length <= 2 && v.length >= 2;
+  const isHost = (v) => /^(?=.{1,253}\.?$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\.?$/i.test(v);
+  const isName = (v) => v === "@" || /^(\*\.)?([a-z0-9_]([a-z0-9-_]{0,61}[a-z0-9])?)(\.[a-z0-9_]([a-z0-9-_]{0,61}[a-z0-9])?)*$/i.test(v);
+  function validateRecord(t, n, v) {
+    if (!isName(n)) return ["name", "Имя: @, www, mail или поддомен"];
+    if (t === "A" && !isIPv4(v)) return ["value", "Для A нужен IPv4, например 203.0.113.24"];
+    if (t === "AAAA" && !isIPv6(v)) return ["value", "Для AAAA нужен IPv6, например 2001:db8::1"];
+    if (t === "CNAME" && !isHost(v)) return ["value", "Для CNAME нужно имя хоста, например example.com"];
+    if (t === "MX") { const [p, h] = v.split(/\s+/); if (!/^\d{1,5}$/.test(p || "") || !isHost(h || "")) return ["value", "Формат MX: приоритет и хост, например 10 mail.alijon.tj"]; }
+    if (t === "TXT" && (!v || v.length > 255)) return ["value", "TXT: от 1 до 255 символов"];
+    return null;
+  }
+
+  function renderDomain(main) {
+    const d = DOMAINS.find((x) => x.id === current.id);
+    $("#panelUrl").textContent = `my.amcloud.example/domains/${d.id}/dns`;
+    main.innerHTML = `
+      <div class="view">
+        <div class="srv-head">
+          <div class="srv-title">
+            <h3>${d.id} <span class="status on" id="syncStatus"><span class="led on"></span><span>DNS опубликован</span></span></h3>
+            <div class="meta"><span>Зона обслуживается <span class="mono">ns1/ns2.amcloud.example</span></span></div>
+          </div>
+        </div>
+        <div class="dns-head">
+          <div class="card"><span>Оплачен до</span><b>${d.exp}</b></div>
+          <div class="card"><span>Неймсерверы</span><b>ns1.amcloud.example<br>ns2.amcloud.example</b></div>
+          <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div style="display:grid;gap:4px"><span>Автопродление</span><b id="renewText">${d.renew ? "Включено" : "Выключено"}</b></div><button class="toggle" type="button" role="switch" id="renew" aria-checked="${d.renew}" aria-label="Автопродление"></button></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h4>DNS‑записи <span class="mono" style="color:var(--muted);font-weight:400" id="recCount"></span></h4><span class="anno">PowerDNS API · PATCH rrsets</span></div>
+          <div class="table-scroll">
+            <table class="dns"><thead><tr><th>Тип</th><th>Имя</th><th>Значение</th><th>TTL</th><th></th></tr></thead><tbody id="dnsBody"></tbody></table>
+          </div>
+          <form class="add-row" id="dnsForm" novalidate>
+            <div class="input"><select id="rType" aria-label="Тип записи">${["A", "AAAA", "CNAME", "MX", "TXT"].map((t) => `<option>${t}</option>`).join("")}</select></div>
+            <div class="input"><input id="rName" placeholder="@ или www" aria-label="Имя" value="api"></div>
+            <div class="input wide"><input id="rValue" placeholder="203.0.113.24" aria-label="Значение" value="203.0.113.24"></div>
+            <div class="input"><select id="rTtl" aria-label="TTL"><option value="300">5 мин</option><option value="1800">30 мин</option><option value="3600" selected>1 час</option><option value="86400">1 день</option></select></div>
+            <button class="btn btn-primary" type="submit" style="height:44px">Добавить</button>
+          </form>
+          <div class="err-text" id="dnsErr"></div>
+        </div>
+      </div>`;
+    const tbody = $("#dnsBody");
+    const fmtTtl = (t) => ({ 300: "5 мин", 1800: "30 мин", 3600: "1 час", 86400: "1 день" }[t] || t + " с");
+    const placeholders = { A: "203.0.113.24", AAAA: "2001:db8::1", CNAME: "example.com", MX: "10 mail." + d.id, TXT: "v=spf1 -all" };
+    function rowHtml(r) {
+      return `<td><span class="rtype t-${r.t}">${r.t}</span></td><td>${r.n}</td><td class="val" title="${r.v.replace(/"/g, "&quot;")}"></td><td>${fmtTtl(r.ttl)}</td>
+        <td style="text-align:right"><button class="icon-btn" type="button" aria-label="Удалить запись"><svg class="icon"><use href="#i-trash"/></svg></button></td>`;
+    }
+    function addRow(r, isNew) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = rowHtml(r);
+      $(".val", tr).textContent = r.v;
+      if (isNew) tr.className = "new";
+      $("button", tr).addEventListener("click", () => {
+        d.records.splice(d.records.indexOf(r), 1);
+        tr.classList.add("gone");
+        setTimeout(() => { tr.remove(); count(); }, reduced ? 0 : 340);
+        publish(`Запись ${r.t} ${r.n} удалена`);
+      });
+      tbody.appendChild(tr);
+    }
+    const count = () => { $("#recCount").textContent = `· ${d.records.length}`; };
+    d.records.forEach((r) => addRow(r, false));
+    count();
+    let pubTimer;
+    function publish(msg) {
+      const st = $("#syncStatus");
+      st.className = "status busy"; st.innerHTML = `<span class="led busy"></span><span>Публикация…</span>`;
+      clearTimeout(pubTimer);
+      pubTimer = setTimeout(() => {
+        st.className = "status on"; st.innerHTML = `<span class="led on"></span><span>DNS опубликован</span>`;
+        toast(msg);
+      }, reduced ? 50 : 1300);
+    }
+    $("#rType").addEventListener("change", (e) => { $("#rValue").placeholder = placeholders[e.target.value]; $("#rValue").value = ""; $("#rValue").focus(); });
+    $("#dnsForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const t = $("#rType").value, n = $("#rName").value.trim().toLowerCase() || "@", v = $("#rValue").value.trim(), ttl = +$("#rTtl").value;
+      $$(".add-row .input").forEach((x) => x.classList.remove("err"));
+      const err = validateRecord(t, n, v);
+      if (err) {
+        const box = (err[0] === "name" ? $("#rName") : $("#rValue")).parentElement;
+        void box.offsetWidth; box.classList.add("err");
+        $("#dnsErr").textContent = err[1];
+        return;
+      }
+      if (t === "CNAME" && d.records.some((r) => r.n === n)) { $("#dnsErr").textContent = `CNAME нельзя ставить рядом с другими записями для «${n}»`; return; }
+      $("#dnsErr").textContent = "";
+      const r = { t, n, v, ttl };
+      d.records.push(r); addRow(r, true); count();
+      $("#rName").value = ""; $("#rValue").value = "";
+      publish(`Запись ${t} ${n} → ${v} опубликована`);
+    });
+    $("#renew").addEventListener("click", (e) => {
+      d.renew = !d.renew; e.currentTarget.setAttribute("aria-checked", String(d.renew));
+      $("#renewText").textContent = d.renew ? "Включено" : "Выключено";
+    });
+  }
+
+  renderSide();
+  renderMain();
+  onTheme(() => { if (current.kind === "srv" && tab === "stats") updateKpis(); });
+  addEventListener("resize", () => { moveInk(); updateKpis(); });
+  document.fonts?.ready.then(moveInk);
+})();
+</script>
