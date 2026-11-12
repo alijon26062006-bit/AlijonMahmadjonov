@@ -3264,3 +3264,13 @@ body:has(.bx) { background: #0b0b0e; }
 .bx-hints b { font-size: 15px; font-variant-numeric: tabular-nums; }
 .bx-reprice .bx-in button { white-space: nowrap; }
 .bx-new { gap: 14px; }
+
+/* iPhone (Safari) приближает страницу, если шрифт поля ввода меньше 16px: на сенсорных экранах
+   все поля — не меньше 16px, тогда при вводе (поиск, сумма, ID) экран не прыгает. Масштаб пальцами
+   не отключаем — это нужно людям со слабым зрением. */
+@media (pointer: coarse), (max-width: 900px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), select, textarea {
+    font-size: 16px !important;
+  }
+  .rf-phone input { font-size: 1.1rem !important; }   /* номер телефона — крупнее, как задумано */
+}
