@@ -713,6 +713,30 @@ def _looks_like(data: bytes, ext: str) -> bool:
     return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
 
 
+def backfill_receipt_hashes(config: Config, limit: int = 5000) -> int:
+    """Один раз: отпечатки картинок для уже принятых чеков — чтобы повтор старого чека тоже ловился."""
+    from . import receipt_ai
+    conn = db.connect(config.db_path)
+    try:
+        if db.get_setting(conn, "pay.phash_v1"):
+            return 0
+        folder, n = receipts_dir(config), 0
+        for r in conn.execute("SELECT id, receipt_file FROM payments WHERE status = 'paid' AND receipt_file IS NOT NULL "
+                              "AND receipt_phash IS NULL ORDER BY id DESC LIMIT ?", (limit,)).fetchall():
+            try:
+                data = (folder / r["receipt_file"]).read_bytes()
+            except OSError:
+                continue
+            ph = receipt_ai.image_hash(data, r["receipt_file"].rsplit(".", 1)[-1])
+            if ph:
+                conn.execute("UPDATE payments SET receipt_phash = ? WHERE id = ?", (ph, r["id"]))
+                n += 1
+        db.set_setting(conn, "pay.phash_v1", db.now())
+        return n
+    finally:
+        conn.close()
+
+
 def receipts_dir(config: Config):
     from pathlib import Path
     return Path(config.db_path).parent / "receipts"
@@ -839,11 +863,16 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
                        f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
-    # Этот чек уже ПРИНЯЛИ (зачислили) — второй раз не пускаем вовсе
+    # Не пускаем только ТУ ЖЕ КАРТИНКУ, которую админ уже принял (зачислил): тот же файл или пересжатая копия.
+    # По одному лишь прочитанному ИИ (номер операции, сумма+минута) среди чеков не отклоняем — ИИ ошибается,
+    # и отклонялись настоящие чеки. Исключение — код операции, который прислал сам банк (автоплатёж).
+    phash = receipt_ai.image_hash(data, ext)
     used = conn.execute("SELECT id, status FROM payments WHERE receipt_hash = ? AND id != ? AND status = 'paid'",
                         (digest, payment_id)).fetchone()
-    used = used or (receipt_ai.duplicate(conn, payment_id, seen, statuses="('paid')") if seen else None)
-    if used and used["status"] == "paid":
+    used = (used or receipt_ai.same_picture_paid(conn, payment_id, phash, seen)
+            or receipt_ai.paid_same_transfer(conn, payment_id, seen)   # номер операции + сумма + минута — все сразу
+            or receipt_ai.paid_by_bank_code(conn, payment_id, seen))   # код операции от самого банка — точно повтор
+    if used:
         raise ReceiptUsed(used["id"])
     twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
     if not twin and seen and p["auto_kind"] == "dcbank":   # та же сумма от этого клиента уже пришла автоматом
@@ -861,10 +890,10 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     # receipt_file IS NULL — два одновременных запроса с чеком: пройдёт только первый
     done = conn.execute(
         "UPDATE payments SET receipt_file = ?, receipt_hash = ?, receipt_ai = ?, receipt_txn = ?, receipt_fp = ?, "
-        "receipt_fp2 = ? WHERE id = ? AND receipt_file IS NULL",
+        "receipt_fp2 = ?, receipt_phash = ? WHERE id = ? AND receipt_file IS NULL",
         (name, digest, json.dumps(seen, ensure_ascii=False) if seen else None,
          (receipt_ai.txn_key(seen) or None) if seen else None, (receipt_ai.fingerprint(seen) or None) if seen else None,
-         (receipt_ai.loose_fingerprint(seen) or None) if seen else None, payment_id)).rowcount
+         (receipt_ai.loose_fingerprint(seen) or None) if seen else None, phash, payment_id)).rowcount
     if not done:
         (folder / name).unlink(missing_ok=True)
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")

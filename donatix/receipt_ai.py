@@ -4,7 +4,9 @@
 номер операции, получателя. Сайт запоминает это у заявки и ищет по базе:
   • тот же номер операции — чек уже был;
   • та же сумма + валюта + время до минуты + банк — тот же перевод, даже если скриншот другой.
-Не пускаем только чек, который уже ПРИНЯЛИ (зачислили) по другой заявке. Остальное (verdict: чужие реквизиты,
+Не пускаем только ТУ ЖЕ КАРТИНКУ чека, которую уже ПРИНЯЛИ (зачислили) по другой заявке: тот же файл или
+та же картинка, пересжатая Telegram (отпечаток image_hash). Совпадения по прочитанному ИИ (номер операции,
+сумма+время) не отклоняют — ИИ ошибается, — админ видит «похоже, этот перевод уже был» и решает сам. Остальное (verdict: чужие реквизиты,
 подделка, «не чек», старый чек, фоторедактор или нейросеть, повтор ждущего/отклонённого) не отклоняем —
 админ видит предупреждения в заявке и кнопку на старую заявку и решает сам.
 
@@ -110,6 +112,104 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
 def _pick(value: Any, allowed: tuple[str, ...], default: str) -> str:
     value = str(value or "").strip().lower()
     return value if value in allowed else default
+
+
+PHASH_SIZE = 16          # 16×16 → 256 бит: мелкие отличия (другие цифры) не теряются
+PHASH_SAME = 12          # ≤ 12 бит из 256 разницы — та же картинка (пересжатие Telegram, обрезка рамки)
+
+
+def image_hash(data: bytes, ext: str = "") -> str | None:
+    """Отпечаток самой картинки (dHash 256 бит): та же картинка даёт почти тот же отпечаток, даже если Telegram
+    пересжал её или сохранили в другом формате. Для PDF и битых файлов — None."""
+    if ext == "pdf" or data[:4] == b"%PDF":
+        return None
+    try:
+        import io
+
+        from PIL import Image, ImageOps
+        img = Image.open(io.BytesIO(data))
+        img = ImageOps.exif_transpose(img).convert("L")
+        # убираем однотонные поля по краям (скриншот с рамкой и без — одно и то же)
+        box = ImageOps.invert(img).point(lambda v: 255 if v > 12 else 0).getbbox()
+        if box and (box[2] - box[0]) > 40 and (box[3] - box[1]) > 40:
+            img = img.crop(box)
+        small = img.resize((PHASH_SIZE + 1, PHASH_SIZE), Image.LANCZOS)
+        px = small.tobytes()   # 8 бит на точку, по строкам
+        bits = 0
+        w = PHASH_SIZE + 1
+        for y in range(PHASH_SIZE):
+            for x in range(PHASH_SIZE):
+                bits = (bits << 1) | (1 if px[y * w + x] > px[y * w + x + 1] else 0)
+        return f"{bits:064x}"
+    except Exception:  # noqa: BLE001 — не картинка: сравним только по файлу
+        return None
+
+
+def hash_distance(a: str | None, b: str | None) -> int:
+    if not a or not b or len(a) != len(b):
+        return 9999
+    return bin(int(a, 16) ^ int(b, 16)).count("1")
+
+
+def paid_by_bank_code(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any] | None) -> sqlite3.Row | None:
+    """Номер операции из чека совпал с НАСТОЯЩИМ кодом банка у уже зачисленного автоплатежа (уведомление
+    «Душанбе Сити», хэш USDT). Код пришёл от банка, не от ИИ, — это точно тот же перевод."""
+    key = txn_key(d or {})
+    if not key:
+        return None
+    norm = "UPPER(REPLACE(REPLACE(REPLACE({c}, ' ', ''), '-', ''), '/', ''))"
+    row = conn.execute(f"SELECT id, status FROM payments WHERE {norm.format(c='ext_id')} = ? AND id != ? "
+                       "AND status = 'paid'", (key, payment_id)).fetchone()
+    if row or not _has_table(conn, "bank_notices"):
+        return row
+    return conn.execute(f"SELECT p.id, p.status FROM bank_notices n JOIN payments p ON p.id = n.payment_id "
+                        f"WHERE {norm.format(c='n.op_code')} = ? AND p.id != ? AND n.status = 'matched' "
+                        "AND p.status = 'paid'", (key, payment_id)).fetchone()
+
+
+def paid_same_transfer(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any] | None) -> sqlite3.Row | None:
+    """Другой скриншот того же уже принятого перевода: совпало ВСЁ сразу — номер операции, сумма и время
+    до минуты. Одного признака мало (ИИ читает «номер операции» из постоянного поля чека, суммы и минуты
+    у разных людей совпадают) — из-за этого раньше отклонялись настоящие чеки."""
+    key, fp = txn_key(d or {}), loose_fingerprint(d or {})
+    if not key or not fp:
+        return None
+    return conn.execute("SELECT id, status FROM payments WHERE receipt_txn = ? AND receipt_fp2 = ? AND id != ? "
+                        "AND status = 'paid'", (key, fp, payment_id)).fetchone()
+
+
+def same_picture_paid(conn: sqlite3.Connection, payment_id: int, phash: str | None,
+                      d: dict[str, Any] | None) -> sqlite3.Row | None:
+    """Принятая (зачисленная) заявка с ТЕМ ЖЕ чеком, но в другом файле (Telegram пересжал, скрин заново).
+    Чеки одного банка похожи как две капли — по картинке их не отличить (разница в паре цифр), поэтому
+    нужно ВСЁ сразу: похожая картинка + та же сумма + то же время до минуты (+ тот же номер операции,
+    если ИИ прочитал его в обоих). Чего-то не прочитали — не отклоняем: решит админ."""
+    if not phash or not d:
+        return None
+    when = re.sub(r"[^0-9]", "", d.get("datetime") or "")[:12]
+    key = txn_key(d)
+    try:
+        amount = float(d.get("amount") or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    if not amount or len(when) < 12:
+        return None
+    for row in conn.execute("SELECT id, status, receipt_phash, receipt_ai FROM payments WHERE status = 'paid' "
+                            "AND receipt_phash IS NOT NULL AND receipt_ai IS NOT NULL AND id != ?", (payment_id,)):
+        if hash_distance(phash, row["receipt_phash"]) > PHASH_SAME:
+            continue
+        try:
+            old = json.loads(row["receipt_ai"])
+            old_amount = float(old.get("amount") or 0)
+        except (ValueError, TypeError):
+            continue
+        if abs(old_amount - amount) > 0.009 or re.sub(r"[^0-9]", "", old.get("datetime") or "")[:12] != when:
+            continue
+        old_key = txn_key(old)
+        if key and old_key and key != old_key:
+            continue   # номера операций разные — разные переводы
+        return row
+    return None
 
 
 def txn_key(d: dict[str, Any]) -> str:

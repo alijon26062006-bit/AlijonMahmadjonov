@@ -456,7 +456,7 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_hash TEXT")
         if "boosted_at" not in pay_cols:   # клиент нажал «Ускорить» — когда (не чаще раза в 10 минут)
             conn.execute("ALTER TABLE payments ADD COLUMN boosted_at TEXT")
-        for col in ("receipt_ai", "receipt_txn", "receipt_fp", "receipt_fp2"):   # что прочитал ИИ в чеке — от повторов
+        for col in ("receipt_ai", "receipt_txn", "receipt_fp", "receipt_fp2", "receipt_phash"):   # от повторов чеков
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
         for col in ("receipt_txn", "receipt_fp", "receipt_fp2"):

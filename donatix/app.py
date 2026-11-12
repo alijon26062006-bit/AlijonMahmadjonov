@@ -224,6 +224,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
             log.info("фоновые задачи: этот процесс ведущий (pid %s)", os.getpid())
             from . import catalog
             catalog.SYNC_LOCK.bind(config)
+            from .payments import backfill_receipt_hashes   # отпечатки старых принятых чеков — в фоне, один раз
+            threading.Thread(target=backfill_receipt_hashes, args=(config,), daemon=True).start()
             bg = Worker(config, supplier)
             bg.start()
             started.append(bg)
