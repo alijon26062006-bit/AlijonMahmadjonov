@@ -1,0 +1,88 @@
+<section class="page" data-sec="11 · ТЕХНИЧЕСКАЯ АРХИТЕКТУРА" style="padding-top:44px">
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">11 · Техническая реализация · архитектура</div>
+      <h2 style="font-size:34px;margin-top:8px">Игровой слой «слушает» курс и <span class="g">не доверяет браузеру</span></h2></div>
+    <div class="sm muted" style="max-width:440px;text-align:right">Подходит к любому бэкенду. Пример стека: Python (Django или FastAPI) + PostgreSQL + Redis + WebSocket/SSE.</div>
+  </div>
+  <style>
+    .nd{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:9px 12px;font-size:11.5px;position:absolute}
+    .nd b{display:block;font-size:12.5px;margin-bottom:2px}.nd .muted{font-size:10.8px;line-height:1.35}
+    .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font:500 10.4px/1.45 var(--mono)}
+    .tbl .h{background:#17231D;padding:5px 9px;font-weight:700;color:var(--mint);font-size:11px;display:flex;justify-content:space-between}
+    .tbl .h i{font-style:normal;color:var(--faint);font-weight:500}
+    .tbl .r{padding:4px 9px;color:#B9D9C6}
+  </style>
+  <div style="display:grid;grid-template-columns:900px 1fr;gap:22px;margin-top:18px">
+    <div style="position:relative;height:700px">
+      <svg width="900" height="700" style="position:absolute;inset:0">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#2EE070"/></marker>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#B57BFF"/></marker></defs>
+        <rect x="0" y="0" width="230" height="470" rx="16" fill="rgba(255,255,255,.02)" stroke="#2C4337" stroke-dasharray="4 5"/>
+        <g stroke="#2EE070" stroke-width="2" fill="none" marker-end="url(#ar)">
+          <path d="M230 235H285"/>
+          <path d="M455 235H500"/>
+          <path d="M670 235H705"/>
+          <path d="M760 280C760 340 620 330 620 375"/>
+          <path d="M820 280C820 300 860 300 860 375" />
+          <path d="M620 455V500"/>
+          <path d="M840 455V500"/>
+        </g>
+
+      </svg>
+      <div class="mono xs faint" style="position:absolute;left:14px;top:-4px;letter-spacing:.1em;background:var(--bg);padding:0 6px">СУЩЕСТВУЮЩИЙ MYCOURSE.TJ</div>
+      <div class="nd" style="left:14px;top:22px;width:202px"><b>Видеоплеер</b><div class="muted">heartbeat каждые 15 с → video.progress</div></div>
+      <div class="nd" style="left:14px;top:92px;width:202px"><b>Тесты</b><div class="muted">quiz.submitted (балл, попытка)</div></div>
+      <div class="nd" style="left:14px;top:162px;width:202px"><b>Код-раннер (песочница)</b><div class="muted">code.run · code.passed · тип ошибки</div></div>
+      <div class="nd" style="left:14px;top:232px;width:202px"><b>Практика и ДЗ</b><div class="muted">homework.accepted (оценка наставника)</div></div>
+      <div class="nd" style="left:14px;top:302px;width:202px"><b>Обсуждения</b><div class="muted">help.vote «Помогло»</div></div>
+      <div class="nd" style="left:14px;top:372px;width:202px"><b>Внешние проверки</b><div class="muted">Telegram Bot API · GitHub API · AI-сервис</div></div>
+
+      <div class="nd" style="left:290px;top:180px;width:165px;border-color:rgba(46,224,112,.5)"><b>Шина событий</b><div class="muted">таблица events или Redis Streams · уникальный idem_key</div></div>
+      <div class="nd" style="left:505px;top:180px;width:165px;border-color:rgba(255,107,107,.45)"><b>Валидатор</b><div class="muted">проверка подлинности, дубликатов, лимитов, аномалий</div></div>
+      <div class="nd" style="left:710px;top:180px;width:180px;border-color:rgba(255,194,74,.5)"><b>Движок правил</b><div class="muted">правила XP, квестов, значков как данные (JSON/YAML) — меняются без релиза</div></div>
+
+      <div class="nd" style="left:530px;top:380px;width:180px"><b>Журнал (append-only)</b><div class="muted">xp_ledger · wallet_tx — каждую монету можно объяснить и откатить</div></div>
+      <div class="nd" style="left:740px;top:380px;width:150px"><b>Прогресс</b><div class="muted">квесты, серии, значки, бестиарий, радар</div></div>
+      
+      <div class="nd" style="left:530px;top:505px;width:180px"><b>Проекции</b><div class="muted">профиль, уровень, лиги (Redis sorted sets), рейтинги</div></div>
+      <div class="nd" style="left:740px;top:505px;width:150px;border-color:rgba(181,123,255,.5)"><b>Уведомления</b><div class="muted">WebSocket/SSE → анимация в браузере · Telegram · e-mail раз в неделю</div></div>
+
+      
+      <div class="nd" style="left:14px;top:535px;width:290px;border-color:rgba(181,123,255,.45)"><b>Планировщик (cron / Celery)</b><div class="muted">00:00 — миссии дня по часовым поясам · вс 23:59 — итоги Гулхана и лиг · эхо-миссии по расписанию</div></div>
+      <div class="code" style="position:absolute;left:290px;top:300px;width:220px;font-size:10.5px;line-height:1.5;padding:9px 11px">
+        <div class="c"># пример события</div>
+        <div>{<span class="s">"type"</span>: <span class="s">"code.passed"</span>,</div>
+        <div>&nbsp;<span class="s">"user"</span>: <span class="n">1042</span>,</div>
+        <div>&nbsp;<span class="s">"task"</span>: <span class="s">"b2.l2.t1"</span>,</div>
+        <div>&nbsp;<span class="s">"attempt"</span>: <span class="n">1</span>, <span class="s">"hints"</span>: <span class="n">0</span>,</div>
+        <div>&nbsp;<span class="s">"tests"</span>: <span class="s">"5/5"</span>,</div>
+        <div>&nbsp;<span class="s">"idem_key"</span>: <span class="s">"1042:b2.l2.t1"</span>}</div>
+      </div>
+      <div class="card glow" style="position:absolute;left:14px;top:625px;width:876px;padding:10px 16px;font-size:12px;display:flex;gap:18px">
+        <span><b class="g">1.</b> Клиент только показывает — начисляет сервер</span><span><b class="g">2.</b> Каждое событие обрабатывается ровно один раз</span><span><b class="g">3.</b> Правила — данные, а не код</span><span><b class="g">4.</b> Ничего не удаляется — только компенсирующие записи</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="mono xs faint" style="letter-spacing:.1em;margin-bottom:8px">ОСНОВНЫЕ ТАБЛИЦЫ БАЗЫ ДАННЫХ</div>
+      <div class="grid g2" style="gap:8px">
+        <div class="tbl"><div class="h">game_profile<i>1:1 user</i></div><div class="r">user_id · xp · level · rank<br>coins · gems · payko_stage<br>weekly_goal · timezone</div></div>
+        <div class="tbl"><div class="h">events<i>вход</i></div><div class="r">id · user_id · type<br>source_id · payload jsonb<br>idem_key UNIQUE · created_at</div></div>
+        <div class="tbl"><div class="h">xp_ledger<i>append-only</i></div><div class="r">user_id · amount · reason<br>source_type · source_id<br>rule_id · created_at</div></div>
+        <div class="tbl"><div class="h">wallet_tx<i>append-only</i></div><div class="r">user_id · currency · amount<br>reason · ref_id · created_at</div></div>
+        <div class="tbl"><div class="h">achievements<i>справочник</i></div><div class="r">code · rarity · rule jsonb<br>is_secret · riddle · tiers</div></div>
+        <div class="tbl"><div class="h">user_achievements</div><div class="r">user_id · achievement_id<br>tier · earned_at · share_token</div></div>
+        <div class="tbl"><div class="h">daily_missions</div><div class="r">user_id · date · steps jsonb<br>completed_at · find_item_id</div></div>
+        <div class="tbl"><div class="h">streak_weeks</div><div class="r">user_id · week · goal<br>days_done · freeze_used</div></div>
+        <div class="tbl"><div class="h">bestiary</div><div class="r">user_id · error_type<br>first_seen · tamed_at</div></div>
+        <div class="tbl"><div class="h">codex_items</div><div class="r">user_id · task_id · code<br>tags · created_at</div></div>
+        <div class="tbl"><div class="h">skills · task_skill_tags</div><div class="r">user_id · skill · value<br>task_id · skill · weight</div></div>
+        <div class="tbl"><div class="h">echo_schedule</div><div class="r">user_id · topic · box<br>due_at · last_result</div></div>
+        <div class="tbl"><div class="h">league_members</div><div class="r">week · league_id · user_id<br>points · result</div></div>
+        <div class="tbl"><div class="h">teams · team_quests</div><div class="r">team_id · members<br>week · goal · progress</div></div>
+        <div class="tbl"><div class="h">shop_items · inventory</div><div class="r">item_id · price · currency<br>user_id · item_id · equipped</div></div>
+        <div class="tbl"><div class="h">help_votes · verifications</div><div class="r">from · to · post_id<br>kind · status · checked_at</div></div>
+      </div>
+    </div>
+  </div>
+</section>

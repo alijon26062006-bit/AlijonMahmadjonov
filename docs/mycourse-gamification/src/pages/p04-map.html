@@ -1,0 +1,86 @@
+<section class="page" data-sec="03 · КАРТА МИРОВ">
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">03 · Карта приключения</div>
+      <h2>11 миров — <span class="g">11 разных жанров</span>, один путь к вершине</h2></div>
+    <div class="sm muted" style="max-width:430px;text-align:right">Путь поднимается от долины к пику Сомони (7 495 м). Каждый блок курса — отдельный мир с собственной механикой, чтобы игра не приедалась.</div>
+  </div>
+  <div style="display:grid;grid-template-columns:960px 1fr;gap:28px;margin-top:18px">
+    <div style="position:relative;width:960px;height:700px;border-radius:24px;overflow:hidden;border:1px solid var(--line)">
+      <svg viewBox="0 0 960 700" width="960" height="700" style="position:absolute;inset:0">
+        <defs>
+          <linearGradient id="mapbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0F2018"/><stop offset="1" stop-color="#0A130E"/></linearGradient>
+          <filter id="mb"><feGaussianBlur stdDeviation="30"/></filter>
+          <filter id="mb2"><feGaussianBlur stdDeviation="5"/></filter>
+        </defs>
+        <rect width="960" height="700" fill="url(#mapbg)"/>
+        <g fill="none" stroke="#2EE070" stroke-opacity=".06" stroke-width="1.5">
+          <path d="M0 520c120-40 220 30 360-10s260-60 380-20 160 30 220 0"/><path d="M0 560c120-40 220 30 360-10s260-60 380-20 160 30 220 0"/>
+          <path d="M0 360c140-30 240 40 380 0s240-80 340-40 180 30 240 10"/><path d="M0 320c140-30 240 40 380 0s240-80 340-40 180 30 240 10"/>
+          <path d="M0 200c160-20 260 30 400-10s220-70 320-40"/>
+        </g>
+        <g filter="url(#mb)" opacity=".55">
+          <circle cx="90" cy="630" r="80" fill="#9CF7C1" opacity=".18"/><circle cx="260" cy="610" r="90" fill="#2EE070" opacity=".2"/>
+          <circle cx="440" cy="640" r="80" fill="#FFB547" opacity=".16"/><circle cx="620" cy="590" r="80" fill="#3FD5E0" opacity=".16"/>
+          <circle cx="800" cy="530" r="80" fill="#FF7AB6" opacity=".16"/><circle cx="850" cy="400" r="80" fill="#FFC24A" opacity=".14"/>
+          <circle cx="660" cy="390" r="80" fill="#B57BFF" opacity=".18"/><circle cx="470" cy="420" r="80" fill="#4FA8FF" opacity=".16"/>
+          <circle cx="280" cy="370" r="80" fill="#8EA2FF" opacity=".16"/><circle cx="520" cy="230" r="80" fill="#F2A65A" opacity=".14"/>
+        </g>
+        <!-- горы -->
+        <linearGradient id="mtn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1A3A28"/><stop offset="1" stop-color="#1A3A28" stop-opacity="0"/></linearGradient>
+        <linearGradient id="mtn2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14301F"/><stop offset="1" stop-color="#14301F" stop-opacity="0"/></linearGradient>
+        <path d="M380 420 590 140l55 45 75-125 80 95 70-40 120 120v185z" fill="url(#mtn)"/>
+        <path d="M700 60 720 92l-12-5-10 12-9-12-12 6z" fill="#DFF7E9" opacity=".85"/>
+        <path d="M520 420 650 230l60 40 70-60 90 70 90-30v170z" fill="url(#mtn2)"/>
+        <!-- река -->
+        <path d="M0 470c80 10 120 60 170 110s120 50 160 120" fill="none" stroke="#3FD5E0" stroke-opacity=".25" stroke-width="10" stroke-linecap="round"/>
+        <!-- путь -->
+        <path d="M90 660C170 650 190 640 260 640S380 675 440 670 560 625 620 620 760 590 800 560 880 470 850 430 720 410 660 420 530 455 470 450 320 420 280 400 420 260 520 250 650 160 700 120" fill="none" stroke="#2EE070" stroke-width="14" opacity=".15" filter="url(#mb2)"/>
+        <path d="M90 660C170 650 190 640 260 640S380 675 440 670 560 625 620 620 760 590 800 560 880 470 850 430 720 410 660 420 530 455 470 450 320 420 280 400 420 260 520 250 650 160 700 120" fill="none" stroke="#9CF7C1" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/>
+        <!-- деревья -->
+        <g fill="#1B4A31"><path d="M150 560l10-24 10 24z"/><path d="M168 570l8-20 8 20z"/><path d="M360 590l10-24 10 24z"/><path d="M540 560l9-22 9 22z"/><path d="M720 500l9-22 9 22z"/><path d="M120 470l9-22 9 22z"/><path d="M380 360l9-22 9 22z"/></g>
+        <text x="24" y="40" font-family="JetBrains Mono" font-size="12" fill="#61756A" letter-spacing="2">КАРТАИ САФАР · КАРТА ПУТЕШЕСТВИЯ</text>
+        <g transform="translate(900 640)" font-family="JetBrains Mono" font-size="11" fill="#61756A" text-anchor="middle"><circle r="22" fill="none" stroke="#2C4337"/><path d="M0-18 5 0 0 18-5 0z" fill="#2EE070" opacity=".6"/><text y="-28">С</text></g>
+      </svg>
+      <!-- узлы -->
+      <div class="mapnodes">
+        <style>
+          .mn{position:absolute;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#0B110E;border:3px solid var(--c);box-shadow:0 0 0 6px rgba(0,0,0,.25),0 0 30px -4px var(--c)}
+          .mn svg{width:26px;height:26px}
+          .mn .n{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--c);color:#06120B;font:800 11px/22px var(--mono);text-align:center}
+          .ml{position:absolute;width:160px;text-align:center;font-size:12.5px;font-weight:700;line-height:1.2}
+          .ml span{display:block;font-weight:500;color:var(--muted);font-size:11px}
+        </style>
+        <div class="mn" style="--c:#9CF7C1;left:62px;top:632px" data-i="egg" data-c="#9CF7C1"></div><div class="ml" style="left:10px;top:592px">Тухми Аждаҳо<span>Яйцо дракона</span></div>
+        <div class="mn" style="--c:#2EE070;left:232px;top:612px" data-i="city" data-c="#2EE070"></div><div class="ml" style="left:180px;top:572px">Шаҳри Хомӯш<span>Безмолвный город</span></div>
+        <div class="mn" style="--c:#FFB547;left:412px;top:642px" data-i="flask" data-c="#FFB547"></div><div class="ml" style="left:360px;top:604px">Устохонаи Кимиёгар<span>Мастерская алхимика</span></div>
+        <div class="mn" style="--c:#3FD5E0;left:592px;top:592px" data-i="chat" data-c="#3FD5E0"></div><div class="ml" style="left:540px;top:652px">Корвонсарои Ботҳо<span>Караван-сарай ботов</span></div>
+        <div class="mn" style="--c:#FF7AB6;left:772px;top:532px" data-i="robot" data-c="#FF7AB6"></div><div class="ml" style="left:720px;top:592px">Заводи Роботҳо<span>Завод роботов</span></div>
+        <div class="mn" style="--c:#FFC24A;left:822px;top:402px" data-i="search" data-c="#FFC24A"></div><div class="ml" style="left:770px;top:462px">Тиллои Помир<span>Дело о золоте</span></div>
+        <div class="mn" style="--c:#B57BFF;left:632px;top:392px" data-i="lamp" data-c="#B57BFF"></div><div class="ml" style="left:580px;top:452px">Чароғи Ҷин<span>Лампа джинна</span></div>
+        <div class="mn" style="--c:#4FA8FF;left:442px;top:422px" data-i="clock" data-c="#4FA8FF"></div><div class="ml" style="left:390px;top:482px">Мошини Вақт<span>Машина времени</span></div>
+        <div class="mn" style="--c:#8EA2FF;left:252px;top:372px" data-i="ship" data-c="#8EA2FF"></div><div class="ml" style="left:200px;top:432px">Экипажи Ситора<span>Звёздный экипаж</span></div>
+        <div class="mn" style="--c:#F2A65A;left:492px;top:222px" data-i="camel" data-c="#F2A65A"></div><div class="ml" style="left:340px;top:226px;text-align:right;width:140px">Роҳи Абрешим<span>Шёлковый путь</span></div>
+        <div class="mn" style="--c:#FFC24A;left:672px;top:92px;width:64px;height:64px" data-i="mountain" data-c="#FFC24A"></div><div class="ml" style="left:748px;top:102px;text-align:left">Қуллаи Сомонӣ<span>Пик Сомони · финал</span></div>
+      </div>
+      <div style="position:absolute;left:100px;top:600px;transform:translate(-60px,-80px)"></div>
+    </div>
+
+    <div class="col" style="gap:7px">
+      <style>.wl{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:5px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+        .wl .d{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:800 12px/1 var(--mono);color:#06120B}
+        .wl b{font-size:13px}.wl i{font-style:normal;color:var(--muted);font-size:11.5px}</style>
+      <div class="wl"><div class="d" style="background:#9CF7C1">0</div><div><b>Начало программирования</b><br><i>выращивание компаньона</i></div><span class="chip gray">5 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#2EE070">1</div><div><b>Основы Python</b><br><i>восстановление города</i></div><span class="chip gray">10 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#FFB547">2</div><div><b>Функции и данные</b><br><i>крафт и алхимия</i></div><span class="chip gray">5 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#3FD5E0">3</div><div><b>Telegram-боты</b><br><i>бизнес-тайкун</i></div><span class="chip gray">6 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#FF7AB6">4</div><div><b>ООП</b><br><i>конструктор и арена</i></div><span class="chip gray">4 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#FFC24A">5</div><div><b>Базы данных</b><br><i>детектив</i></div><span class="chip gray">5 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#B57BFF">6</div><div><b>Искусственный интеллект</b><br><i>сказка-головоломка</i></div><span class="chip gray">2 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#4FA8FF">7</div><div><b>Git и GitHub</b><br><i>путешествие во времени</i></div><span class="chip gray">4 ур.</span></div>
+      <div class="wl"><div class="d" style="background:#8EA2FF">8</div><div><b>Вайбкодинг</b><br><i>космический экипаж</i></div><span class="chip prop">идея</span></div>
+      <div class="wl"><div class="d" style="background:#F2A65A">9</div><div><b>Фриланс</b><br><i>торговая RPG репутации</i></div><span class="chip prop">идея</span></div>
+      <div class="wl"><div class="d" style="background:#FFC24A">10</div><div><b>Финальный проект</b><br><i>горная экспедиция</i></div><span class="chip prop">идея</span></div>
+      <div class="xs faint" style="margin-top:2px">«идея» — уроки блока ещё не определены; на следующих страницах содержание предложено, а не взято из курса.</div>
+    </div>
+  </div>
+</section>

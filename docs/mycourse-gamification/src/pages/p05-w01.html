@@ -1,0 +1,101 @@
+<section class="page" data-sec="04 · МИРЫ 0–1" style="padding-top:40px">
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">04 · Миры блоков 0 и 1</div><h2 style="font-size:30px;margin-top:8px">Первые шаги: вылупить компаньона и оживить город</h2></div>
+    <div class="row" style="gap:6px"><span class="chip gray">жанр меняется каждый блок</span><span class="chip">весь контент курса сохранён</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px;gap:20px">
+
+    <!-- БЛОК 0 -->
+    <div class="world" style="--wc:#9CF7C1">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w0bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#123D29"/><stop offset="1" stop-color="#08140E"/></linearGradient>
+          <radialGradient id="w0gl"><stop offset="0" stop-color="#9CF7C1" stop-opacity=".55"/><stop offset="1" stop-color="#9CF7C1" stop-opacity="0"/></radialGradient>
+          <linearGradient id="shadeB" x1="0" y1="0" x2="0" y2="1"><stop offset=".35" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".65"/></linearGradient><linearGradient id="shadeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".55" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
+          <rect width="720" height="170" fill="url(#w0bg)"/>
+          <g fill="#DFF7E9" opacity=".7"><circle cx="40" cy="30" r="1.2"/><circle cx="120" cy="18" r="1"/><circle cx="260" cy="26" r="1.4"/><circle cx="400" cy="14" r="1"/><circle cx="470" cy="40" r="1.2"/><circle cx="690" cy="22" r="1"/></g>
+          <text x="210" y="62" font-family="JetBrains Mono" font-size="17" fill="#9CF7C1" opacity=".45">print("Салом, Ҷаҳон!")</text>
+          <text x="300" y="92" font-family="JetBrains Mono" font-size="12" fill="#9CF7C1" opacity=".3">&gt;&gt;&gt; Салом, Ҷаҳон!</text>
+          <circle cx="590" cy="88" r="80" fill="url(#w0gl)"/>
+          <path d="M520 130c20 22 120 22 140 0" stroke="#7A5A33" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path d="M515 126l40 14M665 126l-40 14M530 138l30-4M650 138l-30-4" stroke="#5E4426" stroke-width="4" stroke-linecap="round"/>
+          <path d="M590 30c24 0 40 34 40 62a40 40 0 0 1-80 0c0-28 16-62 40-62z" fill="#C9FFD9" stroke="#2E8B57" stroke-width="2"/>
+          <circle cx="578" cy="58" r="6" fill="#FFC24A" opacity=".8"/><circle cx="606" cy="84" r="8" fill="#FFC24A" opacity=".75"/><circle cx="582" cy="106" r="5" fill="#FFC24A" opacity=".75"/>
+          <path d="M556 80l9 6 7-8 8 9 7-7 8 8 7-6 10 5" fill="none" stroke="#0F3B24" stroke-width="2.5" stroke-linejoin="round"/>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 0 · Начало программирования</div><div class="wn">Тухми Аждаҳо</div><div class="wr">Яйцо дракона</div></div><span class="chip" style="background:rgba(0,0,0,.4)">выращивание компаньона</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>Ученик получает загадочное яйцо. Внутри — <b class="mint">Пайко</b>, питон-дракончик, который просыпается только от настоящего кода. Каждый урок блока — шаг к вылуплению, а первая программа — его первое слово.</div>
+        <div><div class="lbl">Уроки курса → игровые квесты</div>
+          <div class="qmap">
+            <span class="l">Знакомство с курсом</span><span class="q"><b>«Найди яйцо»</b> — видео + выбор имени героя и недельной цели Гулхана</span>
+            <span class="l">Установка Python</span><span class="q"><b>«Согрей яйцо»</b> — тест + проверка вывода <span class="mono">python --version</span>: яйцо теплеет</span>
+            <span class="l">VS Code</span><span class="q"><b>«Построй гнездо»</b> — практика с редактором: гнездо готово</span>
+            <span class="l">Первая программа</span><span class="q"><b>«Первое слово»</b> — <span class="mono">print()</span> в онлайн-редакторе: Пайко вылупляется и «говорит» вывод</span>
+            <span class="l">Ошибки и исправление</span><span class="q"><b>«Доктор для Пайко»</b> — починить 5 сломанных программ: первые существа Бестиария</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">3 мин</span><b>Читай Traceback</b>По сообщению об ошибке указать строку и тип ошибки</div>
+          <div><span class="t">2 мин</span><b>Собери print</b>Перетащить токены в правильный порядок, чтобы код запустился</div>
+          <div><span class="t">2 мин</span><b>Что выведет?</b>5 коротких программ — угадать вывод до запуска</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="bug" data-c="#FF8A8A"></div>
+          <div><b>Босс «Хатои Аввал» (Первая Ошибка)</b><div class="muted">Тень, которая питается непрочитанными ошибками. Победа — исправить 3 программы, читая Traceback. Подсказки разрешены и не отнимают XP: они лишь уменьшают «блеск» трофея.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="0" data-s="50"></div><div data-ach="1" data-s="50"></div>
+          <div class="rew"><span class="chip">Пайко: стадия «Малыш»</span><span class="chip">рамка профиля «Гнездо»</span><span class="chip">скорлупа — 1-й предмет коллекции</span></div></div>
+        <div class="hook"><span data-i="moon" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">Пайко засыпает со словами «Завтра я научусь запоминать!» — тизер темы «Переменные» и первое здание города.</span></div></div>
+      </div>
+    </div>
+
+    <!-- БЛОК 1 -->
+    <div class="world" style="--wc:#2EE070">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w1bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0F3322"/><stop offset="1" stop-color="#07120C"/></linearGradient>
+          <pattern id="w1win" width="12" height="14" patternUnits="userSpaceOnUse"><rect x="3" y="3" width="5" height="6" fill="#FFE08A" opacity=".75"/></pattern>
+          <pattern id="w1off" width="12" height="14" patternUnits="userSpaceOnUse"><rect x="3" y="3" width="5" height="6" fill="#2A3A31"/></pattern></defs>
+          <rect width="720" height="170" fill="url(#w1bg)"/>
+          <circle cx="300" cy="36" r="16" fill="#E9FFF1" opacity=".8"/>
+          <g transform="translate(680 118)"><circle r="40" fill="none" stroke="#2EE070" stroke-width="4" opacity=".6"/><g stroke="#2EE070" stroke-width="3" opacity=".6"><path d="M-40 0H40M0-40V40M-28-28 28 28M-28 28 28-28"/></g><circle r="6" fill="#2EE070"/></g>
+          <path d="M630 165c40-8 80-8 120 0" stroke="#3FD5E0" stroke-width="6" opacity=".4" fill="none"/>
+          <g><rect x="350" y="70" width="60" height="100" fill="#13261C"/><rect x="350" y="70" width="60" height="100" fill="url(#w1win)"/>
+            <rect x="408" y="40" width="50" height="130" fill="#13261C"/><rect x="408" y="40" width="50" height="130" fill="url(#w1win)"/>
+            <rect x="466" y="85" width="70" height="85" fill="#13261C"/><rect x="466" y="85" width="70" height="85" fill="url(#w1win)"/>
+            <rect x="544" y="55" width="44" height="115" fill="#101C16"/><rect x="544" y="55" width="44" height="115" fill="url(#w1off)"/>
+            <rect x="596" y="96" width="64" height="80" fill="#101C16"/><rect x="596" y="96" width="64" height="80" fill="url(#w1off)"/>
+            </g>
+          <g transform="translate(325 100)"><rect x="-7" y="-20" width="14" height="36" rx="4" fill="#0B110E" stroke="#2C4337"/><circle cy="-12" r="3.5" fill="#3a1a1a"/><circle cy="-2" r="3.5" fill="#3a331a"/><circle cy="8" r="3.5" fill="#2EE070"/><path d="M0 16v54" stroke="#2C4337" stroke-width="3"/></g>
+          <text x="470" y="24" font-family="JetBrains Mono" font-size="11" fill="#97AAA0" opacity=".9">кварталы восстановлены: 3 / 9</text>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 1 · Основы Python</div><div class="wn">Шаҳри Хомӯш</div><div class="wr">Безмолвный город</div></div><span class="chip" style="background:rgba(0,0,0,.4)">восстановление города</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>Город, где все машины остановились: их программы стёрты. Каждая тема оживляет <b class="g">один квартал</b> — и город на карте буквально загорается огнями. На экзамене на город обрушивается Шторм багов.</div>
+        <div><div class="lbl">Уроки курса → кварталы города</div>
+          <div class="qmap" style="grid-template-columns:auto 1fr auto 1fr;gap:3px 10px">
+            <span class="l">Переменные</span><span class="q"><b>Склад</b> — ящики с ярлыками</span>
+            <span class="l">Математика</span><span class="q"><b>Базар</b> — цены и сдача</span>
+            <span class="l">input()</span><span class="q"><b>Почта</b> — письма жителей</span>
+            <span class="l">if/elif/else</span><span class="q"><b>Светофоры</b> перекрёстков</span>
+            <span class="l">while и for</span><span class="q"><b>Водяная мельница</b></span>
+            <span class="l">Списки</span><span class="q"><b>Поезд</b> — вагоны-индексы</span>
+            <span class="l">Строки</span><span class="q"><b>Библиотека</b></span>
+            <span class="l">Словари</span><span class="q"><b>Архив</b> ключей</span>
+            <span class="l">Ошибки</span><span class="q"><b>Пожарная часть</b> — try/except</span>
+            <span class="l">Экзамен</span><span class="q"><b>Шторм багов</b> — босс</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">60 сек</span><b>Сортировщик типов</b>Раскидать значения по ящикам int / float / str / bool / list</div>
+          <div><span class="t">3 мин</span><b>Трассировщик цикла</b>Предсказать значение переменной на каждом шаге цикла</div>
+          <div><span class="t">2 мин</span><b>Срез-снайпер</b>Написать срез строки, попадающий в подсвеченные буквы</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="bolt" data-c="#FF8A8A"></div>
+          <div><b>Босс «Тӯфони Багҳо» (Шторм багов) = итоговый экзамен</b><div class="muted">7 волн задач атакуют кварталы, построенные учеником. Ошибка не отнимает прогресс — квартал лишь «мерцает», пока его не починят.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="11" data-s="50"></div><div data-ach="12" data-s="50"></div><div data-ach="9" data-s="50"></div>
+          <div class="rew"><span class="chip">Пайко → «Золотой»</span><span class="chip">«Ключ от архива»</span><span class="chip">живой город на карте</span></div></div>
+        <div class="hook"><span data-i="mail" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">каждый день жители приносят «заявку» — 3-минутную задачу на пройденную тему. Город растёт вместе с учеником.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,83 @@
+<section class="page" data-sec="04 · МИРЫ 6–7" style="padding-top:40px">
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">04 · Миры блоков 6 и 7</div><h2 style="font-size:30px;margin-top:8px">Современные инструменты: приручить джинна и управлять временем</h2></div>
+    <div class="row" style="gap:6px"><span class="chip">проверка через реальные API: AI-сервис и GitHub</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px;gap:20px">
+
+    <!-- БЛОК 6 -->
+    <div class="world" style="--wc:#B57BFF">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w6bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2C1150"/><stop offset="1" stop-color="#0C0518"/></linearGradient>
+          <radialGradient id="w6gl"><stop offset="0" stop-color="#B57BFF" stop-opacity=".55"/><stop offset="1" stop-color="#B57BFF" stop-opacity="0"/></radialGradient></defs>
+          <rect width="720" height="170" fill="url(#w6bg)"/>
+          <circle cx="560" cy="70" r="90" fill="url(#w6gl)"/>
+          <path d="M520 130c-20-30 30-40 10-70s40-40 30-60" stroke="#D3B2FF" stroke-opacity=".55" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <path d="M520 130c-20-30 30-40 10-70s40-40 30-60" stroke="#F0E2FF" stroke-opacity=".5" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <g fill="#F0E2FF"><path d="m600 30 3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><path d="m640 70 2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="m470 40 2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></g>
+          <text x="590" y="110" font-family="JetBrains Mono" font-size="26" font-weight="800" fill="#F0E2FF" opacity=".85">AI</text>
+          <g transform="translate(520 140)"><path d="M-60 0c20 0 30-14 60-14 28 0 38 8 50 8l14-14M-60 0c10 14 30 20 60 20s44-8 50-24" fill="#FFC24A" stroke="#7A4E05" stroke-width="3"/><path d="M-6-14v-8h12v8" fill="#FFC24A" stroke="#7A4E05" stroke-width="3"/></g>
+          <text x="340" y="34" font-family="JetBrains Mono" font-size="11" fill="#D3B2FF" opacity=".45">messages=[{"role": "user", ...}]</text>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 6 · Искусственный интеллект</div><div class="wn">Чароғи Ҷин</div><div class="wr">Лампа джинна</div></div><span class="chip epic" style="background:rgba(0,0,0,.4)">сказка-головоломка</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>Ученик находит лампу с джинном — это AI. Джинн всесилен, но понимает слова буквально и тратит «желания» (токены и деньги). Цель — научиться <b style="color:var(--epic)">ставить точные задачи</b> и безопасно встраивать джинна в свои боты и сервисы.</div>
+        <div><div class="lbl">Уроки курса → игровые квесты</div>
+          <div class="qmap">
+            <span class="l">Подключение AI</span><span class="q"><b>«Пробудить джинна»</b> — API-ключ в <span class="mono">.env</span> («не произноси заклинание вслух»), первый запрос, лимиты и стоимость</span>
+            <span class="l">AI в ботах и веб</span><span class="q"><b>«Джинн на службе»</b> — AI-ответы в своём Telegram-боте: контекст, роль, ограничения, обработка ошибок API</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">4 мин</span><b>Три желания</b>Получить нужный ответ ИИ не более чем за 3 запроса</div>
+          <div><span class="t">3 мин</span><b>Промпт-гольф</b>Меньше токенов при верном результате = лучший счёт</div>
+          <div><span class="t">3 мин</span><b>Хитрый гость</b>Защитить бота от попытки выведать секретный ключ</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="lamp" data-c="#FF8A8A"></div>
+          <div><b>Босс «Ҷини Маккор» (Хитрый джинн)</b><div class="muted">AI-бот ученика проходит серию проверочных диалогов: вредные запросы, попытки взлома (prompt injection), вопросы не по теме. Бот должен отвечать вежливо, по делу и безопасно.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="23" data-s="50"></div><div data-ach="24" data-s="50"></div>
+          <div class="rew"><span class="chip epic">анимированная лампа в профиле</span><span class="chip epic">дым-эффект для аватара</span></div></div>
+        <div class="hook"><span data-i="star" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">«Желание дня» — новая промпт-задача с общим рейтингом по краткости; лучшие решения разбираются в пятницу.</span></div></div>
+      </div>
+    </div>
+
+    <!-- БЛОК 7 -->
+    <div class="world" style="--wc:#4FA8FF">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w7bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0D2A52"/><stop offset="1" stop-color="#050D1A"/></linearGradient></defs>
+          <rect width="720" height="170" fill="url(#w7bg)"/>
+          <g transform="translate(610 80)"><circle r="64" fill="#0A1B33" stroke="#4FA8FF" stroke-opacity=".6" stroke-width="3"/><circle r="52" fill="none" stroke="#4FA8FF" stroke-opacity=".3" stroke-dasharray="2 9" stroke-width="6"/>
+            <path d="M0 0V-38M0 0l26 14" stroke="#D8ECFF" stroke-width="4" stroke-linecap="round"/><circle r="5" fill="#4FA8FF"/>
+            <path d="M-78-10a80 80 0 0 1 20-40" stroke="#4FA8FF" stroke-width="3" fill="none"/><path d="M-62-56l6 8-10 1z" fill="#4FA8FF"/></g>
+          <g stroke-width="4" fill="none" stroke-linecap="round"><path d="M340 120h200" stroke="#4FA8FF"/><path d="M380 120c20 0 20-40 50-40h40c30 0 30 40 50 40" stroke="#2EE070"/></g>
+          <g stroke-width="3"><circle cx="350" cy="120" r="7" fill="#050D1A" stroke="#4FA8FF"/><circle cx="400" cy="120" r="7" fill="#050D1A" stroke="#4FA8FF"/><circle cx="440" cy="80" r="7" fill="#050D1A" stroke="#2EE070"/><circle cx="470" cy="80" r="7" fill="#050D1A" stroke="#2EE070"/><circle cx="460" cy="120" r="7" fill="#050D1A" stroke="#4FA8FF"/><circle cx="520" cy="120" r="9" fill="#4FA8FF" stroke="#D8ECFF"/></g>
+          <text x="420" y="66" font-family="JetBrains Mono" font-size="10" fill="#2EE070" opacity=".8">feature</text><text x="340" y="146" font-family="JetBrains Mono" font-size="10" fill="#4FA8FF" opacity=".8">main</text>
+          <text x="340" y="30" font-family="JetBrains Mono" font-size="12" fill="#4FA8FF" opacity=".45">git commit -m "сохраняю момент"</text>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 7 · Git и GitHub</div><div class="wn">Мошини Вақт</div><div class="wr">Машина времени</div></div><span class="chip rare" style="background:rgba(0,0,0,.4)">путешествие во времени</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>Коммиты — точки сохранения во времени, ветки — параллельные вселенные. Кто-то сломал историю проекта, и ученик становится <b style="color:var(--blue)">Хранителем времени</b>. Платформа проверяет реальный публичный репозиторий ученика через GitHub API.</div>
+        <div><div class="lbl">Уроки курса → игровые квесты</div>
+          <div class="qmap">
+            <span class="l">Git-команды</span><span class="q"><b>«Запустить машину»</b> — init, status, add: первый снимок мира</span>
+            <span class="l">Commit, push, clone</span><span class="q"><b>«Точки во времени»</b> — каждый коммит зажигает звезду на линии времени; push — отправка в «облачную башню»</span>
+            <span class="l">Branch</span><span class="q"><b>«Параллельные миры»</b> — ветка, merge и первый конфликт</span>
+            <span class="l">CI/CD</span><span class="q"><b>«Стражи врат»</b> — GitHub Actions: роботы-стражи запускают тесты на каждый push</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">3 мин</span><b>Граф времени</b>Каким станет граф после этих команд?</div>
+          <div><span class="t">2 мин</span><b>Команда-спринт</b>Выбрать git-команду для ситуации</div>
+          <div><span class="t">3 мин</span><b>Развилка</b>Разрешить конфликт, выбирая правильные строки</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="branch" data-c="#FF8A8A"></div>
+          <div><b>Босс «Парадокси Вақт» (Парадокс времени)</b><div class="muted">В учебном репозитории два «прошлых я» внесли конфликтующие изменения. Нужно слить ветки, разрешить конфликт и получить зелёную галочку CI.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="25" data-s="50"></div><div data-ach="26" data-s="50"></div><div data-ach="27" data-s="50"></div>
+          <div class="rew"><span class="chip rare">Пайко получает карманные часы</span><span class="chip rare">лента коммитов в профиле</span></div></div>
+        <div class="hook"><span data-i="cal" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">«Коммит дня» в своё портфолио засчитывается через API — и на GitHub растёт настоящая зелёная история, которую увидит работодатель.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>

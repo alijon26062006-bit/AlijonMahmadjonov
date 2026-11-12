@@ -1,0 +1,137 @@
+<section class="page" data-sec="10 · UX/UI · ГЛАВНАЯ" style="padding-top:40px">
+  <style>
+    .app{display:grid;grid-template-columns:196px 1fr;height:100%}
+    .side{background:#0A0F0C;border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:3px}
+    .side .logo{font:800 15px/1 var(--sans);margin:2px 6px 14px;display:flex;align-items:center;gap:7px}
+    .side .logo i{width:22px;height:22px;border-radius:7px;background:var(--g);display:grid;place-items:center;color:#03130A;font:800 11px/1 var(--mono);font-style:normal}
+    .nv{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;color:var(--muted);font-size:12px;font-weight:600}
+    .nv svg{width:16px;height:16px}.nv.on{background:rgba(46,224,112,.12);color:var(--mint)}
+    .nv .bd{margin-left:auto;font:700 9.5px/1 var(--mono);background:var(--g);color:#03130A;border-radius:6px;padding:3px 5px}
+    .mainui{padding:14px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+    .tb{display:flex;align-items:center;gap:14px}
+    .stat{display:flex;align-items:center;gap:6px;background:#111A15;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font:700 12px/1 var(--mono)}
+    .stat svg{width:15px;height:15px}
+  </style>
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">10 · UX/UI · Главная страница ученика</div><h2 style="font-size:30px;margin-top:8px">Всё, что нужно на сегодня, — на одном экране</h2></div>
+    <div class="row" style="gap:6px"><span class="chip gray">тёмная тема</span><span class="chip">зелёный акцент mycourse.tj</span><span class="chip gray">игровые элементы — дозированно</span></div>
+  </div>
+
+  <div class="screen" style="margin-top:14px;height:712px;position:relative">
+    <div class="bar"><i></i><i></i><i></i><span class="url">mycourse.tj/app</span></div>
+    <div class="app ui" style="height:682px">
+      <div class="side">
+        <div class="logo"><i>mc</i>mycourse<span class="g">.tj</span></div>
+        <div class="nv on"><span data-i="home"></span>Главная</div>
+        <div class="nv"><span data-i="map"></span>Карта миров</div>
+        <div class="nv"><span data-i="play"></span>Мои уроки</div>
+        <div class="nv"><span data-i="scroll"></span>Кодекс<span class="bd">64</span></div>
+        <div class="nv"><span data-i="bug"></span>Бестиарий<span class="bd">9</span></div>
+        <div class="nv"><span data-i="trophy"></span>Достижения</div>
+        <div class="nv"><span data-i="gem"></span>Лига</div>
+        <div class="nv"><span data-i="team"></span>Команда</div>
+        <div class="nv"><span data-i="shop"></span>Магазин</div>
+        <div class="nv"><span data-i="user"></span>Профиль</div>
+        <div style="margin-top:auto;background:#111A15;border:1px solid var(--line);border-radius:12px;padding:10px">
+          <div class="xs muted">Гулхан · неделя 5</div>
+          <div class="row" style="gap:3px;margin-top:6px;align-items:flex-end"><span data-i="flame" data-c="#FFB547" data-s="14"></span><span data-i="flame" data-c="#FFB547" data-s="16"></span><span data-i="flame" data-c="#FFB547" data-s="18"></span><span data-i="flame" data-c="#3a3a2a" data-s="18"></span><b class="mono" style="margin-left:auto;color:var(--warn);font-size:12px">3/4</b></div>
+          <div class="xs faint" style="margin-top:4px">ещё 1 день до цели недели</div>
+        </div>
+      </div>
+
+      <div class="mainui">
+        <div class="tb">
+          <div><div style="font-size:19px;font-weight:800">Салом, Фаррух!</div><div class="xs muted">Четверг · ты на 6 400 м пути</div></div>
+          <div style="flex:1;max-width:360px;margin-left:24px">
+            <div class="row xs" style="justify-content:space-between"><b>Ур. 12 · Созидатель <span class="tj">Созанда</span></b><span class="mono muted">4 100 / 4 600 XP</span></div>
+            <div class="xpbar" style="margin-top:5px"><span style="width:62%"></span></div>
+          </div>
+          <div class="row" style="gap:8px;margin-left:auto">
+            <div class="stat"><span data-i="coin" data-c="#FFC24A"></span>312</div>
+            <div class="stat"><span data-i="gem" data-c="#D3B2FF"></span>3</div>
+            <div class="stat"><span data-i="bell" data-c="#97AAA0"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--g)"></span></div>
+            <div class="av" style="width:32px;height:32px;border-radius:50%;background:var(--g);display:grid;place-items:center;font:800 13px/1 var(--sans);color:#06120B">Ф</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 330px;gap:12px">
+          <div class="panel" style="padding:0;overflow:hidden;display:grid;grid-template-columns:300px 1fr;height:196px">
+            <div style="position:relative;background:linear-gradient(135deg,#3B2608,#110A03)">
+              <svg viewBox="0 0 300 196" width="300" height="196" style="position:absolute;inset:0">
+                <circle cx="150" cy="120" r="70" fill="#2EE070" opacity=".12"/>
+                <path d="M100 105h100l-8 44c-3 14-14 20-42 20s-39-6-42-20z" fill="#1E1A14" stroke="#6B4A1E" stroke-width="3"/>
+                <ellipse cx="150" cy="105" rx="52" ry="10" fill="#2EE070" opacity=".85"/>
+                <g fill="#9CF7C1"><circle cx="130" cy="94" r="5"/><circle cx="160" cy="86" r="7" opacity=".8"/><circle cx="175" cy="70" r="4" opacity=".6"/></g>
+                <g><path d="M30 60V40h10v20zM50 60c-8 0-10-10-4-16v-8h8v8c6 6 4 16-4 16z" fill="#FF7AB6" opacity=".7"/><path d="M250 60V34h12v26zM272 60c-8 0-9-12 0-14 9 2 8 14 0 14z" fill="#3FD5E0" opacity=".7"/></g>
+              </svg>
+              <span class="chip warn" style="position:absolute;left:12px;top:12px;background:rgba(0,0,0,.45)">Мир 2 · Мастерская алхимика</span>
+            </div>
+            <div style="padding:16px 18px;display:flex;flex-direction:column">
+              <div class="mono xs" style="color:var(--warn);letter-spacing:.08em">ПРОДОЛЖИТЬ ПРИКЛЮЧЕНИЕ</div>
+              <div style="font-size:20px;font-weight:800;margin-top:6px">Квест «Ингредиенты и эликсир»</div>
+              <div class="sm muted">Урок 2.2 · Параметры и return · видео 12 мин + тест + 2 задачи</div>
+              <div class="row" style="gap:6px;margin-top:10px"><span class="chip gray">✓ видео</span><span class="chip gray">✓ тест 90%</span><span class="chip">● задача 1</span><span class="chip gray">○ задача 2</span></div>
+              <div class="row" style="margin-top:auto;align-items:center;gap:12px"><span class="btn">▶ Продолжить</span><span class="xs muted">+70 XP · +14 танга · эликсир для коллекции</span></div>
+            </div>
+          </div>
+          <div class="panel" style="display:flex;gap:8px;align-items:center;height:196px;background:radial-gradient(circle at 25% 60%,rgba(255,194,74,.12),#111A15 60%)">
+            <div data-payko="2" data-s="120"></div>
+            <div style="flex:1">
+              <div style="background:#1A2a21;border:1px solid var(--line2);border-radius:14px 14px 14px 4px;padding:10px 12px;font-size:12px;line-height:1.4">Мне снилась функция, которая возвращает <span class="mono g">return</span> пирожки! Сварим сегодня первый эликсир?</div>
+              <div class="xs faint" style="margin-top:6px">Пайко · Золотой · сыт</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.25fr 1fr 1fr 0.95fr;gap:12px">
+          <div class="panel" style="border-color:rgba(46,224,112,.4)">
+            <div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:13.5px">Миссия дня</b><span class="mono xs muted">≈ 14 мин</span></div>
+            <div class="col" style="gap:8px;margin-top:10px;font-size:12px">
+              <div class="row" style="gap:8px;align-items:center"><span class="check on"></span><span class="muted" style="text-decoration:line-through">Видео «Параметры функции»</span><span class="mono xs g" style="margin-left:auto">+10</span></div>
+              <div class="row" style="gap:8px;align-items:center"><span class="check on"></span><span class="muted" style="text-decoration:line-through">Тест урока 2.2</span><span class="mono xs g" style="margin-left:auto">+27</span></div>
+              <div class="row" style="gap:8px;align-items:center"><span class="check"></span><span>Задача «Цена со скидкой»</span><span class="mono xs g" style="margin-left:auto">+40</span></div>
+              <div class="row" style="gap:8px;align-items:center"><span class="check"></span><span>Эхо: списки (из Блока 1)</span><span class="mono xs g" style="margin-left:auto">+15</span></div>
+            </div>
+            <div class="xpbar" style="margin-top:12px"><span style="width:50%"></span></div>
+            <div class="row xs" style="justify-content:space-between;margin-top:6px"><span class="muted">2 из 4</span><span style="color:var(--leg)">награда: +20 XP · находка дня</span></div>
+          </div>
+          <div class="panel">
+            <div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:13.5px">Сирри рӯз</b><span class="chip" style="padding:2px 7px;font-size:10px">2 мин</span></div>
+            <div class="code" style="margin-top:10px;font-size:11px;padding:8px 10px"><div>x = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]</div><div>y = x</div><div>y.append(<span class="n">4</span>)</div><div><span class="k">print</span>(len(x))</div></div>
+            <div class="row" style="gap:6px;margin-top:10px"><span class="btn ghost" style="height:26px;padding:0 10px">3</span><span class="btn ghost" style="height:26px;padding:0 10px">4</span><span class="btn ghost" style="height:26px;padding:0 10px">ошибка</span></div>
+            <div class="xs faint" style="margin-top:8px">Решили 1 284 ученика · разбор в 20:00</div>
+          </div>
+          <div class="panel">
+            <div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:13.5px">Сила программиста</b><span class="chip" style="padding:2px 7px;font-size:10px">+3 сегодня</span></div>
+            <div style="display:flex;justify-content:center;margin-top:-4px" data-radar='{"v":[0.72,0.6,0.55,0.42,0.25,0.38],"p":[0.6,0.5,0.4,0.3,0.2,0.3]}' data-s="168"></div>
+          </div>
+          <div class="panel">
+            <div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:13.5px">Лига «Нуқра»</b><span class="mono xs muted">3 дня</span></div>
+            <div class="col" style="gap:5px;margin-top:10px;font-size:11.5px">
+              <div class="row" style="gap:6px"><span class="mono faint">6</span><span>Мадина</span><span class="mono muted" style="margin-left:auto">412</span></div>
+              <div class="row" style="gap:6px;background:rgba(46,224,112,.12);border-radius:7px;padding:3px 6px;margin:0 -6px"><span class="mono g">7</span><b>Ты</b><span class="mono g" style="margin-left:auto">398</span></div>
+              <div class="row" style="gap:6px"><span class="mono faint">8</span><span>Сухроб</span><span class="mono muted" style="margin-left:auto">371</span></div>
+              <div class="row" style="gap:6px"><span class="mono faint">9</span><span>Нигина</span><span class="mono muted" style="margin-left:auto">350</span></div>
+            </div>
+            <div class="xs" style="margin-top:8px;color:var(--mint)">Топ-10 переходят в «Тилло»</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="panel row" style="align-items:center;gap:10px"><div data-cr="#4FA8FF|2" data-s="44"></div><div class="xs"><b style="font-size:12px">Новое существо рядом!</b><div class="muted">IndexError «Канорбез» замечен в задаче 2</div></div></div>
+          <div class="panel row" style="align-items:center;gap:10px"><div data-ach="13" data-s="40"></div><div class="xs" style="flex:1"><b style="font-size:12px">«Алхимик»: 18 / 25 функций</b><div class="xpbar" style="margin-top:5px"><span style="width:72%;background:linear-gradient(90deg,#1F5FA8,var(--rare))"></span></div></div></div>
+          <div class="panel row" style="align-items:center;gap:10px"><span data-i="team" data-c="#9CF7C1" data-s="26"></span><div class="xs" style="flex:1"><b style="font-size:12px">«Памирские барсы»: 31/40</b><div class="muted">твой вклад 9 задач · босс недели в пятницу</div></div></div>
+        </div>
+        <div class="panel" style="display:flex;align-items:center;gap:14px;padding:10px 16px">
+          <div style="width:120px"><b style="font-size:12.5px">Путь героя</b><div class="xs muted">мир 3 из 11 · 6 400 м</div></div>
+          <div style="flex:1;position:relative;display:flex;justify-content:space-between"><div style="position:absolute;left:35px;right:35px;top:13px;height:2px;background:linear-gradient(90deg,var(--g) 20%,#2C4337 20%)"></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#9CF7C1;border:2px solid #9CF7C1;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#06120B;">0</div><div style="font-size:10px;margin-top:4px;color:#97AAA0">Яйцо</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#2EE070;border:2px solid #2EE070;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#06120B;">1</div><div style="font-size:10px;margin-top:4px;color:#97AAA0">Город</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #FFB547;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#FFB547;box-shadow:0 0 0 4px rgba(255,181,71,.18),0 0 18px #FFB547;">2</div><div style="font-size:10px;margin-top:4px;color:#97AAA0">Алхимия</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">3</div><div style="font-size:10px;margin-top:4px;color:#61756A">Боты</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">4</div><div style="font-size:10px;margin-top:4px;color:#61756A">Роботы</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">5</div><div style="font-size:10px;margin-top:4px;color:#61756A">Детектив</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">6</div><div style="font-size:10px;margin-top:4px;color:#61756A">Джинн</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">7</div><div style="font-size:10px;margin-top:4px;color:#61756A">Время</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">8</div><div style="font-size:10px;margin-top:4px;color:#61756A">Экипаж</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">9</div><div style="font-size:10px;margin-top:4px;color:#61756A">Шёлк. путь</div></div><div style="text-align:center;width:70px;position:relative"><div style="width:26px;height:26px;margin:0 auto;border-radius:50%;background:#0B110E;border:2px solid #2C4337;display:grid;place-items:center;font:800 10px/1 var(--mono);color:#61756A;">10</div><div style="font-size:10px;margin-top:4px;color:#61756A">Пик</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label-tag l" style="left:1020px;top:46px">1 · УРОВЕНЬ И ВАЛЮТЫ</div>
+    <div class="label-tag l" style="left:925px;top:252px">2 · ПРОДОЛЖИТЬ УРОК</div>
+    <div class="label-tag t" style="left:1180px;top:262px">3 · ПАЙКО ГОВОРИТ ТИЗЕРОМ</div>
+    <div class="label-tag b" style="left:220px;top:286px">4 · МИССИЯ ДНЯ</div>
+    <div class="label-tag l" style="left:20px;top:560px">5 · НЕДЕЛЬНЫЙ КОСТЁР</div>
+  </div>
+</section>

@@ -1,0 +1,94 @@
+<section class="page" data-sec="04 · МИРЫ 2–3" style="padding-top:40px">
+  <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div><div class="kicker">04 · Миры блоков 2 и 3</div><h2 style="font-size:30px;margin-top:8px">Из рецептов — в настоящий продукт: функции становятся ботом</h2></div>
+    <div class="row" style="gap:6px"><span class="chip">сквозной сюжет: код из Блока 2 работает в Блоке 3</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px;gap:20px">
+
+    <!-- БЛОК 2 -->
+    <div class="world" style="--wc:#FFB547">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w2bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B2608"/><stop offset="1" stop-color="#110A03"/></linearGradient>
+          <radialGradient id="w2gl"><stop offset="0" stop-color="#2EE070" stop-opacity=".5"/><stop offset="1" stop-color="#2EE070" stop-opacity="0"/></radialGradient></defs>
+          <rect width="720" height="170" fill="url(#w2bg)"/>
+          <text x="340" y="34" font-family="JetBrains Mono" font-size="13" fill="#FFB547" opacity=".35">def brew(herb, water): return elixir</text>
+          <g stroke="#6B4A1E" stroke-width="5"><path d="M600 60h120M600 112h120"/></g>
+          <g><path d="M615 58V38h10v20z" fill="#FF7AB6" opacity=".85"/><path d="M640 58c-8 0-10-10-4-16v-8h8v8c6 6 4 16-4 16z" fill="#3FD5E0" opacity=".85"/><path d="M668 58V30h12v28z" fill="#B57BFF" opacity=".85"/><path d="M694 58c-8 0-9-12 0-14 9 2 8 14 0 14z" fill="#2EE070" opacity=".85"/>
+          <path d="M618 110V88h12v22z" fill="#FFC24A" opacity=".85"/><path d="M650 110c-9 0-11-12-4-18v-6h8v6c7 6 5 18-4 18z" fill="#FF6B6B" opacity=".8"/><path d="M680 110V92h14v18z" fill="#9CF7C1" opacity=".85"/></g>
+          <circle cx="490" cy="110" r="70" fill="url(#w2gl)"/>
+          <path d="M440 95h100l-8 44c-3 14-14 20-42 20s-39-6-42-20z" fill="#1E1A14" stroke="#6B4A1E" stroke-width="3"/>
+          <ellipse cx="490" cy="95" rx="52" ry="10" fill="#2EE070" opacity=".85"/>
+          <g fill="#9CF7C1"><circle cx="470" cy="86" r="5"/><circle cx="500" cy="78" r="7" opacity=".8"/><circle cx="515" cy="62" r="4" opacity=".6"/><circle cx="485" cy="55" r="3" opacity=".5"/></g>
+          <path d="M470 60c-10-14 10-20 0-36M505 50c-10-14 10-20 0-34" stroke="#9CF7C1" stroke-opacity=".35" stroke-width="3" fill="none"/>
+          <path d="M455 160l-10 10M525 160l10 10" stroke="#6B4A1E" stroke-width="4"/>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 2 · Функции и работа с данными</div><div class="wn">Устохонаи Кимиёгар</div><div class="wr">Мастерская алхимика</div></div><span class="chip" style="background:rgba(0,0,0,.4);color:#FFD08A;border-color:rgba(255,181,71,.4)">крафт рецептов</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>Старый алхимик оставил мастерскую, где рецепты — это функции. Ученик собирает <b style="color:var(--warn)">Книгу рецептов</b>: каждая принятая функция становится флаконом-эликсиром и <b>пригодится в следующих мирах</b>.</div>
+        <div><div class="lbl">Уроки курса → игровые квесты</div>
+          <div class="qmap">
+            <span class="l">Функции</span><span class="q"><b>«Первый рецепт»</b> — <span class="mono">def</span>: записать рецепт в книгу</span>
+            <span class="l">Параметры и return</span><span class="q"><b>«Ингредиенты и эликсир»</b> — что входит в котёл и что из него выходит</span>
+            <span class="l">Файлы</span><span class="q"><b>«Свитки хранилища»</b> — прочитать и записать свиток с рецептами</span>
+            <span class="l">JSON</span><span class="q"><b>«Кристаллы-посланники»</b> — упаковать зелье для отправки в другие миры</span>
+            <span class="l">Экзамен</span><span class="q"><b>«Великое зелье»</b> — финальный босс блока</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">3 мин</span><b>Котёл</b>Собрать функцию из перемешанных строк (Parsons-задача)</div>
+          <div><span class="t">4 мин</span><b>Чёрный ящик</b>По 5 парам «вход → выход» угадать и написать функцию</div>
+          <div><span class="t">2 мин</span><b>JSON-пара</b>Сопоставить dict и JSON, найти невалидный JSON</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="book" data-c="#FF8A8A"></div>
+          <div><b>Босс «Гримуари Гумшуда» (Утерянный гримуар)</b><div class="muted">Повреждённый <span class="mono">recipes.json</span>: написать программу, которая читает, чинит, считает и сохраняет данные. Каждый пройденный автотест — снятая «печать» гримуара.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="13" data-s="50"></div><div data-ach="14" data-s="50"></div><div data-ach="15" data-s="50"></div>
+          <div class="rew"><span class="chip warn">коллекция «Эликсиры»</span><span class="chip warn">тема редактора «Котёл»</span><span class="chip">Пайко учится варить</span></div></div>
+        <div class="hook"><span data-i="flask" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">«Твой рецепт <span class="mono">format_price()</span> станет частью бота-магазина» — ученик видит, что его код нужен дальше.</span></div></div>
+      </div>
+    </div>
+
+    <!-- БЛОК 3 -->
+    <div class="world" style="--wc:#3FD5E0">
+      <div class="scene">
+        <svg viewBox="0 0 720 170" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="w3bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0C343A"/><stop offset="1" stop-color="#051315"/></linearGradient></defs>
+          <rect width="720" height="170" fill="url(#w3bg)"/>
+          <g fill="#0A2226" stroke="#3FD5E0" stroke-opacity=".5" stroke-width="2">
+            <path d="M380 170V95a35 35 0 0 1 70 0v75z"/><path d="M470 170V80a40 40 0 0 1 80 0v90z"/><path d="M570 170V95a35 35 0 0 1 70 0v75z"/><path d="M660 170V100a30 30 0 0 1 60 0v70z"/>
+          </g>
+          <rect x="370" y="150" width="350" height="20" fill="#0E2A2E"/>
+          <g font-family="Inter" font-size="11" font-weight="700">
+            <g transform="translate(420 22)"><rect width="90" height="28" rx="12" fill="#3FD5E0"/><text x="45" y="18" text-anchor="middle" fill="#04181B">/start</text></g>
+            <g transform="translate(530 36)"><rect width="150" height="28" rx="12" fill="#13393E" stroke="#3FD5E0" stroke-opacity=".6"/><text x="12" y="18" fill="#BFF5F9">Салом! Каталог ↓</text></g>
+            <g transform="translate(560 72)"><rect width="56" height="22" rx="7" fill="#1A4A50"/><text x="28" y="15" text-anchor="middle" fill="#BFF5F9" font-size="10">Купить</text><rect x="62" width="56" height="22" rx="7" fill="#1A4A50"/><text x="90" y="15" text-anchor="middle" fill="#BFF5F9" font-size="10">Корзина</text></g>
+          </g>
+          <text x="410" y="78" font-family="JetBrains Mono" font-size="11" fill="#3FD5E0" opacity=".45">await bot.send_message()</text>
+          <rect width="720" height="170" fill="url(#shadeB)"/><rect width="720" height="170" fill="url(#shadeL)"/>
+        </svg>
+        <div class="title"><div><div class="bn">Блок 3 · Telegram-боты</div><div class="wn">Корвонсарои Ботҳо</div><div class="wr">Караван-сарай ботов</div></div><span class="chip" style="background:rgba(0,0,0,.4);color:#9BEFF5;border-color:rgba(63,213,224,.45)">бизнес-тайкун</span></div>
+      </div>
+      <div class="body">
+        <div><div class="lbl">Сюжет</div>На Шёлковом пути открывается цифровой караван-сарай. Ученик открывает лавку — <b style="color:var(--cyan)">своего Telegram-бота</b> — и шаг за шагом превращает её в торговый дом, который обслуживает купцов 24/7.</div>
+        <div><div class="lbl">Уроки курса → игровые квесты</div>
+          <div class="qmap">
+            <span class="l">Первый бот</span><span class="q"><b>«Открыть лавку»</b> — бот отвечает на /start секретным кодом платформы (проверка «живого» бота)</span>
+            <span class="l">Обработчики, async</span><span class="q"><b>«Нанять помощников»</b> — обслуживать много покупателей одновременно</span>
+            <span class="l">Reply и Inline кнопки</span><span class="q"><b>«Вывески и прилавок»</b> — красивое меню лавки</span>
+            <span class="l">Бот-магазин</span><span class="q"><b>«Торговый дом»</b> — каталог, корзина, заказ</span>
+            <span class="l">Развёртывание</span><span class="q"><b>«Лавка 24/7»</b> — бот работает на сервере без компьютера ученика</span>
+            <span class="l">Экзамен</span><span class="q"><b>«Большая ярмарка»</b> — босс</span>
+          </div></div>
+        <div><div class="lbl">Мини-игры · 2–5 минут</div>
+          <div class="mg"><div><span class="t">3 мин</span><b>Async-жонглёр</b>Расставить await на шкале времени, чтобы никто не ждал</div>
+          <div><span class="t">2 мин</span><b>Конструктор кнопок</b>Собрать InlineKeyboard точно по эскизу</div>
+          <div><span class="t">2 мин</span><b>Кто поймает?</b>Какой обработчик сработает на это сообщение</div></div></div>
+        <div class="boss"><div class="ico" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)" data-i="shop" data-c="#FF8A8A"></div>
+          <div><b>Босс «Бозори Калон» (Большая ярмарка)</b><div class="muted">Тестовый бот платформы присылает 20 «покупателей» с разными запросами. Бот ученика должен ответить правильно — на экране растёт счётчик довольных купцов.</div></div></div>
+        <div class="row" style="align-items:center;gap:10px"><div data-ach="16" data-s="50"></div><div data-ach="17" data-s="50"></div><div data-ach="18" data-s="50"></div>
+          <div class="rew"><span class="chip prop">вывеска лавки с именем бота</span><span class="chip prop">значок «Живой бот» со ссылкой</span></div></div>
+        <div class="hook"><span data-i="chart" data-c="#9CF7C1" data-s="20"></span><div><b>Зачем вернуться завтра:</b> <span class="muted">виджет «Пульс лавки»: сколько реальных людей запустили бота ученика. Друзья пользуются его кодом — это лучшая мотивация.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
