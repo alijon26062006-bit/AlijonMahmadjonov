@@ -996,7 +996,7 @@
   }
 
   // ═══════════ Админка ═══════════
-  const ADMIN_TABS = [["overview", "Готовность"], ["topups", "Пополнения"], ["prices", "Цены"], ["clients", "Клиенты"], ["log", "Журнал"]];
+  const ADMIN_TABS = [["overview", "Готовность"], ["settings", "Настройки"], ["topups", "Пополнения"], ["prices", "Цены"], ["clients", "Клиенты"], ["log", "Журнал"]];
 
   async function viewAdmin(tab = "overview") {
     if (!ADMIN_TABS.some(([k]) => k === tab)) tab = "overview";
@@ -1016,6 +1016,7 @@
     else if (tab === "topups") await adminTopups(body);
     else if (tab === "prices") await adminPrices(body);
     else if (tab === "clients") adminClients(body, o.users);
+    else if (tab === "settings") await adminSettings(body);
     else adminLog(body, o.audit);
   }
 
@@ -1135,6 +1136,55 @@
         },
       }],
     })));
+  }
+
+  async function adminSettings(body) {
+    const st = await api("GET", "/api/admin/settings");
+    const inp = (id, label, value, hint = "", attrs = "") => `<div class="field"><label for="st-${id}">${label}</label>
+      <div class="input" id="st-${id}-box"><input id="st-${id}" value="${esc(value ?? "")}" ${attrs}></div>${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
+    const secret = (id, label, hint = "") => inp(id, label, "", (st[id + "_set"] ? "✅ Сохранён. Оставьте пустым, чтобы не менять. " : "") + hint,
+      `type="password" autocomplete="off" placeholder="${st[id + "_set"] ? "••••••••" : ""}"`);
+    const area = (id, label, value, hint = "") => `<div class="field"><label for="st-${id}">${label}</label>
+      <textarea id="st-${id}" rows="3" style="width:100%;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);padding:10px 12px;font:inherit;color:var(--fg);resize:vertical">${esc(value || "")}</textarea>${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
+    const card = (title, inner, note = "") => `<div class="card form"><div class="card-head" style="margin:0"><h4>${title}</h4></div>${note ? `<p style="color:var(--muted);font-size:13px;margin:0">${note}</p>` : ""}${inner}</div>`;
+    body.innerHTML = `<form class="view" id="stForm" novalidate style="gap:14px">
+      ${card("Приём оплаты", inp("payment_methods", "Способы оплаты через запятую", (st.payment_methods || []).join(", "), "Например: Алиф Моби, Душанбе Сити, Корти Милли")
+        + area("payment_instructions", "Реквизиты для перевода", st.payment_instructions, "Клиент увидит этот текст на странице «Баланс»"),
+        "Клиент переводит деньги и отправляет заявку, вы подтверждаете во вкладке «Пополнения».")}
+      ${card("Компания и поддержка", `<div class="grid-2">${inp("company_name", "Название ИП или компании", st.company_name)}${inp("support_telegram", "Telegram поддержки", st.support_telegram, "Без @, например averix_support")}
+        ${inp("support_email", "Email поддержки", st.support_email)}${inp("support_phone", "Телефон поддержки", st.support_phone)}</div>`
+        + area("company_details", "Реквизиты (ИНН, адрес, банк)", st.company_details, "Попадут в оферту и подвал сайта"))}
+      ${card("Ключи поставщиков", `${secret("hetzner_token", "Токен Hetzner", "console.hetzner.com → проект → Security → API tokens (Read & Write)")}
+        <div class="grid-2">${inp("rc_user_id", "ResellerClub: Reseller ID", st.rc_user_id)}${inp("rc_customer_id", "ResellerClub: Customer ID", st.rc_customer_id)}</div>
+        ${secret("rc_api_key", "ResellerClub: API key", "manage.resellerclub.com → Settings → API. Там же разрешите IP вашего сервера")}
+        <label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" id="st-rc_test" ${st.rc_test ? "checked" : ""}> Тестовый режим ResellerClub (деньги не списываются)</label>`,
+        `Сейчас: серверы — <b>${esc(st.vps_provider)}</b>, домены — <b>${esc(st.registrar)}</b>. Новые ключи сначала проверяются у поставщика и сохраняются, только если работают.`)}
+      ${card("Уведомления", `<div class="grid-2">${secret("telegram_bot_token", "Telegram: токен бота", "@BotFather → /newbot")}${inp("telegram_admin_chat_id", "Telegram: ваш Chat ID", st.telegram_admin_chat_id)}</div>
+        <div class="grid-2">${inp("smtp_host", "Почта: SMTP‑сервер", st.smtp_host, "Например smtp.gmail.com")}${inp("smtp_port", "Порт", st.smtp_port, "", 'inputmode="numeric"')}
+        ${inp("smtp_user", "Логин", st.smtp_user)}${secret("smtp_password", "Пароль")}</div>${inp("smtp_from", "Адрес отправителя", st.smtp_from, "Например noreply@averix.dev")}`,
+        "Telegram — вам о заказах и оплатах. Почта — клиентам о создании серверов, пополнении и продлении.")}
+      <div class="form-error" id="stErr"></div>
+      <button class="btn btn-primary" type="submit" id="stSave" style="justify-self:start">Сохранить настройки</button>
+    </form>`;
+    $("#stForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("#stErr").textContent = "";
+      const btn = $("#stSave"); btn.disabled = true; btn.textContent = "Проверяем и сохраняем…";
+      const data = {};
+      ["payment_methods", "payment_instructions", "company_name", "company_details", "support_telegram", "support_email", "support_phone",
+        "telegram_bot_token", "telegram_admin_chat_id", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
+        "hetzner_token", "rc_user_id", "rc_api_key", "rc_customer_id"].forEach((f) => { data[f] = $(`#st-${f}`).value; });
+      data.rc_test = $("#st-rc_test").checked;
+      try {
+        await api("POST", "/api/admin/settings", data);
+        AM.config = await api("GET", "/api/config");
+        AM.toast("Настройки сохранены");
+        location.hash = "#/admin/overview";
+      } catch (err) {
+        $("#stErr").textContent = err.error;
+        if (err.field) AM.shake($(`#st-${err.field}-box`));
+      } finally { btn.disabled = false; btn.textContent = "Сохранить настройки"; }
+    });
   }
 
   function adminLog(body, audit) {

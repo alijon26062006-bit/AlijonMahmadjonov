@@ -12,6 +12,9 @@
 # Повторный запуск безопасен: обновляет код и перезапускает панель.
 set -euo pipefail
 
+# Домен и название вшиты; при необходимости их можно задать заранее: AVERIX_DOMAIN=... AVERIX_BRAND=...
+DOMAIN="${AVERIX_DOMAIN:-averix.dev}"
+BRAND="${AVERIX_BRAND:-Averix}"
 APP_DIR=/opt/averix
 APP_USER=averix
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -53,7 +56,7 @@ python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
-  say "3/5 Настройка (потом можно поменять в $APP_DIR/.env)"
+  say "3/5 Ключи (всё остальное — реквизиты, оплата, контакты — настраивается на сайте: Админка → Настройки)"
   echo "Токен Hetzner: console.hetzner.com → ваш проект → Security → API tokens → Generate (Read & Write)."
   HETZNER=""
   for attempt in 1 2 3; do
@@ -64,19 +67,16 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
     echo "  ❌ Hetzner не принял токен (ответ $CODE). Проверьте, что скопировали его целиком."
     HETZNER=""
   done
-  ask_domain
-  ask_required ADMIN "Ваш email (станет администратором)"
-  ask BRAND "Название хостинга" "Averix"
-  ask RC_USER "ResellerClub: Reseller ID (Enter — домены в демо-режиме)"
+  echo
+  echo "Ключи ResellerClub (домены): manage.resellerclub.com → Settings → API. Enter — пропустить, добавите позже."
+  ask RC_USER "ResellerClub: Reseller ID"
   RC_KEY=""; RC_CUST=""
   if [[ -n "$RC_USER" ]]; then
     ask_secret RC_KEY "ResellerClub: API key"
-    ask RC_CUST "ResellerClub: Customer ID, на которого регистрировать домены"
+    ask_required RC_CUST "ResellerClub: Customer ID (Customers → ваш клиент)"
   fi
-  ask METHODS "Способы оплаты через запятую" "Алиф Моби,Душанбе Сити"
-  ask INSTR "Реквизиты для перевода (одной строкой)" "Переведите сумму на карту 0000 0000 0000 0000 и укажите ваш email в комментарии"
-  ask TG "Telegram поддержки без @ (Enter — пропустить)"
-  ask COMPANY "Название ИП/компании для документов"
+  echo
+  ask_required ADMIN "Email администратора"
   SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')
   VPS=demo; DNS=demo; REG=demo
   [[ -n "$HETZNER" ]] && VPS=hetzner && DNS=hetzner
@@ -104,8 +104,9 @@ RESELLERCLUB_API_KEY=$RC_KEY
 RESELLERCLUB_CUSTOMER_ID=$RC_CUST
 RESELLERCLUB_TEST=true
 
-PAYMENT_METHODS=$METHODS
-PAYMENT_INSTRUCTIONS=$INSTR
+# Способы оплаты, реквизиты, контакты, Telegram и почта задаются на сайте: Админка → Настройки
+PAYMENT_METHODS=
+PAYMENT_INSTRUCTIONS=
 
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_ADMIN_CHAT_ID=
@@ -115,9 +116,9 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=
 
-COMPANY_NAME=$COMPANY
+COMPANY_NAME=
 COMPANY_DETAILS=
-SUPPORT_TELEGRAM=$TG
+SUPPORT_TELEGRAM=
 SUPPORT_EMAIL=$ADMIN
 SUPPORT_PHONE=
 ENV
@@ -127,8 +128,8 @@ else
   DOMAIN=$(grep -E '^PUBLIC_URL=' "$APP_DIR/.env" | sed -E 's#^PUBLIC_URL=https?://##; s#/.*##')
   ADMIN=$(grep -E '^ADMIN_EMAIL=' "$APP_DIR/.env" | cut -d= -f2-)
   if [[ -z "$DOMAIN" ]] || is_ip "$DOMAIN" || [[ "$DOMAIN" == 127.0.0.1* ]]; then
-    echo "  В настройках указан не домен ($DOMAIN). Исправим."
-    ask_domain
+    DOMAIN="${AVERIX_DOMAIN:-averix.dev}"
+    echo "  В настройках был IP вместо домена — исправляю на $DOMAIN"
     sed -i -E "s#^PUBLIC_URL=.*#PUBLIC_URL=https://$DOMAIN#" "$APP_DIR/.env"
   fi
 fi

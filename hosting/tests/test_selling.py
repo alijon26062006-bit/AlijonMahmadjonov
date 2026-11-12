@@ -144,3 +144,48 @@ def test_legal_pages(client):
 def test_config_exposes_payments_and_support(client):
     cfg = client.get("/api/config").json()
     assert cfg["payment_methods"] == ["Алиф", "Душанбе Сити"] and "support" in cfg
+
+
+def test_admin_site_settings(client, hosting):
+    boss = admin_api(client)
+    r = boss.post("/api/admin/settings", {"payment_methods": "Алиф Моби, Душанбе Сити", "payment_instructions": "Карта 1111",
+                                          "support_telegram": "@averix_support", "smtp_password": "s3cret", "company_name": "ИП Тест"})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["payment_methods"] == ["Алиф Моби", "Душанбе Сити"] and data["support_telegram"] == "averix_support"
+    assert data["smtp_password"] == "" and data["smtp_password_set"] is True  # секрет не возвращается
+    cfg = client.get("/api/config").json()
+    assert cfg["payment_methods"] == ["Алиф Моби", "Душанбе Сити"] and cfg["support"]["telegram"] == "averix_support"
+    # пустой секрет не стирает сохранённый
+    boss.post("/api/admin/settings", {"smtp_password": ""})
+    assert hosting.s.smtp_password == "s3cret"
+    assert boss.post("/api/admin/settings", {"support_email": "bad"}).status_code == 400
+    # настройки переживают перезапуск
+    from app.services import Hosting
+    from app.catalog import Catalog
+    again = Hosting(hosting.s.__class__(), hosting.db, Catalog.load(), hosting.p)
+    assert again.s.payment_instructions == "Карта 1111" and again.s.company_name == "ИП Тест"
+
+
+def test_admin_settings_rejects_bad_keys(client, hosting):
+    from app.providers.base import ProviderError
+
+    class BadVps:
+        name = "hetzner"
+        def server_types(self):
+            raise ProviderError("Hetzner отклонил токен", code="unauthorized")
+
+    class P:
+        vps, dns, registrar = BadVps(), hosting.p.dns, hosting.p.registrar
+
+    hosting.provider_factory = lambda s: P()
+    boss = admin_api(client)
+    r = boss.post("/api/admin/settings", {"hetzner_token": "wrong"})
+    assert r.status_code == 400 and "не подошёл" in r.json()["error"]
+    assert hosting.s.hetzner_token == "" and hosting.p.vps.name == "demo"  # ничего не поменялось
+
+
+def test_non_admin_cannot_touch_settings(api):
+    api.signup()
+    assert api.get("/api/admin/settings").status_code == 403
+    assert api.post("/api/admin/settings", {"company_name": "x"}).status_code == 403

@@ -471,6 +471,15 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     def admin_catalog_save(body: CatalogIn, request: Request, admin: dict = Depends(admin_user)):
         return hosting.update_catalog(admin, body.plans, body.tlds, ip_of(request))
 
+    @app.get("/api/admin/settings")
+    def admin_settings(_: dict = Depends(admin_user)):
+        return hosting.site_settings()
+
+    @app.post("/api/admin/settings")
+    def admin_settings_save(body: dict, request: Request, admin: dict = Depends(admin_user)):
+        limit(f"settings:{admin['id']}", 30, 3600)
+        return hosting.update_site_settings(admin, body, ip_of(request))
+
     @app.get("/api/admin/readiness")
     def admin_readiness(_: dict = Depends(admin_user)):
         checks = hosting.readiness()

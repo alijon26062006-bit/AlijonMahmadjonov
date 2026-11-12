@@ -62,6 +62,14 @@ class Hosting:
         self.catalog = catalog
         self.p = providers
         self.notify = notifier or Notifier(settings)
+        self.provider_factory = None  # тесты подменяют; по умолчанию build_providers
+        # Реквизиты, оплата, контакты и ключи, сохранённые в админке, важнее .env.
+        site = db.get_setting("site")
+        if site:
+            try:
+                self._apply_site(json.loads(site), rebuild=True)
+            except (ValueError, ProviderError) as e:
+                log.error("site settings ignored: %s", e)
         # Цены и тарифы, изменённые в админке, важнее catalog.json.
         override = db.get_setting("catalog")
         if override:
@@ -623,6 +631,103 @@ class Hosting:
         self.db.audit(admin["id"], "admin.catalog", f"{len(new_plans)} plans, {len(new_tlds)} tlds", ip)
         return data
 
+    # ═══════════════════════ Настройки сайта (админка) ═══════════════════════
+    SITE_FIELDS = {
+        "payment_methods": "list", "payment_instructions": "text",
+        "company_name": "str", "company_details": "text",
+        "support_telegram": "str", "support_email": "str", "support_phone": "str",
+        "telegram_bot_token": "secret", "telegram_admin_chat_id": "str",
+        "smtp_host": "str", "smtp_port": "int", "smtp_user": "str", "smtp_password": "secret", "smtp_from": "str",
+        "hetzner_token": "secret", "rc_user_id": "str", "rc_api_key": "secret", "rc_customer_id": "str", "rc_test": "bool",
+    }
+    KEY_FIELDS = ("hetzner_token", "rc_user_id", "rc_api_key", "rc_customer_id", "rc_test")
+
+    def site_settings(self) -> dict:
+        out = {}
+        for f, kind in self.SITE_FIELDS.items():
+            v = getattr(self.s, f)
+            if kind == "secret":
+                out[f] = ""
+                out[f + "_set"] = bool(v)
+            else:
+                out[f] = v
+        out["vps_provider"], out["registrar"] = self.p.vps.name, self.p.registrar.name
+        return out
+
+    def _settings_with(self, data: dict) -> Settings:
+        import copy
+        s = copy.copy(self.s)
+        for f, v in data.items():
+            setattr(s, f, v)
+        if s.hetzner_token:
+            s.vps_provider = s.dns_provider = "hetzner"
+        if s.rc_user_id and s.rc_api_key and s.rc_customer_id:
+            s.registrar = "resellerclub"
+        return s
+
+    def _build(self, s: Settings) -> Providers:
+        from .providers import build_providers
+        return (self.provider_factory or build_providers)(s)
+
+    def _apply_site(self, data: dict, rebuild: bool) -> None:
+        new = self._settings_with({k: v for k, v in data.items() if k in self.SITE_FIELDS})
+        if rebuild and any(k in data for k in self.KEY_FIELDS):
+            self.p = self._build(new)
+            self.cache = _Cache()
+        for f in list(self.SITE_FIELDS) + ["vps_provider", "dns_provider", "registrar"]:
+            setattr(self.s, f, getattr(new, f))
+
+    def update_site_settings(self, admin: dict, data: dict, ip: str = "") -> dict:
+        clean = {}
+        for f, kind in self.SITE_FIELDS.items():
+            if f not in data or data[f] is None:
+                continue
+            v = data[f]
+            if kind == "secret":
+                v = str(v).strip()
+                if not v:
+                    continue  # пусто — оставить сохранённый
+            elif kind == "list":
+                items = v if isinstance(v, list) else str(v).split(",")
+                v = [str(x).strip()[:40] for x in items if str(x).strip()][:10]
+            elif kind == "int":
+                try:
+                    v = int(v)
+                except (TypeError, ValueError):
+                    raise ServiceError("Порт SMTP — число", field=f) from None
+                if not 1 <= v <= 65535:
+                    raise ServiceError("Порт SMTP от 1 до 65535", field=f)
+            elif kind == "bool":
+                v = bool(v)
+            else:
+                v = str(v).strip()[:2000 if kind == "text" else 200]
+            if f == "support_telegram":
+                v = v.lstrip("@").removeprefix("https://t.me/")
+            if f == "support_email" and v and ("@" not in v or "." not in v.split("@")[-1]):
+                raise ServiceError("Некорректный email поддержки", field=f)
+            clean[f] = v
+
+        # Новые ключи сначала проверяем у поставщика и сохраняем, только если они работают.
+        if any(k in clean and clean[k] != getattr(self.s, k) for k in self.KEY_FIELDS):
+            candidate = self._settings_with(clean)
+            try:
+                providers = self._build(candidate)
+                if "hetzner_token" in clean and candidate.vps_provider == "hetzner":
+                    providers.vps.server_types()
+                if candidate.registrar == "resellerclub" and any(k in clean for k in ("rc_user_id", "rc_api_key", "rc_customer_id", "rc_test")):
+                    providers.registrar.ping()
+            except ProviderError as e:
+                raise ServiceError(f"Ключ не подошёл: {e.message}", 400) from None
+            self.p = providers
+            self.cache = _Cache()
+
+        stored = json.loads(self.db.get_setting("site") or "{}")
+        stored.update(clean)
+        self.db.set_setting("site", json.dumps(stored, ensure_ascii=False))
+        self._apply_site(clean, rebuild=False)
+        self.db.audit(admin["id"], "admin.settings", ",".join(sorted(clean)), ip)
+        return self.site_settings()
+
     # ═══════════════════════ Готовность к продажам ═══════════════════════
     def readiness(self) -> list[dict]:
         s = self.s
@@ -643,11 +748,11 @@ class Hosting:
                 add("vps", "Серверы: Hetzner", not missing,
                     "Ключ работает" + (f", но нет типов: {', '.join(missing)} — поправьте тарифы" if missing else ""))
             else:
-                add("vps", "Серверы: Hetzner", False, "Демо-режим. Задайте VPS_PROVIDER=hetzner и HETZNER_TOKEN")
+                add("vps", "Серверы: Hetzner", False, "Демо-режим. Вставьте токен Hetzner: Админка → Настройки → Ключи")
         except ProviderError as e:
             add("vps", "Серверы: Hetzner", False, e.message)
         add("dns", "DNS: Hetzner", self.p.dns.name == "hetzner",
-            "Подключено" if self.p.dns.name == "hetzner" else "Демо-режим. Задайте DNS_PROVIDER=hetzner")
+            "Подключено" if self.p.dns.name == "hetzner" else "Подключится вместе с токеном Hetzner")
         try:
             detail = self.p.registrar.ping()
             add("registrar", "Домены: регистратор", self.p.registrar.name != "demo", detail)
@@ -655,19 +760,20 @@ class Hosting:
             add("registrar", "Домены: регистратор", False, e.message)
         if self.p.registrar.name == "resellerclub" and s.rc_test:
             add("registrar_live", "Регистратор в боевом режиме", False,
-                "Сейчас тестовый сервер ResellerClub. Когда всё проверите, поставьте RESELLERCLUB_TEST=false")
+                "Сейчас тестовый сервер ResellerClub. Когда проверите покупку домена, выключите «Тестовый режим» в Настройках")
         add("payments", "Приём оплаты", bool(s.payment_methods and s.payment_instructions) and not s.demo_payments,
-            "Демо-пополнение включено: выключите DEMO_PAYMENTS" if s.demo_payments
-            else ("Способы: " + ", ".join(s.payment_methods)) if s.payment_methods else "Задайте PAYMENT_METHODS и PAYMENT_INSTRUCTIONS")
+            "Демо-пополнение включено: выключите DEMO_PAYMENTS в .env" if s.demo_payments
+            else ("Способы: " + ", ".join(s.payment_methods)) if s.payment_methods and s.payment_instructions
+            else "Укажите способы оплаты и реквизиты: Админка → Настройки")
         add("telegram", "Уведомления вам в Telegram", s.telegram_bot_token and s.telegram_admin_chat_id,
-            "Подключены" if s.telegram_bot_token else "Задайте TELEGRAM_BOT_TOKEN и TELEGRAM_ADMIN_CHAT_ID", required=False)
+            "Подключены" if s.telegram_bot_token else "Укажите бота и Chat ID: Админка → Настройки", required=False)
         add("email", "Письма клиентам", s.smtp_host and s.smtp_from,
-            f"Через {s.smtp_host}" if s.smtp_host else "Задайте SMTP_HOST, SMTP_FROM и пароль", required=False)
+            f"Через {s.smtp_host}" if s.smtp_host else "Укажите почтовый сервер: Админка → Настройки", required=False)
         add("company", "Реквизиты для документов", s.company_name and s.company_details,
-            s.company_name or "Задайте COMPANY_NAME и COMPANY_DETAILS — они попадут в оферту")
+            (s.company_name if s.company_details else "") or "Укажите название и реквизиты (попадут в оферту): Админка → Настройки")
         add("support", "Контакты поддержки", s.support_telegram or s.support_email or s.support_phone,
             ", ".join(x for x in (s.support_telegram and "@" + s.support_telegram, s.support_email, s.support_phone) if x)
-            or "Задайте SUPPORT_TELEGRAM или SUPPORT_EMAIL")
+            or "Укажите Telegram или email поддержки: Админка → Настройки")
         return checks
 
     # ═══════════════════════ Биллинг ═══════════════════════
