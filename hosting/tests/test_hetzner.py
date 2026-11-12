@@ -155,3 +155,16 @@ def test_dns_zone_and_rrsets(client, fake):
 
     dns.set_rrset("example.com", "@", "A", 3600, [])
     assert ("@", "A") not in fake.rrsets
+
+
+def test_rebuild_sends_user_data(client, fake):
+    fake_resp = HetznerVps(client)
+    fake_resp.rebuild("42", "debian-12", user_data="#cloud-config\n")
+    method, path, body, _ = fake.calls[-1]
+    assert path == "/servers/42/actions/rebuild" and body == {"image": "debian-12", "user_data": "#cloud-config\n"}
+
+
+def test_cpu_normalized_per_core():
+    # По документации Hetzner: 100 = одно ядро; у 4-ядерного сервера 400 = полная загрузка.
+    from app.services import normalize_cpu
+    assert normalize_cpu([[1, 200.0], [2, 400.0], [3, 450.0]], 4) == [[1, 50.0], [2, 100.0], [3, 100.0]]

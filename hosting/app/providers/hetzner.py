@@ -54,6 +54,14 @@ _ERRORS_RU = {
     "uniqueness_error": "Такое имя уже занято в проекте Hetzner",
     "invalid_input": "Hetzner не принял параметры запроса",
     "conflict": "Ресурс изменился, повторите попытку",
+    "protected": "Ресурс защищён от изменений в Hetzner (снимите защиту в консоли)",
+    "maintenance": "У Hetzner идут технические работы, повторите позже",
+    "unavailable": "Сервис Hetzner временно недоступен, повторите позже",
+    "timeout": "Hetzner не успел ответить, повторите попытку",
+    "server_error": "Ошибка на стороне Hetzner, повторите позже",
+    "service_error": "Ошибка на стороне Hetzner, повторите позже",
+    "bad_gateway": "Ошибка на стороне Hetzner, повторите позже",
+    "incorrect_zone_mode": "Эта DNS-зона у Hetzner не в режиме primary",
 }
 
 
@@ -148,8 +156,12 @@ class HetznerVps:
             raise ProviderError("Hetzner не вернул новый пароль", code="no_password")
         return pw
 
-    def rebuild(self, provider_id: str, image: str) -> str | None:
-        data = self.c.request("POST", f"/servers/{provider_id}/actions/rebuild", json={"image": image})
+    def rebuild(self, provider_id: str, image: str, user_data: str | None = None) -> str | None:
+        # По документации rebuild принимает user_data — так агент графиков ставится заново.
+        body = {"image": image}
+        if user_data:
+            body["user_data"] = user_data
+        data = self.c.request("POST", f"/servers/{provider_id}/actions/rebuild", json=body)
         return data.get("root_password")
 
     def delete_server(self, provider_id: str) -> None:

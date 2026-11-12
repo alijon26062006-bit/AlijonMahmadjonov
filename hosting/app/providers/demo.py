@@ -76,7 +76,7 @@ class DemoVps:
                 raise ProviderError("Сервер должен быть включён", code="server_not_running", status=409)
         return secrets.token_urlsafe(14)
 
-    def rebuild(self, provider_id: str, image: str) -> str | None:
+    def rebuild(self, provider_id: str, image: str, user_data: str | None = None) -> str | None:
         with self._lock:
             s = self._get(provider_id)
             s.update(status="rebuilding", target="running", since=time.time(), delay=15)

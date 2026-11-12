@@ -261,13 +261,15 @@ class Hosting:
         self._require_active(row)
         if not self.catalog.image(image):
             raise ServiceError("Такой ОС нет", field="image")
+        # Новая система — новый ключ SSH; агент ставится заново через user_data с новым токеном.
+        agent_token = secrets.token_urlsafe(32)
         try:
-            pw = self.p.vps.rebuild(row["provider_id"], image)
+            pw = self.p.vps.rebuild(row["provider_id"], image,
+                                    user_data=build_user_data(self.s.public_url, row["id"], agent_token))
         except ProviderError as e:
             raise ServiceError(e.message, 502) from None
-        # Новая система — новый ключ SSH и новый агент нужно ставить заново (cloud-init не перезапускается).
-        self.db.run("UPDATE servers SET image = ?, status = 'rebuilding', ssh_hostkey = '', password_state = '' WHERE id = ?",
-                    (image, row["id"]))
+        self.db.run("UPDATE servers SET image = ?, status = 'rebuilding', ssh_hostkey = '', password_state = '',"
+                    " agent_token_hash = ? WHERE id = ?", (image, sha256(agent_token), row["id"]))
         self.cache.drop(("state", row["id"]))
         self.db.audit(user["id"], "server.rebuild", f"{row['id']}:{image}", ip)
         return pw
@@ -294,7 +296,12 @@ class Hosting:
                 m = self.p.vps.metrics(row["provider_id"], start, end, step)
             except ProviderError as e:
                 raise ServiceError(e.message, 502) from None
-            data = {"step": m.step, "series": m.series}
+            series = m.series
+            if self.p.vps.name == "hetzner":
+                # Hetzner считает CPU на ядро: 100 = одно ядро загружено. Приводим к 0–100% всего сервера.
+                cores = max(1, int((self.catalog.plan(row["plan"]) or {}).get("cpu") or 1))
+                series = {**series, "cpu": normalize_cpu(series.get("cpu", []), cores)}
+            data = {"step": m.step, "series": series}
             self.cache.put(key, data)
 
         agent_rows = self.db.all(
@@ -744,6 +751,10 @@ class Hosting:
                 sent += 1
             self.db.run("UPDATE domains SET reminded_at = ? WHERE id = ?", (t, r["id"]))
         return sent
+
+
+def normalize_cpu(points: list[list[float]], cores: int) -> list[list[float]]:
+    return [[t, round(min(100.0, v / cores), 2)] for t, v in points]
 
 
 def profile_missing(user: dict) -> list[str]:
