@@ -488,17 +488,31 @@ def create_app(settings: Settings | None = None, db: Database | None = None, hos
     @app.get("/api/admin/provider")
     def admin_provider(_: dict = Depends(admin_user)):
         vps = hosting.p.vps
+        active = db.all("SELECT plan, location, price_cents FROM servers WHERE deleted_at IS NULL")
+        revenue = sum(r["price_cents"] for r in active) / 100
         if vps.name != "hetzner":
-            return {"provider": vps.name, "server_types": [], "note": "Демо-режим: подключите HETZNER_TOKEN"}
+            return {"provider": vps.name, "server_types": [], "note": "Демо-режим: вставьте токен Hetzner в Настройках",
+                    "costs": {"servers": len(active), "revenue": revenue, "hetzner_month": None}}
         types = vps.server_types()
         prices = {}
         for st in types:
             for p in st.get("prices", []):
-                prices.setdefault(st["name"], {})[p["location"]] = float(p["price_monthly"]["gross"])
+                # Цена без НДС: для клиентов вне ЕС Hetzner НДС не начисляет.
+                prices.setdefault(st["name"], {})[p["location"]] = float(p["price_monthly"]["net"])
         plans = [{"plan": p["id"], "server_type": p["server_type"], "our_price": p["price_month"],
                   "hetzner_price": prices.get(p["server_type"], {}),
                   "exists": p["server_type"] in prices} for p in hosting.catalog.plans]
+        # Во сколько вам обходятся серверы клиентов у Hetzner (баланса и счетов в их API нет).
+        cost, unknown = 0.0, 0
+        for r in active:
+            plan = hosting.catalog.plan(r["plan"]) or {}
+            price = prices.get(plan.get("server_type", ""), {}).get(r["location"])
+            if price is None:
+                unknown += 1
+            else:
+                cost += price
         return {"provider": "hetzner", "plans": plans,
+                "costs": {"servers": len(active), "revenue": revenue, "hetzner_month": round(cost, 2), "unknown": unknown},
                 "server_types": [{"name": t["name"], "cores": t["cores"], "memory": t["memory"], "disk": t["disk"],
                                   "deprecated": bool(t.get("deprecation"))} for t in types]}
 

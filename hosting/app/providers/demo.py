@@ -43,7 +43,11 @@ class DemoVps:
         n = _seed("ip", pid)
         return f"203.0.113.{n % 250 + 2}"
 
-    def create_server(self, *, name, server_type, image, location, user_data, labels) -> CreatedServer:
+    def ensure_ssh_key(self, name: str, public_key: str) -> str:
+        return name
+
+    def create_server(self, *, name, server_type, image, location, user_data, labels,
+                      ssh_keys: list[str] | None = None) -> CreatedServer:
         with self._lock:
             self._next += 1
             pid = str(self._next)

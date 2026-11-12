@@ -7,6 +7,7 @@ import logging
 import secrets
 import threading
 import time
+from pathlib import Path
 
 from .catalog import Catalog, cents
 from .cloudinit import build_user_data
@@ -15,7 +16,8 @@ from .db import Database, now
 from .notify import Notifier
 from .providers import ProviderError, Providers
 from .security import generate_root_password, root_password_problems, sha256
-from .ssh import SshError, set_root_password
+from .panelkey import PanelKey
+from .ssh import SshAuthError, SshError, set_root_password
 from .validators import (HOST_RE, ValidationError, normalize_domain, validate_record, validate_server_name)
 
 log = logging.getLogger("hosting")
@@ -63,6 +65,8 @@ class Hosting:
         self.p = providers
         self.notify = notifier or Notifier(settings)
         self.provider_factory = None  # тесты подменяют; по умолчанию build_providers
+        self.panel_key = PanelKey(Path(settings.database_path).parent if settings.database_path != ":memory:" else "data")
+        self._ssh_key_name: tuple[int, str] | None = None
         # Реквизиты, оплата, контакты и ключи, сохранённые в админке, важнее .env.
         site = db.get_setting("site")
         if site:
@@ -158,6 +162,13 @@ class Hosting:
                     f"Новым аккаунтам доступно серверов: {self.s.new_user_server_limit}. Чтобы заказать больше, "
                     "напишите в поддержку — мы подтвердим аккаунт.", 403)
 
+        # Ключ панели: Hetzner не ставит свой пароль, не шлёт письмо и не требует смены пароля при входе.
+        try:
+            ssh_keys = self._panel_ssh_keys()
+        except ProviderError as e:
+            raise ServiceError(f"Не удалось подготовить сервер: {e.message}", 502) from None
+        chosen_password = root_password or generate_root_password()
+
         price = cents(plan["price_month"])
         if not self.db.charge(user["id"], price, f"Сервер {name} ({plan['name']}), 1 месяц"):
             raise ServiceError("Недостаточно средств на балансе", 402)
@@ -167,14 +178,14 @@ class Hosting:
             "INSERT INTO servers(user_id, name, plan, location, image, provider, status, price_cents, paid_until,"
             " agent_token_hash, password_state, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (user["id"], name, plan_id, location, image, self.p.vps.name, "creating", price, now() + MONTH,
-             sha256(agent_token), "pending" if root_password else "", now()))
+             sha256(agent_token), "pending", now()))
         # У Hetzner имя сервера уникально в проекте, поэтому добавляем номер заказа.
         provider_name = f"{name}-{sid}"
         try:
             created = self.p.vps.create_server(
                 name=provider_name, server_type=plan["server_type"], image=image, location=location,
                 user_data=build_user_data(self.s.public_url, sid, agent_token),
-                labels={"panel_server": str(sid), "panel_user": str(user["id"])})
+                labels={"panel_server": str(sid), "panel_user": str(user["id"])}, ssh_keys=ssh_keys)
         except ProviderError as e:
             self.db.run("UPDATE servers SET deleted_at = ?, status = 'failed' WHERE id = ?", (now(), sid))
             self.db.credit(user["id"], price, "refund", f"Возврат: сервер {name} не создан")
@@ -192,15 +203,24 @@ class Hosting:
                           f"IPv4: {created.ipv4 or 'появится в личном кабинете'}\nЛогин: root\n"
                           "Пароль мы не отправляем по почте: он показан в кабинете при заказе или задан вами.")
         row = self.db.one("SELECT * FROM servers WHERE id = ?", (sid,))
-        if root_password:
-            self.run_async(self._apply_initial_password, sid, created.root_password, root_password)
-            return row, None
-        return row, created.root_password
+        self.run_async(self._apply_initial_password, sid, created.root_password, chosen_password)
+        # Свой пароль клиент знает; сгенерированный показываем один раз.
+        return row, (None if root_password else chosen_password)
 
-    def _apply_initial_password(self, sid: int, temp: str | None, new: str) -> None:
-        """Ждём, пока сервер загрузится, и ставим пароль, который клиент указал при заказе."""
+    def _panel_ssh_keys(self) -> list[str] | None:
+        if self.p.vps.name == "demo":
+            return None
+        if not self._ssh_key_name or self._ssh_key_name[0] != id(self.p.vps):
+            name = self.p.vps.ensure_ssh_key(self.panel_key.name, self.panel_key.public_line)
+            self._ssh_key_name = (id(self.p.vps), name)
+        return [self._ssh_key_name[1]]
+
+    def _apply_initial_password(self, sid: int, temp: str | None, new: str, initial_delay: float = 0) -> None:
+        """Ждём, пока сервер загрузится, и ставим root-пароль клиента."""
         try:
-            deadline = time.time() + 300
+            if initial_delay and self.p.vps.name != "demo":
+                time.sleep(initial_delay)  # после переустановки сервер сначала выключается
+            deadline = time.time() + 400
             row = self.db.one("SELECT * FROM servers WHERE id = ?", (sid,))
             while time.time() < deadline:
                 row = self.refresh(row, force=True)
@@ -218,10 +238,14 @@ class Hosting:
         if self.p.vps.name == "demo":
             time.sleep(self.demo_password_delay)
             return
-        if temp is None:
+        try:
+            # Обычный путь: вход по ключу панели (или по паролю Hetzner, если он был выдан при создании).
+            hostkey = set_root_password(row["ipv4"], temp, new, known_hostkey=row["ssh_hostkey"], pkey=self.panel_key.load())
+        except SshAuthError:
+            # Клиент удалил ключ панели — сбрасываем пароль через Hetzner и входим с временным.
             temp = self.p.vps.reset_password(row["provider_id"])
             time.sleep(3)  # qemu-guest-agent применяет пароль не мгновенно
-        hostkey = set_root_password(row["ipv4"], temp, new, known_hostkey=row["ssh_hostkey"])
+            hostkey = set_root_password(row["ipv4"], temp, new, known_hostkey=row["ssh_hostkey"])
         if hostkey and hostkey != row["ssh_hostkey"]:
             self.db.run("UPDATE servers SET ssh_hostkey = ? WHERE id = ?", (hostkey, row["id"]))
 
@@ -236,7 +260,9 @@ class Hosting:
             raise ServiceError("Сервер должен быть включён", 409)
         try:
             if new_password is None:
-                pw = self.p.vps.reset_password(row["provider_id"])
+                pw = generate_root_password()
+                self._set_password(row, pw)
+                self.db.run("UPDATE servers SET password_state = 'applied' WHERE id = ?", (row["id"],))
                 self.db.audit(user["id"], "server.password_reset", str(row["id"]), ip)
                 return {"mode": "generated", "password": pw}
             problems = root_password_problems(new_password)
@@ -276,11 +302,14 @@ class Hosting:
                                     user_data=build_user_data(self.s.public_url, row["id"], agent_token))
         except ProviderError as e:
             raise ServiceError(e.message, 502) from None
-        self.db.run("UPDATE servers SET image = ?, status = 'rebuilding', ssh_hostkey = '', password_state = '',"
+        self.db.run("UPDATE servers SET image = ?, status = 'rebuilding', ssh_hostkey = '', password_state = 'pending',"
                     " agent_token_hash = ? WHERE id = ?", (image, sha256(agent_token), row["id"]))
         self.cache.drop(("state", row["id"]))
         self.db.audit(user["id"], "server.rebuild", f"{row['id']}:{image}", ip)
-        return pw
+        # Сервер создан с ключом панели — новый пароль ставим сами, как при заказе.
+        chosen = generate_root_password()
+        self.run_async(self._apply_initial_password, row["id"], pw, chosen, 20)
+        return chosen
 
     def delete_server(self, user: dict, row: dict, ip: str = "") -> None:
         try:

@@ -1034,6 +1034,13 @@
         </ul>
         <p style="color:var(--muted);font-size:13px;margin:14px 0 0">Настройки меняются в файле .env на сервере, после изменения перезапустите панель. Подробно — в README.</p>
       </div>
+      ${prov.costs ? `<div class="card"><div class="card-head"><h4>Деньги за месяц</h4></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <div class="kpi"><span>Клиенты платят вам</span><b>${money(prov.costs.revenue)}</b><em>${prov.costs.servers} серв.</em></div>
+          <div class="kpi"><span>Вы платите Hetzner</span><b>${prov.costs.hetzner_month == null ? "—" : "€" + prov.costs.hetzner_month.toFixed(2)}</b><em>без IPv4 и НДС</em></div>
+          <div class="kpi"><span>Наценка</span><b>${prov.costs.hetzner_month ? Math.round((prov.costs.revenue / prov.costs.hetzner_month - 1) * 100) + "%" : "—"}</b><em>валюты разные, примерно</em></div>
+        </div>
+        <p style="color:var(--muted);font-size:13px;margin:12px 0 0">Hetzner не показывает баланс через API: он работает по постоплате и в начале месяца присылает счёт за прошлый. Счета и способ оплаты — в Hetzner Console: меню аккаунта (значок человека справа вверху) → Billing.</p></div>` : ""}
       <div class="card table-scroll"><div class="card-head"><h4>Тарифы у Hetzner</h4></div>
         ${prov.error ? `<div class="banner bad"><span>${esc(prov.error)}</span></div>` : prov.note ? `<p style="color:var(--muted);font-size:14px">${esc(prov.note)}</p>` : `
         <table class="table"><thead><tr><th>Тариф</th><th>Тип Hetzner</th><th>Есть у Hetzner</th><th style="text-align:right">Наша цена</th><th style="text-align:right">Себестоимость (fsn1)</th></tr></thead><tbody>

@@ -5,7 +5,7 @@ import threading
 import paramiko
 import pytest
 
-from app.ssh import SshError, set_root_password
+from app.ssh import SshAuthError, SshError, set_root_password
 
 
 class FakeSshd(paramiko.ServerInterface):
@@ -17,8 +17,12 @@ class FakeSshd(paramiko.ServerInterface):
         ok = username == "root" and password == self.state["password"]
         return paramiko.AUTH_SUCCESSFUL if ok else paramiko.AUTH_FAILED
 
+    def check_auth_publickey(self, username, key):
+        ok = username == "root" and self.state.get("pubkey") is not None and key.asbytes() == self.state["pubkey"].asbytes()
+        return paramiko.AUTH_SUCCESSFUL if ok else paramiko.AUTH_FAILED
+
     def get_allowed_auths(self, username):
-        return "password"
+        return "password,publickey"
 
     def check_channel_request(self, kind, chanid):
         return paramiko.OPEN_SUCCEEDED if kind == "session" else paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
@@ -34,7 +38,7 @@ class FakeSshd(paramiko.ServerInterface):
                     break
                 data += chunk
             user, _, pw = data.decode().strip().partition(":")
-            if command == b"chpasswd" and user == "root":
+            if command.startswith(b"chpasswd") and user == "root":
                 self.state["password"] = pw
                 channel.send_exit_status(0)
             else:
@@ -75,7 +79,8 @@ def test_sets_password_via_chpasswd_stdin(sshd):
     fp = set_root_password("127.0.0.1", "TempPass123", "N3w!RootPassword", port=sshd["port"], attempts=1)
     assert sshd["password"] == "N3w!RootPassword"
     # пароль передаётся через stdin, а не в командной строке
-    assert sshd["commands"] == ["chpasswd"]
+    assert len(sshd["commands"]) == 1 and sshd["commands"][0].startswith("chpasswd")
+    assert "chage" in sshd["commands"][0]  # пароль не «просрочен» — система не заставит менять его при входе
     assert fp.startswith("ssh-rsa ")
 
 
@@ -90,10 +95,20 @@ def test_known_hostkey_is_accepted_and_mismatch_rejected(sshd):
 
 
 def test_wrong_temp_password_fails(sshd):
-    with pytest.raises(SshError, match="временный пароль"):
+    with pytest.raises(SshAuthError):
         set_root_password("127.0.0.1", "wrong", "N3w!RootPassword", port=sshd["port"], attempts=2, delay=0)
 
 
 def test_unreachable_host_fails_fast():
     with pytest.raises(SshError, match="Не удалось подключиться"):
         set_root_password("127.0.0.1", "x", "N3w!RootPassword", port=1, attempts=1, timeout=2)
+
+
+def test_sets_password_with_panel_key(sshd):
+    key = paramiko.RSAKey.generate(2048)
+    sshd["pubkey"] = key
+    set_root_password("127.0.0.1", None, "Key!Based0Pass", pkey=key, port=sshd["port"], attempts=1)
+    assert sshd["password"] == "Key!Based0Pass"
+    other = paramiko.RSAKey.generate(2048)
+    with pytest.raises(SshAuthError):
+        set_root_password("127.0.0.1", None, "Nope!Pass1234", pkey=other, port=sshd["port"], attempts=1)

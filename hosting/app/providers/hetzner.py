@@ -108,7 +108,25 @@ class HetznerVps:
     def __init__(self, client: HetznerClient):
         self.c = client
 
-    def create_server(self, *, name, server_type, image, location, user_data, labels) -> CreatedServer:
+    def ensure_ssh_key(self, name: str, public_key: str) -> str:
+        """Регистрирует ключ панели в проекте Hetzner (один раз) и возвращает его имя."""
+        found = self.c.request("GET", "/ssh_keys", params={"name": name}).get("ssh_keys") or []
+        if not found:
+            try:
+                self.c.request("POST", "/ssh_keys", json={"name": name, "public_key": public_key,
+                                                          "labels": {"managed_by": "averix"}})
+            except ProviderError as e:
+                if e.code != "uniqueness_error":  # тот же ключ уже добавлен под другим именем
+                    raise
+                fp = self.c.request("GET", "/ssh_keys").get("ssh_keys") or []
+                same = [k for k in fp if k.get("public_key", "").split()[:2] == public_key.split()[:2]]
+                if same:
+                    return same[0]["name"]
+                raise
+        return name
+
+    def create_server(self, *, name, server_type, image, location, user_data, labels,
+                      ssh_keys: list[str] | None = None) -> CreatedServer:
         body = {
             "name": name,
             "server_type": server_type,
@@ -119,6 +137,8 @@ class HetznerVps:
             "labels": labels,
             "public_net": {"enable_ipv4": True, "enable_ipv6": True},
         }
+        if ssh_keys:
+            body["ssh_keys"] = ssh_keys
         data = self.c.request("POST", "/servers", json=body)
         srv = data.get("server") or {}
         net = srv.get("public_net") or {}

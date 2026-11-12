@@ -13,6 +13,7 @@ class FakeHetzner:
         self.calls = []
         self.rrsets = {}
         self.read_only = False
+        self.ssh_keys = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path.removeprefix("/v1")
@@ -48,6 +49,13 @@ class FakeHetzner:
         if m == "POST" and path == "/servers/99/actions/poweron":
             return httpx.Response(429, json={"error": {"code": "rate_limit_exceeded", "message": "limit"}})
 
+        if path == "/ssh_keys" and m == "GET":
+            name = request.url.params.get("name")
+            keys = [k for k in self.ssh_keys if not name or k["name"] == name]
+            return httpx.Response(200, json={"ssh_keys": keys})
+        if path == "/ssh_keys" and m == "POST":
+            self.ssh_keys.append({"id": len(self.ssh_keys) + 1, **body})
+            return httpx.Response(201, json={"ssh_key": self.ssh_keys[-1]})
         # DNS
         if path == "/zones/example.com" and m == "GET":
             return httpx.Response(404, json={"error": {"code": "not_found", "message": "zone not found"}})
@@ -183,3 +191,14 @@ def test_check_write_detects_read_only_token(client, fake):
     with pytest.raises(ProviderError) as e:
         vps.check_write()
     assert "Read & Write" in e.value.message
+
+
+def test_ensure_ssh_key_once_and_create_with_key(client, fake):
+    vps = HetznerVps(client)
+    assert vps.ensure_ssh_key("averix-panel-1", "ssh-rsa AAAA averix-panel") == "averix-panel-1"
+    assert vps.ensure_ssh_key("averix-panel-1", "ssh-rsa AAAA averix-panel") == "averix-panel-1"
+    assert len(fake.ssh_keys) == 1 and fake.ssh_keys[0]["public_key"] == "ssh-rsa AAAA averix-panel"
+    vps.create_server(name="web-1", server_type="cx23", image="ubuntu-24.04", location="fsn1",
+                      user_data="#cloud-config\n", labels={}, ssh_keys=["averix-panel-1"])
+    body = [c for c in fake.calls if c[:2] == ("POST", "/servers")][-1][2]
+    assert body["ssh_keys"] == ["averix-panel-1"]
