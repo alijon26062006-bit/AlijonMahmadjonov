@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 (async () => {
-  const src = 'file://' + path.join(__dirname, 'presentation.html');
+  const src = 'file://' + path.join(__dirname, process.env.HTML || 'presentation.html');
   const out = process.argv[2] || path.join(__dirname, '..', 'PyDoston-mycourse-gamification.pdf');
   const shots = process.argv[3];
   const only = process.argv[4] ? process.argv[4].split(',').map(Number) : null;
