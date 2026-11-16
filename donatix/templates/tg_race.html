@@ -118,6 +118,7 @@ button { font-family: inherit; color: #fff; border: 0; }
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 const tg = window.Telegram && Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {} }
@@ -223,7 +224,8 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x07061a); s
 const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 function resize() { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3560, 3.0)); scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+let ENV; { const pm = new THREE.PMREMGenerator(R); ENV = pm.fromScene(new RoomEnvironment(), .04).texture; pm.dispose(); }      // отражения студии на кузове — краска блестит как настоящая
+scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3560, 2.6)); scene.add(new THREE.AmbientLight(0xffffff, .9));
 const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(6, 12, 8); scene.add(sun);
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, metalness: .5, roughness: .4, ...o});
 const world = new THREE.Group(); scene.add(world);       // трасса и город (видны в заезде)
@@ -264,7 +266,7 @@ function layoutWorld(z) {
 /* ── машина: одна модель, цвет — перекраска текстуры ── */
 let BASE = null, baseMat = null, baseImg = null; const paintTex = {};
 async function loadCar() {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/static/race/car1.glb?v=1');
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/static/race/car1.glb?v=2');
   const m = gltf.scene, box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   m.position.set(-c.x, -box.min.y, -c.z); const inner = new THREE.Group(); inner.add(m);
   inner.rotation.y = (size.x > size.z ? Math.PI / 2 : 0) + Math.PI;        // длина вдоль z, нос вперёд (−z)
@@ -288,10 +290,11 @@ function paint(hex) {       // краска кузова: фиолетовые �
   return (paintTex[hex] = tex);
 }
 const HEX = {};
+const SHT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 6, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,.8)'); g.addColorStop(.6, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
 function makeCar(colorCode) {       // g — место на трассе, body — сам кузов (его крутит руль и занос)
-  const g = new THREE.Group(), body = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]);
+  const g = new THREE.Group(), body = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]); mat.envMap = ENV; mat.envMapIntensity = .35;
   m.traverse(o => { if (o.isMesh) o.material = mat; }); body.add(m); g.add(body); g.userData = {mat, body};
-  const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .55})); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; sh.scale.set(1.35, 2.7, 1); g.add(sh);
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({map: SHT, transparent: true, depthWrite: false})); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; sh.scale.set(1.75, 3.1, 1); g.add(sh);
   return g;
 }
 const setColor = (car, code) => { car.userData.mat.map = paint(HEX[code]); car.userData.mat.needsUpdate = true; };
