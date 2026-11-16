@@ -239,7 +239,12 @@ def money_page(request: Request, period: str = "", date_from: str = "", date_to:
         "SELECT COUNT(*), COALESCE(SUM(cost_source = 'supplier'), 0) FROM orders WHERE status = 'completed' "
         "AND COALESCE(completed_at, created_at) >= ? AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
     tax = taxreport.tax_percent(conn)
+    from datetime import timedelta as _td
+    first = periods.midnight(timez.zone(timez.site_zone_name(conn))).date().replace(day=1)
+    prev_last = first - _td(days=1)
     return render(request, "admin/money.html", {
+        "prev_month": (prev_last.replace(day=1).isoformat(), prev_last.isoformat()),
+        "today_iso": periods.midnight(timez.zone(timez.site_zone_name(conn))).date().isoformat(),
         "user": admin, "m": m, "s": m["total"], "pr": pr, "presets": periods.PRESETS, "keep": "",
         "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
         "loss_n": loss[0], "loss_micro": loss[1], "exact_n": exact[1], "orders_n": exact[0],

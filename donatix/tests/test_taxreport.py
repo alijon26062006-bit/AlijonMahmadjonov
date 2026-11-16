@@ -92,3 +92,20 @@ def test_no_tax_on_a_day_in_minus(config, conn):
     start, end = _day(conn)
     day = [c.value for c in load_workbook(io.BytesIO(taxreport.build(conn, config, start, end)))["Итог по дням"][4]]
     assert day[1] == 1100.0 and day[8] < 0 and day[9] == 0          # налог с прибыли, не с оборота
+
+
+def test_export_any_date_range_finds_old_days(app, config, conn):
+    """Файл за любые даты «с … по …»: старый день находится, заказы вне периода в файл не попадают."""
+    uid, _ = make_client(conn)
+    _order(conn, uid, 11, 40, 30, "2025-03-10T09:00:00")          # давно — должен найтись
+    _order(conn, uid, 12, 50, 40, "2025-03-25T09:00:00")          # вне периода
+    c = TestClient(app)
+    web_login(c, "admin@example.com", "adminpass123")
+    page = c.get("/admin/money?period=today").text
+    assert 'name="date_from"' in page and "Скачать за эти даты" in page and "Прошлый месяц" in page
+    r = c.get("/admin/money/export?date_from=2025-03-01&date_to=2025-03-15")
+    assert r.status_code == 200
+    wb = load_workbook(io.BytesIO(r.content))
+    text = " ".join(str(v) for ws in wb.worksheets for row in ws.iter_rows(values_only=True) for v in row if v is not None)
+    assert "dx-f11" in text and "dx-f12" not in text
+    assert "2025" in r.headers["content-disposition"]

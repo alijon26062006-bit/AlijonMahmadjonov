@@ -2606,6 +2606,8 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .money-tax h3 { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
 .mt-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
 .mt-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.mt-range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 10px 0 6px; }
+.mt-range .date-field { flex: 1 1 140px; }
 .mt-tax label { font-weight: 600; }
 .mt-tax-in { display: flex; gap: 8px; margin: 6px 0; }
 .mt-tax-in input { max-width: 120px; }

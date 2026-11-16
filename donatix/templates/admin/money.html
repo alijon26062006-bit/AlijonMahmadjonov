@@ -26,8 +26,17 @@
         <a class="btn primary sm" href="/admin/money/export?period=yesterday">Вчера</a>
         <a class="btn sm" href="/admin/money/export?period=today">Сегодня</a>
         <a class="btn sm" href="/admin/money/export?period=month">Этот месяц</a>
+        <a class="btn sm" href="/admin/money/export?date_from={{ prev_month[0] }}&date_to={{ prev_month[1] }}">Прошлый месяц</a>
         <a class="btn sm" href="/admin/money/export?{{ export_q or 'period=' ~ pr.key }}">Период выше</a>
       </div>
+      <form class="mt-range" method="get" action="/admin/money/export">
+        <div class="date-field"><label class="label-caps" for="ex_from">С даты</label>
+          <input type="date" id="ex_from" name="date_from" required max="{{ today_iso }}" value="{{ pr.date_from if pr.key == 'custom' else prev_month[0] }}"></div>
+        <div class="date-field"><label class="label-caps" for="ex_to">По дату</label>
+          <input type="date" id="ex_to" name="date_to" required max="{{ today_iso }}" value="{{ pr.date_to if pr.key == 'custom' else today_iso }}"></div>
+        <button class="btn primary sm" type="submit">{{ icon('download', 16) }} Скачать за эти даты</button>
+      </form>
+      <p class="muted small">Любой день или период — с первого дня работы сайта. Заказы и пополнения из базы не удаляются никогда.</p>
       <p class="muted small">Каждое утро файл за прошедшие сутки приходит в админ-бот.</p>
     </div>
     <form class="mt-tax" method="post" action="/admin/money/tax">
