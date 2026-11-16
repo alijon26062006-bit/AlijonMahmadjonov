@@ -155,3 +155,40 @@ def test_results_build_rating_and_stats(conn, uid):
     top = race.top(conn, period="week")
     assert top[0]["user_id"] == uid and top[0]["points"] == race.POINTS[1]
     assert race.top(conn, period="all")[0]["wins"] == 1
+
+
+def test_group_gathers_own_players_and_host_starts(conn, uid):
+    """Своя группа: код, свои игроки, отсчёт у всех один — с момента, когда хозяин нажал «Старт»."""
+    from conftest import make_client
+    friend, stranger = make_client(conn, login="friend")[0], make_client(conn, login="stranger")[0]
+    rooms = race.RaceGame(conn).rooms
+    g = rooms.group_create(uid, "Али")
+    assert g["waiting"] and g["is_host"] and len(g["code"]) == 5
+    pub = race.join(conn, stranger, "Чужой")                    # быстрый заезд в чужую группу не попадает
+    assert pub["room"] != g["room"] and race.lobby(conn, friend)["rooms"][0]["room"] == pub["room"]
+    j = rooms.group_join(friend, "Фаррух", g["code"].lower())
+    assert j["room"] == g["room"] and j["waiting"] and not j["is_host"] and len(j["players"]) == 2
+    assert race.tick(conn, friend, g["room"], 0, 0, 0)["waiting"]
+    with pytest.raises(race.RaceError):
+        rooms.group_start(friend, g["room"])                    # старт даёт только хозяин
+    with pytest.raises(race.RaceError):
+        rooms.group_join(stranger, "Чужой", "ZZZZZ")
+    s = rooms.group_start(uid, g["room"])
+    assert not s["waiting"] and 0 < s["start_in"] <= race.GROUP_WAIT
+    t = race.tick(conn, friend, g["room"], 0, 0, 0)
+    assert not t["waiting"] and abs(t["start_in"] - s["start_in"]) < 1      # у друга тот же отсчёт
+    with pytest.raises(race.RaceError):
+        rooms.group_join(stranger, "Чужой", g["code"])          # после старта войти нельзя
+
+
+def test_group_leave_passes_host_and_closes_empty(conn, uid):
+    from conftest import make_client
+    friend = make_client(conn, login="friend2")[0]
+    rooms = race.RaceGame(conn).rooms
+    g = rooms.group_create(uid, "Али")
+    rooms.group_join(friend, "Фаррух", g["code"])
+    rooms.group_leave(uid, g["room"])
+    assert rooms.group_join(friend, "Фаррух", g["code"])["is_host"]         # хозяин ушёл — хозяин теперь друг
+    rooms.group_leave(friend, g["room"])
+    with pytest.raises(race.RaceError):
+        rooms.group_join(uid, "Али", g["code"])                 # пустая группа закрыта

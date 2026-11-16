@@ -49,6 +49,13 @@ button { font-family: inherit; color: #fff; border: 0; }
 .btn.b { background: linear-gradient(135deg,#3ddc84,#12b981); color: #05240f; box-shadow: 0 16px 34px -14px #12b981; }
 .btn.c { background: linear-gradient(135deg,#8b7bff,#5b3df5); box-shadow: 0 16px 34px -14px #6a55ff; }
 .btn:active { transform: scale(.96); }
+.go3 { grid-template-columns: 1fr 1fr 1fr; gap: 8px; } .go3 .btn { font-size: 13.5px; height: 62px; } .go3 .btn small { font-size: 10.5px; }
+.btn.g { background: linear-gradient(135deg,#ffb23d,#ff7a3d); color: #2a1500; box-shadow: 0 16px 34px -14px #ff8a3d; }
+#grp { position: fixed; z-index: 7; left: 16px; right: 16px; top: 24%; padding: 18px 16px; border-radius: 24px; text-align: center; background: rgba(16,13,48,.92); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: rise .3s both; }
+#grp small { display: block; color: #b4b0e6; font-size: 13px; font-weight: 600; } #grp-code { font-size: 44px; font-weight: 900; letter-spacing: .14em; margin: 2px 0 8px; user-select: text; -webkit-user-select: text; }
+#grp-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 4px 0 14px; } #grp-list span { padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.1); font-size: 13px; }
+#grp .btn { width: 100%; height: 54px; margin-top: 8px; } #grp-wait { margin-top: 10px; color: #ffd23d; font-size: 14px; }
+.gin { width: 100%; height: 54px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,.2); background: rgba(255,255,255,.07); color: #fff; font: inherit; font-size: 22px; font-weight: 900; letter-spacing: .14em; text-align: center; text-transform: uppercase; user-select: text; -webkit-user-select: text; outline: 0; margin: 10px 0 8px; }
 /* заезд */
 #r-top { top: calc(env(safe-area-inset-top) + 12px); display: flex; justify-content: space-between; align-items: center; }
 #pos { font-size: 30px; font-weight: 900; text-shadow: 0 4px 18px #000; } #pos i { font-style: normal; font-size: 13px; opacity: .7; }
@@ -96,7 +103,7 @@ button { font-family: inherit; color: #fff; border: 0; }
 .note { font-size: 12px; color: #9d98d4; font-weight: 600; text-align: center; margin-top: 6px; }
 </style>
 <script type="importmap">{"imports": {"three": "/static/race/three/build/three.module.js", "three/addons/": "/static/race/three/examples/jsm/"}}</script>
-</head><body>
+</head><body data-g="{{ group_code }}">
 <div class="ui" id="load"><div><b>🏁</b><span id="load-t">Боркунӣ… / Загрузка…</span></div></div>
 
 <div id="garage" class="hide">
@@ -108,8 +115,9 @@ button { font-family: inherit; color: #fff; border: 0; }
     <button id="g-live" class="hide"></button>
     <div id="colors"></div>
     <div class="three"><button class="btn a" id="b-tune"><span>🔧 <span data-t="tune">Тюнинг</span></span></button><button class="btn a" id="b-top"><span>🏆 <span data-t="top">Беҳтаринҳо</span></span></button><button class="btn a" id="b-set"><span>⚙️ <span data-t="set">Танзимот</span></span></button></div>
-    <div class="two"><button class="btn c" id="b-bots"><span>🤖 <span data-t="bots">Бо ботҳо</span><small data-t="botsS">фавран оғоз</small></span></button>
-      <button class="btn b" id="b-start"><span>👥 <span data-t="people">Бо одамон</span><small id="g-day"></small></span></button></div>
+    <div class="two go3"><button class="btn c" id="b-bots"><span>🤖 <span data-t="bots">Бо ботҳо</span><small data-t="botsS">фавран оғоз</small></span></button>
+      <button class="btn b" id="b-start"><span>👥 <span data-t="people">Бо одамон</span><small id="g-day"></small></span></button>
+      <button class="btn g" id="b-grp"><span>🔑 <span data-t="grp">Гурӯҳ</span><small data-t="grpS">бо дӯстон</small></span></button></div>
   </div>
 </div>
 
@@ -123,6 +131,9 @@ button { font-family: inherit; color: #fff; border: 0; }
 <div class="ui hide" id="msg"></div>
 <button id="invite" class="hide">📨 <span data-t="invite">Дӯстро даъват кун</span></button>
 <div id="wait-list" class="hide"></div>
+<div id="grp" class="hide"><small data-t="grpCode">Коди гурӯҳ</small><div id="grp-code"></div><div id="grp-list"></div>
+  <button class="btn b hide" id="grp-go"><span data-t="grpGo">ОҒОЗ</span></button><div id="grp-wait" class="hide" data-t="grpWait">Соҳиби гурӯҳ оғоз медиҳад…</div>
+  <button class="btn a" id="grp-inv"><span>📨 <span data-t="invite">Дӯстро даъват кун</span></span></button><button class="btn a" id="grp-out"><span data-t="grpOut">Баромадан</span></button></div>
 <div class="ui" id="hit"></div>
 <div class="ui hide" id="res"><div class="card"><h2 id="res-place"></h2><p id="res-sub"></p><div class="won" id="res-won"></div>
   <div class="two"><button class="btn a" id="res-garage"><span data-t="garage">Гараж</span></button><button class="btn b" id="res-again"><span data-t="again">БОЗ</span></button></div></div></div>
@@ -134,7 +145,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
-const tg = window.Telegram && Telegram.WebApp;
+const tg = window.Telegram && Telegram.WebApp, GROUP = document.body.dataset.g || '';
 if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {} }
 let INIT = (tg && tg.initData) || '';
 try { if (INIT) sessionStorage.setItem('dx_init', INIT); else INIT = sessionStorage.getItem('dx_init') || ''; } catch (e) {}
@@ -151,7 +162,10 @@ const TX = {shop: ['Мағоза', 'Магазин'], race: ['ПОЙГА', 'ГО
   sound: ['Садо', 'Звук'], vibro: ['Ларзиш', 'Вибрация'], wheel: ['Руль', 'Руль'], wheelS: ['телефонро чун руль моил кунед', 'наклоняйте телефон как руль'], btns: ['Тугмаҳо', 'Кнопки'], tilt: ['Моил', 'Наклон'],
   auto: ['Гази худкор', 'Автогаз'], autoS: ['мошин худаш газ медиҳад', 'машина сама жмёт газ'], inv: ['Руль баръакс', 'Руль наоборот'], invS: ['агар мошин ба тарафи дигар равад', 'если машина едет не в ту сторону'],
   nosens: ['Сенсори моилӣ дастрас нест', 'Датчик наклона недоступен'], tuneN: ['Тангаҳоро дар пойга ба даст меоред', 'Монеты зарабатываются в заездах'], empty: ['Ҳоло холӣ', 'Пока пусто'],
-  invite: ['Дӯстро даъват кун', 'Позвать друга'], you: ['Шумо', 'Вы'], inGarage: ['дар гараж', 'в гараже'], racing: ['дар пойга', 'в заезде'], waiting: ['рақибро интизор аст', 'ждёт соперника'],
+  invite: ['Дӯстро даъват кун', 'Позвать друга'], you: ['Шумо', 'Вы'],
+  grp: ['Гурӯҳ', 'Группа'], grpS: ['бо дӯстон', 'с друзьями'], grpCode: ['Коди гурӯҳ', 'Код группы'], grpGo: ['ОҒОЗ', 'СТАРТ'], grpWait: ['Соҳиби гурӯҳ оғоз медиҳад…', 'Старт даёт хозяин группы…'], grpOut: ['Баромадан', 'Выйти'],
+  grpNew: ['Гурӯҳи нав сохтан', 'Создать группу'], grpNewS: ['Шумо соҳиб мешавед ва дӯстонро даъват мекунед', 'Вы хозяин: зовёте друзей и даёте старт'], grpIn: ['Даромадан', 'Войти'], grpEnter: ['Ё коди гурӯҳи дӯстро нависед', 'Или введите код группы друга'],
+  grpTxt: ['🏁 Биё ба гурӯҳи ман дар пойга! Код: {a}', '🏁 Заходи в мою группу в гонке! Код: {a}'], grpT: ['Гурӯҳи худ', 'Своя группа'], inGarage: ['дар гараж', 'в гараже'], racing: ['дар пойга', 'в заезде'], waiting: ['рақибро интизор аст', 'ждёт соперника'],
   startIn: ['оғоз баъди {a} с', 'старт через {a} с'], joinGo: ['Ҳамроҳ', 'Играть'], waitN: ['{a} интизор', 'ждут: {a}'], invTxt: ['🏁 Биё пойга! Заезд бо рақибони зинда:', '🏁 Давай гонку! Заезд с живыми соперниками:'],
   pDay: ['Имрӯз', 'Сегодня'], pWeek: ['Ҳафта', 'Неделя'], pAll: ['Ҳамааш', 'Всё время'], sRaces: ['пойга', 'заездов'], sWins: ['ғалаба', 'побед'], sPod: ['дар 3 беҳтарин', 'в тройке'],
   sBest: ['беҳтарин вақт', 'лучшее время'], sRate: ['ғалаба %', '% побед'], sRank: ['ҷой дар ҳафта', 'место за неделю'], pts: ['хол', 'очк.'], rules: ['1-ум +10 · 2-юм +6 · 3-юм +4 · марра +1 хол', '1 место +10 · 2 место +6 · 3 место +4 · финиш +1 очко']};
@@ -410,7 +424,7 @@ function garage() {
   mode = 'garage'; world.visible = false; stage.visible = true; rivals.clear(); others = {}; bots = [];
   if (me) { scene.remove(me); me = null; }
   if (!garageCar) { garageCar = makeCar(P.color); stage.add(garageCar); } else setColor(garageCar, P.color);
-  show('garage', true); show('hud', false); show('res', false); show('msg', false);
+  show('garage', true); show('hud', false); show('res', false); show('msg', false); show('grp', false);
   $('g-coins').textContent = '🪙 ' + P.coins; $('g-wins').textContent = '🏆 ' + P.wins;
   $('g-sub').textContent = t('sub', P.prizes[1]); $('g-day').textContent = t('day', P.day_left);
   onlineUI();
@@ -453,6 +467,8 @@ function sheet(kind) {
     $('sh-b').innerHTML = tgl('sound', '🔊', 'sound') + tgl('vibro', '📳', 'vibro') +
       `<div class="row"><div><b>🎮 ${t('wheel')}</b><small>${t('wheelS')}</small></div><div class="seg"><button data-w="btn" class="${SET.steer === 'btn' ? 'on' : ''}">${t('btns')}</button><button data-w="tilt" class="${SET.steer === 'tilt' ? 'on' : ''}">${t('tilt')}</button></div></div>` +
       (SET.steer === 'tilt' ? tgl('inv', '🔁', 'inv', 'invS') : '') + tgl('auto', '🦶', 'auto', 'autoS'); }
+  if (kind === 'grp') { $('sh-t').textContent = '🔑 ' + t('grpT');
+    $('sh-b').innerHTML = `<div class="row" data-g="new"><div><b>➕ ${t('grpNew')}</b><small>${t('grpNewS')}</small></div><b>›</b></div><div class="note">${t('grpEnter')}</div><input class="gin" id="gcode" maxlength="6" placeholder="ABCDE" autocomplete="off" autocapitalize="characters"><button class="btn b" style="width:100%" data-g="join">${t('grpIn')}</button>`; }
   if (kind === 'top') { $('sh-t').textContent = '🏆 ' + t('top'); const s = P.stats || {}, sec = ms => ms ? (ms / 1000).toFixed(1) + ' с' : '—';
     $('sh-b').innerHTML = `<div class="mystat"><div><b>${s.races || 0}</b><small>${t('sRaces')}</small></div><div><b>${s.wins || 0}</b><small>${t('sWins')}</small></div><div><b>${s.podium || 0}</b><small>${t('sPod')}</small></div>
         <div><b>${sec(s.best_ms)}</b><small>${t('sBest')}</small></div><div><b>${s.win_rate || 0}%</b><small>${t('sRate')}</small></div><div><b>${s.rank_week ? '#' + s.rank_week : '—'}</b><small>${t('sRank')}</small></div></div>
@@ -461,8 +477,14 @@ function sheet(kind) {
       `<div class="note">${t('rules')}</div>`; }
 }
 $('sh-x').onclick = () => sheet(''); $('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') sheet(''); });
+$('b-grp').onclick = () => sheet('grp');
+$('grp-go').onclick = async () => { try { await api('group_start', {room: room.room}); haptic('medium', 40); } catch (err) { toast(err.message, 2000); } };
+$('grp-out').onclick = async () => { try { await api('group_leave', {room: room.room}); } catch (e) {} room = null; show('grp', false); try { Object.assign(P, await api('profile')); } catch (e) {} garage(); };
+$('grp-inv').onclick = () => { if (!P.bot) { toast(t('need'), 2000); return; } share('https://t.me/' + P.bot + '?start=race_' + room.code, t('grpTxt', room.code)); };
 $('b-tune').onclick = () => sheet('tune'); $('b-set').onclick = () => sheet('set'); $('b-top').onclick = () => sheet('top');
 $('sh-b').addEventListener('click', async e => {
+  const gb = e.target.closest('[data-g]');
+  if (gb) { audioInit(); try { const r = gb.dataset.g === 'new' ? await api('group_create') : await api('group_join', {code: $('gcode').value}); start(false, r); } catch (err) { toast(err.message, 2200); } return; }
   const per = e.target.closest('[data-p]');
   if (per) { topPer = per.dataset.p; haptic('light'); try { const r = await api('top', {period: topPer}); P.top = r.top; P.stats = r.stats; } catch (err) {} sheet('top'); return; }
   const u = e.target.closest('[data-u]'), s = e.target.closest('[data-s]'), w = e.target.closest('[data-w]');
@@ -487,16 +509,17 @@ async function tiltOn(check) {
   return true;
 }
 
-async function start(solo) {
+async function start(solo, grp) {
   if (mode !== 'garage' && mode !== 'result') return;
   solo = typeof solo === 'boolean' ? solo : lastSolo; lastSolo = solo; audioInit(); if (SET.steer === 'tilt') tiltOn(false);
-  try { room = await api('join', {solo}); } catch (err) { toast(err.message); return; }
+  if (grp) room = grp; else try { room = await api('join', {solo}); } catch (err) { toast(err.message); return; }
   tOff = room.now * 1000 - Date.now(); startAt = room.now + room.start_in; lastCount = 9;
   mode = 'wait'; sheet(''); show('garage', false); show('res', false); show('hud', true); show('msg', true); stage.visible = false; world.visible = true;
   $('ctl').classList.toggle('tilt', SET.steer === 'tilt'); $('ctl').classList.toggle('auto', SET.auto);
   buildTrack(room.seed); rivals.clear(); others = {}; bots = []; for (const p of smoke) { p.life = 0; p.s.visible = false; }
   if (me) scene.remove(me); me = makeCar(P.color); flames = makeFlames(); me.userData.body.add(flames); scene.add(me);
-  state = {z: 0, x: 0, v: 0, nitro: 2, nitroT: 0, slowT: 0, shake: 0, done: false, botsReady: false, drift: false, driftT: 0, yaw: 0, wallT: 0, solo, ...car()};
+  state = {z: 0, x: 0, v: 0, nitro: 2, nitroT: 0, slowT: 0, shake: 0, done: false, botsReady: false, drift: false, driftT: 0, yaw: 0, wallT: 0, solo, group: !!room.code, waiting: !!room.waiting, ...car()};
+  show('grp', state.waiting); if (state.waiting) { $('grp-code').textContent = room.code; grpUI(); }
   steer.gas = steer.brake = steer.l = steer.r = false; nitroUI(); syncPlayers(room.players);
 }
 function nitroUI(pop) { const s = state; $('nn').textContent = s.nitro; $('nitro').classList.toggle('off', !s.nitro); if (pop) { $('nitro').classList.remove('pop'); void $('nitro').offsetWidth; $('nitro').classList.add('pop'); } }
@@ -514,9 +537,14 @@ function makeBots() {       // свободные места — боты; у в
     rivals.add(b.car); bots.push(b); }
   state.botsReady = true;
 }
+function grpUI() { $('grp-list').innerHTML = [P.name || t('you'), ...Object.values(others).map(o => o.name)].map(n => `<span>🏎 ${esc(n)}</span>`).join('');
+  show('grp-go', !!room.is_host); show('grp-wait', !room.is_host); }
 async function doTick() {
   if (ticking || !room) return; ticking = true;
-  try { const r = await api('tick', {room: room.room, z: state.z, x: state.x, v: state.v}); syncPlayers(r.players); } catch (e) {}
+  try { const r = await api('tick', {room: room.room, z: state.z, x: state.x, v: state.v}); if (!room) { ticking = false; return; } syncPlayers(r.players);
+    if (state.waiting) { room.is_host = r.is_host; grpUI();
+      if (!r.waiting) { state.waiting = false; tOff = r.now * 1000 - Date.now(); startAt = r.now + r.start_in; lastCount = 9; show('grp', false); haptic('medium', 60); } }
+  } catch (e) { if (state && state.waiting && /закрыт|баста/i.test(e.message)) { room = null; show('grp', false); garage(); toast(e.message, 2200); } }
   ticking = false;
 }
 function crash(kind) { const s = state; s.v *= kind === 'obs' ? .32 : .7; s.shake = .45; s.drift = false; haptic(kind === 'obs' ? 'heavy' : 'medium', kind === 'obs' ? 180 : 90); boom(kind === 'obs' ? 1 : .6); toast(t(kind === 'obs' ? 'crash' : 'bump'), 900); }
@@ -573,9 +601,10 @@ function stepRace(dt, tt) {
   $('bar-in').innerHTML = list.map(c => `<i style="left:${Math.min(100, c.z / CFG.track * 100)}%;background:#8a86b8"></i>`).join('') + `<i style="left:${s.z / CFG.track * 100}%;background:#3ddc84;z-index:2"></i>`;
   const ka = K(s.z + 70 + s.v), tr = $('turn'); tr.textContent = ka > 0 ? '↱' : '↰'; tr.classList.toggle('on', Math.abs(ka) > .003 && Math.abs(kz) < .003 && !s.done && tt > 0);
   const m = $('msg'), cnt = Math.ceil(-tt);
-  const waiting = tt < 0 && !s.solo; $('invite').classList.toggle('hide', !waiting); $('wait-list').classList.toggle('hide', !waiting);
+  if (s.waiting) { layoutWorld(0); me.position.set(0, 0, 0); cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 4.2, 10.2); cam.lookAt(0, 1, -9); show('msg', false); $('invite').classList.add('hide'); $('wait-list').classList.add('hide'); audioFrame(0, false, false, false, false); return; }
+  const waiting = tt < 0 && !s.solo && !s.group; $('invite').classList.toggle('hide', !waiting); $('wait-list').classList.toggle('hide', !waiting);
   if (waiting && (stepRace.n = (stepRace.n || 0) + 1) % 15 === 0) $('wait-list').innerHTML = [P.name || t('you'), ...Object.values(others).map(o => o.name)].map(n => `<span>🏎 ${esc(n)}</span>`).join('');
-  if (tt < 0) { show('msg', true); m.innerHTML = cnt + `<small>${s.solo ? t('waitB') : t('wait') + ' · ' + (Object.keys(others).length + 1) + '/' + CFG.max_cars}</small>`; if (cnt !== lastCount) { lastCount = cnt; if (cnt <= 3) { beep(440, .16, 'square', .35); haptic('light', 20); } } }
+  if (tt < 0) { show('msg', true); m.innerHTML = cnt + `<small>${s.solo ? t('waitB') : s.group ? t('grp') + ' ' + esc(room.code) + ' · ' + (Object.keys(others).length + 1) : t('wait') + ' · ' + (Object.keys(others).length + 1) + '/' + CFG.max_cars}</small>`; if (cnt !== lastCount) { lastCount = cnt; if (cnt <= 3) { beep(440, .16, 'square', .35); haptic('light', 20); } } }
   else if (tt < 1) { show('msg', true); m.innerHTML = t('go'); if (mode === 'wait') { mode = 'race'; haptic('rigid', 120); beep(880, .5, 'square', .4); } }
   else if (tt > 1.6 && s.v < 4 && !gas && !s.done) { show('msg', true); m.innerHTML = `<small style="font-size:22px;color:#3ddc84">${t('hold')} ⬇</small>`; }
   else show('msg', false);
@@ -604,7 +633,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (mode === 'garage') { spin += dt * .6; garageCar.rotation.y = spin; cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 2.5, 8.6); cam.lookAt(0, .9, 0); audioFrame(0, false, false, false, false); }
-  else if (mode === 'wait' || mode === 'race' || mode === 'result') { stepRace(dt, nowS() - startAt); if (now - lastTick > 250 && mode !== 'result') { lastTick = now; doTick(); } }
+  else if (mode === 'wait' || mode === 'race' || mode === 'result') { stepRace(dt, nowS() - startAt); if (now - lastTick > (state && state.waiting ? 900 : 250) && mode !== 'result') { lastTick = now; doTick(); } }
   R.render(scene, cam); requestAnimationFrame(frame);
 }
 
@@ -613,6 +642,7 @@ function frame(now) {
   try { [P] = await Promise.all([api('profile'), loadCar()]); } catch (err) { $('load-t').textContent = err.message === 'net' ? 'Нет связи' : err.message; return; }
   CFG = P; for (const c of P.colors) HEX[c.code] = c.hex;
   show('load', false); garage(); requestAnimationFrame(frame);
+  if (GROUP) try { start(false, await api('group_join', {code: GROUP})); } catch (err) { toast(err.message, 2600); }
   // «в сети»: гараж отмечается каждые 6 с и видит, кто ждёт соперника; в заезде — раз в 15 с
   let lastPing = 0;
   setInterval(async () => { const now = Date.now(); if (document.hidden || (mode !== 'garage' && now - lastPing < 15000)) return; lastPing = now;

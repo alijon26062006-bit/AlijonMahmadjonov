@@ -381,7 +381,7 @@ if (tg) { tg.ready(); tg.expand(); }
 const INIT = tg ? tg.initData : "";
 try { if (INIT) sessionStorage.setItem("dx_init", INIT); } catch (e) {}
 const START = tg && tg.initDataUnsafe ? (tg.initDataUnsafe.start_param || "") : "";
-if (START === "race") { location.replace("/tg/race"); return; }     // друг позвал в гонку
+if (START === "race" || START.startsWith("race_")) { location.replace("/tg/race" + (START.length > 5 ? "?g=" + encodeURIComponent(START.slice(5)) : "")); return; }     // друг позвал в гонку / в свою группу
 let LANG = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && (tg.initDataUnsafe.user.language_code || "").startsWith("ru")) ? "ru" : "tj";
 try { LANG = localStorage.getItem("dx_lang") || LANG; } catch (e) {}
 const SUPPORT = {{ support | tojson }};

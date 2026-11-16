@@ -136,14 +136,15 @@ class GiftBot:
         if text.startswith("/topup"):
             self.handle(conn, upd)
             return True
-        if text == "/start race":      # друг позвал в гонку — сразу кнопка «Играть»
+        if text == "/start race" or text.startswith("/start race_"):      # друг позвал в гонку (или в свою группу)
             tg = msg.get("from") or {}
             ru = lang_of(tg) == "ru"
+            code = "".join(c for c in text[len("/start race_"):].upper() if c.isalnum())[:8]
             self.api("sendMessage", chat_id=msg["chat"]["id"],
                      text="🏁 Тебя зовут в гонку! Жми кнопку — заезд с живыми соперниками." if ru
                      else "🏁 Туро ба пойга даъват карданд! Тугмаро пахш кун — бо рақибони зинда.",
                      reply_markup={"inline_keyboard": [[{"text": "🏁 Играть" if ru else "🏁 Бозӣ",
-                                                         "web_app": {"url": app_url(self.config) + "/race"}}]]})
+                                                         "web_app": {"url": app_url(self.config) + "/race" + (f"?g={code}" if code else "")}}]]})
             return True
         if text.startswith("/start g_"):
             tg = msg.get("from") or {}

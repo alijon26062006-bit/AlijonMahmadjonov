@@ -603,8 +603,9 @@ async def api_topup_receipt(request: Request, conn=Depends(get_conn), config: Co
 # ── Гонка: 3D-игра в мини-приложении (race.py). Денег нет — только игровые монеты на цвет машины ──
 
 @router.get("/race")
-def race_page(request: Request, config: Config = Depends(get_config)):
-    return templates.TemplateResponse(request, "tg_race.html", {"site_name": config.site_name})
+def race_page(request: Request, g: str = "", config: Config = Depends(get_config)):
+    code = "".join(c for c in g.upper() if c.isalnum())[:8]      # ссылка-приглашение в группу друга
+    return templates.TemplateResponse(request, "tg_race.html", {"site_name": config.site_name, "group_code": code})
 
 
 @router.post("/api/race/{action}")
@@ -636,6 +637,16 @@ async def api_race(action: str, request: Request, conn=Depends(get_conn), config
         if action == "join":
             race.seen(conn, user["id"], name, "race")
             return race.join(conn, user["id"], name, config.tz_offset, solo=bool(body.get("solo")))
+        if action.startswith("group_"):       # своя группа: создать, войти по коду, старт (хозяин), выйти
+            rooms = race.RaceGame(conn, config.tz_offset).rooms
+            if action == "group_create":
+                return rooms.group_create(user["id"], name)
+            if action == "group_join":
+                return rooms.group_join(user["id"], name, str(body.get("code") or ""))
+            if action == "group_start":
+                return rooms.group_start(user["id"], int(body.get("room") or 0))
+            if action == "group_leave":
+                return rooms.group_leave(user["id"], int(body.get("room") or 0))
         if action == "tick":
             return race.tick(conn, user["id"], int(body.get("room") or 0), float(body.get("z") or 0),
                              float(body.get("x") or 0), float(body.get("v") or 0))
