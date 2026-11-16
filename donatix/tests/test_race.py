@@ -93,3 +93,29 @@ def test_shop_buy_and_select(conn, uid):
 def test_api_needs_telegram_signature(client):
     assert client.post("/tg/api/race/profile", json={}).status_code == 403
     assert client.get("/tg/race").status_code == 200
+
+
+def test_solo_room_is_private_and_starts_fast(conn, uid):
+    from conftest import make_client
+    a = race.join(conn, uid, "Али", solo=True)
+    assert 0 < a["start_in"] <= race.WAIT_SOLO
+    b = race.join(conn, make_client(conn, login="racer3")[0], "Фаррух")        # «с людьми» в чужой заезд с ботами не попадает
+    assert b["room"] != a["room"]
+
+
+def test_upgrade_costs_grow_and_stop_at_max(conn, uid):
+    p = race.profile(conn, uid, "Али")
+    assert p["upg"] == {"engine": 0, "accel": 0, "nitro": 0} and p["track"] == race.TRACK and p["nitro_k"] == race.NITRO_K
+    with pytest.raises(race.RaceError):
+        race.upgrade(conn, uid, "engine")                      # монет нет
+    conn.execute("UPDATE race_wallet SET coins = 1000 WHERE user_id = ?", (uid,))
+    assert race.upgrade(conn, uid, "engine") == {"coins": 1000 - race.UPG_COST, "upg": {"engine": 1, "accel": 0, "nitro": 0}}
+    assert race.upgrade(conn, uid, "engine")["coins"] == 1000 - race.UPG_COST * 3      # второй уровень дороже
+    for _ in range(race.UPG_MAX - 2):
+        race.upgrade(conn, uid, "engine")
+    with pytest.raises(race.RaceError):
+        race.upgrade(conn, uid, "engine")                      # максимум
+    with pytest.raises(race.RaceError):
+        race.upgrade(conn, uid, "wings")
+    # даже полностью прокачанная машина на сплошном нитро не проедет быстрее серверного минимума
+    assert race.TRACK / ((race.VMAX + race.UPG["engine"] * race.UPG_MAX) * race.NITRO_K) * 1000 >= race.MIN_MS

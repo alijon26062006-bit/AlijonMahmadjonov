@@ -436,12 +436,14 @@ async def api_race(action: str, request: Request, conn=Depends(get_conn), config
             return {**race.profile(conn, user["id"], name, config.tz_offset), "me": user["id"], "name": name,
                     "top": race.top(conn)}
         if action == "join":
-            return race.join(conn, user["id"], name, config.tz_offset)
+            return race.join(conn, user["id"], name, config.tz_offset, solo=bool(body.get("solo")))
         if action == "tick":
             return race.tick(conn, user["id"], int(body.get("room") or 0), float(body.get("z") or 0),
                              float(body.get("x") or 0), float(body.get("v") or 0))
         if action == "finish":
             return race.finish(conn, user["id"], int(body.get("room") or 0), int(body.get("ms") or 0), config.tz_offset)
+        if action == "upgrade":
+            return race.upgrade(conn, user["id"], str(body.get("key") or ""), config.tz_offset)
         if action == "shop":
             return race.shop(conn, user["id"], str(body.get("color") or ""), config.tz_offset)
     except race.RaceError as exc:

@@ -21,11 +21,17 @@ import sqlite3
 import time
 from typing import Any
 
-TRACK = 2400.0            # длина трассы, игровых метров
-VMAX = 52.0               # обычная максимальная скорость, м/с
-VNITRO = 78.0             # с нитро
+TRACK = 3600.0            # длина трассы, игровых метров (заезд ~1 минута)
+VMAX = 52.0               # обычная максимальная скорость без тюнинга, м/с
+NITRO_K = 1.5             # нитро: во сколько раз быстрее
+#: Тюнинг за монеты: что → (шаг за уровень). Уровней UPG_MAX, цена уровня — UPG_COST × (уровень + 1)
+UPG = {"engine": 2.0, "accel": 0.10, "nitro": 0.3}      # +2 м/с к скорости · +10% к разгону · +0.3 с нитро
+UPG_MAX = 5
+UPG_COST = 15
+VNITRO = (VMAX + UPG["engine"] * UPG_MAX) * NITRO_K     # быстрее не едет никто
 MAX_CARS = 6
 WAIT = 8.0                # сколько комната ждёт игроков до старта, сек
+WAIT_SOLO = 4.0           # заезд только с ботами — стартует сразу
 JOIN_GAP = 2.5            # за сколько до старта в комнату уже не пускаем
 MIN_MS = int(TRACK / VNITRO * 1000)        # быстрее проехать нельзя даже на одном нитро
 PRIZES = {1: 10, 2: 5, 3: 3}
@@ -84,6 +90,10 @@ class RaceError(Exception):
 
 def init(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    if "upg" not in {r[1] for r in conn.execute("PRAGMA table_info(race_wallet)")}:
+        conn.execute("ALTER TABLE race_wallet ADD COLUMN upg TEXT NOT NULL DEFAULT '{}'")      # тюнинг
+    if "solo" not in {r[1] for r in conn.execute("PRAGMA table_info(race_rooms)")}:
+        conn.execute("ALTER TABLE race_rooms ADD COLUMN solo INTEGER NOT NULL DEFAULT 0")     # заезд только с ботами
 
 
 def rnd(seed: int, i: int) -> float:
@@ -121,6 +131,11 @@ def wallet(conn: sqlite3.Connection, user_id: int, name: str = "", tz_offset: in
         w["owned"] = ["violet"]
     if w["color"] not in w["owned"]:
         w["color"] = "violet"
+    try:
+        raw = json.loads(w.get("upg") or "{}")
+    except ValueError:
+        raw = {}
+    w["upg"] = {k: max(0, min(UPG_MAX, int(raw.get(k) or 0))) for k in UPG}
     w["day_left"] = DAY_CAP - (w["day_coins"] if w["day"] == _today(tz_offset) else 0)
     return w
 
@@ -136,7 +151,8 @@ def profile(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 
     return {"coins": w["coins"], "wins": w["wins"], "races": w["races"], "color": w["color"], "owned": w["owned"],
             "day_left": max(0, w["day_left"]), "day_cap": DAY_CAP, "online": online(conn),
             "colors": [{"code": c, "ru": ru, "tj": tj, "hex": hx, "price": price} for c, (ru, tj, hx, price) in COLORS.items()],
-            "prizes": PRIZES, "track": TRACK, "vmax": VMAX, "vnitro": VNITRO, "max_cars": MAX_CARS}
+            "prizes": PRIZES, "track": TRACK, "vmax": VMAX, "nitro_k": NITRO_K, "max_cars": MAX_CARS,
+            "upg": w["upg"], "upg_step": UPG, "upg_max": UPG_MAX, "upg_cost": UPG_COST}
 
 
 def _players(conn: sqlite3.Connection, room_id: int) -> list[dict[str, Any]]:
@@ -145,8 +161,8 @@ def _players(conn: sqlite3.Connection, room_id: int) -> list[dict[str, Any]]:
         (room_id,))]
 
 
-def join(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5) -> dict[str, Any]:
-    """В набирающуюся комнату или в новую. Возвращает зерно, время до старта и игроков."""
+def join(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5, solo: bool = False) -> dict[str, Any]:
+    """В набирающуюся комнату или в новую (solo — своя комната только с ботами). Зерно, время до старта, игроки."""
     init(conn)
     w = wallet(conn, user_id, name, tz_offset)
     now = time.time()
@@ -154,13 +170,13 @@ def join(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5) 
     try:
         conn.execute("DELETE FROM race_players WHERE room_id IN (SELECT id FROM race_rooms WHERE created < ?)", (now - 3600,))
         conn.execute("DELETE FROM race_rooms WHERE created < ?", (now - 3600,))
-        room = conn.execute(
-            "SELECT r.* FROM race_rooms r WHERE r.start_at > ? AND (SELECT COUNT(*) FROM race_players p "
+        room = None if solo else conn.execute(
+            "SELECT r.* FROM race_rooms r WHERE r.solo = 0 AND r.start_at > ? AND (SELECT COUNT(*) FROM race_players p "
             "WHERE p.room_id = r.id) < ? AND NOT EXISTS (SELECT 1 FROM race_players p WHERE p.room_id = r.id "
             "AND p.user_id = ?) ORDER BY r.start_at LIMIT 1", (now + JOIN_GAP, MAX_CARS, user_id)).fetchone()
         if room is None:
-            rid = conn.execute("INSERT INTO race_rooms (seed, start_at, created) VALUES (?, ?, ?)",
-                               (random.getrandbits(31), now + WAIT, now)).lastrowid
+            rid = conn.execute("INSERT INTO race_rooms (seed, start_at, created, solo) VALUES (?, ?, ?, ?)",
+                               (random.getrandbits(31), now + (WAIT_SOLO if solo else WAIT), now, 1 if solo else 0)).lastrowid
             room = conn.execute("SELECT * FROM race_rooms WHERE id = ?", (rid,)).fetchone()
         conn.execute("INSERT INTO race_players (room_id, user_id, name, color, upd) VALUES (?, ?, ?, ?, ?)",
                      (room["id"], user_id, (name or "Игрок")[:16], w["color"], now))
@@ -249,6 +265,23 @@ def shop(conn: sqlite3.Connection, user_id: int, color: str, tz_offset: int = 5)
         raise
     w = wallet(conn, user_id, "", tz_offset)
     return {"coins": w["coins"], "color": w["color"], "owned": w["owned"]}
+
+
+def upgrade(conn: sqlite3.Connection, user_id: int, key: str, tz_offset: int = 5) -> dict[str, Any]:
+    """Тюнинг: +1 уровень двигателя, разгона или нитро за монеты."""
+    if key not in UPG:
+        raise RaceError("Такого улучшения нет.")
+    w = wallet(conn, user_id, "", tz_offset)
+    level = w["upg"][key]
+    if level >= UPG_MAX:
+        raise RaceError("Уже максимум. / Аллакай ҳадди аксар.")
+    price = UPG_COST * (level + 1)
+    w["upg"][key] = level + 1
+    if not conn.execute("UPDATE race_wallet SET coins = coins - ?, upg = ? WHERE user_id = ? AND coins >= ?",
+                        (price, json.dumps(w["upg"]), user_id, price)).rowcount:
+        raise RaceError(f"Не хватает монет: нужно {price}. / Танга кам аст.")
+    w = wallet(conn, user_id, "", tz_offset)
+    return {"coins": w["coins"], "upg": w["upg"]}
 
 
 def top(conn: sqlite3.Connection, limit: int = 20) -> list[dict[str, Any]]:

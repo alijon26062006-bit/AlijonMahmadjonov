@@ -6,53 +6,83 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 {% include "_fonts.html" %}
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html, body { height: 100%; overflow: hidden; background: #07061a; color: #fff; font-family: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 700; touch-action: none; }
 canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .ui { position: fixed; left: 0; right: 0; z-index: 5; padding: 0 16px; }
 .hide { display: none !important; }
 .chip { padding: 8px 12px; border-radius: 14px; background: rgba(10,8,30,.62); border: 1px solid rgba(255,255,255,.14); font-weight: 800; font-size: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+button { font-family: inherit; color: #fff; border: 0; }
 /* гараж */
 #g-top { top: calc(env(safe-area-inset-top) + 12px); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #g-top a { color: #b9b4ee; text-decoration: none; font-size: 14px; }
 .coin { background: linear-gradient(135deg,#ffd23d,#ff9d1f); color: #2a1500; border: 0; }
-#g-title { top: calc(env(safe-area-inset-top) + 64px); text-align: center; }
+#g-title { top: calc(env(safe-area-inset-top) + 64px); text-align: center; animation: drop .5s cubic-bezier(.2,.9,.3,1.2) both; }
 #g-title b { display: block; font-size: 30px; font-weight: 900; letter-spacing: .03em; }
 #g-sub { font-size: 12.5px; color: #b4b0e6; font-weight: 600; }
-#g-bottom { bottom: calc(env(safe-area-inset-bottom) + 18px); }
+#g-bottom { bottom: calc(env(safe-area-inset-bottom) + 14px); animation: rise .45s cubic-bezier(.2,.9,.3,1.1) both; }
+@keyframes rise { from { transform: translateY(40px); opacity: 0; } } @keyframes drop { from { transform: translateY(-24px); opacity: 0; } }
 #g-name { text-align: center; font-size: 19px; font-weight: 900; }
-#g-on { text-align: center; margin: 6px 0 10px; font-size: 12.5px; color: #7df0b0; }
-#colors { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; }
+#g-on { text-align: center; margin: 4px 0 8px; font-size: 12.5px; color: #7df0b0; }
+#colors { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; touch-action: pan-x; }
 #colors::-webkit-scrollbar { display: none; }
 .sw { flex: none; width: 62px; padding: 6px 4px 5px; border-radius: 14px; background: rgba(255,255,255,.07); border: 1.5px solid rgba(255,255,255,.1); text-align: center; font-size: 10.5px; font-weight: 700; }
 .sw i { display: block; width: 30px; height: 30px; border-radius: 30px; margin: 0 auto 4px; border: 2px solid rgba(255,255,255,.5); }
 .sw.on { border-color: #8b7bff; background: rgba(139,123,255,.24); }
-.two { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; }
-.btn { height: 66px; border-radius: 20px; display: grid; place-items: center; text-align: center; font-size: 17px; font-weight: 900; border: 0; color: #fff; font-family: inherit; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.three .btn { height: 46px; font-size: 13.5px; border-radius: 15px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn { height: 64px; border-radius: 20px; display: grid; place-items: center; text-align: center; font-size: 16px; font-weight: 900; transition: transform .12s; }
 .btn small { display: block; font-size: 11px; font-weight: 600; opacity: .85; }
 .btn.a { background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.16); }
 .btn.b { background: linear-gradient(135deg,#3ddc84,#12b981); color: #05240f; box-shadow: 0 16px 34px -14px #12b981; }
-.btn:active { transform: scale(.97); }
+.btn.c { background: linear-gradient(135deg,#8b7bff,#5b3df5); box-shadow: 0 16px 34px -14px #6a55ff; }
+.btn:active { transform: scale(.96); }
 /* заезд */
 #r-top { top: calc(env(safe-area-inset-top) + 12px); display: flex; justify-content: space-between; align-items: center; }
 #pos { font-size: 30px; font-weight: 900; text-shadow: 0 4px 18px #000; } #pos i { font-style: normal; font-size: 13px; opacity: .7; }
 #bar { top: calc(env(safe-area-inset-top) + 62px); }
 #bar div { position: relative; height: 6px; border-radius: 6px; background: rgba(255,255,255,.14); }
 #bar i { position: absolute; top: -4px; width: 14px; height: 14px; border-radius: 14px; margin-left: -7px; border: 2px solid #07061a; }
+#turn { top: calc(env(safe-area-inset-top) + 86px); text-align: center; font-size: 40px; font-weight: 900; color: #ffd23d; text-shadow: 0 4px 18px #000; pointer-events: none; opacity: 0; transition: opacity .2s; }
+#turn.on { opacity: 1; animation: blink .5s infinite alternate; } @keyframes blink { to { opacity: .45; } }
 #msg { top: 34%; text-align: center; font-size: 54px; font-weight: 900; text-shadow: 0 6px 30px #000; pointer-events: none; }
 #msg small { display: block; font-size: 15px; font-weight: 700; color: #cfcaff; }
-#hit { z-index: 8; top: 22%; text-align: center; font-size: 17px; font-weight: 900; color: #ffb23d; pointer-events: none; opacity: 0; transition: opacity .2s; text-shadow: 0 3px 14px #000; }
-#ctl { bottom: calc(env(safe-area-inset-bottom) + 16px); display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 10px; }
-#ctl .btn { height: 78px; font-size: 26px; background: rgba(10,8,30,.55); border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-#ctl #nitro { background: linear-gradient(135deg,#ff8a3d,#ff3d7f); border: 0; font-size: 15px; box-shadow: 0 16px 34px -12px #ff5d5d; }
-#ctl #nitro.off { filter: grayscale(1) brightness(.6); }
+#hit { z-index: 30; top: 22%; text-align: center; font-size: 17px; font-weight: 900; color: #ffb23d; pointer-events: none; opacity: 0; transition: opacity .2s; text-shadow: 0 3px 14px #000; }
+#ctl { bottom: calc(env(safe-area-inset-bottom) + 14px); display: grid; grid-template-columns: 1fr 1fr 1fr 1.15fr; gap: 9px; align-items: end; }
+#ctl .btn { height: 80px; font-size: 26px; background: rgba(10,8,30,.55); border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#ctl .btn.dn { transform: scale(.94); filter: brightness(1.5); }
+#ctl #brake { font-size: 12px; background: rgba(255,61,90,.28); border-color: rgba(255,90,110,.6); }
+#ctl #gas { height: 104px; font-size: 15px; background: linear-gradient(160deg,#3ddc84,#0f9f6e); color: #05240f; border: 0; box-shadow: 0 16px 34px -12px #12b981; }
+#ctl.tilt #left, #ctl.tilt #right { visibility: hidden; }
+#ctl.tilt { grid-template-columns: 1.15fr 1fr 1fr 1.15fr; } #ctl.tilt #brake { grid-column: 1; grid-row: 1; height: 104px; font-size: 14px; }
+#ctl.auto #gas { visibility: hidden; }
+#nitro { position: fixed; z-index: 6; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 132px); width: 86px; height: 86px; border-radius: 86px; font-size: 12px; font-weight: 900; background: radial-gradient(circle at 35% 30%,#ffb23d,#ff3d7f); box-shadow: 0 0 0 4px rgba(255,255,255,.12), 0 14px 30px -8px #ff5d5d; transition: transform .12s, filter .2s; }
+#nitro b { display: block; font-size: 22px; line-height: 1; } #nitro:active { transform: scale(.92); }
+#nitro.off { filter: grayscale(1) brightness(.55); } #nitro.pop { animation: pop .35s; } @keyframes pop { 40% { transform: scale(1.25); } }
 /* итог */
 #res { inset: 0; display: grid; place-items: center; background: rgba(7,6,26,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 9; padding: 24px; }
-#res .card { width: 100%; max-width: 340px; border-radius: 28px; padding: 26px 22px; text-align: center; background: linear-gradient(160deg,#2a1f8f,#151238); border: 1px solid rgba(255,255,255,.14); }
+#res .card { width: 100%; max-width: 340px; border-radius: 28px; padding: 26px 22px; text-align: center; background: linear-gradient(160deg,#2a1f8f,#151238); border: 1px solid rgba(255,255,255,.14); animation: rise .4s cubic-bezier(.2,.9,.3,1.2) both; }
 #res h2 { font-size: 46px; font-weight: 900; } #res p { color: #cfcaff; font-size: 14px; font-weight: 600; margin: 6px 0 18px; }
 #res .won { font-size: 22px; font-weight: 900; color: #ffd23d; margin-bottom: 18px; }
-#load { inset: 0; display: grid; place-items: center; z-index: 20; background: #07061a; text-align: center; font-size: 15px; color: #b4b0e6; }
+#load { inset: 0; display: grid; place-items: center; z-index: 40; background: #07061a; text-align: center; font-size: 15px; color: #b4b0e6; }
 #load b { display: block; font-size: 34px; color: #fff; font-weight: 900; margin-bottom: 8px; }
+/* шторка: тюнинг, настройки, топ */
+#sheet { inset: 0; z-index: 20; padding: 0; display: flex; align-items: flex-end; background: rgba(4,3,16,.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.sh { width: 100%; max-height: 82%; overflow-y: auto; touch-action: pan-y; border-radius: 26px 26px 0 0; padding: 18px 16px calc(env(safe-area-inset-bottom) + 18px); background: linear-gradient(170deg,#241c78,#110e33); border-top: 1px solid rgba(255,255,255,.16); animation: rise .3s cubic-bezier(.2,.9,.3,1.05) both; }
+.sh-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 20px; font-weight: 900; }
+#sh-x { width: 44px; height: 44px; border-radius: 44px; background: rgba(255,255,255,.1); font-size: 16px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09); min-height: 60px; }
+.row b { font-size: 15px; font-weight: 800; display: block; } .row small { font-size: 12px; color: #b4b0e6; font-weight: 600; }
+.pips { display: flex; gap: 4px; margin-top: 6px; } .pips i { width: 22px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.14); } .pips i.on { background: linear-gradient(90deg,#ffd23d,#ff8a3d); }
+.mini { flex: none; min-width: 84px; height: 44px; padding: 0 12px; border-radius: 14px; font-size: 14px; font-weight: 900; background: linear-gradient(135deg,#ffd23d,#ff9d1f); color: #2a1500; }
+.mini.max { background: rgba(255,255,255,.1); color: #9d98d4; }
+.tg { flex: none; width: 56px; height: 32px; border-radius: 32px; background: rgba(255,255,255,.16); position: relative; transition: background .2s; }
+.tg::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 26px; background: #fff; transition: transform .2s; }
+.tg.on { background: #3ddc84; } .tg.on::after { transform: translateX(24px); }
+.seg { flex: none; display: flex; padding: 3px; border-radius: 14px; background: rgba(255,255,255,.1); }
+.seg button { height: 38px; padding: 0 12px; border-radius: 11px; background: none; font-size: 13px; font-weight: 800; color: #b4b0e6; } .seg button.on { background: #6a55ff; color: #fff; }
+.note { font-size: 12px; color: #9d98d4; font-weight: 600; text-align: center; margin-top: 6px; }
 </style>
 <script type="importmap">{"imports": {"three": "/static/race/three/build/three.module.js", "three/addons/": "/static/race/three/examples/jsm/"}}</script>
 </head><body>
@@ -65,20 +95,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     <div id="g-name">Donatix GT</div>
     <div id="g-on"></div>
     <div id="colors"></div>
-    <div class="two"><button class="btn a" id="b-top"><span>🏆 <span data-t="top">Беҳтаринҳо</span><small id="g-day"></small></span></button>
-      <button class="btn b" id="b-start"><span><span data-t="start">СТАРТ</span><small data-t="find">рақиб ёфтан</small></span></button></div>
+    <div class="three"><button class="btn a" id="b-tune"><span>🔧 <span data-t="tune">Тюнинг</span></span></button><button class="btn a" id="b-top"><span>🏆 <span data-t="top">Беҳтаринҳо</span></span></button><button class="btn a" id="b-set"><span>⚙️ <span data-t="set">Танзимот</span></span></button></div>
+    <div class="two"><button class="btn c" id="b-bots"><span>🤖 <span data-t="bots">Бо ботҳо</span><small data-t="botsS">фавран оғоз</small></span></button>
+      <button class="btn b" id="b-start"><span>👥 <span data-t="people">Бо одамон</span><small id="g-day"></small></span></button></div>
   </div>
 </div>
 
 <div id="hud" class="hide">
   <div class="ui" id="r-top"><div id="pos">1 <i>/ 6</i></div><div class="chip" id="time" style="color:#ff8a3d">0:00</div><div class="chip" id="spd">0 км/с</div></div>
   <div class="ui" id="bar"><div id="bar-in"></div></div>
-  <div class="ui" id="ctl"><button class="btn" id="left">‹</button><button class="btn" id="nitro"><span style="white-space:nowrap">🚀 НИТРО ×<span id="nn">3</span></span></button><button class="btn" id="right">›</button></div>
+  <div class="ui" id="turn"></div>
+  <button id="nitro"><b>🚀</b>НИТРО ×<span id="nn">2</span></button>
+  <div class="ui" id="ctl"><button class="btn" id="left">‹</button><button class="btn" id="right">›</button><button class="btn" id="brake"><span data-t="brake">ТОРМОЗ</span></button><button class="btn" id="gas"><span data-t="gas">ГАЗ</span></button></div>
 </div>
 <div class="ui hide" id="msg"></div>
 <div class="ui" id="hit"></div>
 <div class="ui hide" id="res"><div class="card"><h2 id="res-place"></h2><p id="res-sub"></p><div class="won" id="res-won"></div>
   <div class="two"><button class="btn a" id="res-garage"><span data-t="garage">Гараж</span></button><button class="btn b" id="res-again"><span data-t="again">БОЗ</span></button></div></div></div>
+<div class="ui hide" id="sheet"><div class="sh"><div class="sh-h"><span id="sh-t"></span><button id="sh-x" aria-label="close">✕</button></div><div id="sh-b"></div></div></div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -90,11 +124,18 @@ if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes && tg.disableV
 let INIT = (tg && tg.initData) || '';
 try { if (INIT) sessionStorage.setItem('dx_init', INIT); else INIT = sessionStorage.getItem('dx_init') || ''; } catch (e) {}
 const RU = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || '').startsWith('ru');
-const TX = {shop: ['Мағоза', 'Магазин'], race: ['ПОЙГА', 'ГОНКА'], top: ['Беҳтаринҳо', 'Топ'], start: ['СТАРТ', 'СТАРТ'], find: ['рақиб ёфтан', 'найти соперников'],
+const TX = {shop: ['Мағоза', 'Магазин'], race: ['ПОЙГА', 'ГОНКА'], top: ['Беҳтаринҳо', 'Топ'], tune: ['Тюнинг', 'Тюнинг'], set: ['Танзимот', 'Настройки'],
+  bots: ['Бо ботҳо', 'С ботами'], botsS: ['фавран оғоз', 'старт сразу'], people: ['Бо одамон', 'С людьми'], gas: ['ГАЗ', 'ГАЗ'], brake: ['ТОРМОЗ', 'ТОРМОЗ'],
   garage: ['Гараж', 'Гараж'], again: ['БОЗ', 'ЕЩЁ'], online: ['онлайн', 'в сети'], sub: ['то 6 мошин · ҷои 1 = +{a} 🪙', 'до 6 машин · 1 место = +{a} 🪙'],
-  day: ['имрӯз боз {a} 🪙', 'сегодня ещё {a} 🪙'], wait: ['Ҷустуҷӯи рақибон', 'Ищем соперников'], go: ['РАФТЕМ!', 'ПОЕХАЛИ!'], bot: ['Бот', 'Бот'], you: ['Шумо', 'Вы'],
+  day: ['имрӯз боз {a} 🪙', 'сегодня ещё {a} 🪙'], wait: ['Ҷустуҷӯи рақибон', 'Ищем соперников'], waitB: ['Ботҳо омодаанд', 'Боты готовы'], go: ['РАФТЕМ!', 'ПОЕХАЛИ!'],
   crash: ['Монеа! −суръат', 'Препятствие! −скорость'], bump: ['Задед! −суръат', 'Врезались! −скорость'], place: ['ҷой', 'место'], won: ['+{a} 🪙', '+{a} 🪙'], nowon: ['Лимити рӯз тамом', 'Лимит на сегодня исчерпан'],
-  need: ['Аз Telegram-бот кушоед', 'Откройте из Telegram-бота'], buy: ['Харидан?', 'Купить?'], few: ['Танга кам аст', 'Не хватает монет'], fin: ['Марра!', 'Финиш!'], km: ['км/с', 'км/ч']};
+  need: ['Аз Telegram-бот кушоед', 'Откройте из Telegram-бота'], buy: ['Харидан?', 'Купить?'], few: ['Танга кам аст', 'Не хватает монет'], km: ['км/с', 'км/ч'],
+  drift: ['ДРИФТ! +1 🚀', 'ДРИФТ! +1 🚀'], can: ['+1 НИТРО 🚀', '+1 НИТРО 🚀'], hold: ['ГАЗ-ро пахш карда истед', 'Держите ГАЗ'], wall: ['Канор! −суръат', 'Обочина! −скорость'],
+  engine: ['Муҳаррик', 'Двигатель'], engineS: ['суръати баландтар', 'выше максимальная скорость'], accel: ['Шитоб', 'Разгон'], accelS: ['тезтар суръат мегирад', 'быстрее набирает скорость'],
+  nitroU: ['Нитро', 'Нитро'], nitroS: ['нитро дарозтар кор мекунад', 'нитро работает дольше'], max: ['МАКС', 'МАКС'], lvl: ['сатҳ', 'ур.'],
+  sound: ['Садо', 'Звук'], vibro: ['Ларзиш', 'Вибрация'], wheel: ['Руль', 'Руль'], wheelS: ['телефонро чун руль моил кунед', 'наклоняйте телефон как руль'], btns: ['Тугмаҳо', 'Кнопки'], tilt: ['Моил', 'Наклон'],
+  auto: ['Гази худкор', 'Автогаз'], autoS: ['мошин худаш газ медиҳад', 'машина сама жмёт газ'], inv: ['Руль баръакс', 'Руль наоборот'], invS: ['агар мошин ба тарафи дигар равад', 'если машина едет не в ту сторону'],
+  nosens: ['Сенсори моилӣ дастрас нест', 'Датчик наклона недоступен'], tuneN: ['Тангаҳоро дар пойга ба даст меоред', 'Монеты зарабатываются в заездах'], empty: ['Ҳоло холӣ', 'Пока пусто']};
 const t = (k, a) => TX[k][RU ? 1 : 0].replace('{a}', a);
 document.querySelectorAll('[data-t]').forEach(e => { e.textContent = t(e.dataset.t); });
 const $ = id => document.getElementById(id);
@@ -104,7 +145,48 @@ async function api(path, body) {
   if (!r.ok) throw new Error(j.error || 'error');
   return j;
 }
-const haptic = k => { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(k); } catch (e) {} };
+
+/* ── настройки игрока (хранятся в телефоне) ── */
+const SET = {sound: true, vibro: true, steer: 'btn', auto: false, inv: false};
+try { Object.assign(SET, JSON.parse(localStorage.getItem('dx_race_set') || '{}')); } catch (e) {}
+const saveSet = () => { try { localStorage.setItem('dx_race_set', JSON.stringify(SET)); } catch (e) {} };
+const haptic = (k, ms) => { if (!SET.vibro) return; try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(k); } catch (e) {} try { ms && navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+
+/* ── звук: всё синтезируется в телефоне, файлов нет ── */
+const AU = {};
+function audioInit() {
+  if (AU.ctx) { AU.ctx.state === 'suspended' && AU.ctx.resume(); return; }
+  const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+  const c = AU.ctx = new C(), comp = c.createDynamicsCompressor(); AU.master = c.createGain(); AU.master.gain.value = SET.sound ? 1 : 0; AU.master.connect(comp); comp.connect(c.destination);
+  const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; AU.noise = nb;
+  const G = v => { const g = c.createGain(); g.gain.value = v; return g; };
+  // мотор: две пилы + фильтр, высота тона от скорости
+  AU.o1 = c.createOscillator(); AU.o1.type = 'sawtooth'; AU.o2 = c.createOscillator(); AU.o2.type = 'square';
+  AU.ef = c.createBiquadFilter(); AU.ef.type = 'lowpass'; AU.ef.frequency.value = 500; AU.eg = G(0);
+  const g2 = G(.5); AU.o1.connect(AU.ef); AU.o2.connect(g2); g2.connect(AU.ef); AU.ef.connect(AU.eg); AU.eg.connect(AU.master); AU.o1.start(); AU.o2.start();
+  // шум: нитро (свист струи) и визг шин
+  const src = c.createBufferSource(); src.buffer = nb; src.loop = true; src.start();
+  const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 900; nf.Q.value = .8; AU.ng = G(0); src.connect(nf); nf.connect(AU.ng); AU.ng.connect(AU.master);
+  const sf = c.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 2400; sf.Q.value = 9; AU.sg = G(0); src.connect(sf); sf.connect(AU.sg); AU.sg.connect(AU.master); AU.sf = sf;
+  const wf = c.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 600; AU.wg = G(0); src.connect(wf); wf.connect(AU.wg); AU.wg.connect(AU.master);      // ветер
+}
+function audioFrame(v, gas, nitro, drift, on) {
+  if (!AU.ctx) return; const c = AU.ctx.currentTime, k = on ? 1 : 0, vn = Math.min(1.2, v / 60);
+  AU.o1.frequency.setTargetAtTime(48 + v * 2.5 + (nitro ? 40 : 0), c, .06); AU.o2.frequency.setTargetAtTime(24 + v * 1.25, c, .06);
+  AU.ef.frequency.setTargetAtTime(300 + v * 26 + (gas ? 500 : 0), c, .08); AU.eg.gain.setTargetAtTime(k * (.16 + (gas ? .2 : 0) + vn * .1), c, .08);
+  AU.ng.gain.setTargetAtTime(k * (nitro ? .75 : 0), c, .07); AU.sg.gain.setTargetAtTime(k * (drift ? .5 : 0), c, .05); AU.sf.frequency.setTargetAtTime(2100 + v * 14, c, .1);
+  AU.wg.gain.setTargetAtTime(k * vn * .22, c, .2);
+}
+function beep(f, dur = .12, type = 'sine', vol = .5, delay = 0) {
+  if (!AU.ctx) return; const c = AU.ctx, o = c.createOscillator(), g = c.createGain(), t0 = c.currentTime + delay; o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + .01); g.gain.exponentialRampToValueAtTime(.001, t0 + dur); o.connect(g); g.connect(AU.master); o.start(t0); o.stop(t0 + dur + .02);
+}
+function boom(vol = 1) {
+  if (!AU.ctx) return; const c = AU.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), t0 = c.currentTime; s.buffer = AU.noise; f.type = 'lowpass'; f.frequency.value = 900;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + .45); s.connect(f); f.connect(g); g.connect(AU.master); s.start(t0); s.stop(t0 + .5);
+  const o = c.createOscillator(), g2 = c.createGain(); o.frequency.setValueAtTime(120, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + .3); g2.gain.setValueAtTime(vol * .9, t0); g2.gain.exponentialRampToValueAtTime(.001, t0 + .35); o.connect(g2); g2.connect(AU.master); o.start(t0); o.stop(t0 + .4);
+}
+document.addEventListener('visibilitychange', () => { if (AU.ctx) document.hidden ? AU.ctx.suspend() : AU.ctx.resume(); });
 
 /* ── одинаковый для всех «случай» из зерна комнаты (та же формула на сервере) ── */
 function rnd(seed, i) {
@@ -112,10 +194,27 @@ function rnd(seed, i) {
   x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
-const LANES = [-4.3, 0, 4.3];
-let CFG = {track: 2400, vmax: 52, vnitro: 78, max_cars: 6};
+const LANES = [-4.3, 0, 4.3], NITRO_MAX = 5, EDGE = 5.3;
+let CFG = {track: 3600, vmax: 52, nitro_k: 1.5, max_cars: 6};
 const botV = (seed, i) => 41 + rnd(seed, i) * 7.5;
 const botZ = (v, tt) => tt <= 0 ? 0 : tt < 3 ? v * tt * tt / 6 : v * (tt - 1.5);
+
+/* ── повороты трассы: отрезки из зерна, у всех в комнате одинаковые ── */
+let CURVES = [];
+function buildCurves(seed) {
+  CURVES = []; let z = 200, i = 0;
+  while (z < CFG.track - 160) {
+    const len = 170 + rnd(seed, 2000 + i) * 210;
+    if (rnd(seed, 2100 + i) > .33) CURVES.push({a: z, b: z + len, k: (rnd(seed, 2200 + i) > .5 ? 1 : -1) * (.0038 + rnd(seed, 2300 + i) * .0052)});
+    z += len; i++;
+  }
+}
+function K(z) { for (const c of CURVES) { if (z < c.a) return 0; if (z < c.b) return c.k * Math.sin(Math.PI * (z - c.a) / (c.b - c.a)); } return 0; }
+const TS = 2, TN = 92, TX_ = new Float32Array(TN), TD = new Float32Array(TN); let K0 = 0;
+function bendTable(z) { let x = 0, dx = 0; K0 = K(z); for (let i = 0; i < TN; i++) { TX_[i] = x; TD[i] = dx; dx += K(z + i * TS) * TS; x += dx * TS; } }
+function off(d) { if (d <= 0) return K0 * d * d * .5; const f = Math.min(TN - 1.001, d / TS), i = f | 0; return TX_[i] + (TX_[i + 1] - TX_[i]) * (f - i); }
+function slope(d) { if (d <= 0) return K0 * d; const f = Math.min(TN - 1.001, d / TS), i = f | 0; return TD[i] + (TD[i + 1] - TD[i]) * (f - i); }
+const place3 = (obj, x, d) => { obj.position.x = x + off(d); obj.position.z = -d; obj.rotation.y = -Math.atan(slope(d)); };
 
 /* ── сцена ── */
 const R = new THREE.WebGLRenderer({antialias: true, powerPreference: 'high-performance'});
@@ -130,26 +229,30 @@ const M = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, metalness: .5
 const world = new THREE.Group(); scene.add(world);       // трасса и город (видны в заезде)
 const stage = new THREE.Group(); scene.add(stage);       // платформа гаража
 
-{ // дорога, обочины, город
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(13, 420), M(0x14122e, {metalness: .2, roughness: .75})); road.rotation.x = -Math.PI / 2; road.position.z = -160; world.add(road);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), M(0x08071c, {roughness: 1, metalness: 0})); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -.05, -160); world.add(ground);
-  for (const [x, c] of [[-6.4, 0x8b7bff], [6.4, 0xff3d7f]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(.18, .18, 420), new THREE.MeshBasicMaterial({color: c})); e.position.set(x, .12, -160); world.add(e); }
-}
-const dashes = [], blocks = [];
-{ const dm = new THREE.MeshBasicMaterial({color: 0xbdb6ff}), dg = new THREE.PlaneGeometry(.14, 4);
-  for (let i = 0; i < 32; i++) for (const x of [-2.15, 2.15]) { const d = new THREE.Mesh(dg, dm); d.rotation.x = -Math.PI / 2; d.position.x = x; d.position.y = .02; world.add(d); dashes.push([d, i]); }
+const SEGL = 6, segs = [], blocks = [];
+{ const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 520), M(0x08071c, {roughness: 1, metalness: 0})); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -.05, -150); world.add(ground);
+  const rg = new THREE.PlaneGeometry(13, SEGL + .7), rm = M(0x14122e, {metalness: .2, roughness: .75}), eg = new THREE.BoxGeometry(.18, .18, SEGL + .5), dg = new THREE.PlaneGeometry(.14, 3.6);
+  const em = [new THREE.MeshBasicMaterial({color: 0x8b7bff}), new THREE.MeshBasicMaterial({color: 0xff3d7f})], dm = new THREE.MeshBasicMaterial({color: 0xbdb6ff});
+  for (let i = 0; i < 32; i++) {         // дорога из коротких кусков — так она гнётся в поворотах
+    const g = new THREE.Group(), r = new THREE.Mesh(rg, rm); r.rotation.x = -Math.PI / 2; g.add(r);
+    [-6.4, 6.4].forEach((x, j) => { const e = new THREE.Mesh(eg, em[j]); e.position.set(x, .12, 0); g.add(e); });
+    const ds = [-2.15, 2.15].map(x => { const d = new THREE.Mesh(dg, dm); d.rotation.x = -Math.PI / 2; d.position.set(x, .02, 0); g.add(d); return d; });
+    world.add(g); segs.push({g, ds, i});
+  }
   const bg = new THREE.BoxGeometry(1, 1, 8), bm = M(0x121036, {roughness: .9, metalness: 0}), sg = new THREE.BoxGeometry(1, .25, .1), pg = new THREE.BoxGeometry(.15, 4, .15), pm = M(0x2a2760), lg = new THREE.SphereGeometry(.28, 10, 8);
   const NEON = [0x8b7bff, 0xff3d7f, 0x3aa0ff, 0xffb23d].map(c => new THREE.MeshBasicMaterial({color: c}));
   for (let i = 0; i < 18; i++) for (const side of [-1, 1]) {
     const g = new THREE.Group(), b = new THREE.Mesh(bg, bm), s = new THREE.Mesh(sg, NEON[0]), p = new THREE.Mesh(pg, pm), l = new THREE.Mesh(lg, NEON[side < 0 ? 0 : 3]);
-    p.position.set(-side * 0, 2, 6); l.position.set(0, 4, 6); g.add(b, s, p, l); world.add(g); blocks.push({g, b, s, p, l, i, side});
+    p.position.set(0, 2, 6); l.position.set(0, 4, 6); g.add(b, s, p, l); world.add(g); blocks.push({g, b, s, p, l, i, side});
   } blocks.NEON = NEON; }
 function layoutWorld(z) {
-  const o = z % 12; for (const [d, i] of dashes) d.position.z = -(i - 3) * 12 + o;
+  bendTable(z);
+  const sb = Math.floor(z / SEGL), so = z % SEGL;
+  for (const s of segs) { place3(s.g, 0, (s.i - 2) * SEGL - so + SEGL / 2); const on = (sb + s.i) % 2 === 0; s.ds[0].visible = s.ds[1].visible = on; }
   const base = Math.floor(z / 24), o2 = z % 24;
   for (const k of blocks) {
     const idx = base + k.i, key = idx * 2 + (k.side > 0 ? 1 : 0), h = 5 + rnd(77, key) * 22, w = 4 + rnd(78, key) * 5, bx = k.side * (13 + rnd(79, key) * 8);
-    k.g.position.z = -(k.i - 2) * 24 + o2; k.b.scale.set(w, h, 1); k.b.position.set(bx, h / 2, 0);
+    place3(k.g, 0, (k.i - 2) * 24 - o2); k.b.scale.set(w, h, 1); k.b.position.set(bx, h / 2, 0);
     k.s.scale.set(w * .8, 1, 1); k.s.position.set(bx, h * (.4 + rnd(80, key) * .5), 4.1); k.s.material = blocks.NEON[Math.floor(rnd(81, key) * 4)];
     k.p.position.x = k.side * 7.4; k.l.position.x = k.side * 7.1;
   }
@@ -185,18 +288,19 @@ function paint(hex) {       // краска кузова: фиолетовые �
   return (paintTex[hex] = tex);
 }
 const HEX = {};
-function makeCar(colorCode) {
-  const g = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]);
-  m.traverse(o => { if (o.isMesh) o.material = mat; }); g.add(m); g.userData.mat = mat;
+function makeCar(colorCode) {       // g — место на трассе, body — сам кузов (его крутит руль и занос)
+  const g = new THREE.Group(), body = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]);
+  m.traverse(o => { if (o.isMesh) o.material = mat; }); body.add(m); g.add(body); g.userData = {mat, body};
   const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .55})); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; sh.scale.set(1.35, 2.7, 1); g.add(sh);
   return g;
 }
 const setColor = (car, code) => { car.userData.mat.map = paint(HEX[code]); car.userData.mat.needsUpdate = true; };
 
-/* ── огонь нитро: светящиеся слои, как у реактивной струи ── */
+/* ── огонь нитро и дым из-под колёс ── */
 function glowTex(stops) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); stops.forEach(([o, col]) => g.addColorStop(o, col)); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); }
 const FT = [glowTex([[0, 'rgba(255,255,255,1)'], [.25, 'rgba(160,210,255,.95)'], [.6, 'rgba(60,110,255,.35)'], [1, 'rgba(0,0,0,0)']]),
             glowTex([[0, 'rgba(255,245,200,1)'], [.3, 'rgba(255,170,60,.9)'], [.65, 'rgba(255,70,30,.3)'], [1, 'rgba(0,0,0,0)']])];
+const SMT = glowTex([[0, 'rgba(235,235,245,.85)'], [.5, 'rgba(200,200,220,.35)'], [1, 'rgba(0,0,0,0)']]);
 function makeFlames() {
   const g = new THREE.Group(), parts = [];
   for (const dx of [-.48, .48]) for (let i = 0; i < 7; i++) {
@@ -215,15 +319,19 @@ function animFlames(g, power, time) {       // power 0..1
   }
   g.userData.light.intensity = 46 * power * (.8 + Math.random() * .4);
 }
+const smoke = []; { for (let i = 0; i < 22; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({map: SMT, depthWrite: false, transparent: true, opacity: 0})); s.visible = false; world.add(s); smoke.push({s, life: 0}); } }
+let smokeI = 0, smokeT = 0;
+function puff(x) { const p = smoke[smokeI++ % smoke.length]; p.life = 1; p.s.visible = true; p.s.position.set(x + (Math.random() - .5) * .5, .35, 1.9); p.vx = (Math.random() - .5) * 2; }
+function animSmoke(dt, v) { for (const p of smoke) if (p.life > 0) { p.life -= dt * 1.5; p.s.position.z += v * .3 * dt; p.s.position.x += p.vx * dt; p.s.position.y += dt * 1.2; const sc = 1 + (1 - p.life) * 3.2; p.s.scale.set(sc, sc, 1); p.s.material.opacity = Math.max(0, p.life) * .6; if (p.life <= 0) p.s.visible = false; } }
 
-/* ── препятствия ── */
-const obsGroup = new THREE.Group(); world.add(obsGroup); let OBS = [];
-function buildObstacles(seed) {
-  obsGroup.clear(); OBS = [];
+/* ── препятствия, баллончики нитро, финиш ── */
+const obsGroup = new THREE.Group(); world.add(obsGroup); let OBS = [], CANS = [], gate = null;
+function buildTrack(seed) {
+  obsGroup.clear(); OBS = []; CANS = []; buildCurves(seed);
   const stripe = new THREE.MeshBasicMaterial({color: 0xff3b3b}), white = M(0xf2f2f2, {roughness: .6, metalness: 0}), cone = M(0xff7a1a, {roughness: .5, metalness: 0});
-  let z = 140, k = 0;
-  while (z < CFG.track - 80) {
-    const lane = Math.floor(rnd(seed, 500 + k) * 3), two = rnd(seed, 900 + k) > .72, kind = rnd(seed, 700 + k) > .5 ? 'bar' : 'cone';
+  let z = 150, k = 0;
+  while (z < CFG.track - 90) {
+    const lane = Math.floor(rnd(seed, 500 + k) * 3), two = rnd(seed, 900 + k) > .76, kind = rnd(seed, 700 + k) > .5 ? 'bar' : 'cone';
     for (const ln of two ? [lane, (lane + 1 + Math.floor(rnd(seed, 1100 + k) * 2)) % 3] : [lane]) {
       const g = new THREE.Group();
       if (kind === 'bar') { const b = new THREE.Mesh(new THREE.BoxGeometry(3, .9, .5), white); b.position.y = .55; g.add(b);
@@ -233,20 +341,32 @@ function buildObstacles(seed) {
         const band = new THREE.Mesh(new THREE.CylinderGeometry(.2, .25, .16, 12), white); band.position.set(cx * .95, .55, 0); g.add(band); }
       obsGroup.add(g); OBS.push({z, x: LANES[ln], g, hit: false});
     }
-    z += 62 + rnd(seed, 300 + k) * 46; k++;
+    z += 70 + rnd(seed, 300 + k) * 55; k++;
   }
+  const cm = M(0x2f8bff, {emissive: 0x1d5fd0, emissiveIntensity: .9, metalness: .7, roughness: .25}), capm = M(0xdfe6ff, {metalness: .8, roughness: .2});
+  for (let cz = 190, i = 0; cz < CFG.track - 120; cz += 190 + rnd(seed, 3000 + i) * 90, i++) {       // баллончики: подобрал — +1 нитро
+    let ln = Math.floor(rnd(seed, 3100 + i) * 3); if (OBS.some(o => Math.abs(o.z - cz) < 14 && o.x === LANES[ln])) ln = (ln + 1) % 3;
+    const g = new THREE.Group(), body = new THREE.Mesh(new THREE.CylinderGeometry(.26, .26, .85, 14), cm), cap = new THREE.Mesh(new THREE.CylinderGeometry(.1, .2, .26, 12), capm); cap.position.y = .55;
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({map: FT[0], blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .8})); glow.scale.set(2.6, 2.6, 1);
+    const spin = new THREE.Group(); spin.add(body, cap); spin.rotation.z = .35; g.add(spin, glow); obsGroup.add(g); CANS.push({z: cz, x: LANES[ln], g, spin, got: false});
+  }
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 32; const cx = cv.getContext('2d'); for (let i = 0; i < 32; i++) for (let j = 0; j < 4; j++) { cx.fillStyle = (i + j) % 2 ? '#fff' : '#111'; cx.fillRect(i * 8, j * 8, 8, 8); }
+  gate = new THREE.Group(); const ban = new THREE.Mesh(new THREE.BoxGeometry(14, 1.6, .3), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(cv)})); ban.position.y = 6.2; gate.add(ban);
+  for (const x of [-6.9, 6.9]) { const p = new THREE.Mesh(new THREE.BoxGeometry(.4, 7, .4), M(0xdfe6ff)); p.position.set(x, 3.5, 0); gate.add(p); }
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.6), new THREE.MeshBasicMaterial({map: ban.material.map})); line.rotation.x = -Math.PI / 2; line.position.y = .03; gate.add(line); obsGroup.add(gate);
 }
 
 /* ── состояние ── */
-let P = null, me = null, flames = null, garageCar = null, mode = 'load', spin = 0;
-let room = null, others = {}, bots = [], tOff = 0, startAt = 0, state = null, lastTick = 0, ticking = false;
-const steer = {l: false, r: false, target: null};
+let P = null, me = null, flames = null, garageCar = null, mode = 'load', spin = 0, lastSolo = false;
+let room = null, others = {}, bots = [], tOff = 0, startAt = 0, state = null, lastTick = 0, ticking = false, lastCount = 9;
+const steer = {l: false, r: false, gas: false, brake: false, tilt: 0};
 const rivals = new THREE.Group(); world.add(rivals);
 const nowS = () => (Date.now() + tOff) / 1000;
 const show = (id, on) => $(id).classList.toggle('hide', !on);
+const car = () => ({vmax: P.vmax + P.upg_step.engine * P.upg.engine, acc: 15 * (1 + P.upg_step.accel * P.upg.accel), nitroS: 2.4 + P.upg_step.nitro * P.upg.nitro});
 
 function garage() {
-  mode = 'garage'; world.visible = false; stage.visible = true; scene.fog.near = 40; rivals.clear(); others = {}; bots = [];
+  mode = 'garage'; world.visible = false; stage.visible = true; rivals.clear(); others = {}; bots = [];
   if (me) { scene.remove(me); me = null; }
   if (!garageCar) { garageCar = makeCar(P.color); stage.add(garageCar); } else setColor(garageCar, P.color);
   show('garage', true); show('hud', false); show('res', false); show('msg', false);
@@ -259,24 +379,65 @@ $('colors').addEventListener('click', async e => {
   const el = e.target.closest('.sw'); if (!el) return; const c = P.colors.find(x => x.code === el.dataset.c);
   if (!P.owned.includes(c.code)) { if (P.coins < c.price) { toast(t('few') + ': ' + c.price + ' 🪙'); setColor(garageCar, c.code); setTimeout(() => setColor(garageCar, P.color), 1400); return; }
     if (!confirm((RU ? c.ru : c.tj) + ' — ' + c.price + ' 🪙. ' + t('buy'))) return; }
-  try { const r = await api('shop', {color: c.code}); Object.assign(P, r); haptic('light'); garage(); } catch (err) { toast(err.message); }
+  try { const r = await api('shop', {color: c.code}); Object.assign(P, r); haptic('light'); beep(880, .1); garage(); } catch (err) { toast(err.message); }
 });
-function toast(text) { const h = $('hit'); h.textContent = text; h.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => { h.style.opacity = 0; }, 1400); }
-$('b-top').onclick = () => { alert('🏆 ' + t('top') + '\n\n' + (P.top.length ? P.top.map((r, i) => `${i + 1}. ${r.name || '—'} — ${r.wins} 🏆 (${r.races})`).join('\n') : '—')); };
+function toast(text, ms = 1400) { const h = $('hit'); h.textContent = text; h.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => { h.style.opacity = 0; }, ms); }
 $('back').onclick = e => { if (mode === 'race' || mode === 'wait') e.preventDefault(); };
 
-async function start() {
-  if (mode !== 'garage' && mode !== 'result') return;
-  $('b-start').disabled = true;
-  try { room = await api('join'); } catch (err) { $('b-start').disabled = false; toast(err.message); return; }
-  $('b-start').disabled = false;
-  tOff = room.now * 1000 - Date.now(); startAt = room.now + room.start_in;
-  mode = 'wait'; show('garage', false); show('res', false); show('hud', true); show('msg', true); stage.visible = false; world.visible = true;
-  buildObstacles(room.seed); rivals.clear(); others = {}; bots = [];
-  if (me) scene.remove(me); me = makeCar(P.color); flames = makeFlames(); me.add(flames); scene.add(me);
-  state = {z: 0, x: 0, v: 0, nitro: 3, nitroT: 0, slowT: 0, shake: 0, done: false, botsReady: false};
-  $('nn').textContent = 3; $('nitro').classList.remove('off'); syncPlayers(room.players);
+/* ── шторка: тюнинг, настройки, топ ── */
+let sheetKind = '';
+function sheet(kind) {
+  sheetKind = kind; show('sheet', !!kind); if (!kind) return; audioInit();
+  if (kind === 'tune') { $('sh-t').textContent = '🔧 ' + t('tune') + ' · 🪙 ' + P.coins;
+    $('sh-b').innerHTML = [['engine', '🏎', 'engine', 'engineS'], ['accel', '⚡', 'accel', 'accelS'], ['nitro', '🚀', 'nitroU', 'nitroS']].map(([key, ic, n, d]) => { const lv = P.upg[key], mx = lv >= P.upg_max;
+      return `<div class="row"><div><b>${ic} ${t(n)} · ${lv} ${t('lvl')}</b><small>${t(d)}</small><div class="pips">${Array.from({length: P.upg_max}, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></div><button class="mini ${mx ? 'max' : ''}" data-u="${key}" ${mx ? 'disabled' : ''}>${mx ? t('max') : P.upg_cost * (lv + 1) + ' 🪙'}</button></div>`; }).join('') + `<div class="note">${t('tuneN')} · ${t('day', P.day_left)}</div>`; }
+  if (kind === 'set') { $('sh-t').textContent = '⚙️ ' + t('set');
+    const tgl = (key, ic, n, d) => `<div class="row" data-s="${key}"><div><b>${ic} ${t(n)}</b>${d ? `<small>${t(d)}</small>` : ''}</div><div class="tg ${SET[key] ? 'on' : ''}"></div></div>`;
+    $('sh-b').innerHTML = tgl('sound', '🔊', 'sound') + tgl('vibro', '📳', 'vibro') +
+      `<div class="row"><div><b>🎮 ${t('wheel')}</b><small>${t('wheelS')}</small></div><div class="seg"><button data-w="btn" class="${SET.steer === 'btn' ? 'on' : ''}">${t('btns')}</button><button data-w="tilt" class="${SET.steer === 'tilt' ? 'on' : ''}">${t('tilt')}</button></div></div>` +
+      (SET.steer === 'tilt' ? tgl('inv', '🔁', 'inv', 'invS') : '') + tgl('auto', '🦶', 'auto', 'autoS'); }
+  if (kind === 'top') { $('sh-t').textContent = '🏆 ' + t('top');
+    $('sh-b').innerHTML = P.top.length ? P.top.map((r, i) => `<div class="row"><div><b>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${(r.name || '—').replace(/[<>&]/g, '')}</b><small>${r.races} 🏁</small></div><b>${r.wins} 🏆</b></div>`).join('') : `<div class="note">${t('empty')}</div>`; }
 }
+$('sh-x').onclick = () => sheet(''); $('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') sheet(''); });
+$('b-tune').onclick = () => sheet('tune'); $('b-set').onclick = () => sheet('set'); $('b-top').onclick = () => sheet('top');
+$('sh-b').addEventListener('click', async e => {
+  const u = e.target.closest('[data-u]'), s = e.target.closest('[data-s]'), w = e.target.closest('[data-w]');
+  if (u) { try { Object.assign(P, await api('upgrade', {key: u.dataset.u})); haptic('medium', 30); beep(660, .09); beep(990, .14, 'sine', .5, .09); $('g-coins').textContent = '🪙 ' + P.coins; sheet('tune'); } catch (err) { toast(err.message, 2000); } }
+  if (s) { const k = s.dataset.s; SET[k] = !SET[k]; saveSet(); if (k === 'sound' && AU.master) AU.master.gain.value = SET.sound ? 1 : 0; haptic('light', 20); beep(700, .08); sheet('set'); }
+  if (w) { if (w.dataset.w === 'tilt') { if (!await tiltOn(true)) return; } SET.steer = w.dataset.w; saveSet(); sheet('set'); }
+});
+
+/* ── руль наклоном: датчик ускорения телефона (боковая составляющая силы тяжести) ── */
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let tiltSeen = false, tiltBound = false;
+function onMotion(e) { const a = e.accelerationIncludingGravity; if (!a || a.x === null) return; tiltSeen = true; setTilt((IOS ? -a.x : a.x)); }
+function setTilt(ax) { let v = Math.max(-1, Math.min(1, -ax / 3.6)); if (Math.abs(v) < .07) v = 0; if (SET.inv) v = -v; steer.tilt += (v - steer.tilt) * .35; }
+async function tiltOn(check) {
+  try { if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && await DeviceMotionEvent.requestPermission() !== 'granted') { toast(t('nosens'), 2200); return false; } } catch (e) {}
+  if (!tiltBound) { addEventListener('devicemotion', onMotion); tiltBound = true; }
+  if (check && !tiltSeen) {
+    await new Promise(r => setTimeout(r, 900));
+    if (!tiltSeen && tg && tg.Accelerometer) try { tg.Accelerometer.start({refresh_rate: 20}); tg.onEvent('accelerometerChanged', () => { tiltSeen = true; setTilt(tg.Accelerometer.x); }); await new Promise(r => setTimeout(r, 900)); } catch (e) {}
+    if (!tiltSeen) { toast(t('nosens'), 2200); return false; }
+  }
+  return true;
+}
+
+async function start(solo) {
+  if (mode !== 'garage' && mode !== 'result') return;
+  solo = typeof solo === 'boolean' ? solo : lastSolo; lastSolo = solo; audioInit(); if (SET.steer === 'tilt') tiltOn(false);
+  try { room = await api('join', {solo}); } catch (err) { toast(err.message); return; }
+  tOff = room.now * 1000 - Date.now(); startAt = room.now + room.start_in; lastCount = 9;
+  mode = 'wait'; sheet(''); show('garage', false); show('res', false); show('hud', true); show('msg', true); stage.visible = false; world.visible = true;
+  $('ctl').classList.toggle('tilt', SET.steer === 'tilt'); $('ctl').classList.toggle('auto', SET.auto);
+  buildTrack(room.seed); rivals.clear(); others = {}; bots = []; for (const p of smoke) { p.life = 0; p.s.visible = false; }
+  if (me) scene.remove(me); me = makeCar(P.color); flames = makeFlames(); me.userData.body.add(flames); scene.add(me);
+  state = {z: 0, x: 0, v: 0, nitro: 2, nitroT: 0, slowT: 0, shake: 0, done: false, botsReady: false, drift: false, driftT: 0, yaw: 0, wallT: 0, solo, ...car()};
+  steer.gas = steer.brake = steer.l = steer.r = false; nitroUI(); syncPlayers(room.players);
+}
+function nitroUI(pop) { const s = state; $('nn').textContent = s.nitro; $('nitro').classList.toggle('off', !s.nitro); if (pop) { $('nitro').classList.remove('pop'); void $('nitro').offsetWidth; $('nitro').classList.add('pop'); } }
+function addNitro(text) { const s = state; if (s.nitro < NITRO_MAX) s.nitro++; nitroUI(true); toast(text, 900); haptic('light', 25); beep(880, .08, 'triangle'); beep(1320, .14, 'triangle', .5, .07); }
 function syncPlayers(list) {
   const seen = {};
   for (const p of list) { if (p.user_id === P.me) continue; seen[p.user_id] = 1;
@@ -295,48 +456,67 @@ async function doTick() {
   try { const r = await api('tick', {room: room.room, z: state.z, x: state.x, v: state.v}); syncPlayers(r.players); } catch (e) {}
   ticking = false;
 }
-function crash(kind) { state.v *= kind === 'obs' ? .32 : .7; state.shake = .45; haptic(kind === 'obs' ? 'heavy' : 'medium'); const h = $('hit'); h.textContent = t(kind === 'obs' ? 'crash' : 'bump'); h.style.opacity = 1; clearTimeout(crash.t); crash.t = setTimeout(() => { h.style.opacity = 0; }, 900); }
+function crash(kind) { const s = state; s.v *= kind === 'obs' ? .32 : .7; s.shake = .45; s.drift = false; haptic(kind === 'obs' ? 'heavy' : 'medium', kind === 'obs' ? 180 : 90); boom(kind === 'obs' ? 1 : .6); toast(t(kind === 'obs' ? 'crash' : 'bump'), 900); }
 
 function stepRace(dt, tt) {
   const s = state, list = [];
   if (!s.botsReady && tt > -1.2) makeBots();
   for (const b of bots) { b.z = botZ(b.v, tt); b.x = b.lane + Math.sin(tt * .45 + b.i * 2.3) * 1.1; list.push(b); }
   for (const id in others) { const o = others[id]; o.pz = o.fin ? CFG.track + 20 : Math.min(CFG.track + 20, o.z + o.v * (performance.now() - o.at) / 1000); o.x += (o.tx - o.x) * Math.min(1, dt * 8); list.push({z: o.pz, x: o.x, v: o.v, car: o.car}); }
+  const dir = SET.steer === 'tilt' ? steer.tilt : (steer.r ? 1 : 0) - (steer.l ? 1 : 0), gas = (steer.gas || SET.auto) && !steer.brake, kz = K(s.z);
   if (tt >= 0 && !s.done) {
-    const dir = (steer.r ? 1 : 0) - (steer.l ? 1 : 0);
-    if (dir) { s.x += dir * 10 * dt; steer.target = null; } else if (steer.target !== null) s.x += Math.max(-10 * dt, Math.min(10 * dt, steer.target - s.x));
-    s.x = Math.max(-5.3, Math.min(5.3, s.x));
+    // руль; в повороте машину сносит наружу тем сильнее, чем выше скорость
+    s.x += dir * (s.drift ? 12.5 : 10) * dt - kz * s.v * s.v * .1 * dt;
+    if (Math.abs(s.x) > EDGE) { s.x = Math.sign(s.x) * EDGE; s.v -= s.v * 1.1 * dt; if (s.v > 22 && (s.wallT -= dt) <= 0) { s.wallT = .5; toast(t('wall'), 700); haptic('light', 40); } }
+    // газ, тормоз, нитро
     if (s.nitroT > 0) s.nitroT -= dt;
-    const vmax = s.nitroT > 0 ? CFG.vnitro : CFG.vmax;
-    s.v += (s.v < vmax ? (s.nitroT > 0 ? 34 : 15) : -22) * dt; if (Math.abs(s.v - vmax) < .6) s.v = vmax;
+    const boost = s.nitroT > 0, vmax = boost ? s.vmax * CFG.nitro_k : s.vmax;
+    if (steer.brake) s.v = Math.max(0, s.v - 44 * dt);
+    else if (boost) s.v += (s.v < vmax ? 36 : 0) * dt;
+    else if (gas) s.v += (s.v < vmax ? s.acc : -22) * dt;
+    else s.v = Math.max(0, s.v - 9 * dt);
+    if (!steer.brake && (gas || boost) && Math.abs(s.v - vmax) < .6) s.v = vmax;
+    // дрифт: на скорости рулим в сторону поворота (или руль + тормоз) — машину ставит боком, за занос даётся нитро
+    const into = Math.abs(kz) > .0022 && Math.sign(dir) === Math.sign(kz);
+    s.drift = s.v > 33 && Math.abs(dir) > .35 && (into || steer.brake);
+    if (s.drift) { s.driftT += dt; if (s.driftT > 1.3) { s.driftT = 0; addNitro(t('drift')); } if ((smokeT -= dt) <= 0) { smokeT = .035; puff(s.x - .8); puff(s.x + .8); } if (Math.random() < dt * 9) haptic('soft'); }
+    else s.driftT = Math.max(0, s.driftT - dt * .5);
     const z0 = s.z; s.z += s.v * dt;
     for (const o of OBS) if (!o.hit && o.z > z0 - 1 && o.z - s.z < 2.3 && o.z - s.z > -2 && Math.abs(o.x - s.x) < 2.25) { o.hit = true; crash('obs'); o.g.rotation.z = .5; o.g.position.y = .4; }
+    for (const c of CANS) if (!c.got && Math.abs(c.z - s.z) < 2.6 && Math.abs(c.x - s.x) < 2.1) { c.got = true; c.g.visible = false; addNitro(t('can')); }
     for (const c of list) { const dz = c.z - s.z; if (dz > 0 && dz < 4.5 && Math.abs(c.x - s.x) < 1.95 && s.v > (c.v || 0)) { s.z = c.z - 4.5; if (s.slowT <= 0) { crash('car'); s.slowT = .6; } s.v = Math.min(s.v, (c.v || 30) * .82); } }
     if (s.slowT > 0) s.slowT -= dt;
     if (s.z >= CFG.track) { s.z = CFG.track; s.done = true; finish(Math.round(tt * 1000)); }
-  } else if (s.done) { s.v = Math.max(0, s.v - 30 * dt); s.z += s.v * dt; }
+  } else if (s.done) { s.v = Math.max(0, s.v - 30 * dt); s.z += s.v * dt; s.drift = false; }
   // картинка
-  layoutWorld(s.z); const dir = (steer.r ? 1 : 0) - (steer.l ? 1 : 0);
-  me.position.set(s.x, 0, 0); me.rotation.y += (-dir * .2 - me.rotation.y) * Math.min(1, dt * 9); me.rotation.z = -me.rotation.y * .35;
-  animFlames(flames, s.nitroT > 0 ? 1 : 0, tt);
-  for (const c of list) { c.car.position.set(c.x, 0, -(c.z - s.z)); c.car.visible = Math.abs(c.z - s.z) < 170; }
-  for (const o of OBS) { o.g.position.x = o.x; o.g.position.z = -(o.z - s.z); o.g.visible = o.z - s.z < 170 && o.z - s.z > -12; }
+  layoutWorld(s.z);
+  const yawT = -dir * (s.drift ? .62 : .2); s.yaw += (yawT - s.yaw) * Math.min(1, dt * (s.drift ? 6 : 9));
+  me.position.set(s.x, 0, 0); me.userData.body.rotation.y = s.yaw; me.userData.body.rotation.z = -s.yaw * .3;
+  animFlames(flames, s.nitroT > 0 ? 1 : 0, tt); animSmoke(dt, s.v);
+  for (const c of list) { const d = c.z - s.z; place3(c.car, c.x, d); c.car.visible = Math.abs(d) < 170; }
+  for (const o of OBS) { const d = o.z - s.z; o.g.visible = d < 170 && d > -12; if (o.g.visible) { const rz = o.g.rotation.z; place3(o.g, o.x, d); o.g.rotation.z = rz; } }
+  for (const c of CANS) { const d = c.z - s.z; c.g.visible = !c.got && d < 170 && d > -8; if (c.g.visible) { place3(c.g, c.x, d); c.g.position.y = 1.05 + Math.sin(tt * 4 + c.z) * .15; c.spin.rotation.y = tt * 3; } }
+  { const d = CFG.track - s.z; gate.visible = d < 170 && d > -30; if (gate.visible) place3(gate, 0, d); }
   if (s.shake > 0) s.shake -= dt;
-  const sh = s.shake > 0 ? s.shake * .5 : 0, boost = s.nitroT > 0 ? 1 : 0;
+  const sh = s.shake > 0 ? s.shake * .5 : 0, boost = s.nitroT > 0 ? 1 : 0, look = off(26);
   cam.fov += ((60 + boost * 12 + s.v * .08) - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
-  cam.position.set(s.x * .55 + (Math.random() - .5) * sh, 4.2 + (Math.random() - .5) * sh, 10.2 + boost * .8); cam.lookAt(s.x * .7, 1.0, -9);
+  cam.position.set(s.x * .55 - look * .12 + (Math.random() - .5) * sh, 4.2 + (Math.random() - .5) * sh, 10.2 + boost * .8); cam.lookAt(s.x * .7 + look * .55, 1.0, -9);
+  cam.rotateZ(Math.max(-.11, Math.min(.11, -kz * s.v * .22)) - s.yaw * .04);
+  audioFrame(s.v, gas && tt >= 0 && !s.done, boost, s.drift, mode !== 'result');
   // интерфейс
   const place = 1 + list.filter(c => c.z > s.z).length; $('pos').innerHTML = place + ' <i>/ ' + (list.length + 1) + '</i>';
   const sec = Math.max(0, tt); $('time').textContent = Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
   $('spd').textContent = Math.round(s.v * 3.4) + ' ' + t('km');
   $('bar-in').innerHTML = list.map(c => `<i style="left:${Math.min(100, c.z / CFG.track * 100)}%;background:#8a86b8"></i>`).join('') + `<i style="left:${s.z / CFG.track * 100}%;background:#3ddc84;z-index:2"></i>`;
-  const m = $('msg');
-  if (tt < 0) { show('msg', true); m.innerHTML = Math.ceil(-tt) + `<small>${t('wait')} · ${Object.keys(others).length + 1}/${CFG.max_cars}</small>`; }
-  else if (tt < 1) { show('msg', true); m.innerHTML = t('go'); if (mode === 'wait') { mode = 'race'; haptic('rigid'); } }
+  const ka = K(s.z + 70 + s.v), tr = $('turn'); tr.textContent = ka > 0 ? '↱' : '↰'; tr.classList.toggle('on', Math.abs(ka) > .003 && Math.abs(kz) < .003 && !s.done && tt > 0);
+  const m = $('msg'), cnt = Math.ceil(-tt);
+  if (tt < 0) { show('msg', true); m.innerHTML = cnt + `<small>${s.solo ? t('waitB') : t('wait') + ' · ' + (Object.keys(others).length + 1) + '/' + CFG.max_cars}</small>`; if (cnt !== lastCount) { lastCount = cnt; if (cnt <= 3) { beep(440, .16, 'square', .35); haptic('light', 20); } } }
+  else if (tt < 1) { show('msg', true); m.innerHTML = t('go'); if (mode === 'wait') { mode = 'race'; haptic('rigid', 120); beep(880, .5, 'square', .4); } }
+  else if (tt > 1.6 && s.v < 4 && !gas && !s.done) { show('msg', true); m.innerHTML = `<small style="font-size:22px;color:#3ddc84">${t('hold')} ⬇</small>`; }
   else show('msg', false);
 }
 async function finish(ms) {
-  haptic('rigid'); let r;
+  haptic('rigid', 250); [660, 880, 1100, 1320].forEach((f, i) => beep(f, .2, 'triangle', .5, i * .11)); let r;
   try { r = await api('finish', {room: room.room, ms}); } catch (err) { r = {place: 0, won: 0, coins: P.coins, wins: P.wins, day_left: P.day_left, error: err.message}; }
   P.coins = r.coins; P.wins = r.wins; P.day_left = r.day_left; mode = 'result';
   $('res-place').textContent = r.place ? ['🥇', '🥈', '🥉'][r.place - 1] || ('#' + r.place) : '🏁';
@@ -344,20 +524,21 @@ async function finish(ms) {
   $('res-won').textContent = r.won ? t('won', r.won) : (r.place && r.place <= 3 ? t('nowon') : '');
   show('res', true); show('hud', false);
 }
-$('res-again').onclick = start; $('b-start').onclick = start;
+$('res-again').onclick = () => start(); $('b-start').onclick = () => start(false); $('b-bots').onclick = () => start(true);
 $('res-garage').onclick = async () => { try { Object.assign(P, await api('profile')); } catch (e) {} garage(); };
-$('nitro').onclick = () => { const s = state; if (mode !== 'race' || !s || s.done || s.nitro <= 0 || s.nitroT > 0) return; s.nitro--; s.nitroT = 2.4; $('nn').textContent = s.nitro; if (!s.nitro) $('nitro').classList.add('off'); haptic('heavy'); };
-for (const [id, k] of [['left', 'l'], ['right', 'r']]) { const b = $(id); const on = e => { e.preventDefault(); steer[k] = true; }, off = e => { e.preventDefault(); steer[k] = false; };
-  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off); }
-R.domElement.addEventListener('pointermove', e => { if (mode === 'race' && e.buttons) steer.target = (e.clientX / innerWidth - .5) * 11.5; });
-R.domElement.addEventListener('pointerdown', e => { if (mode === 'race') steer.target = (e.clientX / innerWidth - .5) * 11.5; });
-addEventListener('keydown', e => { if (e.key === 'ArrowLeft') steer.l = true; if (e.key === 'ArrowRight') steer.r = true; if (e.key === ' ') $('nitro').onclick(); });
-addEventListener('keyup', e => { if (e.key === 'ArrowLeft') steer.l = false; if (e.key === 'ArrowRight') steer.r = false; });
+function fireNitro() { const s = state; if (mode !== 'race' || !s || s.done || s.nitro <= 0 || s.nitroT > 0) return; s.nitro--; s.nitroT = s.nitroS; nitroUI(); haptic('heavy', 200); boom(.5); }
+$('nitro').addEventListener('pointerdown', e => { e.preventDefault(); fireNitro(); });
+for (const [id, k] of [['left', 'l'], ['right', 'r'], ['gas', 'gas'], ['brake', 'brake']]) { const b = $(id);
+  const on = e => { e.preventDefault(); steer[k] = true; b.classList.add('dn'); try { b.setPointerCapture(e.pointerId); } catch (x) {} if (k === 'brake') haptic('light'); }, offF = e => { e.preventDefault(); steer[k] = false; b.classList.remove('dn'); };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', offF); b.addEventListener('pointercancel', offF); b.addEventListener('lostpointercapture', offF); b.addEventListener('contextmenu', e => e.preventDefault()); }
+const KEYS = {ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'gas', ArrowDown: 'brake'};
+addEventListener('keydown', e => { if (KEYS[e.key]) steer[KEYS[e.key]] = true; if (e.key === ' ') fireNitro(); });
+addEventListener('keyup', e => { if (KEYS[e.key]) steer[KEYS[e.key]] = false; });
 
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (mode === 'garage') { spin += dt * .6; garageCar.rotation.y = spin; cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 2.5, 8.6); cam.lookAt(0, .9, 0); }
+  if (mode === 'garage') { spin += dt * .6; garageCar.rotation.y = spin; cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 2.5, 8.6); cam.lookAt(0, .9, 0); audioFrame(0, false, false, false, false); }
   else if (mode === 'wait' || mode === 'race' || mode === 'result') { stepRace(dt, nowS() - startAt); if (now - lastTick > 250 && mode !== 'result') { lastTick = now; doTick(); } }
   R.render(scene, cam); requestAnimationFrame(frame);
 }
@@ -369,6 +550,6 @@ function frame(now) {
   show('load', false); garage(); requestAnimationFrame(frame);
   setInterval(async () => { if (mode === 'garage') try { const r = await api('profile'); P.online = r.online; P.top = r.top; $('g-on').textContent = '● ' + Math.max(1, P.online) + ' ' + t('online'); } catch (e) {} }, 8000);
 })();
-window.__dx = {get mode() { return mode; }, get state() { return state; }, start, steer};
+window.__dx = {get mode() { return mode; }, get state() { return state; }, start, steer, sheet, K};
 </script>
 </body></html>
