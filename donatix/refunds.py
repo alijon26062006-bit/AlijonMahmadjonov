@@ -123,7 +123,7 @@ def clean_number(kind: str, raw: str) -> tuple[str | None, str]:
     if digits.startswith("992"):
         digits = digits[3:]
     if len(digits) != 9:
-        return None, "Номер телефона — 9 цифр после +992, например 90 123 45 67. · 9 рақам пас аз +992."
+        return None, "Номер телефона — 9 цифр после +992 (вид: 9_ ___ __ __). · 9 рақам пас аз +992."
     return "+992" + digits, ""
 
 

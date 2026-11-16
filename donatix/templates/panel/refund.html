@@ -54,6 +54,13 @@
   border-right: 1.5px solid var(--line); background: var(--surface-2); font-variant-numeric: tabular-nums; }
 .rf-phone input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important;
   font-size: 1.1rem; font-weight: 600; letter-spacing: .04em; padding: 14px; min-height: 54px; font-variant-numeric: tabular-nums; outline: 0; }
+.rf-warn { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0 0; padding: 12px 14px; border-radius: var(--r);
+  background: var(--bad-soft); border: 1.5px solid color-mix(in srgb, var(--bad) 45%, transparent); color: var(--bad);
+  font-size: .88rem; line-height: 1.45; }
+.rf-warn-ico { flex: none; width: 26px; height: 26px; border-radius: 26px; background: var(--bad); color: #fff;
+  display: grid; place-items: center; font-weight: 800; font-size: 16px; }
+.rf-warn > span:last-child { color: var(--text); }
+.rf-warn b { color: var(--bad); font-size: .95rem; }
 .rf-hint { margin: 8px 2px 0; color: var(--muted); font-size: .84rem; line-height: 1.45; }
 .rf-save { margin-top: 22px; width: 100%; min-height: 54px; font-size: 1.02rem; border-radius: var(--r); }
 .rf-safe { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 14px 0 0; color: var(--muted); font-size: .82rem; }
@@ -109,9 +116,12 @@
 
         <div class="rf-step"><b>2</b><span data-l="tj">Рақами телефон</span><span data-l="ru">Номер телефона</span></div>
         <label class="rf-phone" for="rf-number"><span>🇹🇯 +992</span>
-          <input id="rf-number" name="number" type="tel" inputmode="numeric" maxlength="12" required placeholder="90 123 45 67"
+          <input id="rf-number" name="number" type="tel" inputmode="numeric" maxlength="12" required placeholder="9_ ___ __ __"
                  value="{{ form.get('number', '') | replace('+992', '') }}" aria-label="Номер телефона"></label>
-        <p class="rf-hint"><span data-l="tj">Рақаме, ки ҳамёни ҳамин бонк ба он пайваст аст.</span><span data-l="ru">Номер, к которому привязан кошелёк этого банка.</span></p>
+        <p class="rf-hint"><span data-l="tj">Рақами <b>худатонро</b> нависед, ки ҳамёни ҳамин бонк ба он пайваст аст.</span><span data-l="ru">Напишите <b>свой</b> номер, к которому привязан кошелёк этого банка.</span></p>
+        <div class="rf-warn" role="note"><span class="rf-warn-ico">!</span>
+          <span><b data-l="tj">Ин рақам барои пур кардани баланс НЕСТ.</b><b data-l="ru">Это НЕ номер для пополнения баланса.</b><br>
+          <span data-l="tj">Ба ягон рақам пул нафиристед — баланс танҳо бо тугмаи «Пур кардан» ва SmartPay пур мешавад.</span><span data-l="ru">Никуда не переводите деньги — баланс пополняется только кнопкой «Пополнить» через SmartPay.</span></span></div>
 
         <button class="btn primary lg rf-save"><span data-l="tj">Нигоҳ доштан</span><span data-l="ru">Сохранить</span></button>
         <p class="rf-safe">{{ icon('shield', 14) }}<span data-l="tj">Рақамро танҳо маъмур мебинад · иваз кардан мумкин</span><span data-l="ru">Номер видит только администратор · можно изменить</span></p>
@@ -135,7 +145,7 @@
     r.addEventListener("change", function () { other.hidden = r.value !== "Другой банк" || !r.checked; });
   });
   var num = document.getElementById("rf-number");
-  num.addEventListener("input", function () {   // 90 123 45 67
+  num.addEventListener("input", function () {   // 9X XXX XX XX
     var d = num.value.replace(/\D/g, "").replace(/^992/, "").slice(0, 9), out = "";
     [2, 3, 2, 2].reduce(function (i, n) { if (d.length > i) out += (out ? " " : "") + d.slice(i, i + n); return i + n; }, 0);
     num.value = out;

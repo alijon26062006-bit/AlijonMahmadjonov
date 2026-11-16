@@ -1162,8 +1162,10 @@ class ShopBot:
     def ask_refund_phone(self, tg_id: int, bank: str, mid: int | None = None) -> None:
         self.state[tg_id] = {"step": "rf_num", "bank": bank}
         self.show(tg_id, f"<b>2/2.</b> {_e(bank)}\n\nРақами телефонро нависед, ки ҳамёни бонк ба он пайваст аст.\n"
-                         "Напишите номер телефона, к которому привязан кошелёк банка.\n\nМасалан / например: "
-                         "<code>90 123 45 67</code>", [[("‹ Назад", "rf:start")]], edit=mid)
+                         "Напишите СВОЙ номер телефона, к которому привязан кошелёк банка.\n\nШакл / вид: <code>9_ ___ __ __</code>\n\n"
+                         "🛑 <b>Ин рақам барои пур кардани баланс НЕСТ.</b>\n"
+                         "🛑 <b>Это НЕ номер для пополнения баланса.</b> Никуда не переводите деньги — "
+                         "баланс пополняется только кнопкой «💰 Баланс».", [[("‹ Назад", "rf:start")]], edit=mid)
 
     def on_refund_button(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str, mid: int | None) -> None:
         from . import refunds
