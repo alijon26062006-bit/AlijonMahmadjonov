@@ -266,12 +266,32 @@ function layoutWorld(z) {
 /* ── машина: одна модель, цвет — перекраска текстуры ── */
 let BASE = null, baseMat = null, baseImg = null; const paintTex = {};
 async function loadCar() {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/static/race/car1.glb?v=2');
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/static/race/car2.glb?v=1');
   const m = gltf.scene, box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   m.position.set(-c.x, -box.min.y, -c.z); const inner = new THREE.Group(); inner.add(m);
-  inner.rotation.y = (size.x > size.z ? Math.PI / 2 : 0) + Math.PI;        // длина вдоль z, нос вперёд (−z)
+  inner.rotation.y = (size.x > size.z ? Math.PI / 2 : 0);        // длина вдоль z, нос вперёд (−z)
   BASE = new THREE.Group(); BASE.add(inner); BASE.scale.setScalar(4.4 / Math.max(size.x, size.z));
-  m.traverse(o => { if (o.isMesh && !baseMat) { baseMat = o.material; baseImg = o.material.map && o.material.map.image; } });
+  let mesh = null; m.traverse(o => { if (o.isMesh && !baseMat) { mesh = o; baseMat = o.material; baseImg = o.material.map && o.material.map.image; } });
+  if (mesh && baseImg) tailLights(mesh);
+}
+function tailLights(mesh) {       // серые плашки задних фонарей на текстуре → красные и светятся
+  BASE.updateMatrixWorld(true);
+  const geo = mesh.geometry, pos = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index, map = baseMat.map, w = baseImg.width, h = baseImg.height; if (!uv) return;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d', {willReadFrequently: true}); cx.drawImage(baseImg, 0, 0);
+  const src = cx.getImageData(0, 0, w, h).data, em = document.createElement('canvas'); em.width = em.height = 512; const ex = em.getContext('2d'); ex.fillStyle = '#000'; ex.fillRect(0, 0, 512, 512);
+  map.updateMatrix(); const v = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], t = [new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2()], n = idx ? idx.count : pos.count;
+  cx.fillStyle = cx.strokeStyle = '#ff2030'; ex.fillStyle = ex.strokeStyle = '#ff2030'; cx.lineWidth = 1.5; ex.lineWidth = 1; cx.beginPath(); ex.beginPath();
+  for (let i = 0; i < n; i += 3) {
+    let cxz = 0, cxx = 0, cxy = 0, tu = 0, tv = 0;
+    for (let k = 0; k < 3; k++) { const j = idx ? idx.getX(i + k) : i + k; v[k].fromBufferAttribute(pos, j).applyMatrix4(mesh.matrixWorld); t[k].fromBufferAttribute(uv, j).applyMatrix3(map.matrix); cxx += v[k].x / 3; cxy += v[k].y / 3; cxz += v[k].z / 3; tu += t[k].x / 3; tv += t[k].y / 3; }
+    if (cxz < 1.86 || Math.abs(cxx) < .36 || Math.abs(cxx) > .9 || cxy < .6 || cxy > .88) continue;
+    const px = (Math.min(w - 1, Math.max(0, tu * w | 0)) + Math.min(h - 1, Math.max(0, tv * h | 0)) * w) * 4, r = src[px], g = src[px + 1], b = src[px + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx > 62) continue;                               // только тёмное стекло фонаря, не краска кузова
+    for (const [c, W, H] of [[cx, w, h], [ex, 512, 512]]) { c.moveTo(t[0].x * W, t[0].y * H); c.lineTo(t[1].x * W, t[1].y * H); c.lineTo(t[2].x * W, t[2].y * H); c.closePath(); }
+  }
+  cx.fill(); cx.stroke(); ex.fill(); ex.stroke(); baseImg = cv;
+  const mk = c => { const x = new THREE.CanvasTexture(c); x.flipY = map.flipY; x.wrapS = map.wrapS; x.wrapT = map.wrapT; x.offset.copy(map.offset); x.repeat.copy(map.repeat); return x; };
+  const bt = mk(cv); bt.colorSpace = THREE.SRGBColorSpace; baseMat.map = bt; baseMat.emissiveMap = mk(em); baseMat.emissiveMap.colorSpace = THREE.SRGBColorSpace; baseMat.emissive = new THREE.Color(0xffffff); baseMat.emissiveIntensity = 1.6;
 }
 function paint(hex) {       // краска кузова: фиолетовые точки заводской текстуры → нужный цвет с той же светотенью
   if (!hex || !baseImg) return baseMat.map;
@@ -292,7 +312,7 @@ function paint(hex) {       // краска кузова: фиолетовые �
 const HEX = {};
 const SHT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 6, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,.8)'); g.addColorStop(.6, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
 function makeCar(colorCode) {       // g — место на трассе, body — сам кузов (его крутит руль и занос)
-  const g = new THREE.Group(), body = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]); mat.envMap = ENV; mat.envMapIntensity = .35;
+  const g = new THREE.Group(), body = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]); mat.envMap = ENV; mat.envMapIntensity = .5; mat.metalness = .55;
   m.traverse(o => { if (o.isMesh) o.material = mat; }); body.add(m); g.add(body); g.userData = {mat, body};
   const sh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({map: SHT, transparent: true, depthWrite: false})); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; sh.scale.set(1.75, 3.1, 1); g.add(sh);
   return g;
@@ -497,7 +517,7 @@ function stepRace(dt, tt) {
   me.position.set(s.x, 0, 0); me.userData.body.rotation.y = s.yaw; me.userData.body.rotation.z = -s.yaw * .3;
   animFlames(flames, s.nitroT > 0 ? 1 : 0, tt); animSmoke(dt, s.v);
   for (const c of list) { const d = c.z - s.z; place3(c.car, c.x, d); c.car.visible = Math.abs(d) < 170; }
-  for (const o of OBS) { const d = o.z - s.z; o.g.visible = d < 170 && d > -12; if (o.g.visible) { const rz = o.g.rotation.z; place3(o.g, o.x, d); o.g.rotation.z = rz; } }
+  for (const o of OBS) { const d = o.z - s.z; o.g.visible = d < 170 && d > -5; if (o.g.visible) { const rz = o.g.rotation.z; place3(o.g, o.x, d); o.g.rotation.z = rz; } }
   for (const c of CANS) { const d = c.z - s.z; c.g.visible = !c.got && d < 170 && d > -8; if (c.g.visible) { place3(c.g, c.x, d); c.g.position.y = 1.05 + Math.sin(tt * 4 + c.z) * .15; c.spin.rotation.y = tt * 3; } }
   { const d = CFG.track - s.z; gate.visible = d < 170 && d > -30; if (gate.visible) place3(gate, 0, d); }
   if (s.shake > 0) s.shake -= dt;
