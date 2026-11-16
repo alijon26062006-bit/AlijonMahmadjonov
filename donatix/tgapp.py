@@ -167,7 +167,164 @@ async def api_init(request: Request, conn=Depends(get_conn), config: Config = De
         "bot": bot,
         "friday": jumuah.MESSAGE if jumuah.closed(config) else "",
         "pay": _pay_info(request, conn, config, user),
+        "reviews": _reviews_short(conn),
     }
+
+
+# ── Каталог прямо в мини-приложении: игры, карты, Steam. На сайт не уходим ──
+
+def _cover(kind: str, url: str | None) -> str:
+    from .deps import _img, kind_cover
+    return _img(kind_cover(kind, url)) if kind_cover(kind, url) else ""
+
+
+def _tiles(conn, config: Config, user, kinds: tuple[str, ...]) -> list[dict[str, Any]]:
+    from .money import apply_markup, to_decimal
+    out = []
+    for kind in kinds:
+        for c in catalog.categories(conn, kind=kind):
+            price = apply_markup(to_decimal(str(c["from_price"])), accounts.markup_for(user, config, c["kind"]))
+            out.append({"kind": c["kind"], "category": c["category_id"], "name": c["category_name"], "n": c["n"],
+                        "img": _cover(c["kind"], c["image_url"]), "from_usd": str(price),
+                        "regions": sorted(filter(None, (c["regions"] or "").split(",")))})
+    return out
+
+
+@router.post("/api/catalog")
+async def api_catalog(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    user = _account(conn, tg)
+    from . import popular
+    hot = []
+    for p in popular.services(conn):
+        if p.get("key") == "telegram":
+            continue
+        hot.append({"kind": p["kind"], "category": p.get("category_id") or "", "region": p.get("region") or "",
+                    "name": p["title"], "img": _cover(p["kind"], p.get("image_url")), "hot": True})
+    games = _tiles(conn, config, user, ("topup",))
+    for g in games:      # FF СНГ / FF Инд — как на сайте, своими названиями и обложками
+        same = next((h for h in hot if h["category"] == g["category"] and h["kind"] == g["kind"]), None)
+        if same:
+            g["name"], g["img"], g["hot"] = same["name"], same["img"] or g["img"], True
+    games.sort(key=lambda g: (not g.get("hot"), g["name"].lower()))
+    return {"games": games, "cards": _tiles(conn, config, user, ("gift_card", "game_key", "steam_topup")),
+            "popular": [h for h in hot if h["category"]]}
+
+
+@router.post("/api/game")
+async def api_game(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    user = _account(conn, tg)
+    body = await request.json()
+    kind, category, region = str(body.get("kind") or "")[:32], str(body.get("category") or "")[:64], str(body.get("region") or "")[:16]
+    products = [p for p in catalog.list_products(conn, kind=kind, category_id=category)
+                if p["kind"] not in ("telegram_stars", "telegram_premium")]
+    if not products:
+        return JSONResponse({"error": "Мол дастрас нест. / Товар недоступен."}, status_code=404)
+    regions = sorted({p["region"] for p in products if p.get("region")})
+    if region:
+        products = [p for p in products if p.get("region") == region] or products
+    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"]), config=config, user=user) for p in products]
+    from . import packs
+    from .suppliers import region_title
+    if kind == "topup":
+        items.sort(key=lambda i: packs.order_key(i["name"], float(i["price_usd"])))
+    else:
+        items.sort(key=lambda i: float(i["price_usd"]))
+    for i in items:
+        i["img"] = i.get("image_url") or ""
+        i["group_title"] = (f"{packs.GROUP_EMOJI[i['group']]} {packs.GROUP_TITLES[i['group']]}" if i.get("group") is not None else "")
+    first = products[0]
+    return {"name": first["category_name"], "kind": first["kind"], "img": _cover(first["kind"], first.get("image_url")),
+            "regions": [{"code": r, "title": region_title(r)} for r in regions], "region": region,
+            "note": catalog.delivery_note(first["category_name"]), "items": items}
+
+
+@router.post("/api/order")
+async def api_order(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Покупка любого товара каталога с баланса — прямо в мини-приложении."""
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    body = await request.json()
+    user = _account(conn, tg)
+    if jumuah.blocks(config, user, SOURCE):
+        return {"ok": False, "error": jumuah.MESSAGE}
+    p = catalog.get_product(conn, str(body.get("product_id") or ""))
+    if p is None or p["kind"] in ("telegram_stars", "telegram_premium"):
+        return {"ok": False, "error": "Мол дастрас нест. / Товар недоступен."}
+    raw = body.get("fields") if isinstance(body.get("fields"), dict) else {}
+    fields = {str(k)[:40]: str(v).strip()[:200] for k, v in raw.items()}
+    qty = body.get("qty") or 1
+    from . import quickbuy
+    supplier = request.app.state.supplier
+    try:
+        order, _ = orders.create_order(conn, config, supplier, user, product_id=p["id"], quantity=qty, fields=fields,
+                                       client_idem_key="tgapp-" + str(body.get("idem") or uuid.uuid4())[:64], source=SOURCE)
+    except orders.OrderError as exc:
+        if exc.code == "insufficient_balance":
+            try:
+                return _need(user, quickbuy.need_micro(config, supplier, user, p, qty, fields))
+            except orders.OrderError as exc2:
+                return {"ok": False, "error": str(exc2)}
+        return {"ok": False, "error": str(exc)}
+    tgnotify.add(conn, "order", order["id"], tg)
+    return {"ok": True, "ref": order["public_id"], "balance": accounts.get_user(conn, user["id"])["balance_micro"],
+            "message": f"✅ Фармоиш № {order['public_id']} қабул шуд. / Заказ № {order['public_id']} принят."}
+
+
+@router.post("/api/order/view")
+async def api_order_view(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    user = _account(conn, tg)
+    body = await request.json()
+    row = conn.execute("SELECT * FROM orders WHERE public_id = ? AND user_id = ?",
+                       (str(body.get("ref") or "")[:40], user["id"])).fetchone()
+    if row is None:
+        return JSONResponse({"error": "Фармоиш ёфт нашуд. / Заказ не найден."}, status_code=404)
+    v = orders.public_view(row)
+    return {"ref": v["order_id"], "status": v["status"], "title": v["product_name"], "qty": v["quantity"],
+            "fields": v["fields"], "total": row["total_micro"], "items": v["delivery_items"], "error": v["error"],
+            "at": v["created_at"], "kind": v["kind"]}
+
+
+def _reviews_short(conn) -> dict[str, Any]:
+    from . import reviews
+    try:
+        s = reviews.summary(conn)
+    except Exception:  # noqa: BLE001 — таблицы отзывов нет (старые базы в тестах)
+        return {"total": 0, "avg": 0}
+    return {"total": s["total"], "avg": s["avg"]}
+
+
+@router.post("/api/reviews")
+async def api_reviews(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    from . import reviews
+    s = reviews.summary(conn)
+    items = [{"name": r["name"], "initials": r["initials"], "hue": r["hue"], "rating": r["rating"], "text": r["text"],
+              "game": r["game"], "reply": r["reply"], "at": r["created_at"]} for r in reviews.listing(conn, limit=30)]
+    return {"total": s["total"], "avg": s["avg"], "pct": s["pct"], "items": items}
+
+
+@router.post("/api/ping")
+async def api_ping(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """«Я в сети» каждые 15 с, пока мини-приложение открыто; в ответ — кто ждёт соперников в гонке."""
+    from . import race
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    user = _account(conn, tg)
+    race.seen(conn, user["id"], (tg.get("first_name") or tg.get("username") or "")[:16], "app")
+    return race.lobby(conn, user["id"])
 
 
 @router.post("/api/history")
@@ -433,9 +590,20 @@ async def api_race(action: str, request: Request, conn=Depends(get_conn), config
         body = {}
     try:
         if action == "profile":
+            race.seen(conn, user["id"], name, "garage")
             return {**race.profile(conn, user["id"], name, config.tz_offset), "me": user["id"], "name": name,
-                    "top": race.top(conn)}
+                    "top": race.top(conn, period="week", tz_offset=config.tz_offset),
+                    "stats": race.stats(conn, user["id"], config.tz_offset), "lobby": race.lobby(conn, user["id"]),
+                    "bot": db.get_setting(conn, "gifts.bot_username") or ""}
+        if action == "lobby":
+            race.seen(conn, user["id"], name, str(body.get("place") or "garage"))
+            return race.lobby(conn, user["id"])
+        if action == "top":
+            period = str(body.get("period") or "week")
+            return {"top": race.top(conn, period=period if period in ("day", "week", "all") else "week",
+                                    tz_offset=config.tz_offset), "stats": race.stats(conn, user["id"], config.tz_offset)}
         if action == "join":
+            race.seen(conn, user["id"], name, "race")
             return race.join(conn, user["id"], name, config.tz_offset, solo=bool(body.get("solo")))
         if action == "tick":
             return race.tick(conn, user["id"], int(body.get("room") or 0), float(body.get("z") or 0),

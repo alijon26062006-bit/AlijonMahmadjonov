@@ -119,3 +119,39 @@ def test_upgrade_costs_grow_and_stop_at_max(conn, uid):
         race.upgrade(conn, uid, "wings")
     # даже полностью прокачанная машина на сплошном нитро не проедет быстрее серверного минимума
     assert race.TRACK / ((race.VMAX + race.UPG["engine"] * race.UPG_MAX) * race.NITRO_K) * 1000 >= race.MIN_MS
+
+
+def test_online_counts_everyone_in_the_app(conn, uid):
+    from conftest import make_client
+    other = make_client(conn, login="viewer")[0]
+    race.seen(conn, uid, "Али", "garage")
+    race.seen(conn, other, "Фаррух", "app")
+    lob = race.lobby(conn, uid)
+    assert lob["online"] == 2 and lob["garage"] == 1 and lob["rooms"] == []
+    conn.execute("UPDATE race_seen SET at = ? WHERE user_id = ?", (time.time() - race.ONLINE_SEC - 5, other))
+    assert race.online(conn) == 1                               # закрыл приложение — уже не «в сети»
+
+
+def test_lobby_shows_waiting_player_and_second_human_speeds_start(conn, uid):
+    from conftest import make_client
+    a = race.join(conn, uid, "Али")
+    assert race.WAIT - 1 < a["start_in"] <= race.WAIT           # один — ждём соперников дольше
+    other = make_client(conn, login="racer4")[0]
+    lob = race.lobby(conn, other)
+    assert lob["rooms"][0]["players"] == ["Али"] and not lob["rooms"][0]["mine"]
+    b = race.join(conn, other, "Фаррух")
+    assert b["room"] == a["room"] and b["start_in"] <= race.WAIT_PAIR    # двое живых — старт скоро
+    assert race.lobby(conn, other)["rooms"][0]["mine"]
+
+
+def test_results_build_rating_and_stats(conn, uid):
+    a = race.join(conn, uid, "Али")
+    fast = min(race.bot_finish_ms(a["seed"], i) for i in range(5)) - 500
+    _started(conn, a["room"], fast / 1000)
+    race.finish(conn, uid, a["room"], fast)
+    st = race.stats(conn, uid)
+    assert st["races"] == 1 and st["wins"] == 1 and st["podium"] == 1 and st["best_ms"] == fast
+    assert st["points"] == race.POINTS[1] and st["rank_week"] == 1 and st["win_rate"] == 100
+    top = race.top(conn, period="week")
+    assert top[0]["user_id"] == uid and top[0]["points"] == race.POINTS[1]
+    assert race.top(conn, period="all")[0]["wins"] == 1

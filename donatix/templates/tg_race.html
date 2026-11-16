@@ -24,6 +24,17 @@ button { font-family: inherit; color: #fff; border: 0; }
 @keyframes rise { from { transform: translateY(40px); opacity: 0; } } @keyframes drop { from { transform: translateY(-24px); opacity: 0; } }
 #g-name { text-align: center; font-size: 19px; font-weight: 900; }
 #g-on { text-align: center; margin: 4px 0 8px; font-size: 12.5px; color: #7df0b0; }
+#g-live { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 8px; padding: 10px 12px; border-radius: 16px; text-align: left; background: linear-gradient(110deg,#1d7a4a,#13b26b); animation: rise .35s both; }
+#g-live .dot { width: 9px; height: 9px; border-radius: 9px; background: #b6ffd5; flex: none; animation: ping 1.4s infinite; } @keyframes ping { 70% { box-shadow: 0 0 0 8px rgba(182,255,213,0); } }
+#g-live b { display: block; font-size: 14px; } #g-live small { font-size: 12px; opacity: .9; } #g-live .go { margin-left: auto; padding: 7px 11px; border-radius: 11px; background: #fff; color: #0f5a33; font-weight: 900; font-size: 13px; flex: none; }
+#invite { position: fixed; z-index: 7; left: 50%; top: 52%; transform: translateX(-50%); padding: 12px 18px; border-radius: 16px; font-size: 15px; font-weight: 900; background: #fff; color: #2a1f8f; box-shadow: 0 14px 30px -12px #000; white-space: nowrap; }
+#wait-list { position: fixed; z-index: 6; left: 16px; right: 16px; top: 61%; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; pointer-events: none; }
+#wait-list span { padding: 5px 10px; border-radius: 999px; background: rgba(10,8,30,.7); border: 1px solid rgba(255,255,255,.18); font-size: 13px; }
+.mystat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.mystat div { padding: 10px 6px; border-radius: 14px; background: rgba(255,255,255,.07); text-align: center; } .mystat b { display: block; font-size: 18px; } .mystat small { font-size: 11px; color: #b4b0e6; }
+.per { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 14px; background: rgba(255,255,255,.1); margin-bottom: 10px; }
+.per button { height: 38px; border-radius: 11px; background: none; font-size: 13px; font-weight: 800; color: #b4b0e6; } .per button.on { background: #6a55ff; color: #fff; }
+.row.me { border-color: #8b7bff; background: rgba(139,123,255,.18); }
 #colors { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; touch-action: pan-x; }
 #colors::-webkit-scrollbar { display: none; }
 .sw { flex: none; width: 62px; padding: 6px 4px 5px; border-radius: 14px; background: rgba(255,255,255,.07); border: 1.5px solid rgba(255,255,255,.1); text-align: center; font-size: 10.5px; font-weight: 700; }
@@ -94,6 +105,7 @@ button { font-family: inherit; color: #fff; border: 0; }
   <div class="ui" id="g-bottom">
     <div id="g-name">Donatix GT</div>
     <div id="g-on"></div>
+    <button id="g-live" class="hide"></button>
     <div id="colors"></div>
     <div class="three"><button class="btn a" id="b-tune"><span>🔧 <span data-t="tune">Тюнинг</span></span></button><button class="btn a" id="b-top"><span>🏆 <span data-t="top">Беҳтаринҳо</span></span></button><button class="btn a" id="b-set"><span>⚙️ <span data-t="set">Танзимот</span></span></button></div>
     <div class="two"><button class="btn c" id="b-bots"><span>🤖 <span data-t="bots">Бо ботҳо</span><small data-t="botsS">фавран оғоз</small></span></button>
@@ -109,6 +121,8 @@ button { font-family: inherit; color: #fff; border: 0; }
   <div class="ui" id="ctl"><button class="btn" id="left">‹</button><button class="btn" id="right">›</button><button class="btn" id="brake"><span data-t="brake">ТОРМОЗ</span></button><button class="btn" id="gas"><span data-t="gas">ГАЗ</span></button></div>
 </div>
 <div class="ui hide" id="msg"></div>
+<button id="invite" class="hide">📨 <span data-t="invite">Дӯстро даъват кун</span></button>
+<div id="wait-list" class="hide"></div>
 <div class="ui" id="hit"></div>
 <div class="ui hide" id="res"><div class="card"><h2 id="res-place"></h2><p id="res-sub"></p><div class="won" id="res-won"></div>
   <div class="two"><button class="btn a" id="res-garage"><span data-t="garage">Гараж</span></button><button class="btn b" id="res-again"><span data-t="again">БОЗ</span></button></div></div></div>
@@ -136,7 +150,11 @@ const TX = {shop: ['Мағоза', 'Магазин'], race: ['ПОЙГА', 'ГО
   nitroU: ['Нитро', 'Нитро'], nitroS: ['нитро дарозтар кор мекунад', 'нитро работает дольше'], max: ['МАКС', 'МАКС'], lvl: ['сатҳ', 'ур.'],
   sound: ['Садо', 'Звук'], vibro: ['Ларзиш', 'Вибрация'], wheel: ['Руль', 'Руль'], wheelS: ['телефонро чун руль моил кунед', 'наклоняйте телефон как руль'], btns: ['Тугмаҳо', 'Кнопки'], tilt: ['Моил', 'Наклон'],
   auto: ['Гази худкор', 'Автогаз'], autoS: ['мошин худаш газ медиҳад', 'машина сама жмёт газ'], inv: ['Руль баръакс', 'Руль наоборот'], invS: ['агар мошин ба тарафи дигар равад', 'если машина едет не в ту сторону'],
-  nosens: ['Сенсори моилӣ дастрас нест', 'Датчик наклона недоступен'], tuneN: ['Тангаҳоро дар пойга ба даст меоред', 'Монеты зарабатываются в заездах'], empty: ['Ҳоло холӣ', 'Пока пусто']};
+  nosens: ['Сенсори моилӣ дастрас нест', 'Датчик наклона недоступен'], tuneN: ['Тангаҳоро дар пойга ба даст меоред', 'Монеты зарабатываются в заездах'], empty: ['Ҳоло холӣ', 'Пока пусто'],
+  invite: ['Дӯстро даъват кун', 'Позвать друга'], you: ['Шумо', 'Вы'], inGarage: ['дар гараж', 'в гараже'], racing: ['дар пойга', 'в заезде'], waiting: ['рақибро интизор аст', 'ждёт соперника'],
+  startIn: ['оғоз баъди {a} с', 'старт через {a} с'], joinGo: ['Ҳамроҳ', 'Играть'], waitN: ['{a} интизор', 'ждут: {a}'], invTxt: ['🏁 Биё пойга! Заезд бо рақибони зинда:', '🏁 Давай гонку! Заезд с живыми соперниками:'],
+  pDay: ['Имрӯз', 'Сегодня'], pWeek: ['Ҳафта', 'Неделя'], pAll: ['Ҳамааш', 'Всё время'], sRaces: ['пойга', 'заездов'], sWins: ['ғалаба', 'побед'], sPod: ['дар 3 беҳтарин', 'в тройке'],
+  sBest: ['беҳтарин вақт', 'лучшее время'], sRate: ['ғалаба %', '% побед'], sRank: ['ҷой дар ҳафта', 'место за неделю'], pts: ['хол', 'очк.'], rules: ['1-ум +10 · 2-юм +6 · 3-юм +4 · марра +1 хол', '1 место +10 · 2 место +6 · 3 место +4 · финиш +1 очко']};
 const t = (k, a) => TX[k][RU ? 1 : 0].replace('{a}', a);
 document.querySelectorAll('[data-t]').forEach(e => { e.textContent = t(e.dataset.t); });
 const $ = id => document.getElementById(id);
@@ -395,7 +413,7 @@ function garage() {
   show('garage', true); show('hud', false); show('res', false); show('msg', false);
   $('g-coins').textContent = '🪙 ' + P.coins; $('g-wins').textContent = '🏆 ' + P.wins;
   $('g-sub').textContent = t('sub', P.prizes[1]); $('g-day').textContent = t('day', P.day_left);
-  $('g-on').textContent = '● ' + Math.max(1, P.online) + ' ' + t('online');
+  onlineUI();
   $('colors').innerHTML = P.colors.map(c => `<div class="sw ${c.code === P.color ? 'on' : ''}" data-c="${c.code}"><i style="background:${c.hex || '#7a2bd6'}"></i>${P.owned.includes(c.code) ? '✓' : c.price + ' 🪙'}</div>`).join('');
 }
 $('colors').addEventListener('click', async e => {
@@ -404,6 +422,22 @@ $('colors').addEventListener('click', async e => {
     if (!confirm((RU ? c.ru : c.tj) + ' — ' + c.price + ' 🪙. ' + t('buy'))) return; }
   try { const r = await api('shop', {color: c.code}); Object.assign(P, r); haptic('light'); beep(880, .1); garage(); } catch (err) { toast(err.message); }
 });
+let LOB = null, topPer = 'week';
+function onlineUI() {
+  const L = LOB || P.lobby || {online: P.online};
+  $('g-on').textContent = '● ' + Math.max(1, L.online || 1) + ' ' + t('online') + (L.garage ? ' · ' + L.garage + ' ' + t('inGarage') : '') + (L.racing ? ' · ' + L.racing + ' ' + t('racing') : '');
+  const rooms = (L.rooms || []).filter(r => !r.mine), g = $('g-live');
+  if (rooms.length && mode === 'garage') { const r = rooms[0];
+    g.innerHTML = `<span class="dot"></span><span><b>${esc(r.players.slice(0, 2).join(', '))}${r.players.length > 2 ? ' +' + (r.players.length - 2) : ''} — ${t('waiting')}</b><small>${t('startIn', Math.max(1, Math.round(r.start_in)))}</small></span><span class="go">${t('joinGo')}</span>`;
+    g.classList.remove('hide'); } else g.classList.add('hide');
+  const waitN = (L.rooms || []).reduce((a, r) => a + (r.mine ? 0 : r.players.length), 0);
+  $('g-day').textContent = waitN ? t('waitN', waitN) : t('day', P.day_left);
+}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+function share(link, text) { const u = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text);
+  try { tg && tg.openTelegramLink ? tg.openTelegramLink(u) : window.open(u); } catch (e) {} }
+function inviteFriend() { if (!P.bot) { toast(t('need'), 2000); return; } haptic('light'); share('https://t.me/' + P.bot + '?start=race', t('invTxt')); }
+$('g-live').onclick = () => start(false); $('invite').onclick = inviteFriend;
 function toast(text, ms = 1400) { const h = $('hit'); h.textContent = text; h.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => { h.style.opacity = 0; }, ms); }
 $('back').onclick = e => { if (mode === 'race' || mode === 'wait') e.preventDefault(); };
 
@@ -419,12 +453,18 @@ function sheet(kind) {
     $('sh-b').innerHTML = tgl('sound', '🔊', 'sound') + tgl('vibro', '📳', 'vibro') +
       `<div class="row"><div><b>🎮 ${t('wheel')}</b><small>${t('wheelS')}</small></div><div class="seg"><button data-w="btn" class="${SET.steer === 'btn' ? 'on' : ''}">${t('btns')}</button><button data-w="tilt" class="${SET.steer === 'tilt' ? 'on' : ''}">${t('tilt')}</button></div></div>` +
       (SET.steer === 'tilt' ? tgl('inv', '🔁', 'inv', 'invS') : '') + tgl('auto', '🦶', 'auto', 'autoS'); }
-  if (kind === 'top') { $('sh-t').textContent = '🏆 ' + t('top');
-    $('sh-b').innerHTML = P.top.length ? P.top.map((r, i) => `<div class="row"><div><b>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${(r.name || '—').replace(/[<>&]/g, '')}</b><small>${r.races} 🏁</small></div><b>${r.wins} 🏆</b></div>`).join('') : `<div class="note">${t('empty')}</div>`; }
+  if (kind === 'top') { $('sh-t').textContent = '🏆 ' + t('top'); const s = P.stats || {}, sec = ms => ms ? (ms / 1000).toFixed(1) + ' с' : '—';
+    $('sh-b').innerHTML = `<div class="mystat"><div><b>${s.races || 0}</b><small>${t('sRaces')}</small></div><div><b>${s.wins || 0}</b><small>${t('sWins')}</small></div><div><b>${s.podium || 0}</b><small>${t('sPod')}</small></div>
+        <div><b>${sec(s.best_ms)}</b><small>${t('sBest')}</small></div><div><b>${s.win_rate || 0}%</b><small>${t('sRate')}</small></div><div><b>${s.rank_week ? '#' + s.rank_week : '—'}</b><small>${t('sRank')}</small></div></div>
+      <div class="per">${[['day', 'pDay'], ['week', 'pWeek'], ['all', 'pAll']].map(([k, n]) => `<button data-p="${k}" class="${topPer === k ? 'on' : ''}">${t(n)}</button>`).join('')}</div>` +
+      (P.top.length ? P.top.map((r, i) => `<div class="row ${r.user_id === P.me ? 'me' : ''}"><div><b>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(r.name || '—')}</b><small>${r.races} 🏁 · ${r.wins} 🏆${r.best_ms ? ' · ' + sec(r.best_ms) : ''}</small></div><b>${r.points} ${t('pts')}</b></div>`).join('') : `<div class="note">${t('empty')}</div>`) +
+      `<div class="note">${t('rules')}</div>`; }
 }
 $('sh-x').onclick = () => sheet(''); $('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') sheet(''); });
 $('b-tune').onclick = () => sheet('tune'); $('b-set').onclick = () => sheet('set'); $('b-top').onclick = () => sheet('top');
 $('sh-b').addEventListener('click', async e => {
+  const per = e.target.closest('[data-p]');
+  if (per) { topPer = per.dataset.p; haptic('light'); try { const r = await api('top', {period: topPer}); P.top = r.top; P.stats = r.stats; } catch (err) {} sheet('top'); return; }
   const u = e.target.closest('[data-u]'), s = e.target.closest('[data-s]'), w = e.target.closest('[data-w]');
   if (u) { try { Object.assign(P, await api('upgrade', {key: u.dataset.u})); haptic('medium', 30); beep(660, .09); beep(990, .14, 'sine', .5, .09); $('g-coins').textContent = '🪙 ' + P.coins; sheet('tune'); } catch (err) { toast(err.message, 2000); } }
   if (s) { const k = s.dataset.s; SET[k] = !SET[k]; saveSet(); if (k === 'sound' && AU.master) AU.master.gain.value = SET.sound ? 1 : 0; haptic('light', 20); beep(700, .08); sheet('set'); }
@@ -533,6 +573,8 @@ function stepRace(dt, tt) {
   $('bar-in').innerHTML = list.map(c => `<i style="left:${Math.min(100, c.z / CFG.track * 100)}%;background:#8a86b8"></i>`).join('') + `<i style="left:${s.z / CFG.track * 100}%;background:#3ddc84;z-index:2"></i>`;
   const ka = K(s.z + 70 + s.v), tr = $('turn'); tr.textContent = ka > 0 ? '↱' : '↰'; tr.classList.toggle('on', Math.abs(ka) > .003 && Math.abs(kz) < .003 && !s.done && tt > 0);
   const m = $('msg'), cnt = Math.ceil(-tt);
+  const waiting = tt < 0 && !s.solo; $('invite').classList.toggle('hide', !waiting); $('wait-list').classList.toggle('hide', !waiting);
+  if (waiting && (stepRace.n = (stepRace.n || 0) + 1) % 15 === 0) $('wait-list').innerHTML = [P.name || t('you'), ...Object.values(others).map(o => o.name)].map(n => `<span>🏎 ${esc(n)}</span>`).join('');
   if (tt < 0) { show('msg', true); m.innerHTML = cnt + `<small>${s.solo ? t('waitB') : t('wait') + ' · ' + (Object.keys(others).length + 1) + '/' + CFG.max_cars}</small>`; if (cnt !== lastCount) { lastCount = cnt; if (cnt <= 3) { beep(440, .16, 'square', .35); haptic('light', 20); } } }
   else if (tt < 1) { show('msg', true); m.innerHTML = t('go'); if (mode === 'wait') { mode = 'race'; haptic('rigid', 120); beep(880, .5, 'square', .4); } }
   else if (tt > 1.6 && s.v < 4 && !gas && !s.done) { show('msg', true); m.innerHTML = `<small style="font-size:22px;color:#3ddc84">${t('hold')} ⬇</small>`; }
@@ -571,7 +613,10 @@ function frame(now) {
   try { [P] = await Promise.all([api('profile'), loadCar()]); } catch (err) { $('load-t').textContent = err.message === 'net' ? 'Нет связи' : err.message; return; }
   CFG = P; for (const c of P.colors) HEX[c.code] = c.hex;
   show('load', false); garage(); requestAnimationFrame(frame);
-  setInterval(async () => { if (mode === 'garage') try { const r = await api('profile'); P.online = r.online; P.top = r.top; $('g-on').textContent = '● ' + Math.max(1, P.online) + ' ' + t('online'); } catch (e) {} }, 8000);
+  // «в сети»: гараж отмечается каждые 6 с и видит, кто ждёт соперника; в заезде — раз в 15 с
+  let lastPing = 0;
+  setInterval(async () => { const now = Date.now(); if (document.hidden || (mode !== 'garage' && now - lastPing < 15000)) return; lastPing = now;
+    try { LOB = await api('lobby', {place: mode === 'garage' ? 'garage' : 'race'}); if (mode === 'garage') onlineUI(); } catch (e) {} }, 6000);
 })();
 window.__dx = {get mode() { return mode; }, get state() { return state; }, start, steer, sheet, K};
 </script>

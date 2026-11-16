@@ -30,13 +30,16 @@ UPG_MAX = 5
 UPG_COST = 15
 VNITRO = (VMAX + UPG["engine"] * UPG_MAX) * NITRO_K     # быстрее не едет никто
 MAX_CARS = 6
-WAIT = 8.0                # сколько комната ждёт игроков до старта, сек
+WAIT = 25.0               # заезд «с людьми» ждёт соперников до старта, сек (все в сети видят приглашение)
+WAIT_PAIR = 10.0          # как только в комнате двое живых — старт не позже чем через столько секунд
+WAIT_FULL = 4.0           # комната полная — стартуем почти сразу
 WAIT_SOLO = 4.0           # заезд только с ботами — стартует сразу
 JOIN_GAP = 2.5            # за сколько до старта в комнату уже не пускаем
 MIN_MS = int(TRACK / VNITRO * 1000)        # быстрее проехать нельзя даже на одном нитро
 PRIZES = {1: 10, 2: 5, 3: 3}
 DAY_CAP = 30              # монет в день со всех заездов
-ONLINE_SEC = 25
+ONLINE_SEC = 45           # «в сети» — кто открыл мини-приложение или гонку за последние столько секунд
+POINTS = {1: 10, 2: 6, 3: 4}   # очки рейтинга за место; за любой другой финиш — 1
 #: Цвета машины: код → (название ru, название tj, цвет краски или None для заводского, цена в монетах)
 COLORS: dict[str, tuple[str, str, str | None, int]] = {
     "violet": ("Фиолетовый", "Бунафш", None, 0),
@@ -70,6 +73,24 @@ CREATE TABLE IF NOT EXISTS race_players (
     PRIMARY KEY (room_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS race_players_upd ON race_players(upd);
+CREATE TABLE IF NOT EXISTS race_seen (
+    user_id   INTEGER PRIMARY KEY,
+    name      TEXT NOT NULL DEFAULT '',
+    at        REAL NOT NULL,
+    place     TEXT NOT NULL DEFAULT 'app'
+);
+CREATE TABLE IF NOT EXISTS race_results (
+    id        INTEGER PRIMARY KEY,
+    user_id   INTEGER NOT NULL,
+    room_id   INTEGER NOT NULL,
+    place     INTEGER NOT NULL,
+    ms        INTEGER NOT NULL,
+    humans    INTEGER NOT NULL,
+    points    INTEGER NOT NULL,
+    at        REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS race_results_at ON race_results(at);
+CREATE INDEX IF NOT EXISTS race_results_user ON race_results(user_id);
 CREATE TABLE IF NOT EXISTS race_wallet (
     user_id   INTEGER PRIMARY KEY,
     name      TEXT NOT NULL DEFAULT '',
@@ -140,10 +161,35 @@ def wallet(conn: sqlite3.Connection, user_id: int, name: str = "", tz_offset: in
     return w
 
 
-def online(conn: sqlite3.Connection) -> int:
+def seen(conn: sqlite3.Connection, user_id: int, name: str, place: str = "app") -> None:
+    """Отметка «я в сети»: мини-приложение и гонка шлют её каждые ~15 секунд, пока открыты."""
     init(conn)
-    return conn.execute("SELECT COUNT(DISTINCT user_id) FROM race_players WHERE upd > ?",
-                        (time.time() - ONLINE_SEC,)).fetchone()[0]
+    place = place if place in ("app", "garage", "race") else "app"
+    conn.execute("INSERT INTO race_seen (user_id, name, at, place) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE "
+                 "SET name = excluded.name, at = excluded.at, place = excluded.place", (user_id, name[:16], time.time(), place))
+
+
+def online(conn: sqlite3.Connection) -> int:
+    """Сколько людей сейчас в мини-приложении (магазин, гараж или заезд)."""
+    init(conn)
+    return conn.execute("SELECT COUNT(*) FROM race_seen WHERE at > ?", (time.time() - ONLINE_SEC,)).fetchone()[0]
+
+
+def lobby(conn: sqlite3.Connection, user_id: int = 0) -> dict[str, Any]:
+    """Кто сейчас ждёт соперников: открытые заезды «с людьми». Видят все в мини-приложении — так собираются живые игроки."""
+    init(conn)
+    now = time.time()
+    rooms = []
+    for r in conn.execute("SELECT id, start_at FROM race_rooms WHERE solo = 0 AND start_at > ? ORDER BY start_at",
+                          (now + JOIN_GAP,)).fetchall():
+        names = [x["name"] for x in conn.execute("SELECT name FROM race_players WHERE room_id = ? ORDER BY upd", (r["id"],))]
+        mine = bool(conn.execute("SELECT 1 FROM race_players WHERE room_id = ? AND user_id = ?", (r["id"], user_id)).fetchone())
+        if names and len(names) < MAX_CARS:
+            rooms.append({"room": r["id"], "start_in": round(r["start_at"] - now, 1), "players": names, "mine": mine})
+    places = dict(conn.execute("SELECT place, COUNT(*) FROM race_seen WHERE at > ? GROUP BY place",
+                               (now - ONLINE_SEC,)).fetchall())
+    return {"rooms": rooms, "online": sum(places.values()), "garage": places.get("garage", 0),
+            "racing": places.get("race", 0)}
 
 
 def profile(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5) -> dict[str, Any]:
@@ -165,6 +211,7 @@ def join(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5, 
     """В набирающуюся комнату или в новую (solo — своя комната только с ботами). Зерно, время до старта, игроки."""
     init(conn)
     w = wallet(conn, user_id, name, tz_offset)
+    seen(conn, user_id, name, "race")
     now = time.time()
     conn.execute("BEGIN IMMEDIATE")
     try:
@@ -180,6 +227,11 @@ def join(conn: sqlite3.Connection, user_id: int, name: str, tz_offset: int = 5, 
             room = conn.execute("SELECT * FROM race_rooms WHERE id = ?", (rid,)).fetchone()
         conn.execute("INSERT INTO race_players (room_id, user_id, name, color, upd) VALUES (?, ?, ?, ?, ?)",
                      (room["id"], user_id, (name or "Игрок")[:16], w["color"], now))
+        if not solo:      # собрались живые — ждать дольше незачем
+            n = conn.execute("SELECT COUNT(*) FROM race_players WHERE room_id = ?", (room["id"],)).fetchone()[0]
+            soon = now + (WAIT_FULL if n >= MAX_CARS else WAIT_PAIR if n >= 2 else WAIT)
+            conn.execute("UPDATE race_rooms SET start_at = MIN(start_at, ?) WHERE id = ?", (soon, room["id"]))
+            room = conn.execute("SELECT * FROM race_rooms WHERE id = ?", (room["id"],)).fetchone()
         conn.execute("COMMIT")
     except BaseException:
         conn.execute("ROLLBACK")
@@ -235,6 +287,8 @@ def finish(conn: sqlite3.Connection, user_id: int, room_id: int, ms: int, tz_off
             "UPDATE race_wallet SET coins = coins + ?, wins = wins + ?, races = races + 1, day = ?, "
             "day_coins = CASE WHEN day = ? THEN day_coins ELSE 0 END + ? WHERE user_id = ?",
             (won, 1 if place == 1 else 0, today, today, won, user_id))
+        conn.execute("INSERT INTO race_results (user_id, room_id, place, ms, humans, points, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (user_id, room_id, place, ms, humans, POINTS.get(place, 1), now))
         conn.execute("COMMIT")
     except BaseException:
         conn.execute("ROLLBACK")
@@ -284,7 +338,44 @@ def upgrade(conn: sqlite3.Connection, user_id: int, key: str, tz_offset: int = 5
     return {"coins": w["coins"], "upg": w["upg"]}
 
 
-def top(conn: sqlite3.Connection, limit: int = 20) -> list[dict[str, Any]]:
+def _since(period: str, tz_offset: int) -> float:
+    if period == "day":
+        return time.time() - (time.time() + tz_offset * 3600) % 86400
+    if period == "week":
+        return time.time() - 7 * 86400
+    return 0.0
+
+
+def top(conn: sqlite3.Connection, limit: int = 20, period: str = "week", tz_offset: int = 5) -> list[dict[str, Any]]:
+    """Рейтинг: очки за места (1-е — 10, 2-е — 6, 3-е — 4, любой финиш — 1) за день, неделю или всё время."""
     init(conn)
     return [dict(r) for r in conn.execute(
-        "SELECT name, wins, races, color FROM race_wallet WHERE races > 0 ORDER BY wins DESC, races LIMIT ?", (limit,))]
+        "SELECT r.user_id, COALESCE(w.name, '') AS name, COALESCE(w.color, 'violet') AS color, SUM(r.points) AS points, "
+        "COUNT(*) AS races, SUM(r.place = 1) AS wins, MIN(r.ms) AS best_ms FROM race_results r "
+        "LEFT JOIN race_wallet w ON w.user_id = r.user_id WHERE r.at >= ? GROUP BY r.user_id "
+        "ORDER BY points DESC, wins DESC, best_ms LIMIT ?", (_since(period, tz_offset), limit))]
+
+
+def stats(conn: sqlite3.Connection, user_id: int, tz_offset: int = 5) -> dict[str, Any]:
+    """Моя статистика: заезды, победы, подиумы, лучшее время, очки и место в рейтинге недели и всех времён."""
+    init(conn)
+    w = wallet(conn, user_id, "", tz_offset)
+    r = conn.execute("SELECT COUNT(*) AS n, SUM(place = 1) AS wins, SUM(place <= 3) AS podium, MIN(ms) AS best, "
+                     "AVG(place) AS avg_place, SUM(points) AS points, SUM(humans > 1) AS vs_people "
+                     "FROM race_results WHERE user_id = ?", (user_id,)).fetchone()
+
+    def rank(since: float) -> int:
+        mine = conn.execute("SELECT COALESCE(SUM(points), 0) FROM race_results WHERE user_id = ? AND at >= ?",
+                            (user_id, since)).fetchone()[0]
+        if not mine:
+            return 0
+        return 1 + conn.execute("SELECT COUNT(*) FROM (SELECT SUM(points) AS p FROM race_results WHERE at >= ? "
+                                "GROUP BY user_id HAVING p > ?)", (since, mine)).fetchone()[0]
+    week = conn.execute("SELECT COALESCE(SUM(points), 0) FROM race_results WHERE user_id = ? AND at >= ?",
+                        (user_id, _since("week", tz_offset))).fetchone()[0]
+    races = max(w["races"], r["n"] or 0)
+    return {"races": races, "wins": max(w["wins"], r["wins"] or 0), "podium": r["podium"] or 0,
+            "best_ms": r["best"] or 0, "avg_place": round(r["avg_place"] or 0, 1), "points": r["points"] or 0,
+            "week_points": week, "vs_people": r["vs_people"] or 0,
+            "win_rate": round((r["wins"] or 0) * 100 / r["n"]) if r["n"] else 0,
+            "rank_week": rank(_since("week", tz_offset)), "rank_all": rank(0.0)}
