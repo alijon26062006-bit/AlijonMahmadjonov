@@ -300,10 +300,30 @@ nav.tabs button.on { color: var(--text); } nav.tabs button.on svg { color: var(-
 .bnr-dots button::before { content: ""; position: absolute; inset: -9px; }
 .bnr-dots button.on { background: #fff; transform: scaleX(2.4); }
 
+/* ── заставка при открытии: логотип падает, кольца расходятся, название по буквам; вибрация в такт (JS ниже) ── */
+#intro { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(90% 60% at 50% 42%, #2a1f8f, #0c0a1d 70%); transition: opacity .45s var(--ease), transform .45s var(--ease); }
+#intro.out { opacity: 0; transform: scale(1.08); pointer-events: none; }
+#intro .in { text-align: center; }
+#intro .lg { position: relative; width: 112px; height: 112px; margin: 0 auto 22px; }
+#intro .lg svg { position: relative; z-index: 1; width: 112px; height: 112px; border-radius: 30px; box-shadow: 0 24px 60px -14px #7c6cff; animation: idrop .62s cubic-bezier(.3, 1.5, .5, 1) both; }
+@keyframes idrop { 0% { transform: translateY(-140px) scale(.4) rotate(-18deg); opacity: 0; } 62% { transform: translateY(0) scale(1.12) rotate(4deg); opacity: 1; } 80% { transform: scale(.95) rotate(-2deg); } 100% { transform: none; } }
+#intro .lg i { position: absolute; inset: 0; border-radius: 30px; border: 2px solid #9a8cff; opacity: 0; animation: iring 1s ease-out both; }
+#intro .lg i:nth-child(1) { animation-delay: .4s; } #intro .lg i:nth-child(2) { animation-delay: .62s; }
+@keyframes iring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.3); } }
+#intro .lg svg path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: idraw .5s .42s ease-out forwards; } @keyframes idraw { to { stroke-dashoffset: 0; } }
+#intro .nm { display: flex; justify-content: center; font-size: 36px; font-weight: 900; letter-spacing: .01em; color: #fff; }
+#intro .nm span { opacity: 0; transform: translateY(18px) scale(.6); animation: ilet .34s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+@keyframes ilet { to { opacity: 1; transform: none; } }
+#intro .sl { margin-top: 8px; color: #b4b0e6; font-size: 15px; font-weight: 600; opacity: 0; animation: up .4s 1.5s var(--ease) forwards; }
+#intro .sh { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: linear-gradient(100deg, transparent 40%, rgb(255 255 255 / .16) 50%, transparent 60%); transform: translateX(-100%); animation: ishine .7s 1.45s ease-out forwards; pointer-events: none; }
+@keyframes ishine { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
+<div id="intro" class="hidden" aria-hidden="true"><div class="in"><div class="lg"><i></i><i></i>
+  <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="url(#ig)"/><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8d7fff"/><stop offset="1" stop-color="#4a32d8"/></linearGradient></defs><path d="M10 8.5h6a7.5 7.5 0 0 1 0 15h-6Z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg></div>
+  <div class="nm" id="intro-nm"></div><div class="sl">Алмазы · UC · Stars · Steam</div></div><div class="sh"></div></div>
 <header class="top" id="top">
   <div id="hava" class="ava">D</div>
   <div class="who"><b id="hname">Donatix</b><span id="huser"></span></div>
@@ -339,6 +359,25 @@ function applyTheme() {
 }
 applyTheme();
 if (tg) { tg.ready(); tg.expand(); }
+// Заставка при открытии (раз за запуск): каждое движение на экране — своя вибрация в тот же миг
+(function intro() {
+  const el = document.getElementById("intro"); let seen = false;
+  try { seen = sessionStorage.getItem("dx_intro") === "1"; sessionStorage.setItem("dx_intro", "1"); } catch (e) {}
+  if (seen || matchMedia("(prefers-reduced-motion: reduce)").matches) { el.remove(); return; }
+  const hf = tg && tg.HapticFeedback;
+  const buzz = (kind, ms) => { try { if (hf) { kind === "ok" ? hf.notificationOccurred("success") : hf.impactOccurred(kind); } } catch (e) {} try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+  const name = "Donatix", box = document.getElementById("intro-nm"), T0 = 780, STEP = 85;
+  box.innerHTML = [...name].map((c, i) => `<span style="animation-delay:${T0 + i * STEP}ms">${c}</span>`).join("");
+  el.classList.remove("hidden");
+  const at = (ms, fn) => setTimeout(fn, ms);
+  at(385, () => buzz("heavy", 45));                                  // логотип ударился о «землю»
+  at(500, () => buzz("light", 12));                                  // отскок
+  at(640, () => buzz("soft", 10));                                   // второе кольцо
+  [...name].forEach((_, i) => at(T0 + i * STEP + 60, () => buzz(i === name.length - 1 ? "medium" : "light", 10)));   // буквы — по щелчку на каждую
+  at(1500, () => buzz("rigid", 18));                                 // блик
+  at(1950, () => { buzz("ok", 30); el.classList.add("out"); });      // заставка уходит — «готово»
+  at(2450, () => el.remove());
+})();
 const INIT = tg ? tg.initData : "";
 try { if (INIT) sessionStorage.setItem("dx_init", INIT); } catch (e) {}
 const START = tg && tg.initDataUnsafe ? (tg.initDataUnsafe.start_param || "") : "";
