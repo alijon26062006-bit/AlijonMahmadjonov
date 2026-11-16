@@ -65,3 +65,8 @@ def test_ping_marks_online_and_reviews_open(tc):
     assert lob["online"] >= 1 and lob["rooms"] == []
     assert tc.post("/tg/api/reviews", json={}, headers=H).json()["total"] == 0
     assert tc.post("/tg/api/catalog", json={}).status_code == 403          # без подписи Telegram — нельзя
+
+
+def test_app_demo_page_is_public_and_not_indexed(client):
+    r = client.get("/app/demo")
+    assert r.status_code == 200 and "ДЕМО" in r.text and 'name="robots" content="noindex"' in r.text

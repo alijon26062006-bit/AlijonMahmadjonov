@@ -1,0 +1,251 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"><meta name="robots" content="noindex"><meta name="theme-color" content="#0b0d14"><title>Donatix — приложение (демо)</title>{% include "_fonts.html" %}{% raw %}<style>
+
+
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0d14;--s1:#141722;--s2:#1c2030;--ln:#262b3d;--tx:#f1f3f9;--mu:#8f96ab;--ac:#6d5efc;--ac2:#8f83ff;--ok:#34d399;--warn:#fbbf24;--bad:#fb7185}
+body{width:1380px;background:#06070c;color:var(--tx);font:15px/1.4 Onest,sans-serif;padding:44px 36px 50px}
+h1{font-size:34px;font-weight:800;text-align:center}.sub{text-align:center;color:var(--mu);margin:6px 0 34px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(3,390px);gap:44px 69px;justify-content:center}
+.cap{margin-bottom:12px;font-weight:700;font-size:17px;display:flex;gap:10px;align-items:center}.cap i{font-style:normal;width:28px;height:28px;border-radius:50%;background:var(--ac);display:grid;place-items:center;font-size:14px}
+.ph{position:relative;width:390px;height:844px;border-radius:46px;background:var(--bg);overflow:hidden;box-shadow:0 0 0 10px #1a1c26,0 0 0 12px #2c3042,0 40px 80px -30px #000}
+.sb{height:50px;padding:18px 30px 0;display:flex;justify-content:space-between;font-weight:600;font-size:15px}.sb svg{height:12px}
+.isl{position:absolute;top:11px;left:50%;margin-left:-58px;width:116px;height:32px;border-radius:20px;background:#000}
+.pad{padding:6px 20px 0}
+.row{display:flex;align-items:center}.sp{justify-content:space-between}.g8{gap:8px}.g12{gap:12px}
+.mu{color:var(--mu)}.b{font-weight:700}.xb{font-weight:800}
+.ic{width:44px;height:44px;border-radius:14px;background:var(--s1);border:1px solid var(--ln);display:grid;place-items:center;flex:none}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ava{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#6d5efc,#c26bff);display:grid;place-items:center;font-weight:800;font-size:18px;flex:none}
+/* баланс */
+.bal{margin-top:16px;border-radius:26px;padding:20px;background:linear-gradient(135deg,#6d5efc 0%,#4b3fd6 60%,#3a2fb5 100%);position:relative;overflow:hidden}
+.bal:before{content:"";position:absolute;right:-60px;top:-80px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.09)}
+.bal:after{content:"";position:absolute;right:40px;bottom:-90px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06)}
+.bal .l{font-size:14px;opacity:.85;font-weight:600}.bal .s{font-size:40px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px}.bal .s small{font-size:18px;font-weight:600;opacity:.85}
+.bal .d{font-size:13px;opacity:.85}
+.bal .bt{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.bal .bt div{height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px}
+.bal .w{background:#fff;color:#3a2fb5}.bal .t{background:rgba(255,255,255,.16)}
+.h2{font-size:19px;font-weight:800;margin:20px 0 12px}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.q{text-align:center;font-size:12px;font-weight:600;color:var(--mu)}.q div{height:56px;border-radius:18px;background:var(--s1);border:1px solid var(--ln);display:grid;place-items:center;margin-bottom:6px;color:var(--ac2)}
+.games{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.gm{font-size:13px;font-weight:700;text-align:center}.cv{aspect-ratio:1;border-radius:22px;overflow:hidden;position:relative;margin-bottom:7px;display:grid;place-items:center}
+.cv img{width:100%;height:100%;object-fit:cover;display:block}.cv svg{width:52%;height:52%}
+.cv .tag{position:absolute;left:8px;top:8px;padding:2px 8px;border-radius:99px;background:rgba(0,0,0,.55);font-size:10.5px;font-weight:800;color:#ffd166}
+.c1{background:linear-gradient(140deg,#f6b12d,#b05a06)}.c2{background:linear-gradient(140deg,#2aabee,#1867c9)}.c3{background:linear-gradient(140deg,#28324a,#10151f)}.c4{background:linear-gradient(140deg,#22c58b,#0b6b52)}.c5{background:linear-gradient(140deg,#ff7a59,#b92b4b)}.c6{background:linear-gradient(140deg,#8f6bff,#3d2a9e)}.c7{background:linear-gradient(140deg,#49b6ff,#2356c7)}.c8{background:linear-gradient(140deg,#e9edf5,#9aa3b7)}
+/* нижнее меню */
+.nav{position:absolute;left:14px;right:14px;bottom:16px;height:68px;border-radius:26px;background:rgba(22,25,37,.94);border:1px solid var(--ln);display:grid;grid-template-columns:repeat(5,1fr);align-items:center;box-shadow:0 20px 40px -16px #000}
+.nav div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mu)}.nav .on{color:var(--tx)}.nav .on svg{color:var(--ac2)}
+.nav .fab{width:52px;height:52px;border-radius:18px;background:linear-gradient(135deg,#8f83ff,#5b4bf0);color:#fff;justify-content:center;margin:0 auto;box-shadow:0 10px 22px -8px #6d5efc}
+.home{position:absolute;bottom:6px;left:50%;margin-left:-66px;width:132px;height:5px;border-radius:5px;background:#fff;opacity:.5}
+/* игра */
+.hero{height:210px;position:relative}.hero img{width:100%;height:100%;object-fit:cover;display:block}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,13,20,.5),rgba(11,13,20,0) 35%,var(--bg) 100%)}
+.hero .tb{position:absolute;z-index:2;top:54px;left:20px;right:20px;display:flex;justify-content:space-between}.rb{width:40px;height:40px;border-radius:50%;background:rgba(11,13,20,.6);display:grid;place-items:center}
+.hero .ti{position:absolute;z-index:2;left:20px;bottom:6px}.hero h3{font-size:26px;font-weight:800}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;background:rgba(6,40,28,.85);color:var(--ok);font-size:12px;font-weight:700}
+.lbl{font-size:13px;font-weight:700;color:var(--mu);margin:14px 0 7px}
+.inp{height:52px;border-radius:16px;background:var(--s1);border:1.5px solid var(--ln);display:flex;align-items:center;padding:0 16px;font-size:16px;font-weight:600;justify-content:space-between}.inp.f{border-color:var(--ac)}
+.chk{display:flex;align-items:center;gap:6px;color:var(--ok);font-size:13px;font-weight:700}
+.packs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pk{border-radius:18px;background:var(--s1);border:1.5px solid var(--ln);padding:12px 14px;position:relative}.pk.on{border-color:var(--ac);background:#1b1a3a}
+.pk b{display:block;font-size:16px;font-weight:800}.pk span{font-size:14px;font-weight:700;color:var(--ac2)}.pk em{position:absolute;right:10px;top:10px;font-style:normal;font-size:10.5px;font-weight:800;color:#0b0d14;background:var(--warn);padding:1px 7px;border-radius:99px}
+.pk .ck{position:absolute;right:10px;bottom:10px;width:22px;height:22px;border-radius:50%;background:var(--ac);display:grid;place-items:center}
+.bar{position:absolute;left:0;right:0;bottom:0;padding:14px 20px 30px;background:rgba(16,18,28,.97);border-top:1px solid var(--ln);display:flex;align-items:center;gap:14px}
+.cta{height:54px;border-radius:18px;background:linear-gradient(135deg,#8f83ff,#5b4bf0);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:1;box-shadow:0 12px 26px -12px #6d5efc}
+/* списки */
+.card{border-radius:20px;background:var(--s1);border:1px solid var(--ln);padding:14px}
+.li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:var(--s1);border:1px solid var(--ln);margin-bottom:10px}
+.li .th{width:46px;height:46px;border-radius:14px;overflow:hidden;flex:none;display:grid;place-items:center}.li .th img{width:100%;height:100%;object-fit:cover}.li .th svg{width:54%;height:54%}
+.li .gr{flex:1;min-width:0}.li b{display:block;font-size:15px;font-weight:700}.li small{font-size:12.5px;color:var(--mu)}
+.st{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:99px;white-space:nowrap}.st.ok{background:rgba(52,211,153,.14);color:var(--ok)}.st.wt{background:rgba(251,191,36,.14);color:var(--warn)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--s1);border:1px solid var(--ln);border-radius:16px;padding:4px;margin:14px 0}.seg div{height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:14px;color:var(--mu)}.seg .on{background:var(--ac);color:#fff}
+.pm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pm div{border-radius:18px;background:var(--s1);border:1.5px solid var(--ln);padding:12px;display:flex;gap:10px;align-items:center;font-weight:700;font-size:14px}.pm .on{border-color:var(--ac);background:#1b1a3a}
+.pm i{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:13px;flex:none}.pm small{display:block;font-size:11.5px;color:var(--mu);font-weight:600}
+.amt{text-align:center;margin:18px 0 12px}.amt b{font-size:46px;font-weight:800;letter-spacing:-.02em}.amt span{font-size:20px;color:var(--mu);font-weight:700}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.chips div{height:42px;border-radius:13px;background:var(--s1);border:1px solid var(--ln);display:grid;place-items:center;font-weight:700}.chips .on{border-color:var(--ac);color:var(--ac2)}
+.code{margin-top:10px;border-radius:14px;background:#10131c;border:1px dashed #39405a;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-weight:700;letter-spacing:.04em}.code span{color:var(--ac2);font-size:13px;letter-spacing:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.stats div{border-radius:18px;background:var(--s1);border:1px solid var(--ln);padding:12px;text-align:center}.stats b{display:block;font-size:20px;font-weight:800}.stats small{font-size:12px;color:var(--mu)}
+.mn{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--ln);font-weight:600}.mn:last-child{border:0}.mn .mi{width:36px;height:36px;border-radius:12px;background:#1f2340;color:var(--ac2);display:grid;place-items:center;flex:none}.mn span{margin-left:auto;color:var(--mu);font-size:13.5px}
+.lvl{height:8px;border-radius:8px;background:#232842;overflow:hidden;margin-top:8px}.lvl i{display:block;height:100%;width:64%;background:linear-gradient(90deg,#6d5efc,#c26bff);border-radius:8px}
+
+html,body{height:100%}body{width:auto;padding:0;overflow:hidden;background:#06070c;display:grid;place-items:center;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#app{position:relative;width:100%;max-width:430px;height:100dvh;max-height:932px;overflow:hidden;background:var(--bg)}@media(min-width:500px){#app{border-radius:44px;box-shadow:0 0 0 10px #1a1c26,0 0 0 12px #2c3042,0 40px 80px -30px #000;height:min(844px,96dvh)}}
+.scr{position:absolute;inset:0;background:var(--bg);display:none;overflow-y:auto;scrollbar-width:none;padding-bottom:104px}.scr::-webkit-scrollbar{display:none}.scr .nav,.scr .bar,.scr .home{position:fixed}#app{transform:translateZ(0)}.isl,.sb{display:none}@media(min-width:500px){.isl,.sb{display:flex}.isl{display:block}}@media(max-width:499px){.scr>.pad:first-of-type,.scr>.sb+.pad{padding-top:calc(env(safe-area-inset-top) + 14px)}.hero .tb{top:calc(env(safe-area-inset-top) + 14px)}}.demo{position:absolute;z-index:40;top:0;left:50%;transform:translateX(-50%);padding:1px 10px 2px;border-radius:0 0 9px 9px;font-size:9.5px!important;background:rgba(251,191,36,.16);color:#fbbf24;font-size:11px;font-weight:800;letter-spacing:.06em;pointer-events:none}.scr.on{display:block;animation:in .32s cubic-bezier(.2,.8,.2,1)}.scr.back.on{animation:inb .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateX(28px)}}@keyframes inb{from{opacity:0;transform:translateX(-28px)}}
+.scr.tab.on{animation:fade .22s ease-out}@keyframes fade{from{opacity:0;transform:translateY(8px)}}
+.gm,.pk,.pm div,.chips div,.seg div,.nav div,.cta,.bal .bt div,.q,.li,.mn,.rb,.ic{cursor:pointer;transition:transform .12s}
+.gm:active,.pk:active,.cta:active,.q:active{transform:scale(.95)}
+.gm{animation:pop .4s both}@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.96)}}
+.hero .hc{width:100%;height:100%;display:grid;place-items:center}.hero .hc svg{width:34%;height:60%;opacity:.9}
+.ov{position:absolute;inset:0;background:rgba(4,5,10,.66);z-index:20;display:none;align-items:flex-end}.ov.on{display:flex;animation:fd .2s}@keyframes fd{from{opacity:0}}
+.sheet{width:100%;background:#141722;border-radius:28px 28px 0 0;border-top:1px solid var(--ln);padding:26px 20px 34px;text-align:center;animation:up .34s cubic-bezier(.2,.9,.3,1.1)}@keyframes up{from{transform:translateY(100%)}}
+.okc{width:84px;height:84px;border-radius:50%;background:rgba(52,211,153,.14);color:var(--ok);display:grid;place-items:center;margin:0 auto 14px;animation:okp .5s cubic-bezier(.3,1.5,.5,1)}@keyframes okp{from{transform:scale(.2);opacity:0}}
+.okc svg{width:44px;height:44px;stroke-width:3}.sheet h4{font-size:22px;font-weight:800}.sheet p{color:var(--mu);margin:6px 0 18px}
+.ghost{height:50px;border-radius:16px;background:var(--s2);display:grid;place-items:center;font-weight:700;margin-top:10px;cursor:pointer}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid #fff;border-right-color:transparent;animation:rot .7s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}
+.toast{position:absolute;left:20px;right:20px;top:58px;z-index:30;padding:12px 16px;border-radius:16px;background:#1d2236;border:1px solid var(--ok);font-weight:700;text-align:center;animation:fade .25s}
+.tap{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.8);pointer-events:none;z-index:99;animation:tp .45s ease-out forwards}@keyframes tp{from{transform:scale(.5);opacity:1}to{transform:scale(1.5);opacity:0}}
+.newo{animation:pop .5s both}
+#intro{position:absolute;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(90% 60% at 50% 42%,#2a1f8f,#0b0d14 70%);transition:opacity .45s,transform .45s}#intro.out{opacity:0;transform:scale(1.08);pointer-events:none}
+#intro .lg{position:relative;width:112px;height:112px;margin:0 auto 22px}#intro .lg svg{position:relative;z-index:1;width:112px;height:112px;border-radius:30px;box-shadow:0 24px 60px -14px #7c6cff;animation:idrop .62s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes idrop{0%{transform:translateY(-140px) scale(.4) rotate(-18deg);opacity:0}62%{transform:translateY(0) scale(1.12) rotate(4deg);opacity:1}80%{transform:scale(.95) rotate(-2deg)}100%{transform:none}}
+#intro .lg i{position:absolute;inset:0;border-radius:30px;border:2px solid #9a8cff;opacity:0;animation:iring 1s ease-out both}#intro .lg i:nth-child(1){animation-delay:.4s}#intro .lg i:nth-child(2){animation-delay:.62s}@keyframes iring{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(2.3)}}
+#intro .nm{display:flex;justify-content:center;font-size:36px;font-weight:900;color:#fff}#intro .nm span{opacity:0;transform:translateY(18px) scale(.6);animation:ilet .34s cubic-bezier(.3,1.6,.5,1) forwards}@keyframes ilet{to{opacity:1;transform:none}}
+#intro .sl{margin-top:8px;color:#b4b0e6;font-size:15px;font-weight:600;text-align:center;opacity:0;animation:fade .4s 1.5s forwards}
+</style></head><body><svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+<symbol id="bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+<symbol id="back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13M12 8S10 3 7.5 3 5 5.5 7.5 7 12 8 12 8s2-5 4.5-5S19 5.5 16.5 7 12 8 12 8"/></symbol>
+<symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+<symbol id="heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 15c1.6.6 2.6 2.2 3 5"/></symbol>
+<symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+<!-- обложки-символы (в приложении будут настоящие картинки каталога) -->
+<symbol id="g-aim" viewBox="0 0 24 24"><g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></g><circle cx="12" cy="12" r="1.6" fill="#fff"/></symbol>
+<symbol id="g-helm" viewBox="0 0 24 24"><path fill="#fff" d="M12 3c-4.4 0-8 3.4-8 7.8V15h3v-3.2h10V15h3v-4.2C20 6.4 16.4 3 12 3zM8 16h8v3a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="g-sword" viewBox="0 0 24 24"><path fill="#fff" d="M19.5 2.5 21 4l-9.6 10.2 1.9 1.9-1.5 1.5-1.9-1.9-3.2 3.2-1.6-1.6 3.2-3.2-1.9-1.9 1.5-1.5 1.9 1.9z"/></symbol>
+<symbol id="g-castle" viewBox="0 0 24 24"><path fill="#fff" d="M4 21V9l2-1V4h2v3l2-1V3h4v3l2 1V4h2v4l2 1v12h-6v-5a2 2 0 0 0-4 0v5z"/></symbol>
+<symbol id="g-star4" viewBox="0 0 24 24"><path fill="#fff" d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></symbol>
+<symbol id="g-cube" viewBox="0 0 24 24"><path fill="#2b3142" d="M6.5 3.5l14 3.8-3.8 14-14-3.8zM10.6 9.6l-1 3.8 3.8 1 1-3.8z" fill-rule="evenodd"/></symbol>
+</defs></svg><div id="app"><section class="scr" id="s-home"><div class="isl"></div><div class="sb"><span>9:41</span><span>5G ▰▰▰</span></div>
+<div class="pad">
+ <div class="row sp"><div class="row g12"><div class="ava">А</div><div><div class="mu" style="font-size:13px">Салом 👋</div><div class="xb" style="font-size:18px">Алиҷон</div></div></div><div class="ic"><svg class="i"><use href="#bell"/></svg></div></div>
+ <div class="bal"><div class="l">Ваш баланс</div><div class="s">314,59 <small>сомони</small></div><div class="d">≈ 28,86 $ · D-коин: 213,82</div>
+  <div class="bt"><div class="w"><svg class="i"><use href="#plus"/></svg>Пополнить</div><div class="t"><svg class="i"><use href="#clock"/></svg>История</div></div></div>
+ <div class="quick"><div class="q"><div><svg class="i"><use href="#grid"/></svg></div>Игры</div><div class="q"><div><svg class="i"><use href="#gift"/></svg></div>Подарки</div><div class="q"><div><svg class="i"><use href="#users"/></svg></div>Друзья</div><div class="q"><div><svg class="i"><use href="#chat"/></svg></div>Помощь</div></div>
+ <div class="row sp"><div class="h2">Популярное</div><div class="b" style="color:var(--ac2);font-size:14px">Все</div></div>
+ <div class="games">
+  <div class="gm"><div class="cv"><img src="/static/img/ff-cover.webp"><span class="tag">ТОП</span></div>FF СНГ</div>
+  <div class="gm"><div class="cv c1"><svg><use href="#g-helm"/></svg></div>PUBG Mobile</div>
+  <div class="gm"><div class="cv c2"><img src="/static/img/tg-stars.svg"></div>Telegram Stars</div>
+  <div class="gm"><div class="cv c4"><svg><use href="#g-aim"/></svg></div>Standoff 2</div>
+  <div class="gm"><div class="cv c3"><img src="/static/img/steam.svg"></div>Steam</div>
+  <div class="gm"><div class="cv c6"><svg><use href="#g-sword"/></svg></div>Mobile Legends</div>
+ </div>
+</div>
+<div class="nav"><div class="on"><svg class="i"><use href="#home"/></svg>Главная</div><div><svg class="i"><use href="#grid"/></svg>Каталог</div><div class="fab"><svg class="i" style="width:26px;height:26px"><use href="#plus"/></svg></div><div><svg class="i"><use href="#bag"/></svg>Заказы</div><div><svg class="i"><use href="#user"/></svg>Профиль</div></div><div class="home"></div></section><section class="scr" id="s-catalog"><div class="isl"></div><div class="sb"><span>9:41</span><span>5G ▰▰▰</span></div>
+<div class="pad"><div class="xb" style="font-size:28px;margin-top:4px">Каталог</div>
+ <div class="inp" style="margin-top:12px;justify-content:flex-start;gap:10px;color:var(--mu);font-weight:500"><svg class="i"><use href="#search"/></svg>Поиск игры или сервиса</div>
+ <div class="seg"><div class="on">Игры</div><div>Карты</div><div>Telegram</div></div>
+ <div class="games">
+  <div class="gm"><div class="cv"><img src="/static/img/ff-cover.webp"><span class="tag">ТОП</span></div>FF СНГ</div>
+  <div class="gm"><div class="cv"><img src="/static/img/ff-cover.webp" style="filter:hue-rotate(150deg)"></div>FF Инд</div>
+  <div class="gm"><div class="cv c1"><svg><use href="#g-helm"/></svg></div>PUBG Mobile</div>
+  <div class="gm"><div class="cv c4"><svg><use href="#g-aim"/></svg></div>Standoff 2</div>
+  <div class="gm"><div class="cv c5"><svg><use href="#g-castle"/></svg></div>Clash of Clans</div>
+  <div class="gm"><div class="cv c6"><svg><use href="#g-sword"/></svg></div>Mobile Legends</div>
+  <div class="gm"><div class="cv c7"><svg><use href="#g-star4"/></svg></div>Genshin Impact</div>
+  <div class="gm"><div class="cv c8"><svg><use href="#g-cube"/></svg></div>Roblox</div>
+  <div class="gm"><div class="cv c3"><img src="/static/img/steam.svg"></div>Steam</div>
+ </div></div>
+<div class="nav"><div><svg class="i"><use href="#home"/></svg>Главная</div><div class="on"><svg class="i"><use href="#grid"/></svg>Каталог</div><div class="fab"><svg class="i" style="width:26px;height:26px"><use href="#plus"/></svg></div><div><svg class="i"><use href="#bag"/></svg>Заказы</div><div><svg class="i"><use href="#user"/></svg>Профиль</div></div><div class="home"></div></section><section class="scr" id="s-game"><div class="isl"></div>
+<div class="hero"><img src="/static/img/ff-cover.webp"><div class="tb"><div class="rb"><svg class="i"><use href="#back"/></svg></div><div class="rb"><svg class="i"><use href="#heart"/></svg></div></div>
+ <div class="ti"><span class="pill">⚡ Выдача 1–5 минут</span><h3>FF СНГ</h3></div></div>
+<div class="pad" style="padding-top:0">
+ <div class="lbl">ID игрока</div><div class="inp f">1234567890<span class="chk"><svg class="i" style="width:18px;height:18px"><use href="#check"/></svg>Aliyon_TJ</span></div>
+ <div class="lbl">Выберите пакет</div>
+ <div class="packs">
+  <div class="pk"><b>💎 100</b><span>11,90 с.</span></div>
+  <div class="pk on"><b>💎 310</b><span>35,50 с.</span><em>ХИТ</em><div class="ck"><svg class="i" style="width:14px;height:14px;stroke-width:3"><use href="#check"/></svg></div></div>
+  <div class="pk"><b>💎 520</b><span>58,90 с.</span></div>
+  <div class="pk"><b>💎 1060</b><span>117,00 с.</span></div>
+  <div class="pk"><b>🎫 Недельный</b><span>22,40 с.</span></div>
+  <div class="pk"><b>🎫 Месячный</b><span>109,00 с.</span></div>
+ </div></div>
+<div class="bar"><div><div class="mu" style="font-size:12.5px">К оплате</div><div class="xb" style="font-size:22px">35,50 с.</div></div><div class="cta">Купить</div></div><div class="home"></div></section><section class="scr" id="s-topup"><div class="isl"></div><div class="sb"><span>9:41</span><span>5G ▰▰▰</span></div>
+<div class="pad"><div class="row g12" style="margin-top:4px"><div class="ic" style="width:40px;height:40px;border-radius:50%"><svg class="i"><use href="#back"/></svg></div><div class="xb" style="font-size:22px">Пополнить баланс</div></div>
+ <div class="amt"><b>100</b> <span>сомони</span></div>
+ <div class="chips"><div>20</div><div>50</div><div class="on">100</div><div>200</div></div>
+ <div class="lbl" style="margin-top:20px">Способ оплаты</div>
+ <div class="pm">
+  <div class="on"><i style="background:#16a34a">A</i><span>Алиф Моби<small>⚡ авто</small></span></div>
+  <div><i style="background:#2563eb">DC</i><span>Душанбе Сити<small>⚡ авто</small></span></div>
+  <div><i style="background:#f59e0b">Э</i><span>Эсхата<small>по чеку</small></span></div>
+  <div><i style="background:#0d9488">₮</i><span>USDT<small>TRC20 · авто</small></span></div>
+ </div>
+ <div class="card" style="margin-top:16px;display:flex;gap:12px;align-items:center"><div class="mn" style="padding:0;border:0"><div class="mi"><svg class="i"><use href="#shield"/></svg></div></div><div style="font-size:13.5px"><b>Без комиссии.</b> <span class="mu">Деньги придут на баланс сразу после оплаты.</span></div></div>
+</div>
+<div class="bar"><div class="cta">Оплатить 100 сомони</div></div><div class="home"></div></section><section class="scr" id="s-orders"><div class="isl"></div><div class="sb"><span>9:41</span><span>5G ▰▰▰</span></div>
+<div class="pad"><div class="xb" style="font-size:28px;margin-top:4px">Заказы</div>
+ <div class="seg"><div class="on">Все</div><div>В работе</div><div>Готовые</div></div>
+ <div class="card" style="margin-bottom:10px"><div class="row g12"><div class="li" style="padding:0;border:0;margin:0;background:none;flex:1"><div class="th c3"><img src="/static/img/steam.svg"></div><div class="gr"><b>Steam — карта 5 $</b><small>Вчера, 19:40</small></div><div style="text-align:right"><div class="b">57,80 с.</div><span class="st ok">Готово</span></div></div></div>
+  <div class="code">XK4P-7QW2-M9TZ<span class="row g8"><svg class="i" style="width:16px;height:16px"><use href="#copy"/></svg>Копировать</span></div></div>
+ <div class="li"><div class="th c2"><img src="/static/img/tg-stars.svg"></div><div class="gr"><b>Telegram Stars — 100</b><small>12 ноября · @aliyon</small></div><div style="text-align:right"><div class="b">18,10 с.</div><span class="st ok">Готово</span></div></div>
+ <div class="li"><div class="th c1"><svg><use href="#g-helm"/></svg></div><div class="gr"><b>PUBG Mobile — 60 UC</b><small>9 ноября · ID 5129908812</small></div><div style="text-align:right"><div class="b">11,66 с.</div><span class="st ok">Готово</span></div></div>
+ <div class="li"><div class="th"><img src="/static/img/ff-cover.webp"></div><div class="gr"><b>FF СНГ — 💎 100</b><small>3 ноября · ID 1234567890</small></div><div style="text-align:right"><div class="b">11,90 с.</div><span class="st ok">Готово</span></div></div>
+</div>
+<div class="nav"><div><svg class="i"><use href="#home"/></svg>Главная</div><div><svg class="i"><use href="#grid"/></svg>Каталог</div><div class="fab"><svg class="i" style="width:26px;height:26px"><use href="#plus"/></svg></div><div class="on"><svg class="i"><use href="#bag"/></svg>Заказы</div><div><svg class="i"><use href="#user"/></svg>Профиль</div></div><div class="home"></div></section><section class="scr" id="s-profile"><div class="isl"></div><div class="sb"><span>9:41</span><span>5G ▰▰▰</span></div>
+<div class="pad">
+ <div class="card" style="margin-top:6px"><div class="row g12"><div class="ava" style="width:60px;height:60px;font-size:24px">А</div><div style="flex:1"><div class="xb" style="font-size:20px">Алиҷон</div><div class="mu" style="font-size:13px">ID 900001 · с марта 2025</div></div><span class="st" style="background:rgba(109,94,252,.18);color:var(--ac2)">Silver</span></div>
+  <div class="row sp" style="margin-top:12px;font-size:12.5px"><span class="mu">До уровня Gold</span><span class="b">64%</span></div><div class="lvl"><i></i></div></div>
+ <div class="stats"><div><b>17</b><small>заказов</small></div><div><b>520 с.</b><small>потрачено</small></div><div><b>3</b><small>друга</small></div></div>
+ <div class="card" style="padding:2px 0">
+  <div class="mn"><div class="mi"><svg class="i"><use href="#user"/></svg></div>Мои игровые ID<span>FF, PUBG</span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+  <div class="mn"><div class="mi"><svg class="i"><use href="#users"/></svg></div>Пригласить друзей<span>10%</span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+  <div class="mn"><div class="mi"><svg class="i"><use href="#bell"/></svg></div>Уведомления<span>Вкл</span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+  <div class="mn"><div class="mi"><svg class="i"><use href="#globe"/></svg></div>Язык<span>Тоҷикӣ</span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+  <div class="mn"><div class="mi"><svg class="i"><use href="#shield"/></svg></div>Безопасность<span></span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+  <div class="mn"><div class="mi"><svg class="i"><use href="#chat"/></svg></div>Поддержка<span>24/7</span><svg class="i mu" style="width:18px;height:18px;margin-left:6px"><use href="#chev"/></svg></div>
+ </div>
+</div>
+<div class="nav"><div><svg class="i"><use href="#home"/></svg>Главная</div><div><svg class="i"><use href="#grid"/></svg>Каталог</div><div class="fab"><svg class="i" style="width:26px;height:26px"><use href="#plus"/></svg></div><div><svg class="i"><use href="#bag"/></svg>Заказы</div><div class="on"><svg class="i"><use href="#user"/></svg>Профиль</div></div><div class="home"></div></section><div class="demo">ДЕМО</div><div id="intro"><div><div class="lg"><i></i><i></i><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#5b47f5"/><path d="M10 8.5h6a7.5 7.5 0 0 1 0 15h-6Z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg></div><div class="nm" id="intro-nm"></div><div class="sl">Алмазы · UC · Stars · Steam</div></div></div><div class="ov" id="ov"><div class="sheet" id="sheet"></div></div></div>
+<script>
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+let cur="home",prev="home",bal=314.59;const TABS=["home","catalog","topup","orders","profile"];
+const fmt=v=>v.toFixed(2).replace(".",",");
+function go(id,back){const t=$("#s-"+id);$$(".scr").forEach(s=>s.classList.remove("on","back","tab"));if(TABS.includes(id)&&TABS.includes(cur)&&id!=="topup")t.classList.add("tab");if(back)t.classList.add("back");void t.offsetWidth;t.classList.add("on");prev=cur;cur=id;}
+function balUI(anim){const el=$("#s-home .bal .s");const from=parseFloat(el.dataset.v||bal),to=bal;el.dataset.v=to;const t0=performance.now();(function st(n){const k=Math.min(1,(n-t0)/(anim?900:1)),e=1-Math.pow(1-k,3);el.innerHTML=fmt(from+(to-from)*e)+" <small>сомони</small>";if(k<1)requestAnimationFrame(st)})(t0);$("#s-home .bal .d").textContent="≈ "+fmt(bal/10.9)+" $ · D-коин: 213,82";}
+function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;$("#app").appendChild(e);setTimeout(()=>e.remove(),1800)}
+function sheet(h){$("#sheet").innerHTML=h;$("#ov").classList.add("on")}function closeSheet(){$("#ov").classList.remove("on")}
+document.addEventListener("pointerdown",e=>{const d=document.createElement("div");d.className="tap";d.style.left=e.clientX+"px";d.style.top=e.clientY+"px";try{navigator.vibrate&&navigator.vibrate(8)}catch(x){};document.body.appendChild(d);setTimeout(()=>d.remove(),460)});
+// нижнее меню
+$$(".nav").forEach(n=>[...n.children].forEach((c,i)=>c.onclick=()=>go(TABS[i])));
+// главная
+$("#s-home .bal .w").onclick=()=>go("topup");$("#s-home .bal .t").onclick=()=>go("orders");
+$$("#s-home .q")[0].onclick=()=>go("catalog");$$("#s-home .q")[2].onclick=()=>go("profile");$$("#s-home .q")[3].onclick=()=>toast("Поддержка ответит в чате за пару минут");
+$("#s-home .h2").nextElementSibling.onclick=()=>go("catalog");
+// игра
+let G={name:"FF СНГ",price:35.5,pack:"💎 310",cover:""};
+function openGame(tile){G.name=tile.textContent.trim().replace("ТОП","").trim();const cv=tile.querySelector(".cv");G.cover=cv.outerHTML;const h=$("#s-game .hero");h.querySelector("img,.hc")?.remove();
+  const img=cv.querySelector("img");let el;if(img&&cv.classList.length===1){el=img.cloneNode();}else{el=document.createElement("div");el.className="hc "+[...cv.classList].filter(c=>c!=="cv").join(" ");el.innerHTML=cv.innerHTML.replace(/<span class="tag">.*?<\/span>/,"");}
+  h.prepend(el);$("#s-game h3").textContent=G.name;const uc=/PUBG/.test(G.name),st=/Stars|Steam/.test(G.name);
+  $$("#s-game .pk b").forEach((b,i)=>{const n=["100","310","520","1060"][i];if(i<4)b.textContent=(uc?"🪙 ":st?"⭐ ":"💎 ")+n});G.pack=$("#s-game .pk.on b").textContent;go("game")}
+$$("#s-home .gm,#s-catalog .gm").forEach(t=>t.onclick=()=>openGame(t));
+$("#s-game .rb").onclick=()=>go(prev==="game"?"home":prev,true);
+$$("#s-game .pk").forEach(p=>p.onclick=()=>{$$("#s-game .pk").forEach(x=>{x.classList.remove("on");x.querySelector(".ck")?.remove()});p.classList.add("on");p.insertAdjacentHTML("beforeend",'<div class="ck"><svg class="i" style="width:14px;height:14px;stroke-width:3"><use href="#check"/></svg></div>');
+  G.pack=p.querySelector("b").textContent;G.price=parseFloat(p.querySelector("span").textContent.replace(",","."));$("#s-game .bar .xb").textContent=fmt(G.price)+" с."});
+$("#s-game .cta").onclick=function(){const b=this;if(b.dataset.busy)return;b.dataset.busy=1;b.innerHTML='<div class="spin"></div>';setTimeout(()=>{b.textContent="Купить";delete b.dataset.busy;bal-=G.price;balUI();
+  const li=document.createElement("div");li.className="li newo";li.innerHTML='<div class="th">'+G.cover.replace(/<span class="tag">.*?<\/span>/,"").replace('class="cv','style="width:46px;height:46px;border-radius:14px;margin:0" class="cv')+'</div><div class="gr"><b>'+G.name+" — "+G.pack+'</b><small>Только что · ID 1234567890</small></div><div style="text-align:right"><div class="b">'+fmt(G.price)+' с.</div><span class="st wt">Выполняется</span></div>';
+  $("#s-orders .seg").after(li);setTimeout(()=>{const s=li.querySelector(".st");s.className="st ok";s.textContent="Готово"},7000);
+  sheet('<div class="okc"><svg class="i"><use href="#check"/></svg></div><h4>Заказ принят</h4><p>'+G.name+" · "+G.pack+'<br>Придёт на аккаунт за 1–5 минут</p><div class="cta" id="toOrd">Мои заказы</div><div class="ghost" id="toHome">На главную</div>');
+  $("#toOrd").onclick=()=>{closeSheet();go("orders")};$("#toHome").onclick=()=>{closeSheet();go("home")}},1100)};
+// каталог и заказы: вкладки
+$$(".seg").forEach(s=>[...s.children].forEach(c=>c.onclick=()=>{[...s.children].forEach(x=>x.classList.remove("on"));c.classList.add("on");
+  if(s.closest("#s-orders")){const m=c.textContent;$$("#s-orders .li, #s-orders .pad>.card").forEach(l=>{const ok=!!l.querySelector(".st.ok");l.style.display=m==="Все"||(m==="Готовые"&&ok)||(m==="В работе"&&!ok)?"":"none"})}}));
+$("#s-orders .code span").onclick=()=>toast("Код скопирован ✓");
+// пополнение
+let amt=100;const setAmt=v=>{amt=v;$("#s-topup .amt b").textContent=v;$("#s-topup .cta").textContent="Оплатить "+v+" сомони"};
+$$("#s-topup .chips div").forEach(c=>c.onclick=()=>{$$("#s-topup .chips div").forEach(x=>x.classList.remove("on"));c.classList.add("on");setAmt(+c.textContent)});
+$$("#s-topup .pm>div").forEach(c=>c.onclick=()=>{$$("#s-topup .pm>div").forEach(x=>x.classList.remove("on"));c.classList.add("on")});
+$("#s-topup .ic").onclick=()=>go("home",true);
+$("#s-topup .cta").onclick=function(){const b=this;if(b.dataset.busy)return;b.dataset.busy=1;b.innerHTML='<div class="spin"></div>&nbsp;&nbsp;Ждём оплату…';setTimeout(()=>{delete b.dataset.busy;setAmt(amt);
+  sheet('<div class="okc"><svg class="i"><use href="#check"/></svg></div><h4>Баланс пополнен</h4><p>+'+amt+' сомони уже на балансе</p><div class="cta" id="okTop">Отлично</div>');
+  $("#okTop").onclick=()=>{closeSheet();go("home",true);bal+=amt;balUI(true)}},1800)};
+$$("#s-profile .mn")[1].onclick=()=>toast("Ссылка для друга скопирована ✓");
+$("#s-home .bal .s").dataset.v=bal;go("home");
+(function(){const el=$("#intro"),nm="Donatix",vb=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(x){}};
+ $("#intro-nm").innerHTML=[...nm].map((c,i)=>'<span style="animation-delay:'+(780+i*85)+'ms">'+c+"</span>").join("");
+ setTimeout(()=>vb(45),385);setTimeout(()=>vb(12),500);[...nm].forEach((_,i)=>setTimeout(()=>vb(10),840+i*85));setTimeout(()=>{vb(30);el.classList.add("out")},1950);setTimeout(()=>el.remove(),2450)})();
+</script>{% endraw %}</body></html>

@@ -247,6 +247,13 @@ def service_worker():
                     headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
 
 
+@router.get("/app/demo")
+def app_demo(request: Request):
+    """Демо будущего приложения: экраны и переходы работают, данные примерные, покупок и оплат нет."""
+    from .deps import templates
+    return templates.TemplateResponse(request, "app_demo.html", {}, headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/offline")
 def offline_page(request: Request):
     return render(request, "offline.html", {"user": None, "noindex": True})
