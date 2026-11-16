@@ -70,3 +70,19 @@ def test_ping_marks_online_and_reviews_open(tc):
 def test_app_demo_page_is_public_and_not_indexed(client):
     r = client.get("/app/demo")
     assert r.status_code == 200 and "ДЕМО" in r.text and 'name="robots" content="noindex"' in r.text
+
+
+def test_site_app_uses_site_login_and_needs_session_token(client, conn):
+    """Приложение сайта /app: те же данные, что в мини-приложении, но по входу на сайте и токену этой сессии."""
+    from conftest import csrf_of, make_client, web_login
+    assert client.get("/app", follow_redirects=False).headers["location"] == "/login"      # без входа — на вход
+    uid = make_client(conn, login="appuser")[0]
+    web_login(client, "appuser@example.com", "password123")
+    page = client.get("/app")
+    assert page.status_code == 200 and "Donatix" in page.text
+    assert client.post("/tg/api/init", json={}).status_code == 403                          # вход есть, токена нет — нельзя
+    assert client.post("/tg/api/init", json={}, headers={"X-Dx-App": "wrong"}).status_code == 403
+    token = csrf_of(client.get("/panel/balance").text)
+    d = client.post("/tg/api/init", json={}, headers={"X-Dx-App": token}).json()
+    assert d["me"]["id"] == uid and d["me"]["name"] == "appuser" and d["gifts"] == []
+    assert client.post("/tg/api/catalog", json={}, headers={"X-Dx-App": token}).json()["games"]

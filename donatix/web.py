@@ -65,7 +65,7 @@ def viewer(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
 def _safe_next(url: str) -> str:
     """Куда вернуть после входа/регистрации: только свои страницы кабинета."""
     url = (url or "").strip()
-    return url if url.startswith("/panel") and not url.startswith("//") and len(url) < 500 else ""
+    return url if (url.startswith("/panel") or url == "/app") and not url.startswith("//") and len(url) < 500 else ""
 
 
 # ── Публичные страницы ───────────────────────────────────────
@@ -245,6 +245,18 @@ self.addEventListener("notificationclick", e => {
 def service_worker():
     return Response(SERVICE_WORKER, media_type="text/javascript",
                     headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+@router.get("/app")
+def app_page(request: Request, conn=Depends(get_conn)):
+    """Приложение Donatix: баланс, каталог, покупка, пополнение, заказы — одна страница для телефона."""
+    user = session_user(request, conn)
+    if user is None:
+        request.session["next"] = "/app"
+        return _redirect("/login")
+    if user["role"] == "admin":
+        return _redirect("/admin")
+    return render(request, "app.html", {"user": user, "noindex": True})
 
 
 @router.get("/app/demo")

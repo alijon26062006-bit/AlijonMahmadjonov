@@ -8,6 +8,7 @@ Stars и Premium — обычные заказы каталога (source='tgapp
 from __future__ import annotations
 
 import re
+import secrets
 import uuid
 from typing import Any
 
@@ -28,7 +29,17 @@ USERNAME_RE = re.compile(r"^@?[A-Za-z][A-Za-z0-9_]{3,31}$")
 
 
 def _tg(request: Request, config: Config) -> dict[str, Any] | None:
-    return check_init(request.headers.get("x-tg-init", ""), config.gift_bot_token)
+    """Кто зовёт: мини-приложение (подпись Telegram) или приложение сайта /app (вход на сайте).
+
+    Для входа на сайте нужен заголовок X-Dx-App с токеном формы этой сессии: чужой сайт его не знает и
+    прислать не может, поэтому подделать запрос от имени клиента нельзя."""
+    tg = check_init(request.headers.get("x-tg-init", ""), config.gift_bot_token)
+    if tg:
+        return tg
+    token, expected = request.headers.get("x-dx-app", ""), request.session.get("csrf", "")
+    if token and expected and secrets.compare_digest(token, expected) and request.session.get("user_id"):
+        return {"id": 0, "site": True, "_req": request, "first_name": "", "language_code": "ru"}
+    return None
 
 
 def _deny() -> JSONResponse:
@@ -36,7 +47,15 @@ def _deny() -> JSONResponse:
 
 
 def _account(conn, tg: dict[str, Any], start: str = ""):
-    """Аккаунт Donatix этого Telegram (тот же, что в боте-магазине)."""
+    """Аккаунт Donatix этого Telegram (тот же, что в боте-магазине) или вошедший на сайте клиент."""
+    if tg.get("site"):
+        from fastapi import HTTPException
+
+        from .deps import session_user
+        user = session_user(tg["_req"], conn)
+        if user is None or user["role"] == "admin":
+            raise HTTPException(status_code=403, detail="Войдите в аккаунт.")
+        return user
     from .shopbot import ensure_user
     su = ensure_user(conn, int(tg["id"]), tg.get("first_name") or "", start, username=tg.get("username") or "")
     tggifts.remember_user(conn, tg)
@@ -44,6 +63,16 @@ def _account(conn, tg: dict[str, Any], start: str = ""):
         from . import referrals
         referrals.attach(conn, su["user_id"], start[2:])
     return accounts.get_user(conn, su["user_id"])
+
+
+def _refund_needed(conn, user) -> bool:
+    from . import refunds
+    return bool(refunds.needed(conn, user))
+
+
+def _watch(conn, kind: str, obj_id: int, tg: dict[str, Any]) -> None:
+    if not tg.get("site"):        # клиенту сайта о заказе и оплате сообщают уведомления сайта
+        tgnotify.add(conn, kind, obj_id, tg)
 
 
 def _rate(conn, config: Config) -> str:
@@ -154,13 +183,15 @@ async def api_init(request: Request, conn=Depends(get_conn), config: Config = De
     from . import referrals
     bot = db.get_setting(conn, "gifts.bot_username") or ""
     return {
-        "me": {"id": tg["id"], "name": tg.get("first_name") or "", "username": tg.get("username") or "",
+        "me": {"id": user["id"] if tg.get("site") else tg["id"], "name": tg.get("first_name") or user["login"] or "",
+               "username": tg.get("username") or "",
                "photo": tg.get("photo_url") or "", "balance": user["balance_micro"]},
         "stats": _stats(conn, user["id"]),
         "rate": _rate(conn, config),
         "stars": _stars(conn, config, user),
         "premium": _premium(conn, config, user),
-        "gifts": tggifts.listing(conn, config, user) if tggifts.enabled(config) else [],
+        "gifts": tggifts.listing(conn, config, user) if tggifts.enabled(config) and not tg.get("site") else [],
+        "refund_needed": bool(tg.get("site")) and _refund_needed(conn, user),
         "feed": _feed(conn, tgnotify.lang_of(tg)),
         "ref": {"percent": referrals.percent(conn), "invited": referrals.stats(conn, user["id"])["invited"],
                 "link": f"https://t.me/{bot}?start=r_{referrals.code_for(conn, user['id'])}" if bot else ""},
@@ -272,7 +303,7 @@ async def api_order(request: Request, conn=Depends(get_conn), config: Config = D
             except orders.OrderError as exc2:
                 return {"ok": False, "error": str(exc2)}
         return {"ok": False, "error": str(exc)}
-    tgnotify.add(conn, "order", order["id"], tg)
+    _watch(conn, "order", order["id"], tg)
     return {"ok": True, "ref": order["public_id"], "balance": accounts.get_user(conn, user["id"])["balance_micro"],
             "message": f"✅ Фармоиш № {order['public_id']} қабул шуд. / Заказ № {order['public_id']} принят."}
 
@@ -413,7 +444,7 @@ async def api_buy(request: Request, conn=Depends(get_conn), config: Config = Dep
             total = orders.quote(config, user, p, qty)["total_micro"]
             return _need(user, total)
         return {"ok": False, "error": str(exc)}
-    tgnotify.add(conn, "order", order["id"], tg)
+    _watch(conn, "order", order["id"], tg)
     return {"ok": True, "message": f"✅ Фармоиш № {order['public_id']} қабул шуд — дар 1–5 дақиқа мерасад. "
                                    f"/ Заказ № {order['public_id']} принят.",
             "order": order["public_id"], "balance": accounts.get_user(conn, user["id"])["balance_micro"]}
@@ -434,7 +465,7 @@ def _buy_gift(conn, config: Config, user, tg: dict[str, Any], body: dict, to_fri
             g = conn.execute("SELECT star_count FROM tg_gifts WHERE id = ?", (gift_id,)).fetchone()
             return _need(user, tggifts.price_micro(conn, config, user, g["star_count"]) if g else 0)
         return {"ok": False, "error": str(exc)}
-    tgnotify.add(conn, "gift", o["id"], tg)
+    _watch(conn, "gift", o["id"], tg)
     bot = db.get_setting(conn, "gifts.bot_username") or ""
     out = {"ok": True, "balance": accounts.get_user(conn, user["id"])["balance_micro"], "ref": refs.ref("gift", o["id"])}
     if o["status"] == "awaiting_recipient":
@@ -521,7 +552,7 @@ async def api_topup(request: Request, conn=Depends(get_conn), config: Config = D
         payments.start_auto(conn, config, pid)
     except payments.PaymentError as exc:
         return {"ok": False, "error": str(exc)}
-    tgnotify.add(conn, "pay", pid, tg)
+    _watch(conn, "pay", pid, tg)
     row = conn.execute("SELECT auto_kind FROM payments WHERE id = ?", (pid,)).fetchone()
     if not row["auto_kind"]:
         send_receipt(conn, config, pid)
