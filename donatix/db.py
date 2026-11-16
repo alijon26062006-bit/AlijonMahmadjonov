@@ -776,7 +776,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS bank_notices_code ON bank_notices(op_code) WHE
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS logins_sid ON logins(sid) WHERE sid IS NOT NULL")
         from . import giveaway, refunds
         refunds.init(conn)
-        giveaway.init(conn)   # розыгрыш по промокодам   # карты для возврата остатка, если проект закроется
+        giveaway.init(conn)   # розыгрыш по промокодам
+        from . import race
+        race.init(conn)       # гонка в мини-приложении   # карты для возврата остатка, если проект закроется
         conn.execute("PRAGMA optimize")   # статистика для планировщика запросов — чтобы брал индексы
     finally:
         conn.close()

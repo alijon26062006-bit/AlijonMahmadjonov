@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Пойга — {{ site_name }}</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+{% include "_fonts.html" %}
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+html, body { height: 100%; overflow: hidden; background: #07061a; color: #fff; font-family: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 700; touch-action: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.ui { position: fixed; left: 0; right: 0; z-index: 5; padding: 0 16px; }
+.hide { display: none !important; }
+.chip { padding: 8px 12px; border-radius: 14px; background: rgba(10,8,30,.62); border: 1px solid rgba(255,255,255,.14); font-weight: 800; font-size: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+/* гараж */
+#g-top { top: calc(env(safe-area-inset-top) + 12px); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#g-top a { color: #b9b4ee; text-decoration: none; font-size: 14px; }
+.coin { background: linear-gradient(135deg,#ffd23d,#ff9d1f); color: #2a1500; border: 0; }
+#g-title { top: calc(env(safe-area-inset-top) + 64px); text-align: center; }
+#g-title b { display: block; font-size: 30px; font-weight: 900; letter-spacing: .03em; }
+#g-sub { font-size: 12.5px; color: #b4b0e6; font-weight: 600; }
+#g-bottom { bottom: calc(env(safe-area-inset-bottom) + 18px); }
+#g-name { text-align: center; font-size: 19px; font-weight: 900; }
+#g-on { text-align: center; margin: 6px 0 10px; font-size: 12.5px; color: #7df0b0; }
+#colors { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; }
+#colors::-webkit-scrollbar { display: none; }
+.sw { flex: none; width: 62px; padding: 6px 4px 5px; border-radius: 14px; background: rgba(255,255,255,.07); border: 1.5px solid rgba(255,255,255,.1); text-align: center; font-size: 10.5px; font-weight: 700; }
+.sw i { display: block; width: 30px; height: 30px; border-radius: 30px; margin: 0 auto 4px; border: 2px solid rgba(255,255,255,.5); }
+.sw.on { border-color: #8b7bff; background: rgba(139,123,255,.24); }
+.two { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; }
+.btn { height: 66px; border-radius: 20px; display: grid; place-items: center; text-align: center; font-size: 17px; font-weight: 900; border: 0; color: #fff; font-family: inherit; }
+.btn small { display: block; font-size: 11px; font-weight: 600; opacity: .85; }
+.btn.a { background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.16); }
+.btn.b { background: linear-gradient(135deg,#3ddc84,#12b981); color: #05240f; box-shadow: 0 16px 34px -14px #12b981; }
+.btn:active { transform: scale(.97); }
+/* заезд */
+#r-top { top: calc(env(safe-area-inset-top) + 12px); display: flex; justify-content: space-between; align-items: center; }
+#pos { font-size: 30px; font-weight: 900; text-shadow: 0 4px 18px #000; } #pos i { font-style: normal; font-size: 13px; opacity: .7; }
+#bar { top: calc(env(safe-area-inset-top) + 62px); }
+#bar div { position: relative; height: 6px; border-radius: 6px; background: rgba(255,255,255,.14); }
+#bar i { position: absolute; top: -4px; width: 14px; height: 14px; border-radius: 14px; margin-left: -7px; border: 2px solid #07061a; }
+#msg { top: 34%; text-align: center; font-size: 54px; font-weight: 900; text-shadow: 0 6px 30px #000; pointer-events: none; }
+#msg small { display: block; font-size: 15px; font-weight: 700; color: #cfcaff; }
+#hit { z-index: 8; top: 22%; text-align: center; font-size: 17px; font-weight: 900; color: #ffb23d; pointer-events: none; opacity: 0; transition: opacity .2s; text-shadow: 0 3px 14px #000; }
+#ctl { bottom: calc(env(safe-area-inset-bottom) + 16px); display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 10px; }
+#ctl .btn { height: 78px; font-size: 26px; background: rgba(10,8,30,.55); border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#ctl #nitro { background: linear-gradient(135deg,#ff8a3d,#ff3d7f); border: 0; font-size: 15px; box-shadow: 0 16px 34px -12px #ff5d5d; }
+#ctl #nitro.off { filter: grayscale(1) brightness(.6); }
+/* итог */
+#res { inset: 0; display: grid; place-items: center; background: rgba(7,6,26,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 9; padding: 24px; }
+#res .card { width: 100%; max-width: 340px; border-radius: 28px; padding: 26px 22px; text-align: center; background: linear-gradient(160deg,#2a1f8f,#151238); border: 1px solid rgba(255,255,255,.14); }
+#res h2 { font-size: 46px; font-weight: 900; } #res p { color: #cfcaff; font-size: 14px; font-weight: 600; margin: 6px 0 18px; }
+#res .won { font-size: 22px; font-weight: 900; color: #ffd23d; margin-bottom: 18px; }
+#load { inset: 0; display: grid; place-items: center; z-index: 20; background: #07061a; text-align: center; font-size: 15px; color: #b4b0e6; }
+#load b { display: block; font-size: 34px; color: #fff; font-weight: 900; margin-bottom: 8px; }
+</style>
+<script type="importmap">{"imports": {"three": "/static/race/three/build/three.module.js", "three/addons/": "/static/race/three/examples/jsm/"}}</script>
+</head><body>
+<div class="ui" id="load"><div><b>🏁</b><span id="load-t">Боркунӣ… / Загрузка…</span></div></div>
+
+<div id="garage" class="hide">
+  <div class="ui" id="g-top"><a href="/tg" id="back">‹ <span data-t="shop">Мағоза</span></a><div style="display:flex;gap:8px"><div class="chip" id="g-wins">🏆 0</div><div class="chip coin" id="g-coins">🪙 0</div></div></div>
+  <div class="ui" id="g-title"><b>🏁 <span data-t="race">ПОЙГА</span></b><span id="g-sub"></span></div>
+  <div class="ui" id="g-bottom">
+    <div id="g-name">Donatix GT</div>
+    <div id="g-on"></div>
+    <div id="colors"></div>
+    <div class="two"><button class="btn a" id="b-top"><span>🏆 <span data-t="top">Беҳтаринҳо</span><small id="g-day"></small></span></button>
+      <button class="btn b" id="b-start"><span><span data-t="start">СТАРТ</span><small data-t="find">рақиб ёфтан</small></span></button></div>
+  </div>
+</div>
+
+<div id="hud" class="hide">
+  <div class="ui" id="r-top"><div id="pos">1 <i>/ 6</i></div><div class="chip" id="time" style="color:#ff8a3d">0:00</div><div class="chip" id="spd">0 км/с</div></div>
+  <div class="ui" id="bar"><div id="bar-in"></div></div>
+  <div class="ui" id="ctl"><button class="btn" id="left">‹</button><button class="btn" id="nitro"><span style="white-space:nowrap">🚀 НИТРО ×<span id="nn">3</span></span></button><button class="btn" id="right">›</button></div>
+</div>
+<div class="ui hide" id="msg"></div>
+<div class="ui" id="hit"></div>
+<div class="ui hide" id="res"><div class="card"><h2 id="res-place"></h2><p id="res-sub"></p><div class="won" id="res-won"></div>
+  <div class="two"><button class="btn a" id="res-garage"><span data-t="garage">Гараж</span></button><button class="btn b" id="res-again"><span data-t="again">БОЗ</span></button></div></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {} }
+let INIT = (tg && tg.initData) || '';
+try { if (INIT) sessionStorage.setItem('dx_init', INIT); else INIT = sessionStorage.getItem('dx_init') || ''; } catch (e) {}
+const RU = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || '').startsWith('ru');
+const TX = {shop: ['Мағоза', 'Магазин'], race: ['ПОЙГА', 'ГОНКА'], top: ['Беҳтаринҳо', 'Топ'], start: ['СТАРТ', 'СТАРТ'], find: ['рақиб ёфтан', 'найти соперников'],
+  garage: ['Гараж', 'Гараж'], again: ['БОЗ', 'ЕЩЁ'], online: ['онлайн', 'в сети'], sub: ['то 6 мошин · ҷои 1 = +{a} 🪙', 'до 6 машин · 1 место = +{a} 🪙'],
+  day: ['имрӯз боз {a} 🪙', 'сегодня ещё {a} 🪙'], wait: ['Ҷустуҷӯи рақибон', 'Ищем соперников'], go: ['РАФТЕМ!', 'ПОЕХАЛИ!'], bot: ['Бот', 'Бот'], you: ['Шумо', 'Вы'],
+  crash: ['Монеа! −суръат', 'Препятствие! −скорость'], bump: ['Задед! −суръат', 'Врезались! −скорость'], place: ['ҷой', 'место'], won: ['+{a} 🪙', '+{a} 🪙'], nowon: ['Лимити рӯз тамом', 'Лимит на сегодня исчерпан'],
+  need: ['Аз Telegram-бот кушоед', 'Откройте из Telegram-бота'], buy: ['Харидан?', 'Купить?'], few: ['Танга кам аст', 'Не хватает монет'], fin: ['Марра!', 'Финиш!'], km: ['км/с', 'км/ч']};
+const t = (k, a) => TX[k][RU ? 1 : 0].replace('{a}', a);
+document.querySelectorAll('[data-t]').forEach(e => { e.textContent = t(e.dataset.t); });
+const $ = id => document.getElementById(id);
+async function api(path, body) {
+  const r = await fetch('/tg/api/race/' + path, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init': INIT}, body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({error: 'net'}));
+  if (!r.ok) throw new Error(j.error || 'error');
+  return j;
+}
+const haptic = k => { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(k); } catch (e) {} };
+
+/* ── одинаковый для всех «случай» из зерна комнаты (та же формула на сервере) ── */
+function rnd(seed, i) {
+  let x = (seed ^ (i * 374761393)) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+const LANES = [-4.3, 0, 4.3];
+let CFG = {track: 2400, vmax: 52, vnitro: 78, max_cars: 6};
+const botV = (seed, i) => 41 + rnd(seed, i) * 7.5;
+const botZ = (v, tt) => tt <= 0 ? 0 : tt < 3 ? v * tt * tt / 6 : v * (tt - 1.5);
+
+/* ── сцена ── */
+const R = new THREE.WebGLRenderer({antialias: true, powerPreference: 'high-performance'});
+R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); document.body.prepend(R.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x07061a); scene.fog = new THREE.Fog(0x0b0930, 40, 170);
+const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
+function resize() { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3560, 3.0)); scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(6, 12, 8); scene.add(sun);
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({color: c, metalness: .5, roughness: .4, ...o});
+const world = new THREE.Group(); scene.add(world);       // трасса и город (видны в заезде)
+const stage = new THREE.Group(); scene.add(stage);       // платформа гаража
+
+{ // дорога, обочины, город
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(13, 420), M(0x14122e, {metalness: .2, roughness: .75})); road.rotation.x = -Math.PI / 2; road.position.z = -160; world.add(road);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), M(0x08071c, {roughness: 1, metalness: 0})); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -.05, -160); world.add(ground);
+  for (const [x, c] of [[-6.4, 0x8b7bff], [6.4, 0xff3d7f]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(.18, .18, 420), new THREE.MeshBasicMaterial({color: c})); e.position.set(x, .12, -160); world.add(e); }
+}
+const dashes = [], blocks = [];
+{ const dm = new THREE.MeshBasicMaterial({color: 0xbdb6ff}), dg = new THREE.PlaneGeometry(.14, 4);
+  for (let i = 0; i < 32; i++) for (const x of [-2.15, 2.15]) { const d = new THREE.Mesh(dg, dm); d.rotation.x = -Math.PI / 2; d.position.x = x; d.position.y = .02; world.add(d); dashes.push([d, i]); }
+  const bg = new THREE.BoxGeometry(1, 1, 8), bm = M(0x121036, {roughness: .9, metalness: 0}), sg = new THREE.BoxGeometry(1, .25, .1), pg = new THREE.BoxGeometry(.15, 4, .15), pm = M(0x2a2760), lg = new THREE.SphereGeometry(.28, 10, 8);
+  const NEON = [0x8b7bff, 0xff3d7f, 0x3aa0ff, 0xffb23d].map(c => new THREE.MeshBasicMaterial({color: c}));
+  for (let i = 0; i < 18; i++) for (const side of [-1, 1]) {
+    const g = new THREE.Group(), b = new THREE.Mesh(bg, bm), s = new THREE.Mesh(sg, NEON[0]), p = new THREE.Mesh(pg, pm), l = new THREE.Mesh(lg, NEON[side < 0 ? 0 : 3]);
+    p.position.set(-side * 0, 2, 6); l.position.set(0, 4, 6); g.add(b, s, p, l); world.add(g); blocks.push({g, b, s, p, l, i, side});
+  } blocks.NEON = NEON; }
+function layoutWorld(z) {
+  const o = z % 12; for (const [d, i] of dashes) d.position.z = -(i - 3) * 12 + o;
+  const base = Math.floor(z / 24), o2 = z % 24;
+  for (const k of blocks) {
+    const idx = base + k.i, key = idx * 2 + (k.side > 0 ? 1 : 0), h = 5 + rnd(77, key) * 22, w = 4 + rnd(78, key) * 5, bx = k.side * (13 + rnd(79, key) * 8);
+    k.g.position.z = -(k.i - 2) * 24 + o2; k.b.scale.set(w, h, 1); k.b.position.set(bx, h / 2, 0);
+    k.s.scale.set(w * .8, 1, 1); k.s.position.set(bx, h * (.4 + rnd(80, key) * .5), 4.1); k.s.material = blocks.NEON[Math.floor(rnd(81, key) * 4)];
+    k.p.position.x = k.side * 7.4; k.l.position.x = k.side * 7.1;
+  }
+}
+{ const plat = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.9, .25, 64), M(0x2a2570, {metalness: .6, roughness: .35})); plat.position.y = -.13; stage.add(plat);
+  for (const [r, y, c] of [[3.7, 0, 0x8b7bff], [5.2, -.1, 0xff3d7f]]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(r, .05, 8, 80), new THREE.MeshBasicMaterial({color: c})); ring.rotation.x = Math.PI / 2; ring.position.y = y; stage.add(ring); }
+  const p1 = new THREE.PointLight(0x5aa8ff, 80, 40); p1.position.set(6, 4, 3); const p2 = new THREE.PointLight(0xff3d7f, 60, 40); p2.position.set(-6, 5, -4); const p3 = new THREE.PointLight(0xffffff, 60, 30); p3.position.set(-3, 3, 6); stage.add(p1, p2, p3); }
+
+/* ── машина: одна модель, цвет — перекраска текстуры ── */
+let BASE = null, baseMat = null, baseImg = null; const paintTex = {};
+async function loadCar() {
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/static/race/car1.glb?v=1');
+  const m = gltf.scene, box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  m.position.set(-c.x, -box.min.y, -c.z); const inner = new THREE.Group(); inner.add(m);
+  inner.rotation.y = (size.x > size.z ? Math.PI / 2 : 0) + Math.PI;        // длина вдоль z, нос вперёд (−z)
+  BASE = new THREE.Group(); BASE.add(inner); BASE.scale.setScalar(4.4 / Math.max(size.x, size.z));
+  m.traverse(o => { if (o.isMesh && !baseMat) { baseMat = o.material; baseImg = o.material.map && o.material.map.image; } });
+}
+function paint(hex) {       // краска кузова: фиолетовые точки заводской текстуры → нужный цвет с той же светотенью
+  if (!hex || !baseImg) return baseMat.map;
+  if (paintTex[hex]) return paintTex[hex];
+  const w = baseImg.width, h = baseImg.height, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d', {willReadFrequently: true}); cx.drawImage(baseImg, 0, 0);
+  const im = cx.getImageData(0, 0, w, h), d = im.data, col = new THREE.Color(hex), pr = col.r * 255, pg = col.g * 255, pb = col.b * 255;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx > 40 && (mx - mn) / mx > .28 && b > g && r > g * 1.05) {          // насыщенный фиолетовый = краска
+      const k = Math.min(1.6, mx / 150); d[i] = Math.min(255, pr * k); d[i + 1] = Math.min(255, pg * k); d[i + 2] = Math.min(255, pb * k);
+    }
+  }
+  cx.putImageData(im, 0, 0);
+  const tex = new THREE.CanvasTexture(cv); tex.flipY = baseMat.map.flipY; tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = baseMat.map.wrapS; tex.wrapT = baseMat.map.wrapT;
+  return (paintTex[hex] = tex);
+}
+const HEX = {};
+function makeCar(colorCode) {
+  const g = new THREE.Group(), m = BASE.clone(true), mat = baseMat.clone(); mat.map = paint(HEX[colorCode]);
+  m.traverse(o => { if (o.isMesh) o.material = mat; }); g.add(m); g.userData.mat = mat;
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .55})); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; sh.scale.set(1.35, 2.7, 1); g.add(sh);
+  return g;
+}
+const setColor = (car, code) => { car.userData.mat.map = paint(HEX[code]); car.userData.mat.needsUpdate = true; };
+
+/* ── огонь нитро: светящиеся слои, как у реактивной струи ── */
+function glowTex(stops) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); stops.forEach(([o, col]) => g.addColorStop(o, col)); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); }
+const FT = [glowTex([[0, 'rgba(255,255,255,1)'], [.25, 'rgba(160,210,255,.95)'], [.6, 'rgba(60,110,255,.35)'], [1, 'rgba(0,0,0,0)']]),
+            glowTex([[0, 'rgba(255,245,200,1)'], [.3, 'rgba(255,170,60,.9)'], [.65, 'rgba(255,70,30,.3)'], [1, 'rgba(0,0,0,0)']])];
+function makeFlames() {
+  const g = new THREE.Group(), parts = [];
+  for (const dx of [-.48, .48]) for (let i = 0; i < 7; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({map: FT[i < 2 ? 0 : 1], blending: THREE.AdditiveBlending, depthWrite: false, transparent: true}));
+    g.add(s); parts.push({s, dx, i});
+  }
+  const light = new THREE.PointLight(0xff8a3d, 0, 14); light.position.set(0, .7, 3.4); g.add(light);
+  g.userData = {parts, light}; g.visible = false; return g;
+}
+function animFlames(g, power, time) {       // power 0..1
+  g.visible = power > .02; if (!g.visible) return;
+  for (const p of g.userData.parts) {
+    const k = p.i / 6, fl = .82 + .18 * Math.sin(time * 47 + p.i * 2.1 + p.dx * 9) + (Math.random() - .5) * .14, len = (.35 + k * 2.6) * power * fl;
+    p.s.position.set(p.dx + (Math.random() - .5) * .03 * p.i, .42 + (Math.random() - .5) * .02 * p.i, 2.2 + len);
+    const sc = (.34 + (1 - Math.abs(k - .25)) * .5) * (.6 + power * .7) * fl; p.s.scale.set(sc, sc, 1); p.s.material.opacity = (1 - k * .82) * power;
+  }
+  g.userData.light.intensity = 46 * power * (.8 + Math.random() * .4);
+}
+
+/* ── препятствия ── */
+const obsGroup = new THREE.Group(); world.add(obsGroup); let OBS = [];
+function buildObstacles(seed) {
+  obsGroup.clear(); OBS = [];
+  const stripe = new THREE.MeshBasicMaterial({color: 0xff3b3b}), white = M(0xf2f2f2, {roughness: .6, metalness: 0}), cone = M(0xff7a1a, {roughness: .5, metalness: 0});
+  let z = 140, k = 0;
+  while (z < CFG.track - 80) {
+    const lane = Math.floor(rnd(seed, 500 + k) * 3), two = rnd(seed, 900 + k) > .72, kind = rnd(seed, 700 + k) > .5 ? 'bar' : 'cone';
+    for (const ln of two ? [lane, (lane + 1 + Math.floor(rnd(seed, 1100 + k) * 2)) % 3] : [lane]) {
+      const g = new THREE.Group();
+      if (kind === 'bar') { const b = new THREE.Mesh(new THREE.BoxGeometry(3, .9, .5), white); b.position.y = .55; g.add(b);
+        for (let s = -1; s <= 1; s++) { const st = new THREE.Mesh(new THREE.BoxGeometry(.55, .92, .52), stripe); st.position.set(s * 1.05, .55, 0); g.add(st); }
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(.16, 8, 6), new THREE.MeshBasicMaterial({color: 0xffd23d})); lamp.position.set(0, 1.15, 0); g.add(lamp);
+      } else for (const cx of [-1, 0, 1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(.34, 1.0, 12), cone); c.position.set(cx * .95, .5, 0); g.add(c);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(.2, .25, .16, 12), white); band.position.set(cx * .95, .55, 0); g.add(band); }
+      obsGroup.add(g); OBS.push({z, x: LANES[ln], g, hit: false});
+    }
+    z += 62 + rnd(seed, 300 + k) * 46; k++;
+  }
+}
+
+/* ── состояние ── */
+let P = null, me = null, flames = null, garageCar = null, mode = 'load', spin = 0;
+let room = null, others = {}, bots = [], tOff = 0, startAt = 0, state = null, lastTick = 0, ticking = false;
+const steer = {l: false, r: false, target: null};
+const rivals = new THREE.Group(); world.add(rivals);
+const nowS = () => (Date.now() + tOff) / 1000;
+const show = (id, on) => $(id).classList.toggle('hide', !on);
+
+function garage() {
+  mode = 'garage'; world.visible = false; stage.visible = true; scene.fog.near = 40; rivals.clear(); others = {}; bots = [];
+  if (me) { scene.remove(me); me = null; }
+  if (!garageCar) { garageCar = makeCar(P.color); stage.add(garageCar); } else setColor(garageCar, P.color);
+  show('garage', true); show('hud', false); show('res', false); show('msg', false);
+  $('g-coins').textContent = '🪙 ' + P.coins; $('g-wins').textContent = '🏆 ' + P.wins;
+  $('g-sub').textContent = t('sub', P.prizes[1]); $('g-day').textContent = t('day', P.day_left);
+  $('g-on').textContent = '● ' + Math.max(1, P.online) + ' ' + t('online');
+  $('colors').innerHTML = P.colors.map(c => `<div class="sw ${c.code === P.color ? 'on' : ''}" data-c="${c.code}"><i style="background:${c.hex || '#7a2bd6'}"></i>${P.owned.includes(c.code) ? '✓' : c.price + ' 🪙'}</div>`).join('');
+}
+$('colors').addEventListener('click', async e => {
+  const el = e.target.closest('.sw'); if (!el) return; const c = P.colors.find(x => x.code === el.dataset.c);
+  if (!P.owned.includes(c.code)) { if (P.coins < c.price) { toast(t('few') + ': ' + c.price + ' 🪙'); setColor(garageCar, c.code); setTimeout(() => setColor(garageCar, P.color), 1400); return; }
+    if (!confirm((RU ? c.ru : c.tj) + ' — ' + c.price + ' 🪙. ' + t('buy'))) return; }
+  try { const r = await api('shop', {color: c.code}); Object.assign(P, r); haptic('light'); garage(); } catch (err) { toast(err.message); }
+});
+function toast(text) { const h = $('hit'); h.textContent = text; h.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => { h.style.opacity = 0; }, 1400); }
+$('b-top').onclick = () => { alert('🏆 ' + t('top') + '\n\n' + (P.top.length ? P.top.map((r, i) => `${i + 1}. ${r.name || '—'} — ${r.wins} 🏆 (${r.races})`).join('\n') : '—')); };
+$('back').onclick = e => { if (mode === 'race' || mode === 'wait') e.preventDefault(); };
+
+async function start() {
+  if (mode !== 'garage' && mode !== 'result') return;
+  $('b-start').disabled = true;
+  try { room = await api('join'); } catch (err) { $('b-start').disabled = false; toast(err.message); return; }
+  $('b-start').disabled = false;
+  tOff = room.now * 1000 - Date.now(); startAt = room.now + room.start_in;
+  mode = 'wait'; show('garage', false); show('res', false); show('hud', true); show('msg', true); stage.visible = false; world.visible = true;
+  buildObstacles(room.seed); rivals.clear(); others = {}; bots = [];
+  if (me) scene.remove(me); me = makeCar(P.color); flames = makeFlames(); me.add(flames); scene.add(me);
+  state = {z: 0, x: 0, v: 0, nitro: 3, nitroT: 0, slowT: 0, shake: 0, done: false, botsReady: false};
+  $('nn').textContent = 3; $('nitro').classList.remove('off'); syncPlayers(room.players);
+}
+function syncPlayers(list) {
+  const seen = {};
+  for (const p of list) { if (p.user_id === P.me) continue; seen[p.user_id] = 1;
+    let o = others[p.user_id]; if (!o) { o = others[p.user_id] = {car: makeCar(p.color), name: p.name, x: p.x}; rivals.add(o.car); }
+    o.z = p.z; o.v = p.fin_ms ? 0 : p.v; o.tx = p.x; o.at = performance.now(); o.fin = p.fin_ms; }
+  for (const id in others) if (!seen[id] && !state.botsReady) { rivals.remove(others[id].car); delete others[id]; }
+}
+function makeBots() {       // свободные места — боты; у всех игроков они одинаковые (из зерна комнаты)
+  const n = Math.max(0, CFG.max_cars - 1 - Object.keys(others).length), codes = P.colors.map(c => c.code);
+  for (let i = 0; i < n; i++) { const b = {i, v: botV(room.seed, i), car: makeCar(codes[1 + Math.floor(rnd(room.seed, 40 + i) * (codes.length - 1))]), lane: LANES[(i + Math.floor(rnd(room.seed, 60 + i) * 3)) % 3]};
+    rivals.add(b.car); bots.push(b); }
+  state.botsReady = true;
+}
+async function doTick() {
+  if (ticking || !room) return; ticking = true;
+  try { const r = await api('tick', {room: room.room, z: state.z, x: state.x, v: state.v}); syncPlayers(r.players); } catch (e) {}
+  ticking = false;
+}
+function crash(kind) { state.v *= kind === 'obs' ? .32 : .7; state.shake = .45; haptic(kind === 'obs' ? 'heavy' : 'medium'); const h = $('hit'); h.textContent = t(kind === 'obs' ? 'crash' : 'bump'); h.style.opacity = 1; clearTimeout(crash.t); crash.t = setTimeout(() => { h.style.opacity = 0; }, 900); }
+
+function stepRace(dt, tt) {
+  const s = state, list = [];
+  if (!s.botsReady && tt > -1.2) makeBots();
+  for (const b of bots) { b.z = botZ(b.v, tt); b.x = b.lane + Math.sin(tt * .45 + b.i * 2.3) * 1.1; list.push(b); }
+  for (const id in others) { const o = others[id]; o.pz = o.fin ? CFG.track + 20 : Math.min(CFG.track + 20, o.z + o.v * (performance.now() - o.at) / 1000); o.x += (o.tx - o.x) * Math.min(1, dt * 8); list.push({z: o.pz, x: o.x, v: o.v, car: o.car}); }
+  if (tt >= 0 && !s.done) {
+    const dir = (steer.r ? 1 : 0) - (steer.l ? 1 : 0);
+    if (dir) { s.x += dir * 10 * dt; steer.target = null; } else if (steer.target !== null) s.x += Math.max(-10 * dt, Math.min(10 * dt, steer.target - s.x));
+    s.x = Math.max(-5.3, Math.min(5.3, s.x));
+    if (s.nitroT > 0) s.nitroT -= dt;
+    const vmax = s.nitroT > 0 ? CFG.vnitro : CFG.vmax;
+    s.v += (s.v < vmax ? (s.nitroT > 0 ? 34 : 15) : -22) * dt; if (Math.abs(s.v - vmax) < .6) s.v = vmax;
+    const z0 = s.z; s.z += s.v * dt;
+    for (const o of OBS) if (!o.hit && o.z > z0 - 1 && o.z - s.z < 2.3 && o.z - s.z > -2 && Math.abs(o.x - s.x) < 2.25) { o.hit = true; crash('obs'); o.g.rotation.z = .5; o.g.position.y = .4; }
+    for (const c of list) { const dz = c.z - s.z; if (dz > 0 && dz < 4.5 && Math.abs(c.x - s.x) < 1.95 && s.v > (c.v || 0)) { s.z = c.z - 4.5; if (s.slowT <= 0) { crash('car'); s.slowT = .6; } s.v = Math.min(s.v, (c.v || 30) * .82); } }
+    if (s.slowT > 0) s.slowT -= dt;
+    if (s.z >= CFG.track) { s.z = CFG.track; s.done = true; finish(Math.round(tt * 1000)); }
+  } else if (s.done) { s.v = Math.max(0, s.v - 30 * dt); s.z += s.v * dt; }
+  // картинка
+  layoutWorld(s.z); const dir = (steer.r ? 1 : 0) - (steer.l ? 1 : 0);
+  me.position.set(s.x, 0, 0); me.rotation.y += (-dir * .2 - me.rotation.y) * Math.min(1, dt * 9); me.rotation.z = -me.rotation.y * .35;
+  animFlames(flames, s.nitroT > 0 ? 1 : 0, tt);
+  for (const c of list) { c.car.position.set(c.x, 0, -(c.z - s.z)); c.car.visible = Math.abs(c.z - s.z) < 170; }
+  for (const o of OBS) { o.g.position.x = o.x; o.g.position.z = -(o.z - s.z); o.g.visible = o.z - s.z < 170 && o.z - s.z > -12; }
+  if (s.shake > 0) s.shake -= dt;
+  const sh = s.shake > 0 ? s.shake * .5 : 0, boost = s.nitroT > 0 ? 1 : 0;
+  cam.fov += ((60 + boost * 12 + s.v * .08) - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
+  cam.position.set(s.x * .55 + (Math.random() - .5) * sh, 4.2 + (Math.random() - .5) * sh, 10.2 + boost * .8); cam.lookAt(s.x * .7, 1.0, -9);
+  // интерфейс
+  const place = 1 + list.filter(c => c.z > s.z).length; $('pos').innerHTML = place + ' <i>/ ' + (list.length + 1) + '</i>';
+  const sec = Math.max(0, tt); $('time').textContent = Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
+  $('spd').textContent = Math.round(s.v * 3.4) + ' ' + t('km');
+  $('bar-in').innerHTML = list.map(c => `<i style="left:${Math.min(100, c.z / CFG.track * 100)}%;background:#8a86b8"></i>`).join('') + `<i style="left:${s.z / CFG.track * 100}%;background:#3ddc84;z-index:2"></i>`;
+  const m = $('msg');
+  if (tt < 0) { show('msg', true); m.innerHTML = Math.ceil(-tt) + `<small>${t('wait')} · ${Object.keys(others).length + 1}/${CFG.max_cars}</small>`; }
+  else if (tt < 1) { show('msg', true); m.innerHTML = t('go'); if (mode === 'wait') { mode = 'race'; haptic('rigid'); } }
+  else show('msg', false);
+}
+async function finish(ms) {
+  haptic('rigid'); let r;
+  try { r = await api('finish', {room: room.room, ms}); } catch (err) { r = {place: 0, won: 0, coins: P.coins, wins: P.wins, day_left: P.day_left, error: err.message}; }
+  P.coins = r.coins; P.wins = r.wins; P.day_left = r.day_left; mode = 'result';
+  $('res-place').textContent = r.place ? ['🥇', '🥈', '🥉'][r.place - 1] || ('#' + r.place) : '🏁';
+  $('res-sub').textContent = r.error ? r.error : `${r.place} ${t('place')} · ${(ms / 1000).toFixed(1)} с`;
+  $('res-won').textContent = r.won ? t('won', r.won) : (r.place && r.place <= 3 ? t('nowon') : '');
+  show('res', true); show('hud', false);
+}
+$('res-again').onclick = start; $('b-start').onclick = start;
+$('res-garage').onclick = async () => { try { Object.assign(P, await api('profile')); } catch (e) {} garage(); };
+$('nitro').onclick = () => { const s = state; if (mode !== 'race' || !s || s.done || s.nitro <= 0 || s.nitroT > 0) return; s.nitro--; s.nitroT = 2.4; $('nn').textContent = s.nitro; if (!s.nitro) $('nitro').classList.add('off'); haptic('heavy'); };
+for (const [id, k] of [['left', 'l'], ['right', 'r']]) { const b = $(id); const on = e => { e.preventDefault(); steer[k] = true; }, off = e => { e.preventDefault(); steer[k] = false; };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off); }
+R.domElement.addEventListener('pointermove', e => { if (mode === 'race' && e.buttons) steer.target = (e.clientX / innerWidth - .5) * 11.5; });
+R.domElement.addEventListener('pointerdown', e => { if (mode === 'race') steer.target = (e.clientX / innerWidth - .5) * 11.5; });
+addEventListener('keydown', e => { if (e.key === 'ArrowLeft') steer.l = true; if (e.key === 'ArrowRight') steer.r = true; if (e.key === ' ') $('nitro').onclick(); });
+addEventListener('keyup', e => { if (e.key === 'ArrowLeft') steer.l = false; if (e.key === 'ArrowRight') steer.r = false; });
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (mode === 'garage') { spin += dt * .6; garageCar.rotation.y = spin; cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 2.5, 8.6); cam.lookAt(0, .9, 0); }
+  else if (mode === 'wait' || mode === 'race' || mode === 'result') { stepRace(dt, nowS() - startAt); if (now - lastTick > 250 && mode !== 'result') { lastTick = now; doTick(); } }
+  R.render(scene, cam); requestAnimationFrame(frame);
+}
+
+(async () => {
+  if (!INIT) { $('load-t').textContent = t('need'); return; }
+  try { [P] = await Promise.all([api('profile'), loadCar()]); } catch (err) { $('load-t').textContent = err.message === 'net' ? 'Нет связи' : err.message; return; }
+  CFG = P; for (const c of P.colors) HEX[c.code] = c.hex;
+  show('load', false); garage(); requestAnimationFrame(frame);
+  setInterval(async () => { if (mode === 'garage') try { const r = await api('profile'); P.online = r.online; P.top = r.top; $('g-on').textContent = '● ' + Math.max(1, P.online) + ' ' + t('online'); } catch (e) {} }, 8000);
+})();
+window.__dx = {get mode() { return mode; }, get state() { return state; }, start, steer};
+</script>
+</body></html>

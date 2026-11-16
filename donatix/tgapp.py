@@ -410,3 +410,42 @@ async def api_topup_receipt(request: Request, conn=Depends(get_conn), config: Co
         return {"ok": False, "error": str(exc)}
     send_receipt(conn, config, pid)
     return {"ok": True, "message": "✅ Чек гирифта шуд — санҷида баланс пур мекунем. / Чек получен, проверим и пополним."}
+
+
+# ── Гонка: 3D-игра в мини-приложении (race.py). Денег нет — только игровые монеты на цвет машины ──
+
+@router.get("/race")
+def race_page(request: Request, config: Config = Depends(get_config)):
+    return templates.TemplateResponse(request, "tg_race.html", {"site_name": config.site_name})
+
+
+@router.post("/api/race/{action}")
+async def api_race(action: str, request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import race
+    tg = check_init(request.headers.get("x-tg-init", ""), config.gift_bot_token, ttl=6 * 3600)
+    if not tg:
+        return _deny()
+    user = _account(conn, tg)
+    name = (tg.get("first_name") or tg.get("username") or "Игрок")[:16]
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    try:
+        if action == "profile":
+            return {**race.profile(conn, user["id"], name, config.tz_offset), "me": user["id"], "name": name,
+                    "top": race.top(conn)}
+        if action == "join":
+            return race.join(conn, user["id"], name, config.tz_offset)
+        if action == "tick":
+            return race.tick(conn, user["id"], int(body.get("room") or 0), float(body.get("z") or 0),
+                             float(body.get("x") or 0), float(body.get("v") or 0))
+        if action == "finish":
+            return race.finish(conn, user["id"], int(body.get("room") or 0), int(body.get("ms") or 0), config.tz_offset)
+        if action == "shop":
+            return race.shop(conn, user["id"], str(body.get("color") or ""), config.tz_offset)
+    except race.RaceError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "Неверные данные."}, status_code=400)
+    return JSONResponse({"error": "Нет такого действия."}, status_code=404)

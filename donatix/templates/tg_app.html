@@ -216,6 +216,11 @@ nav.tabs button.on svg { transform: translateY(-1px); }
   pointer-events: auto; transition: transform .2s var(--ease), background-color .2s var(--ease); }
 .bnr-dots button::before { content: ""; position: absolute; inset: -9px; }
 .bnr-dots button.on { background: #fff; transform: scaleX(2.4); }
+.race-go { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 12px 14px; border-radius: 18px; color: #fff; text-decoration: none;
+  background: linear-gradient(110deg, #ff7a3d, #ff3d7f); box-shadow: 0 14px 30px -16px #ff5d5d; }
+.race-go .rg-i { width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,.2); display: grid; place-items: center; font-size: 22px; flex: none; }
+.race-go b { display: block; font-size: 16px; } .race-go small { font-size: 12.5px; opacity: .92; }
+.race-go .rg-b { padding: 8px 13px; border-radius: 12px; background: #fff; color: #111; font-weight: 800; font-size: 13px; flex: none; }
 </style>
 </head>
 <body>
@@ -365,6 +370,7 @@ function home() {
     <div class="sum num">${microTjs(D.me.balance)}<small>${t("som")}</small></div>
     <div class="row"><button class="btn primary grow" data-act="topup">${IC.plus} ${t("topup")}</button>
     <button class="btn soft" data-act="history">${IC.clock} ${t("history")}</button></div></section>
+  <a class="race-go" href="/tg/race" onclick="try{sessionStorage.setItem('dx_init',INIT)}catch(e){}"><span class="rg-i">🏁</span><span class="grow"><b>${LANG === "ru" ? "Гонка 3D" : "Пойга 3D"}</b><small>${LANG === "ru" ? "Играй с друзьями, меняй цвет машины" : "Бо дӯстон бозӣ кун, ранги мошинро иваз кун"}</small></span><span class="rg-b">${LANG === "ru" ? "Играть" : "Бозӣ"}</span></a>
   <div class="menu">
     <button class="mi" data-act="site" data-v="games"><div class="ic ac">${IC.gem}</div><div class="grow"><b>${t("games")}</b><span>${t("games_sub")}</span></div><span class="go">›</span></button>
     <button class="mi" data-act="site" data-v="cards"><div class="ic">${IC.card}</div><div class="grow"><b>${t("cards_t")}</b><span>${t("cards_sub")}</span></div><span class="go">›</span></button>
