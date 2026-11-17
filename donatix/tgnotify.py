@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 import sqlite3
 from typing import Any
@@ -110,6 +111,11 @@ def _text(conn: sqlite3.Connection, config: Config, w: sqlite3.Row) -> str | Non
             except ValueError:
                 items = []
             text += "".join(f"\n{'🔗' if i['link'] else '🔑'} {i['label']}: {i['value']}" for i in items)
+        if o["status"] == "completed":
+            from . import raffle
+            note = raffle.new_ticket_note(conn, o["user_id"])
+            if note:
+                text += "\n\n" + re.sub(r"</?b>", "", note)
         return text
     g = conn.execute("SELECT * FROM gift_orders WHERE id = ?", (w["obj_id"],)).fetchone()
     if g is None:

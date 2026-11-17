@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, place %}
+{% block title %}Розыгрыш призов · Қуръакашӣ — {{ site_name }}{% endblock %}
+{% block description %}Розыгрыш призов {{ site_name }}: купите для себя от ${{ rf.min_usd if rf else 15 }} и участвуйте. Итоги — в прямом эфире Instagram.{% endblock %}
+{% block banners %}{% endblock %}
+{% block body %}
+<main class="section">
+<div class="wrap rf" style="max-width:720px">
+  {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
+  {% if not rf %}
+  <div class="card" style="text-align:center;padding:32px 18px">
+    <h1 style="font-size:1.3rem">Розыгрыш сейчас не идёт</h1>
+    <p class="muted">Ҳоло қуръакашӣ нест. Следите за новостями в нашем Telegram-канале.</p>
+    <a class="btn primary" href="/">На главную</a>
+  </div>
+  {% else %}
+  <section class="rf-hero">
+    <span class="rf-gift" aria-hidden="true">{{ icon('gift', 64) }}</span>
+    <span class="rf-chip">{{ icon('gift', 14) }} Қуръакашӣ · Розыгрыш</span>
+    <h1>{{ rf.winners_n }} ғолиб<br><span>{{ rf.winners_n }} победителей</span></h1>
+    <p>Аз ${{ rf.min_usd }} барои худ харед, «Иштирок мекунам»-ро пахш кунед — ва шумо дар қуръакашӣ.<br>
+      <em>Купите для себя от ${{ rf.min_usd }}, нажмите «Участвую» — и вы в розыгрыше.</em></p>
+    <div class="rf-cd">
+      <div><b>{{ rf.days }}</b><i>рӯз · дней</i></div>
+      <div><b>{{ rf.draw }}</b><i>натиҷа · итоги</i></div>
+      <div class="rf-live">{{ icon('play', 14) }} Пахши мустақим · прямой эфир Instagram</div>
+    </div>
+  </section>
+
+  {# ── Моё участие ── #}
+  <section class="card rf-me" id="me">
+    {% if rf.won %}
+      <div class="rf-ok">{{ icon('trophy', 22) }} Шумо ғолиб шудед! Вы выиграли — {{ rf.won.place }} место, {{ rf.won.prize_tjs }} с. на баланс.</div>
+    {% endif %}
+    {% if not user or user.role == 'admin' %}
+      <h2>Иштирок кардан <span>· Участвовать</span></h2>
+      <p class="muted">Войдите в аккаунт — покажем, сколько осталось купить, и ваши билеты. / Ба аккаунт ворид шавед.</p>
+      <a class="btn primary rf-btn" href="/login?next=/raffle">Войти и участвовать · Ворид шудан</a>
+    {% else %}
+      {% if rf.joined and rf.tickets %}
+        <div class="rf-ok">{{ icon('check', 20) }} Шумо иштирок мекунед! <span>Вы участвуете!</span></div>
+        <div class="rf-tk">{% for n in rf.tickets %}<span>№ {{ '%04d' % n }}</span>{% endfor %}</div>
+        <p class="muted">Чиптаҳои шумо: {{ rf.tickets | length }}. Боз ${{ rf.next_need }} харед — боз 1 чипта.<br>
+          Ваших билетов: {{ rf.tickets | length }}. Купите ещё на ${{ rf.next_need }} — получите ещё 1 билет.</p>
+      {% else %}
+        <h2>{% if rf.percent >= 100 %}Харид кофист! <span>· Покупок достаточно</span>{% else %}Боз <b>${{ rf.need }}</b> харед <span>· купите ещё на ${{ rf.need }}</span>{% endif %}</h2>
+        <div class="rf-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rf.percent }}" aria-label="Прогресс до участия"><i style="width:{{ rf.percent }}%"></i></div>
+        <div class="rf-pp"><span>${{ rf.spent }} аз ${{ rf.min_usd }} · из ${{ rf.min_usd }}</span><b>{{ rf.percent }}%</b></div>
+      {% endif %}
+
+      <ul class="rf-chk">
+        <li class="{{ 'ok' if rf.percent >= 100 else 'no' }}"><i>{{ icon('check', 14) if rf.percent >= 100 else '!' }}</i>
+          <span>Харид аз ${{ rf.min_usd }} <small>· покупки для себя</small></span><b>${{ rf.spent }} / ${{ rf.min_usd }}</b></li>
+        {% if rf.check_tg %}
+        <li class="{{ 'ok' if rf.tg_ok else 'no' }}"><i>{{ icon('check', 14) if rf.tg_ok else '!' }}</i>
+          <span>Канали Telegram <small>· {% if rf.tg_ok %}подписка проверена{% elif not rf.tg_linked %}Telegram не привязан{% else %}проверим при нажатии «Участвую»{% endif %}</small></span>
+          {% if not rf.tg_linked and tg_login_on %}<a href="/auth/telegram?link=1">Привязать →</a>
+          {% elif not rf.tg_ok and rf.channel_url %}<a href="{{ rf.channel_url }}" target="_blank" rel="noopener">Обуна · Подписаться →</a>{% endif %}</li>
+        {% endif %}
+        <li class="{{ 'ok' if rf.joined else 'no' }}"><i>{{ icon('check', 14) if rf.joined else '!' }}</i>
+          <span>Instagram <small>· {% if rf.joined %}@{{ rf.instagram }}{% else %}ник не указан{% endif %}</small></span>
+          {% if rf.instagram_url %}<a href="{{ rf.instagram_url }}" target="_blank" rel="noopener">Обуна · Подписаться →</a>{% endif %}</li>
+      </ul>
+
+      {% if not rf.closed %}
+      <form method="post" action="/raffle/join" class="rf-join" id="join">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="rf-ig">Номи Instagram-и шумо <small>· ваш ник в Instagram (проверим подписку в эфире)</small></label>
+        <div class="rf-row">
+          <input id="rf-ig" name="instagram" value="{{ rf.instagram }}" placeholder="@ali_2006" required maxlength="60"
+                 autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text">
+          <button class="btn primary rf-btn" type="submit">{% if rf.joined %}Сохранить{% else %}Иштирок мекунам · Участвую{% endif %}</button>
+        </div>
+        {% if not rf.joined %}<p class="muted" style="margin:0">Бе пахши ин тугма харидҳо ба қуръакашӣ дохил намешаванд.<br>Без нажатия этой кнопки вы не участвуете. Покупки с начала розыгрыша засчитаются.</p>{% endif %}
+      </form>
+      {% endif %}
+      <a class="btn rf-btn rf-buy" href="/">Харидан · Купить {{ icon('chevron', 16) }}</a>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>{{ icon('trophy', 20) }} Ҷоизаҳо <span>· Призы</span></h2>
+    <ul class="rf-pz">
+      {% for r in rf.prizes %}
+      <li><i class="{{ 'top' if r.to <= 3 else '' }}">{% if r.from == r.to and r.from <= 3 %}{{ place(r.from, 26) }}{% else %}{{ icon('gift', 18) }}{% endif %}</i>
+        <span>{% if r.from == r.to %}Ҷои {{ r.from }}<small>{{ r.from }} место</small>
+          {% else %}Ҷойҳои {{ r.from }}–{{ r.to }} · {{ r.n }} нафар<small>{{ r.from }}–{{ r.to }} места · {{ r.n }} человек</small>{% endif %}</span>
+        <b>{{ r.tjs }} с.</b></li>
+      {% endfor %}
+    </ul>
+    <p class="muted" style="margin:10px 0 0">Ҷоиза ба баланси Donatix гузошта мешавад. / Приз зачисляется на баланс Donatix. Один человек выигрывает один раз.</p>
+  </section>
+
+  <section class="card">
+    <h2>{{ icon('check', 20) }} Шартҳо <span>· Условия</span></h2>
+    <ol class="rf-steps">
+      <li><b>Барои худ аз ${{ rf.min_usd }} харед</b><small>Купите для себя от ${{ rf.min_usd }} — алмазы, UC, Stars, любые товары: на сайте, в боте или в приложении. Считаются выполненные заказы с начала розыгрыша.</small></li>
+      <li><b>Ба канали Telegram обуна шавед</b><small>Подпишитесь на наш Telegram-канал — проверяем автоматически.{% if rf.channel_url %} <a href="{{ rf.channel_url }}" target="_blank" rel="noopener">Открыть канал</a>{% endif %}</small></li>
+      <li><b>Ба Instagram обуна шавед ва номи худро нависед</b><small>Подпишитесь на наш Instagram и напишите свой ник — проверим в эфире.{% if rf.instagram_url %} <a href="{{ rf.instagram_url }}" target="_blank" rel="noopener">Открыть Instagram</a>{% endif %}</small></li>
+      <li><b>Тугмаи «Иштирок мекунам»-ро пахш кунед</b><small>Нажмите «Участвую». Без кнопки участие не считается.</small></li>
+      <li><b>Ҳар ${{ rf.min_usd }} = 1 чипта</b><small>Каждые ${{ rf.min_usd }} покупок = 1 билет. Больше покупок — больше шансов.</small></li>
+    </ol>
+    <div class="rf-livebox">{{ icon('play', 18) }}<span><b>{{ rf.draw }} — пахши мустақим дар Instagram</b><small>Победителей выбираем вживую, в прямом эфире Instagram: случайный билет на экране. Не подписан — приз переходит другому.</small></span></div>
+  </section>
+
+  {% if winners %}
+  <section class="card">
+    <h2>{{ icon('trophy', 20) }} Ғолибон <span>· Победители</span></h2>
+    <ul class="rf-pz">{% for w in winners %}<li><i>{{ place(w.place, 26) if w.place <= 3 else w.place }}</i><span>{{ w.name }}<small>чипта · билет № {{ '%04d' % w.ticket }}</small></span><b>{{ w.tjs }} с.</b></li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+  <p class="muted" style="font-size:.78rem;text-align:center">Розыгрыш проводит {{ site_name }}. Это не азартная игра: участие бесплатное, билет даётся за обычную покупку.</p>
+  {% endif %}
+</div>
+</main>
+<style>
+.rf { display: grid; gap: 14px; }
+.rf h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1.12rem; margin: 0 0 10px; }
+.rf h2 span { font-weight: 500; color: var(--muted); font-size: .86rem; } .rf h2 b { color: var(--accent); }
+.rf small { display: block; color: var(--muted); font-weight: 400; font-size: .8rem; line-height: 1.4; }
+.rf-hero { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 18px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, #a855f7 0%, #6d28d9 42%, #3b1fa8 100%); }
+.rf-hero::before { content: ""; position: absolute; right: -50px; top: -50px; width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, #ffd54a 0%, rgba(255,213,74,0) 70%); opacity: .5; }
+.rf-gift { position: absolute; right: 18px; top: 26px; color: #ffd54a; }
+.rf-chip { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 99px; font-size: .74rem;
+  font-weight: 700; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); }
+.rf-hero h1 { font-size: 2rem; line-height: 1.05; margin: 12px 0 8px; font-weight: 900; padding-right: 80px; color: #fff; }
+.rf-hero h1 span { font-size: 1.1rem; opacity: .85; font-weight: 700; }
+.rf-hero p { font-size: .9rem; line-height: 1.45; margin: 0; } .rf-hero em { font-style: normal; opacity: .82; }
+.rf-cd { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.rf-cd > div { background: rgba(255,255,255,.16); border-radius: 12px; padding: 8px 12px; text-align: center; }
+.rf-cd b { display: block; font-size: 1.15rem; } .rf-cd i { font-style: normal; font-size: .68rem; opacity: .85; }
+.rf-cd .rf-live { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; }
+.rf-me { border: 2px solid var(--accent-line); }
+.rf-prog { height: 14px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 6px 0; }
+.rf-prog i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #7c3aed, #4f46e5); transition: width .4s ease; }
+.rf-pp { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rf-ok { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 800; font-size: 1.1rem; color: var(--ok); margin-bottom: 8px; }
+.rf-ok span { color: var(--muted); font-weight: 500; font-size: .86rem; }
+.rf-tk { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.rf-tk span { background: var(--accent-soft); color: var(--accent); font-weight: 800; border-radius: 10px; padding: 6px 10px;
+  font-size: .82rem; border: 1px dashed var(--accent); font-variant-numeric: tabular-nums; }
+.rf-chk { list-style: none; margin: 12px 0; padding: 0; }
+.rf-chk li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.rf-chk li:last-child { border: 0; } .rf-chk li > span { flex: 1; min-width: 0; }
+.rf-chk i { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-style: normal;
+  font-weight: 900; font-size: .75rem; background: var(--warn-soft); color: var(--warn); }
+.rf-chk li.ok i { background: var(--ok-soft); color: var(--ok); }
+.rf-chk b, .rf-chk a { font-size: .78rem; font-weight: 800; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rf-join { display: grid; gap: 8px; margin-top: 4px; } .rf-join label { font-weight: 700; font-size: .9rem; }
+.rf-row { display: flex; gap: 8px; flex-wrap: wrap; } .rf-row input { flex: 1; min-width: 160px; min-height: 48px; font-size: 16px; }
+.rf-btn { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; }
+.rf-buy { width: 100%; margin-top: 10px; }
+.rf-pz { list-style: none; margin: 0; padding: 0; }
+.rf-pz li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.rf-pz li:last-child { border: 0; } .rf-pz li > span { flex: 1; font-weight: 700; font-size: .92rem; }
+.rf-pz i { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-style: normal;
+  font-weight: 800; background: var(--accent-soft); color: var(--accent); }
+.rf-pz i.top { background: var(--warn-soft); }
+.rf-pz b { font-size: 1.05rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.rf-steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+.rf-steps li { counter-increment: s; position: relative; padding-left: 38px; font-size: .92rem; }
+.rf-steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 8px;
+  display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 900; font-size: .8rem; }
+.rf-livebox { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px; border-radius: 14px;
+  background: var(--warn-soft); color: var(--text); font-size: .9rem; }
+.rf-livebox svg { flex: none; color: #d6249f; margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) { .rf-prog i { transition: none; } }
+</style>
+{% endblock %}

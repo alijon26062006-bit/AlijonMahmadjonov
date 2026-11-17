@@ -33,6 +33,45 @@
   </div>
 </div>
 
+{% if rf %}
+<a class="rfp" href="/raffle#me">
+  <span class="rfp-top"><span class="rfp-chip">{{ icon('gift', 14) }} Қуръакашӣ · Розыгрыш</span><span class="rfp-date">{{ rf.draw }}</span></span>
+  {% if rf.joined and rf.tickets %}
+    <b class="rfp-h ok">{{ icon('check', 18) }} Шумо иштирок мекунед! <small>Вы участвуете · билетов: {{ rf.tickets | length }}</small></b>
+    <span class="rfp-tk">{% for n in rf.tickets[:6] %}<i>№ {{ '%04d' % n }}</i>{% endfor %}{% if rf.tickets | length > 6 %}<i>+{{ rf.tickets | length - 6 }}</i>{% endif %}</span>
+    <small>Боз ${{ rf.next_need }} харед — боз 1 чипта · ещё ${{ rf.next_need }} — ещё 1 билет</small>
+  {% elif rf.percent >= 100 %}
+    <b class="rfp-h">Тугмаи «Иштирок мекунам»-ро пахш кунед <small>Покупок достаточно — нажмите «Участвую» и напишите ник Instagram</small></b>
+    <span class="rfp-bar"><i style="width:100%"></i></span>
+  {% else %}
+    <b class="rfp-h">Боз <em>${{ rf.need }}</em> харед <small>Купите ещё на ${{ rf.need }} — и вы участвуете в розыгрыше</small></b>
+    <span class="rfp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rf.percent }}"><i style="width:{{ rf.percent }}%"></i></span>
+    <span class="rfp-pp"><span>${{ rf.spent }} аз ${{ rf.min_usd }}</span><b>{{ rf.percent }}%</b></span>
+  {% endif %}
+  <span class="rfp-prizes">{% for p in rf.top %}<i>{{ place(loop.index, 16) }}{{ p }} с.</i>{% endfor %}<i>{{ rf.winners_n }} ғолиб · победителей</i></span>
+</a>
+<style>
+.rfp { display: grid; gap: 8px; margin: 14px 0; padding: 14px 16px; border-radius: 18px; text-decoration: none; color: var(--text);
+  background: var(--surface); border: 2px solid var(--accent-line); }
+.rfp:hover { color: var(--text); border-color: var(--accent); }
+.rfp-top { display: flex; justify-content: space-between; align-items: center; }
+.rfp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: .72rem; font-weight: 800;
+  background: var(--accent-soft); color: var(--accent); }
+.rfp-date { font-size: .74rem; color: var(--muted); font-weight: 700; }
+.rfp-h { font-size: 1.2rem; font-weight: 900; line-height: 1.2; } .rfp-h em { font-style: normal; color: var(--accent); }
+.rfp-h.ok { color: var(--ok); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rfp small { display: block; color: var(--muted); font-weight: 500; font-size: .8rem; line-height: 1.35; }
+.rfp-bar { height: 12px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.rfp-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #7c3aed, #4f46e5); }
+.rfp-pp { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rfp-tk, .rfp-prizes { display: flex; flex-wrap: wrap; gap: 6px; }
+.rfp-tk i { font-style: normal; font-weight: 800; font-size: .78rem; padding: 5px 9px; border-radius: 9px; border: 1px dashed var(--accent);
+  background: var(--accent-soft); color: var(--accent); }
+.rfp-prizes i { display: inline-flex; align-items: center; gap: 4px; font-style: normal; font-size: .76rem; font-weight: 700;
+  padding: 3px 9px 3px 4px; border-radius: 99px; background: var(--surface-2); }
+.rfp-prizes i:last-child { padding-left: 9px; color: var(--muted); }
+</style>
+{% endif %}
 {% if cst and cst.on and not is_guest_account(user) %}
 <a class="cst-banner" href="/panel/referrals">
   <span class="cb-trophy">{{ icon('trophy', 30) }}</span>

@@ -513,6 +513,31 @@ async def api_topup_info(request: Request, conn=Depends(get_conn), config: Confi
     return _pay_info(request, conn, config, _account(conn, tg))
 
 
+@router.post("/api/raffle")
+async def api_raffle(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Розыгрыш за покупки: статус (прогресс, билеты) и «Участвую» с ником Instagram — прямо в приложении."""
+    tg = _tg(request, config)
+    if not tg:
+        return _deny()
+    from . import raffle
+    body = await request.json()
+    user = _account(conn, tg)
+    out: dict[str, Any] = {"ok": True}
+    if body.get("join"):
+        try:
+            with db.tx(conn):
+                got = raffle.join(conn, config, user["id"], str(body.get("instagram") or ""))
+            out["new_tickets"] = got["new_tickets"]
+        except raffle.RaffleError as exc:
+            code = str(exc)
+            out = {"ok": False, "code": code if code in ("NEED_TG", "NEED_SUB") else "", "error": {
+                "NEED_SUB": "Аввал ба канали Telegram обуна шавед. / Сначала подпишитесь на наш Telegram-канал.",
+                "NEED_TG": "Қуръакаширо дар боти Telegram кушоед. / Откройте розыгрыш в нашем Telegram-боте.",
+            }.get(code, code)}
+    out["raffle"] = raffle.status(conn, config, user["id"])
+    return out
+
+
 @router.post("/api/topup")
 async def api_topup(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Создать заявку: автоплатёж (крипта, «Душанбе Сити · авто») — экран оплаты; обычный перевод — сразу с чеком."""

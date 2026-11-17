@@ -1,0 +1,40 @@
+{# Баннер розыгрыша: сайт, кабинет. Общую сумму призов не показываем — только места. #}
+{% from "_icons.html" import icon, place %}
+<a class="rfb" href="/raffle" aria-label="Розыгрыш призов — участвовать">
+  <span class="rfb-gift" aria-hidden="true">{{ icon('gift', 54) }}</span>
+  <span class="rfb-chip">{{ icon('gift', 14) }} Қуръакашӣ · Розыгрыш</span>
+  <b class="rfb-h">{{ raffle_banner.winners_n }} ғолиб <span>· {{ raffle_banner.winners_n }} победителей</span></b>
+  <span class="rfb-prizes">{% for p in raffle_banner.top %}<i>{{ place(loop.index, 18) }}{{ p }} с.</i>{% endfor %}</span>
+  <span class="rfb-s">Аз ${{ raffle_banner.min_usd }} харед ва «Иштирок мекунам»-ро пахш кунед.<br>
+    <em>Купите от ${{ raffle_banner.min_usd }} и нажмите «Участвую».</em></span>
+  <span class="rfb-foot">
+    <span class="rfb-days"><b>{{ raffle_banner.days }}</b> рӯз · дн.</span>
+    <span class="rfb-days"><b>{{ raffle_banner.draw }}</b> натиҷа · итоги</span>
+    <span class="rfb-cta">Иштирок · Участвовать {{ icon('chevron', 16) }}</span>
+  </span>
+</a>
+<style>
+.rfb { position: relative; display: grid; gap: 6px; margin: 14px 0; padding: 18px; border-radius: 20px; overflow: hidden;
+  color: #fff; text-decoration: none; background: radial-gradient(120% 140% at 100% 0%, #a855f7 0%, #6d28d9 42%, #3b1fa8 100%);
+  box-shadow: 0 10px 28px rgba(79, 70, 229, .28); transition: transform .18s ease; }
+.rfb:hover { color: #fff; transform: translateY(-1px); } .rfb:active { transform: scale(.99); }
+.rfb::before { content: ""; position: absolute; right: -40px; top: -40px; width: 190px; height: 190px; border-radius: 50%;
+  background: radial-gradient(circle, #ffd54a 0%, rgba(255, 213, 74, 0) 70%); opacity: .5; pointer-events: none; }
+.rfb-gift { position: absolute; right: 18px; top: 22px; color: #ffd54a; opacity: .95; }
+.rfb-chip { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 4px 10px; border-radius: 99px;
+  font-size: .72rem; font-weight: 700; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .3); }
+.rfb-h { font-size: 1.45rem; font-weight: 900; line-height: 1.1; letter-spacing: -.01em; margin-top: 4px; padding-right: 70px; }
+.rfb-h span { font-weight: 700; opacity: .85; font-size: 1rem; }
+.rfb-prizes { display: flex; flex-wrap: wrap; gap: 6px; }
+.rfb-prizes i { display: inline-flex; align-items: center; gap: 5px; font-style: normal; font-weight: 800; font-size: .85rem;
+  padding: 4px 10px 4px 5px; border-radius: 99px; background: rgba(255, 255, 255, .16); }
+.rfb-s { font-size: .84rem; line-height: 1.4; } .rfb-s em { font-style: normal; opacity: .82; }
+.rfb-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.rfb-days { font-size: .72rem; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, .16); }
+.rfb-days b { font-size: .95rem; margin-right: 2px; }
+.rfb-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px;
+  border-radius: 14px; background: #ffd54a; color: #2a1a00; font-weight: 900; font-size: .9rem; }
+.rfb, .rfb * { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 420px) { .rfb-cta { width: 100%; justify-content: center; margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .rfb { transition: none; } }
+</style>

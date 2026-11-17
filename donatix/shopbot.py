@@ -1091,7 +1091,87 @@ class ShopBot:
             if p:
                 self.screen_packs(conn, su, start[1:], 0, edit)
                 return
+        if start == "raffle":
+            self.screen_raffle(conn, su, edit)
+            return
         self.screen_home(conn, su, edit)
+
+    # ── Розыгрыш за покупки ──
+
+    def screen_raffle(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None, note: str = "") -> None:
+        from . import raffle
+        tg_id, lang = su["tg_id"], su["lang"]
+        st = raffle.status(conn, self.config, su["user_id"])
+        home = [(tr(lang, "home"), "h")]
+        if st is None:
+            self.show(tg_id, "Ҳоло қуръакашӣ нест. · Розыгрыш сейчас не идёт.", [home], edit=edit)
+            return
+        medals = ("🥇", "🥈", "🥉")
+        prizes = []
+        for r in st["prizes"]:
+            if r["from"] == r["to"]:
+                prizes.append(f"{medals[r['from'] - 1] if r['from'] <= 3 else '🎁'} Ҷои {r['from']} · {r['from']} место — <b>{r['tjs']} с.</b>")
+            else:
+                prizes.append(f"🎁 {r['from']}–{r['to']} · {r['n']} нафар/чел. — <b>{r['tjs']} с.</b>")
+        text = (f"🎁 <b>Қуръакашӣ · Розыгрыш призов</b>\n{st['winners_n']} ғолиб · {st['winners_n']} победителей\n\n"
+                + "\n".join(prizes)
+                + f"\n\n📅 <b>{st['draw']}</b> — пахши мустақим дар Instagram · прямой эфир в Instagram\n\n"
+                f"<b>Шартҳо · Условия</b>\n"
+                f"1️⃣ Барои худ аз ${st['min_usd']} харед · купите для себя от ${st['min_usd']}\n"
+                f"2️⃣ Ба канали Telegram обуна шавед · подписка на канал\n"
+                f"3️⃣ Ба Instagram обуна шавед · подписка на Instagram\n"
+                f"4️⃣ «Иштирок мекунам»-ро пахш кунед · нажмите «Участвую»\n"
+                f"⭐ Ҳар ${st['min_usd']} = 1 чипта · каждые ${st['min_usd']} = 1 билет\n\n")
+        bar = "🟪" * (st["percent"] // 10) + "⬜" * (10 - st["percent"] // 10)
+        if st["joined"] and st["tickets"]:
+            nums = ", ".join(f"№ {n:04d}" for n in st["tickets"][:20]) + (" …" if len(st["tickets"]) > 20 else "")
+            text += (f"✅ <b>Шумо иштирок мекунед! · Вы участвуете!</b>\n🎟 Чиптаҳо · билеты ({len(st['tickets'])}): <b>{nums}</b>\n"
+                     f"Боз ${st['next_need']} харед — боз 1 чипта · ещё ${st['next_need']} — ещё 1 билет\n"
+                     f"📸 Instagram: @{_e(st['instagram'])}")
+        elif st["joined"]:
+            text += (f"✅ Шумо сабт шудед · вы записаны (📸 @{_e(st['instagram'])})\n{bar} {st['percent']}%\n"
+                     f"Боз <b>${st['need']}</b> харед — чипта мегиред · купите ещё на <b>${st['need']}</b> — получите билет")
+        else:
+            text += (f"{bar} {st['percent']}%  (${st['spent']} / ${st['min_usd']})\n"
+                     + (f"Боз <b>${st['need']}</b> харед · осталось купить на <b>${st['need']}</b>\n" if st["percent"] < 100 else "")
+                     + "👇 «Иштирок мекунам»-ро пахш кунед — бе ин тугма иштирок ҳисоб намешавад.\n"
+                       "Нажмите «Участвую» — без этой кнопки участие не считается.")
+        if note:
+            text = note + "\n\n" + text
+        rows: list[list[Btn]] = []
+        if not st["closed"]:
+            rows.append([("✅ Иштирок мекунам · Участвую" if not st["joined"] else "✏️ Instagram-ро иваз кардан · сменить ник",
+                          "rfj", "success")])
+        if st["channel_url"]:
+            rows.append([("📢 Канал Telegram", None, st["channel_url"])])
+        if st["instagram_url"]:
+            rows.append([("📸 Instagram", None, st["instagram_url"])])
+        rows += [[(tr(lang, "games"), "g:games:0", "primary")], home]
+        self.show(tg_id, text, rows, edit=edit)
+
+    def raffle_join(self, conn: sqlite3.Connection, su: sqlite3.Row, nick: str) -> None:
+        from . import raffle
+        try:
+            got = raffle.join(conn, self.config, su["user_id"], nick, api=self.api)
+        except raffle.RaffleError as exc:
+            code = str(exc)
+            if code == "NEED_SUB":
+                self.state[su["tg_id"]] = {"step": "rfsub", "nick": nick[:60]}
+                url = raffle.cfg(conn)["channel"].get("url") or self.config.tg_channel
+                self.show(su["tg_id"], "📢 <b>Аввал ба канали мо обуна шавед</b>\nСначала подпишитесь на наш Telegram-канал, "
+                                       "потом нажмите «Проверить».",
+                          [[("📢 Обуна шудан · Подписаться", None, url)], [("🔄 Санҷидан · Проверить", "rfc", "success")],
+                           [(tr(su["lang"], "home"), "h")]])
+                return
+            self.state[su["tg_id"]] = {"step": "rfig"}
+            self.show(su["tg_id"], "⚠️ " + _e(code) + "\n\nНапишите ник ещё раз, например <code>@ali_2006</code>",
+                      [[(tr(su["lang"], "home"), "h")]])
+            return
+        self.state.pop(su["tg_id"], None)
+        new = got["new_tickets"]
+        note = ("🎉 <b>Шумо иштирок мекунед! · Вы участвуете!</b>"
+                + (f"\n🎟 Чипта · билет: <b>{', '.join(f'№ {n:04d}' for n in new)}</b>" if new else ""))
+        self.screen_raffle(conn, su, note=note)
 
     # экраны
     def _user(self, conn: sqlite3.Connection, su: sqlite3.Row) -> sqlite3.Row:
@@ -1673,7 +1753,9 @@ class ShopBot:
                         else [(tr(lang, "games"), "g:games:0"), (tr(lang, "tg"), "g:tg:0")])
         if bottour.enabled(conn):
             rows.append([("🏆 Турнир друзей — призы", "tour", "success", bottour.badge(conn).get("emoji_id"))])
-        from . import giveaway
+        from . import giveaway, raffle
+        if raffle.active(conn):
+            rows.append([("🎁 Қуръакашӣ · Розыгрыш призов", "rf", "success")])
         if giveaway.live(conn):
             rows.append([("🎟 Проверить промокод", "gw", "success")])
         rows += [[(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
@@ -2008,6 +2090,8 @@ class ShopBot:
         elif step == "gw":
             self.state.pop(tg_id, None)
             self.giveaway_try(conn, su, text)
+        elif step == "rfig":   # ник Instagram для розыгрыша
+            self.raffle_join(conn, su, text)
         elif step == "receipt":
             self.show(tg_id, tr(lang, "need_receipt", id=st["pid"]))
         else:
@@ -2035,6 +2119,17 @@ class ShopBot:
             return
         elif head == "tour":
             self.screen_tour(conn, su, mid)
+        elif head == "rf":
+            self.state.pop(tg_id, None)
+            self.screen_raffle(conn, su, mid)
+        elif head == "rfj":   # «Участвую» — ждём ник Instagram
+            self.state[tg_id] = {"step": "rfig"}
+            self.show(tg_id, "📸 <b>Номи Instagram-и худро нависед</b>\nНапишите свой ник в Instagram, например "
+                             "<code>@ali_2006</code>.\n\nМо обунаро дар пахши мустақим месанҷем · подписку проверим в прямом эфире.",
+                      [[(tr(lang, "home"), "h")]], edit=mid)
+        elif head == "rfc":   # подписался на канал — проверить ещё раз
+            self.raffle_join(conn, su, (st or {}).get("nick", "")) if st and st.get("step") == "rfsub" \
+                else self.screen_raffle(conn, su, mid)
         elif head == "gw":   # «🎟 Проверить промокод» — ждём код
             self.state[tg_id] = {"step": "gw"}
             self.show(tg_id, "🎟 <b>Проверить промокод · Санҷиши рамз</b>\n\nНапишите промокод из нашего канала, "
@@ -2541,8 +2636,14 @@ class ShopBot:
                            [(tr(w["lang"], "home"), "h")]]
                 from .buyernotify import mark
                 if mark(conn, "order", o["id"]):   # одно событие — одно сообщение
-                    self.show(w["chat_id"], self.order_text(conn, w["lang"], o), rows_kb,
-                              effect=EFFECT_PARTY if status == "completed" else None)
+                    extra = ""
+                    if status == "completed":
+                        from . import raffle
+                        extra = raffle.new_ticket_note(conn, o["user_id"])
+                        if extra:
+                            rows_kb.insert(0, [("🎁 Қуръакашӣ · Розыгрыш", "rf", "success")])
+                    self.show(w["chat_id"], self.order_text(conn, w["lang"], o) + ("\n\n" + extra if extra else ""),
+                              rows_kb, effect=EFFECT_PARTY if status == "completed" else None)
                     if status == "completed":
                         with contextlib.suppress(Exception):
                             self.tour_bought(conn, o["user_id"], o["id"])

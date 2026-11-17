@@ -332,6 +332,7 @@ nav.tabs button.on { color: var(--text); } nav.tabs button.on svg { color: var(-
 </header>
 <div id="friday" class="friday hidden"></div>
 {% if banners %}<div class="bnr-wrap" id="ads">{% include "_banners.html" %}</div>{% endif %}
+<div id="rfbox"></div>
 <main id="view"><div class="skel" style="height:250px;border-radius:28px"></div><div class="skel"></div></main>
 <p class="foot" data-t="indep"></p>
 
@@ -999,6 +1000,60 @@ async function refresh(first) {
   if (first) ping();
 }
 refresh(true);
+/* ── Розыгрыш за покупки: баннер с прогрессом и «Участвую» — всё внутри приложения ── */
+let RF = null, RFOPEN = false;
+const rfEsc = x => String(x == null ? "" : x).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function rfDraw() {
+  const box = document.getElementById("rfbox"); if (!box) return;
+  if (!RF) { box.innerHTML = ""; return; }
+  const m = ["🥇", "🥈", "🥉"], pad = n => "№ " + String(n).padStart(4, "0");
+  let mine;
+  if (RF.joined && RF.tickets.length) mine = `<b class="rf-ok">✓ Шумо иштирок мекунед! <small>Вы участвуете · билетов: ${RF.tickets.length}</small></b>
+      <div class="rf-tk">${RF.tickets.slice(0, 8).map(n => `<i>${pad(n)}</i>`).join("")}${RF.tickets.length > 8 ? `<i>+${RF.tickets.length - 8}</i>` : ""}</div>
+      <small>Боз $${RF.next_need} харед — боз 1 чипта · ещё $${RF.next_need} — ещё 1 билет</small>`;
+  else mine = `<b class="rf-need">${RF.percent >= 100 ? "Харид кофист! <small>Покупок достаточно — нажмите «Участвую»</small>" : `Боз <em>$${RF.need}</em> харед <small>Купите ещё на $${RF.need} — и вы участвуете</small>`}</b>
+      <div class="rf-bar"><i style="width:${RF.percent}%"></i></div><div class="rf-pp"><span>$${RF.spent} аз $${RF.min_usd}</span><b>${RF.percent}%</b></div>`;
+  const prizes = RF.prizes.map(r => `<li><span>${r.from === r.to ? (m[r.from - 1] || "🎁") + " Ҷои " + r.from + " · " + r.from + " место" : "🎁 " + r.from + "–" + r.to + " · " + r.n + " нафар / чел."}</span><b>${r.tjs} с.</b></li>`).join("");
+  box.innerHTML = `<section class="rfm ${RFOPEN ? "open" : ""}">
+    <button class="rfm-head press" type="button" id="rf-toggle" aria-expanded="${RFOPEN}">
+      <span class="rfm-chip">🎁 Қуръакашӣ · Розыгрыш</span>
+      <span class="rfm-h">${RF.winners_n} ғолиб <small>· ${RF.winners_n} победителей</small></span>
+      <span class="rfm-pr">${RF.top.map((p, i) => `<i>${m[i]} ${p} с.</i>`).join("")}</span>
+      <span class="rfm-d">${RF.days} рӯз · дн. — ${RF.draw} пахши мустақим дар Instagram</span>
+    </button>
+    <div class="rfm-me">${mine}</div>
+    <div class="rfm-more">
+      <ul class="rfm-pz">${prizes}</ul>
+      <ol class="rfm-st"><li>Барои худ аз $${RF.min_usd} харед <small>Купите для себя от $${RF.min_usd}</small></li>
+        <li>Ба канали Telegram обуна шавед <small>Подписка на канал — проверим сами</small>${RF.channel_url ? ` <a data-rfl="${rfEsc(RF.channel_url)}">Канал →</a>` : ""}</li>
+        <li>Ба Instagram обуна шавед <small>Подписка на Instagram — проверим в эфире</small>${RF.instagram_url ? ` <a data-rfl="${rfEsc(RF.instagram_url)}">Instagram →</a>` : ""}</li>
+        <li>Ҳар $${RF.min_usd} = 1 чипта <small>Каждые $${RF.min_usd} = 1 билет</small></li></ol>
+      ${RF.closed ? "" : `<label class="rfm-l" for="rf-ig">Номи Instagram-и шумо · ваш ник Instagram</label>
+      <div class="rfm-row"><input id="rf-ig" value="${rfEsc(RF.instagram)}" placeholder="@ali_2006" maxlength="60" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <button class="rfm-btn press" type="button" id="rf-join">${RF.joined ? "Сабт · Сохранить" : "Иштирок мекунам · Участвую"}</button></div>
+      ${RF.joined ? "" : `<small>Бе ин тугма иштирок ҳисоб намешавад · без этой кнопки участие не считается.</small>`}`}
+    </div>
+    ${RFOPEN ? "" : `<button class="rfm-btn press wide" type="button" id="rf-open">${RF.joined ? "Муфассал · Подробнее" : "Иштирок кардан · Участвовать"}</button>`}
+  </section>`;
+}
+async function rfLoad() { try { const r = await api("raffle", {}); RF = r && r.raffle || null; rfDraw(); } catch (e) {} }
+document.addEventListener("click", async e => {
+  const l = e.target.closest("[data-rfl]");
+  if (l) { haptic(); try { /t\.me\//.test(l.dataset.rfl) ? tg.openTelegramLink(l.dataset.rfl) : tg.openLink(l.dataset.rfl); } catch (x) { window.open(l.dataset.rfl, "_blank"); } return; }
+  if (e.target.closest("#rf-toggle") || e.target.closest("#rf-open")) { RFOPEN = !RFOPEN; haptic(); rfDraw(); if (RFOPEN) { const i = document.getElementById("rf-ig"); i && !RF.joined && i.focus({preventScroll: true}); } return; }
+  const j = e.target.closest("#rf-join");
+  if (j) {
+    const nick = document.getElementById("rf-ig").value.trim();
+    if (!nick) { toast("Номи Instagram-ро нависед · напишите ник Instagram", "bad"); return; }
+    j.disabled = true; haptic("medium");
+    const r = await api("raffle", {join: 1, instagram: nick});
+    if (r.raffle) RF = r.raffle;
+    if (r.ok) { haptic("heavy"); toast("Шумо иштирок мекунед! · Вы участвуете!" + (r.new_tickets && r.new_tickets.length ? " № " + r.new_tickets.join(", ") : ""), "ok"); }
+    else { toast(r.error || "Хато / Ошибка", "bad"); if (r.code === "NEED_SUB" && RF && RF.channel_url) { try { tg.openTelegramLink(RF.channel_url); } catch (x) {} } }
+    rfDraw();
+  }
+});
+rfLoad();
 })();
 
 // ── Анимация подарков как в Telegram: Lottie (из .tgs) или видео-стикер. Пока не загрузилась — картинка.
@@ -1039,6 +1094,35 @@ const watchAnims = () => document.querySelectorAll(".pic[data-anim]:not([data-se
 });
 new MutationObserver(watchAnims).observe(document.body, {childList: true, subtree: true});
 watchAnims();
+
 </script>
+<style>
+.rfm { position: relative; margin: 12px 16px 4px; padding: 16px; border-radius: 24px; color: #fff; overflow: hidden; display: grid; gap: 10px;
+  background: radial-gradient(120% 140% at 100% 0%, #a855f7 0%, #6d28d9 42%, #3b1fa8 100%); box-shadow: 0 10px 28px rgba(109, 40, 217, .35); }
+.rfm::before { content: ""; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #ffd54a 0%, rgba(255,213,74,0) 70%); opacity: .45; }
+.rfm small { display: block; font-weight: 500; font-size: 12.5px; opacity: .85; line-height: 1.35; }
+.rfm-head { all: unset; display: grid; gap: 6px; cursor: pointer; position: relative; }
+.rfm-chip { width: max-content; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); }
+.rfm-h { font-size: 24px; font-weight: 900; line-height: 1.1; } .rfm-h small { display: inline; font-size: 15px; font-weight: 700; }
+.rfm-pr { display: flex; flex-wrap: wrap; gap: 6px; } .rfm-pr i { font-style: normal; font-weight: 800; font-size: 13.5px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.16); }
+.rfm-d { font-size: 12.5px; opacity: .9; }
+.rfm-me { position: relative; background: rgba(255,255,255,.12); border-radius: 16px; padding: 12px; display: grid; gap: 6px; }
+.rf-need, .rf-ok { font-size: 18px; font-weight: 900; line-height: 1.2; } .rf-need em { font-style: normal; color: #ffd54a; } .rf-ok { color: #bbf7d0; }
+.rf-bar { height: 12px; border-radius: 99px; background: rgba(255,255,255,.22); overflow: hidden; } .rf-bar i { display: block; height: 100%; border-radius: 99px; background: #ffd54a; transition: width .5s ease; }
+.rf-pp { display: flex; justify-content: space-between; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.rf-tk { display: flex; flex-wrap: wrap; gap: 6px; } .rf-tk i { font-style: normal; font-weight: 800; font-size: 13px; padding: 5px 9px; border-radius: 9px; border: 1px dashed #ffd54a; color: #ffd54a; }
+.rfm-more { display: none; position: relative; gap: 10px; } .rfm.open .rfm-more { display: grid; }
+.rfm-pz, .rfm-st { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.rfm-pz li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,.22); } .rfm-pz b { font-weight: 900; }
+.rfm-st { counter-reset: s; } .rfm-st li { counter-increment: s; padding-left: 28px; position: relative; font-weight: 700; }
+.rfm-st li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 6px; background: rgba(255,255,255,.2); display: grid; place-items: center; font-size: 12px; }
+.rfm-st a { color: #ffd54a; font-weight: 800; font-size: 13px; cursor: pointer; }
+.rfm-l { font-weight: 800; font-size: 14px; } .rfm-row { display: grid; gap: 8px; }
+.rfm-row input { min-height: 48px; border-radius: 14px; border: 0; padding: 0 14px; font-size: 16px; background: #fff; color: #17142e; }
+.rfm-btn { min-height: 48px; border: 0; border-radius: 14px; padding: 0 16px; background: #ffd54a; color: #2a1a00; font-weight: 900; font-size: 15px; cursor: pointer; position: relative; }
+.rfm-btn.wide { width: 100%; } .rfm-btn:disabled { opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .rf-bar i { transition: none; } }
+</style>
 </body>
 </html>

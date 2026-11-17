@@ -1,0 +1,96 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon, place %}
+{% block title %}Розыгрыш — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Розыгрыш за покупки</h1>
+  <p>Клиент покупает для себя от ${{ c.min_usd }} (сайт, бот, приложение), нажимает «Участвую» и пишет ник Instagram — получает билеты:
+    каждые ${{ c.min_usd }} = 1 билет. Подписку на Telegram-канал проверяет бот. Итоги — здесь, кнопкой, в прямом эфире.</p></section>
+
+<div class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px">
+  <div style="flex:1;min-width:200px">
+    <b>{% if c.on and c.start %}<span style="color:var(--ok)">● Идёт</span>{% elif c.start %}⏸ Пауза{% else %}Не запущен{% endif %}</b>
+    {% if c.start %}<div class="muted" style="font-size:13px">Покупки считаются с {{ c.start[:16].replace('T', ' ') }} UTC · итоги {{ c.draw }}</div>{% endif %}
+    <div class="muted" style="font-size:13px">Участников: <b>{{ b.participants }}</b> · с билетами: <b>{{ b.with_tickets }}</b> · билетов: <b>{{ b.tickets }}</b></div>
+  </div>
+  <form method="post" action="/admin/raffle"><input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if c.on and c.start %}<button class="btn" name="action" value="stop">Пауза (скрыть)</button>
+    {% else %}<button class="btn primary" name="action" value="start">▶ Запустить розыгрыш</button>{% endif %}</form>
+</div>
+{% if not c.channel.chat_id %}<div class="flash error"><span>Не указан канал для проверки — подписка на Telegram НЕ проверяется. Впишите ниже @имя_канала или ID и сделайте бот-магазин администратором канала.</span></div>{% endif %}
+{% if not shop_bot %}<div class="flash error"><span>Бот-магазин не подключён — проверить подписку на канал нечем.</span></div>{% endif %}
+
+<section class="card" id="stage" style="margin-bottom:12px">
+  <h2 style="margin-top:0">🎥 Прямой эфир — выбор победителей</h2>
+  {% if b.pending %}{% set w = b.pending %}
+  <div class="rf-stage">
+    <div class="rf-place">{{ w.place }} место · {{ w.prize_tjs }} сомони</div>
+    <div class="rf-ticket">№ {{ '%04d' % w.ticket }}</div>
+    <div class="rf-who">{{ w.tg_name or w.login }}</div>
+    <div class="rf-checks">
+      <span class="{{ 'ok' if w.tg_ok else 'bad' }}">Telegram-канал: {% if w.tg_ok %}✅ подписан{% elif w.tg_ok == 0 %}❌ НЕ подписан{% else %}❓ не проверено{% endif %}</span>
+      <span>Instagram: {% if w.instagram %}<a href="https://instagram.com/{{ w.instagram }}" target="_blank" rel="noopener"><b>@{{ w.instagram }}</b> — открыть и проверить ↗</a>{% else %}—{% endif %}</span>
+    </div>
+    <form method="post" action="/admin/raffle" class="rf-actions"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn primary" name="action" value="confirm">✅ Подтвердить — приз на баланс</button>
+      <button class="btn" name="action" value="redraw" onclick="return confirm('Этот победитель не прошёл проверку? Его билет сгорит, выберем другого.')">🔄 Перевыбрать</button>
+    </form>
+  </div>
+  {% elif b.next_place %}
+  <form method="post" action="/admin/raffle" class="rf-stage"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="rf-place">Следующее: {{ b.next_place }} место · {{ b.places[b.next_place - 1].tjs }} сомони</div>
+    <p class="muted">Осталось разыграть мест: {{ b.left }}. Идём с последнего места к первому. После первого выбора новые билеты не выдаются.</p>
+    <button class="btn primary rf-big" name="action" value="draw" {{ 'disabled' if not b.tickets }}>🎲 Выбрать победителя</button>
+    {% if not b.tickets %}<p class="muted">Пока нет ни одного билета.</p>{% endif %}
+  </form>
+  {% else %}<div class="rf-stage"><div class="rf-place">🎉 Все места разыграны</div></div>{% endif %}
+
+  <div class="table-wrap" style="margin-top:14px"><table>
+    <thead><tr><th>Место</th><th>Приз</th><th>Билет</th><th>Победитель</th><th>Instagram</th><th>Статус</th></tr></thead>
+    <tbody>{% for p in b.places %}<tr>
+      <td>{{ p.place }}</td><td>{{ p.tjs }} с.</td>
+      {% if p.w %}<td>№ {{ '%04d' % p.w.ticket }}</td><td><a href="/admin/users/{{ p.w.user_id }}">{{ p.w.tg_name or p.w.login }}</a></td>
+        <td>{% if p.w.instagram %}@{{ p.w.instagram }}{% endif %}</td><td>{{ '✅ приз зачислен' if p.w.status == 'paid' else '⏳ ждёт проверки' }}</td>
+      {% else %}<td colspan="4" class="muted">—</td>{% endif %}</tr>{% endfor %}</tbody></table></div>
+</section>
+
+<form class="card" method="post" action="/admin/raffle" style="display:grid;gap:10px;margin-bottom:12px">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="save">
+  <h2 style="margin:0">Настройки</h2>
+  <label>Призы — каждая строка «сколько мест x сомони», сверху вниз с 1 места<textarea name="prizes" rows="5">{{ prizes_text }}</textarea></label>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+    <label>Дата итогов<input type="date" name="draw" value="{{ c.draw }}"></label>
+    <label>Минимум покупок, $ (= 1 билет)<input name="min_usd" inputmode="numeric" value="{{ c.min_usd }}"></label>
+  </div>
+  <label>Канал для проверки подписки: @имя_канала или ID (-100…)<input name="channel_id" value="{{ c.channel.chat_id or '' }}" placeholder="@donatix_tj"></label>
+  <label>Ссылка на канал (если канал закрытый — пригласительная)<input name="channel_url" value="{{ c.channel.url or '' }}" placeholder="https://t.me/…"></label>
+  <label>Наш Instagram (ник или ссылка)<input name="instagram" value="{{ c.instagram }}" placeholder="donatix.tj"></label>
+  <span class="muted" style="font-size:13px">Бот-магазин должен быть администратором канала — иначе Telegram не даёт проверять подписку.</span>
+  <button class="btn primary" style="justify-self:start">Сохранить</button>
+</form>
+
+<section class="card" style="margin-bottom:12px"><h2 style="margin-top:0">Участники ({{ b.participants }})</h2>
+  <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Instagram</th><th>Telegram</th><th>Покупки</th><th>Билеты</th></tr></thead>
+  <tbody>{% for p in people %}<tr><td><a href="/admin/users/{{ p.user_id }}">{{ p.login }}</a></td>
+    <td><a href="https://instagram.com/{{ p.instagram }}" target="_blank" rel="noopener">@{{ p.instagram }}</a></td>
+    <td>{{ '✅' if p.tg_ok else ('❌' if p.tg_ok == 0 else '❓') }}</td><td>${{ p.spent }}</td><td><b>{{ p.tickets }}</b></td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Пока никто не нажал «Участвую».</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<form class="card" method="post" action="/admin/raffle" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="reset">
+  <span class="muted" style="flex:1;min-width:220px;font-size:13px">Новый розыгрыш с нуля: стереть участников, билеты и победителей. Напишите слово СБРОС.</span>
+  <input name="sure" placeholder="СБРОС" style="width:110px" autocomplete="off"><button class="btn">Сбросить</button>
+</form>
+<style>
+.rf-stage { text-align: center; padding: 22px 12px; border-radius: 18px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, #a855f7 0%, #6d28d9 42%, #3b1fa8 100%); }
+.rf-stage .muted { color: rgba(255,255,255,.8); }
+.rf-place { font-size: 1.2rem; font-weight: 800; }
+.rf-ticket { font-size: clamp(3.2rem, 14vw, 7rem); font-weight: 900; line-height: 1; margin: 10px 0; color: #ffd54a; font-variant-numeric: tabular-nums; }
+.rf-who { font-size: 1.6rem; font-weight: 800; }
+.rf-checks { display: grid; gap: 6px; margin: 12px 0; font-size: 1rem; } .rf-checks a { color: #ffd54a; }
+.rf-checks .bad { color: #fecaca; font-weight: 800; }
+.rf-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.rf-big { font-size: 1.2rem; min-height: 60px; padding: 0 28px; background: #ffd54a; color: #2a1a00; border: 0; font-weight: 900; }
+</style>
+{% endblock %}

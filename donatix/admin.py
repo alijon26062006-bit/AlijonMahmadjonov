@@ -1214,6 +1214,56 @@ def promo_save(request: Request, product_id: str = Form(""), price_tjs: str = Fo
     return _back("/admin/promo")
 
 
+@router.get("/raffle")
+def raffle_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    """Розыгрыш за покупки: настройки, участники и выбор победителей в прямом эфире."""
+    from . import raffle
+    c = raffle.cfg(conn)
+    return render(request, "admin/raffle.html", {
+        "user": admin, "c": c, "b": raffle.board(conn), "people": raffle.participants(conn),
+        "prizes_text": "\n".join(f"{n} x {t}" for n, t in c["prizes"]),
+        "shop_bot": bool(config.shop_bot_token), "raffle_banner": None})
+
+
+@router.post("/raffle", dependencies=[Depends(check_csrf)])
+def raffle_admin_save(request: Request, action: str = Form(""), prizes: str = Form(""), draw: str = Form(""),
+                      min_usd: str = Form(""), instagram: str = Form(""), channel_id: str = Form(""),
+                      channel_url: str = Form(""), sure: str = Form(""), admin=Depends(admin_user),
+                      conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import raffle
+    try:
+        with db.tx(conn):
+            if action == "save":
+                raffle.save_settings(conn, {"prizes": prizes, "draw": draw, "min_usd": min_usd, "instagram": instagram,
+                                            "channel_id": channel_id, "channel_url": channel_url})
+                flash(request, "Сохранено.")
+            elif action == "start":
+                raffle.start(conn)
+                flash(request, "Розыгрыш запущен — покупки считаются с этой минуты, баннер виден всем.")
+            elif action == "stop":
+                raffle.stop(conn)
+                flash(request, "Розыгрыш скрыт (пауза). Участники и билеты сохранены.")
+            elif action == "draw":
+                w = raffle.draw_next(conn, config)
+                flash(request, f"Место {w['place']}: билет № {w['ticket']:04d}. Проверьте подписки и подтвердите.")
+            elif action == "redraw":
+                raffle.redraw(conn)
+                w = raffle.draw_next(conn, config)
+                flash(request, f"Перевыбрано. Место {w['place']}: билет № {w['ticket']:04d}.")
+            elif action == "confirm":
+                w = raffle.confirm(conn, config)
+                flash(request, f"Место {w['place']}: приз {w['prize_tjs']} с. зачислен на баланс победителя.")
+            elif action == "reset":
+                if sure != "СБРОС":
+                    raise raffle.RaffleError("Чтобы стереть участников и билеты, напишите слово СБРОС.")
+                raffle.reset(conn)
+                flash(request, "Розыгрыш сброшен: участники, билеты и победители стёрты.")
+    except raffle.RaffleError as exc:
+        flash(request, str(exc), "error")
+    return _back("/admin/raffle" + ("#stage" if action in ("draw", "redraw", "confirm") else ""))
+
+
 @router.get("/contest")
 def contest_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):

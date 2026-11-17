@@ -65,7 +65,8 @@ def viewer(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
 def _safe_next(url: str) -> str:
     """Куда вернуть после входа/регистрации: только свои страницы кабинета."""
     url = (url or "").strip()
-    return url if (url.startswith("/panel") or url == "/app") and not url.startswith("//") and len(url) < 500 else ""
+    return url if (url.startswith("/panel") or url in ("/app", "/raffle")) and not url.startswith("//") \
+        and len(url) < 500 else ""
 
 
 # ── Публичные страницы ───────────────────────────────────────
@@ -1002,7 +1003,16 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
         # пришёл по ссылке друга — пусть подтвердит почту, тогда другу засчитается в конкурсе недели
         "verify_mail": _needs_verify(user),
         "cst": _contest_card(conn, config, user["id"]),
+        "rf": _raffle_card(conn, config, user["id"]),
     })
+
+
+def _raffle_card(conn, config: Config, user_id: int):
+    from . import raffle
+    try:
+        return raffle.status(conn, config, user_id)
+    except sqlite3.Error:
+        return None
 
 
 def _contest_card(conn, config: Config, user_id: int):
@@ -2543,6 +2553,44 @@ async def panel_live(request: Request, once: int = 0):
 
 
 # ── Отзывы покупателей ───────────────────────────────────
+
+
+# ── Розыгрыш за покупки ──
+
+RAFFLE_ERRORS = {
+    "NEED_TG": "Сначала привяжите Telegram — так мы автоматически проверим подписку на канал. / "
+               "Аввал Telegram-ро пайваст кунед.",
+    "NEED_SUB": "Вы ещё не подписаны на наш Telegram-канал. Подпишитесь и нажмите «Участвую» ещё раз. / "
+                "Шумо ба канали Telegram обуна нестед. Обуна шавед ва боз пахш кунед.",
+}
+
+
+@router.get("/raffle")
+def raffle_page(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import raffle
+    user = session_user(request, conn)
+    st = raffle.status(conn, config, user["id"] if user and user["role"] != "admin" else None)
+    return render(request, "raffle.html", {
+        "user": user, "rf": st, "winners": raffle.public_winners(conn) if st else [],
+        "tg_bot": db.get_setting(conn, "shop.bot_username") or "", "tg_login_on": bool(config.tg_login)})
+
+
+@router.post("/raffle/join", dependencies=[Depends(check_csrf)])
+def raffle_join(request: Request, instagram: str = Form(""), conn=Depends(get_conn),
+                config: Config = Depends(get_config)):
+    from . import raffle
+    user = session_user(request, conn)
+    if user is None or user["role"] == "admin":
+        return _redirect("/login?next=/raffle")
+    try:
+        with db.tx(conn):
+            got = raffle.join(conn, config, user["id"], instagram)
+    except raffle.RaffleError as exc:
+        flash(request, RAFFLE_ERRORS.get(str(exc), str(exc)), "error")
+        return _redirect("/raffle#join")
+    flash(request, "Вы участвуете! / Шумо иштирок мекунед!" + (
+        " Билет: " + ", ".join(f"№ {n:04d}" for n in got["new_tickets"]) if got["new_tickets"] else ""))
+    return _redirect("/raffle#me")
 
 
 @router.get("/reviews")

@@ -389,6 +389,12 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         _bc = _bp.acquire()
         try:
             ctx["banners"] = banners.active(_bc)
+            if "raffle_banner" not in ctx and request.url.path != "/raffle":   # баннер розыгрыша — на всех страницах
+                from . import raffle
+                try:
+                    ctx["raffle_banner"] = raffle.status(_bc, config, None)
+                except sqlite3.Error:
+                    ctx["raffle_banner"] = None
         finally:
             _bp.release(_bc)
     ctx["csrf"] = csrf_token(request)

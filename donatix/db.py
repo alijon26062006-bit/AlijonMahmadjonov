@@ -458,6 +458,8 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE payments ADD COLUMN card_id INTEGER")
         from .paycards import SCHEMA as _CARDS
         conn.executescript(_CARDS)
+        from .raffle import SCHEMA as _RAFFLE   # розыгрыш за покупки: участники, билеты, победители
+        conn.executescript(_RAFFLE)
         if "boosted_at" not in pay_cols:   # клиент нажал «Ускорить» — когда (не чаще раза в 10 минут)
             conn.execute("ALTER TABLE payments ADD COLUMN boosted_at TEXT")
         for col in ("receipt_ai", "receipt_txn", "receipt_fp", "receipt_fp2", "receipt_phash"):   # от повторов чеков
