@@ -489,7 +489,7 @@ def _pay_info(request: Request, conn, config: Config, user) -> dict[str, Any]:
     methods = [{"code": m["code"], "title": m["title"], "icon": m["icon_url"], "auto": m["auto"],
                 "currency": m["currency"], "net": m["net_short"], "network": m["network"],
                 "details": "" if m["auto"] else m["details"], "min_usd": m["min_usd"], "max_usd": m["max_usd"]}
-               for m in _pay_methods(request, conn, config)]
+               for m in _pay_methods(request, conn, config, user["id"])]
     video = dcvideo.needed(conn, user["id"], "site")
     return {"methods": methods, "min_tjs": str(conf["min_tjs"]), "min_usd": str(conf["min_usd"]),
             "crypto_only": _crypto_only(request),
@@ -541,7 +541,8 @@ async def api_topup(request: Request, conn=Depends(get_conn), config: Config = D
     elif not data:
         return {"ok": False, "error": "Чеки пардохтро замима кунед — акс ё PDF. / Прикрепите чек об оплате — фото или PDF."}
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)
-    details = payments.settings(conn, config)["details"].get(method, "")
+    from . import paycards
+    details = paycards.all_details(conn, method, payments.settings(conn, config)["details"].get(method, ""))
     seen = payments.read_receipt(config, data, details) if data else None
     try:
         with db.tx(conn):

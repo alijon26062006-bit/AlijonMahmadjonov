@@ -454,6 +454,10 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_tg TEXT")
         if "receipt_hash" not in pay_cols:  # один чек — одна заявка: тот же файл второй раз не примем
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_hash TEXT")
+        if "card_id" not in pay_cols:   # несколько карт на банк: на какую карту заявка (paycards.py)
+            conn.execute("ALTER TABLE payments ADD COLUMN card_id INTEGER")
+        from .paycards import SCHEMA as _CARDS
+        conn.executescript(_CARDS)
         if "boosted_at" not in pay_cols:   # клиент нажал «Ускорить» — когда (не чаще раза в 10 минут)
             conn.execute("ALTER TABLE payments ADD COLUMN boosted_at TEXT")
         for col in ("receipt_ai", "receipt_txn", "receipt_fp", "receipt_fp2", "receipt_phash"):   # от повторов чеков

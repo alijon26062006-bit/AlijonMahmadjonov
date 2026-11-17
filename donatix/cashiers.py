@@ -154,6 +154,20 @@ def handles(conn: sqlite3.Connection, config: Config, row: sqlite3.Row | None, m
     return codes is None or method in codes
 
 
+def may_decide(conn: sqlite3.Connection, config: Config, row: sqlite3.Row | None, payment: sqlite3.Row) -> bool:
+    """Решать заявку: если у неё своя карта — только хозяин карты (или кассир с полными правами);
+    иначе — как раньше, по банкам кассира."""
+    if row is None or not row["active"]:
+        return False
+    card_id = payment["card_id"] if "card_id" in payment.keys() else None
+    if card_id:
+        from .paycards import get
+        card = get(conn, card_id)
+        if card is not None:
+            return is_full(row) or (bool(card["owner_tg"]) and card["owner_tg"] == row["tg_id"])
+    return handles(conn, config, row, payment["method"])
+
+
 def _is_auto(conn: sqlite3.Connection, config: Config, method: str) -> bool:
     from .payments import is_auto
     return is_auto(conn, config, method)

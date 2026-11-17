@@ -504,8 +504,8 @@ class AdminBot:
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Неизвестная кнопка")
             return
         if what == "pay" and action in ("ok", "no"):
-            p = conn.execute("SELECT method, user_id FROM payments WHERE id = ?", (obj_id,)).fetchone()
-            if p is None or not cashiers.handles(conn, self.config, cashier, p["method"]):
+            p = conn.execute("SELECT * FROM payments WHERE id = ?", (obj_id,)).fetchone()
+            if p is None or not cashiers.may_decide(conn, self.config, cashier, p):
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Этот банк вам не назначен")
                 return
             # Кнопка — только под настоящим сообщением с этим чеком (подделанную кнопку не принимаем)
@@ -550,9 +550,9 @@ class AdminBot:
 
     def send_cashier_payments(self, conn: sqlite3.Connection, cashier: sqlite3.Row) -> int:
         """Ожидающие заявки с чеком по банкам кассира — заново, с кнопками."""
-        rows = conn.execute("SELECT id, method FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL "
+        rows = conn.execute("SELECT * FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL "
                             "ORDER BY id LIMIT 30").fetchall()
-        mine = [r["id"] for r in rows if cashiers.handles(conn, self.config, cashier, r["method"])][:10]
+        mine = [r["id"] for r in rows if cashiers.may_decide(conn, self.config, cashier, r)][:10]
         for pid in mine:
             send_receipt(conn, self.config, pid, only_chat=cashier["tg_id"])
         return len(mine)
@@ -788,9 +788,7 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import cashiers
     from .payments import receipts_dir
     from .worker import notify_admin_file
-    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency, created_at FROM payments "
-                     "WHERE id = ?",
-                     (payment_id,)).fetchone()
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     if not p or not p["receipt_file"]:
         return
     _, buttons = payment_event(conn, payment_id, config)
@@ -798,9 +796,19 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     caption = (note + "\n\n" if note else "") + receipt_text(conn, config, payment_id)
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
+    from . import paycards
+    card = paycards.get(conn, p["card_id"]) if "card_id" in p.keys() else None
+    owner = cashiers.active(conn, card["owner_tg"]) if card is not None and card["owner_tg"] else None
+    if card is not None and owner is not None:   # карта кассира — чек только ему
+        if only_chat is None or only_chat == owner["tg_id"]:
+            mid = cashiers.send_file(config, owner["tg_id"], caption, buttons, path, photo=photo)
+            cashiers.remember(conn, payment_id, owner["tg_id"], mid, caption)
+        return
     if only_chat is None:
         mid = notify_admin_file(config, caption, buttons, path, photo=photo)
         cashiers.remember(conn, payment_id, str(config.alert_telegram_chat_id).strip(), mid, caption)
+    if card is not None:   # карта владельца (или кассир выключен) — только в админ-чат
+        return
     for c in cashiers.targets(conn, config, p["method"]):
         if only_chat is not None and c["tg_id"] != only_chat:
             continue
@@ -828,8 +836,14 @@ def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> s
     seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
     if p["receipt_file"] and not receipt_ai.enabled(config) and seen and seen.get("dup_of"):
         text += f"\n⚠️⚠️ ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{seen['dup_of']}. Сверьте поступление в банке!"
+    from . import paycards
+    card = paycards.get(conn, p["card_id"]) if "card_id" in p.keys() else None
+    if card is not None:
+        text += f"\n💳 Карта ****{paycards.tail(card)}"
+    if seen and seen.get("card_note"):
+        text += "\n" + _e(seen["card_note"])
     if p["receipt_file"] and receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
-        details = payments.settings(conn, config)["details"].get(p["method"], "")
+        details = paycards.all_details(conn, p["method"], payments.settings(conn, config)["details"].get(p["method"], ""))
         text += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "",
                                              our_details=details, created_at=p["created_at"]))
     return text
@@ -881,12 +895,12 @@ def cashier_own_users(conn: sqlite3.Connection, tg_id: int) -> set[int]:
 
 def queue_ids(conn: sqlite3.Connection, config: Config, cashier: sqlite3.Row | None = None) -> list[int]:
     """Чеки, которые ждут решения: админу — все, кассиру — по его банкам и не свои."""
-    rows = conn.execute("SELECT id, method, user_id FROM payments WHERE status = 'pending' "
+    rows = conn.execute("SELECT * FROM payments WHERE status = 'pending' "
                         "AND receipt_file IS NOT NULL ORDER BY id").fetchall()
     if cashier is None:
         return [r["id"] for r in rows]
     own = cashier_own_users(conn, int(cashier["tg_id"]))
-    return [r["id"] for r in rows if r["user_id"] not in own and cashiers.handles(conn, config, cashier, r["method"])]
+    return [r["id"] for r in rows if r["user_id"] not in own and cashiers.may_decide(conn, config, cashier, r)]
 
 
 def find_payments(conn: sqlite3.Connection, config: Config, query: str,

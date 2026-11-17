@@ -823,6 +823,36 @@ def giveaway_action(request: Request, action: str = Form(""), count: str = Form(
     return RedirectResponse("/admin/giveaway", status_code=303)
 
 
+@router.get("/cards")
+def cards_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    """Несколько карт на банк: кому показывается какая, сколько пришло сегодня, чья карта."""
+    from . import cashiers, payments, paycards
+    config = request.app.state.config
+    banks = [m for m in payments.methods(conn, config) if not payments.is_auto(conn, config, m["code"])]
+    rows = paycards.report(conn, config.tz_offset)
+    titles = {m["code"]: m["title"] for m in payments.methods(conn, config)}
+    return render(request, "admin/cards.html", {"user": admin, "banks": banks, "rows": rows, "titles": titles,
+                                                "cashiers": cashiers.listing(conn), "rate": float(payments.settings(conn, config)["tjs_rate"])})
+
+
+@router.post("/cards", dependencies=[Depends(check_csrf)])
+def cards_save(request: Request, action: str = Form(""), card_id: int = Form(0), method: str = Form(""),
+               details: str = Form(""), owner_tg: int = Form(0), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import paycards
+    try:
+        if action == "add":
+            paycards.add(conn, method, details, owner_tg)
+            flash(request, "Карта добавлена — клиенты начнут её получать сразу.")
+        elif action in ("on", "off"):
+            paycards.set_active(conn, card_id, action == "on")
+        elif action == "delete":
+            paycards.delete(conn, card_id)
+            flash(request, "Карта удалена.")
+    except paycards.CardError as exc:
+        flash(request, str(exc), "error")
+    return RedirectResponse("/admin/cards", status_code=303)
+
+
 @router.get("/refunds")
 def refunds_page(request: Request, only: str = "", fmt_: str = Query("", alias="format"), admin=Depends(admin_user),
                  conn=Depends(get_conn)):

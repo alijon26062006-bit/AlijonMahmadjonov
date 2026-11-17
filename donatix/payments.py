@@ -413,6 +413,11 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (user["id"], method, to_micro(usd), pay, cur, reference.strip()[:200] or None, db.now()),
     )
+    if not chosen.get("auto"):   # несколько карт у банка: в заявку — та карта, что показали этому клиенту
+        from . import paycards
+        card = paycards.pick(conn, user["id"], method, config.tz_offset)
+        if card is not None:
+            conn.execute("UPDATE payments SET card_id = ? WHERE id = ?", (card["id"], c.lastrowid))
     return int(c.lastrowid)
 
 
@@ -811,7 +816,8 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     from . import receipt_ai
     p = conn.execute("SELECT method, created_at FROM payments WHERE id = ? AND user_id = ?",
                      (payment_id, user_id)).fetchone()
-    details = settings(conn, config)["details"].get(p["method"], "") if p else ""
+    from . import paycards
+    details = paycards.all_details(conn, p["method"], settings(conn, config)["details"].get(p["method"], "")) if p else ""
     if seen is _UNREAD:
         seen = read_receipt(config, data, details)
     _, warns = receipt_ai.file_marks(data, ext)
@@ -843,6 +849,16 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise
     if own_tx:
         conn.execute("COMMIT")
+    if seen and seen.get("recipient"):   # перевёл на другую нашу карту — заявка уходит хозяину той карты
+        note = paycards.reroute(conn, payment_id, str(seen["recipient"]))
+        if note:
+            row = conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (payment_id,)).fetchone()
+            try:
+                data_ai = json.loads(row["receipt_ai"]) if row and row["receipt_ai"] else {}
+            except ValueError:
+                data_ai = {}
+            conn.execute("UPDATE payments SET receipt_ai = ? WHERE id = ?",
+                         (json.dumps({**data_ai, "card_note": note}, ensure_ascii=False), payment_id))
     return name
 
 
@@ -940,6 +956,10 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
     """Заявка для API: без внутренних полей."""
     conf = settings(conn, config)
     details = conf["details"].get(p["method"], "")
+    if "card_id" in p.keys() and p["card_id"]:
+        from . import paycards
+        card = paycards.get(conn, p["card_id"])
+        details = card["details"] if card else details
     network = find(conf, p["method"]).get("network", "")
     return {
         "id": p["id"], "status": p["status"], "method": p["method"],

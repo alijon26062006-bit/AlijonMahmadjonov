@@ -1,0 +1,33 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Карты для оплаты — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Карты для оплаты</h1>
+  <p>Несколько карт на один банк. Клиенту показывается карта, на которую сегодня пришло меньше всего — суммы по картам выходят ровные.
+    Чек приходит <b>только хозяину карты</b>. Перевёл клиент по привычке на другую нашу карту — ИИ по номеру получателя в чеке
+    сам отправит заявку хозяину той карты. Если у банка нет ни одной включённой карты — показываются реквизиты из «Способов оплаты», как раньше.</p></section>
+<form method="post" action="/admin/cards" class="card" style="margin-bottom:16px;display:grid;gap:10px">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">
+  <b>Добавить карту</b>
+  <label>Банк<select name="method" required>{% for m in banks %}<option value="{{ m.code }}">{{ m.title }}</option>{% endfor %}</select></label>
+  <label>Реквизиты (как увидит клиент)<textarea name="details" rows="2" required placeholder="Карта 4444 5555 6666 7777&#10;Получатель: Али В."></textarea></label>
+  <label>Чья карта — кому приходят чеки<select name="owner_tg"><option value="0">Вы (владелец) — в админ-чат</option>
+    {% for c in cashiers %}<option value="{{ c.tg_id }}">Кассир {{ c.name }} ({{ c.tg_id }}){{ '' if c.active else ' — выключен' }}</option>{% endfor %}</select></label>
+  <button class="btn primary" type="submit">Добавить</button>
+</form>
+{% set ns = namespace(m='') %}
+{% for r in rows %}
+  {% if r.method != ns.m %}{% set ns.m = r.method %}<h2 style="margin:18px 0 8px">{{ titles.get(r.method, r.method) }}</h2>{% endif %}
+  <div class="card" style="margin-bottom:10px;{{ '' if r.active else 'opacity:.55' }}">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0"><b>****{{ r.tail }}</b> · {{ r.owner_name }}{% if not r.active %} · <span class="muted">выключена</span>{% endif %}
+        <div class="muted small" style="white-space:pre-line;overflow-wrap:anywhere">{{ r.details }}</div></div>
+      <div class="right"><div class="amount">{{ '%.2f' % (r.today_micro / 10000 * rate) }} с.</div><div class="muted small">сегодня · {{ r.today_n }} заявок</div></div>
+    </div>
+    <form method="post" action="/admin/cards" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="card_id" value="{{ r.id }}">
+      {% if r.active %}<button class="btn" name="action" value="off">Выключить</button>{% else %}<button class="btn" name="action" value="on">Включить</button>{% endif %}
+      <button class="btn danger" name="action" value="delete" onclick="return confirm('Удалить карту ****{{ r.tail }}?')">Удалить</button>
+    </form>
+  </div>
+{% else %}<div class="card muted">Карт пока нет — клиентам показываются реквизиты из «Способов оплаты».</div>{% endfor %}
+{% endblock %}

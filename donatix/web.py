@@ -884,9 +884,12 @@ def _no_tjs(request: Request) -> bool:
     return cur != "TJS"
 
 
-def _pay_methods(request: Request, conn, config: Config) -> list[dict]:
-    from . import payments
+def _pay_methods(request: Request, conn, config: Config, user_id: int = 0) -> list[dict]:
+    from . import paycards, payments
     ms = payments.offered(conn, config)
+    if user_id:   # несколько карт у банка — этому клиенту своя (ровно по суммам)
+        ms = [{**m, "details": paycards.details_for(conn, user_id, m["code"], m["details"], config.tz_offset)}
+              if not m.get("auto") else m for m in ms]
     if len(ms) == 1 and ms[0]["auto"] == "smartpay":   # только сумма → страница SmartPay (все банки)
         return ms
     if _crypto_only(request):
@@ -1526,7 +1529,7 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
         "buy": buy,
         "dcv": dcv, "dcv_src": dcvideo.src(config, dcv) if dcv else "",
         "pre_method": request.query_params.get("m", ""),
-        "user": user, "methods": _pay_methods(request, conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
+        "user": user, "methods": _pay_methods(request, conn, config, user["id"]), "payments": rows, "tjs_rate": conf["tjs_rate"],
         "crypto_only": _crypto_only(request), "no_tjs": not _crypto_only(request) and _no_tjs(request),
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: payments.method_label(m) for m in conf["stored"] + conf["all_methods"]},
@@ -1833,7 +1836,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     intent = quickbuy.pending(request.session) if buy == "1" else None
     if intent is not None:   # оплата покупки — сумму считаем сами, а не берём из формы
         amount, amount_tjs = "", str(quickbuy.to_pay_tjs(conn, config, intent["need"], user["balance_micro"]))
-    details = payments.settings(conn, config)["details"].get(method, "")
+    from . import paycards
+    details = paycards.all_details(conn, method, payments.settings(conn, config)["details"].get(method, ""))
     seen = payments.read_receipt(config, data, details) if data else None   # ИИ — до транзакции, базу не держим
     try:
         with db.tx(conn):
