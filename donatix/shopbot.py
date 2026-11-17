@@ -1121,12 +1121,11 @@ class ShopBot:
                 f"2️⃣ Ба канали Telegram обуна шавед · подписка на канал\n"
                 f"3️⃣ Ба Instagram обуна шавед · подписка на Instagram\n"
                 f"4️⃣ «Иштирок мекунам»-ро пахш кунед · нажмите «Участвую»\n"
-                f"⭐ Ҳар ${st['min_usd']} = 1 чипта · каждые ${st['min_usd']} = 1 билет\n\n")
+                f"🎟 Як нафар — як чипта · один человек — один билет\n\n")
         bar = "🟪" * (st["percent"] // 10) + "⬜" * (10 - st["percent"] // 10)
         if st["joined"] and st["tickets"]:
             nums = ", ".join(f"№ {n:04d}" for n in st["tickets"][:20]) + (" …" if len(st["tickets"]) > 20 else "")
-            text += (f"✅ <b>Шумо иштирок мекунед! · Вы участвуете!</b>\n🎟 Чиптаҳо · билеты ({len(st['tickets'])}): <b>{nums}</b>\n"
-                     f"Боз ${st['next_need']} харед — боз 1 чипта · ещё ${st['next_need']} — ещё 1 билет\n"
+            text += (f"✅ <b>Шумо иштирок мекунед! · Вы участвуете!</b>\n🎟 Чиптаи шумо · ваш билет: <b>{nums}</b>\n"
                      f"📸 Instagram: @{_e(st['instagram'])}")
         elif st["joined"]:
             text += (f"✅ Шумо сабт шудед · вы записаны (📸 @{_e(st['instagram'])})\n{bar} {st['percent']}%\n"

@@ -1008,9 +1008,9 @@ function rfDraw() {
   if (!RF) { box.innerHTML = ""; return; }
   const m = ["🥇", "🥈", "🥉"], pad = n => "№ " + String(n).padStart(4, "0");
   let mine;
-  if (RF.joined && RF.tickets.length) mine = `<b class="rf-ok">✓ Шумо иштирок мекунед! <small>Вы участвуете · билетов: ${RF.tickets.length}</small></b>
+  if (RF.joined && RF.tickets.length) mine = `<b class="rf-ok">✓ Шумо иштирок мекунед! <small>Вы участвуете в розыгрыше</small></b>
       <div class="rf-tk">${RF.tickets.slice(0, 8).map(n => `<i>${pad(n)}</i>`).join("")}${RF.tickets.length > 8 ? `<i>+${RF.tickets.length - 8}</i>` : ""}</div>
-      <small>Боз $${RF.next_need} харед — боз 1 чипта · ещё $${RF.next_need} — ещё 1 билет</small>`;
+      <small>Натиҷа — ${RF.draw}, пахши мустақим · итоги ${RF.draw} в прямом эфире</small>`;
   else mine = `<b class="rf-need">${RF.percent >= 100 ? "Харид кофист! <small>Покупок достаточно — нажмите «Участвую»</small>" : `Боз <em>$${RF.need}</em> харед <small>Купите ещё на $${RF.need} — и вы участвуете</small>`}</b>
       <div class="rf-bar"><i style="width:${RF.percent}%"></i></div><div class="rf-pp"><span>$${RF.spent} аз $${RF.min_usd}</span><b>${RF.percent}%</b></div>`;
   const prizes = RF.prizes.map(r => `<li><span>${r.from === r.to ? (m[r.from - 1] || "🎁") + " Ҷои " + r.from + " · " + r.from + " место" : "🎁 " + r.from + "–" + r.to + " · " + r.n + " нафар / чел."}</span><b>${r.tjs} с.</b></li>`).join("");
@@ -1027,7 +1027,7 @@ function rfDraw() {
       <ol class="rfm-st"><li>Барои худ аз $${RF.min_usd} харед <small>Купите для себя от $${RF.min_usd}</small></li>
         <li>Ба канали Telegram обуна шавед <small>Подписка на канал — проверим сами</small>${RF.channel_url ? ` <a data-rfl="${rfEsc(RF.channel_url)}">Канал →</a>` : ""}</li>
         <li>Ба Instagram обуна шавед <small>Подписка на Instagram — проверим в эфире</small>${RF.instagram_url ? ` <a data-rfl="${rfEsc(RF.instagram_url)}">Instagram →</a>` : ""}</li>
-        <li>Ҳар $${RF.min_usd} = 1 чипта <small>Каждые $${RF.min_usd} = 1 билет</small></li></ol>
+        <li>Як нафар — як чипта <small>Один человек — один билет</small></li></ol>
       ${RF.closed ? "" : `<label class="rfm-l" for="rf-ig">Номи Instagram-и шумо · ваш ник Instagram</label>
       <div class="rfm-row"><input id="rf-ig" value="${rfEsc(RF.instagram)}" placeholder="@ali_2006" maxlength="60" autocapitalize="none" autocomplete="off" spellcheck="false">
         <button class="rfm-btn press" type="button" id="rf-join">${RF.joined ? "Сабт · Сохранить" : "Иштирок мекунам · Участвую"}</button></div>

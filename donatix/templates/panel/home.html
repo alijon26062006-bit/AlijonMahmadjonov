@@ -37,9 +37,9 @@
 <a class="rfp" href="/raffle#me">
   <span class="rfp-top"><span class="rfp-chip">{{ icon('gift', 14) }} Қуръакашӣ · Розыгрыш</span><span class="rfp-date">{{ rf.draw }}</span></span>
   {% if rf.joined and rf.tickets %}
-    <b class="rfp-h ok">{{ icon('check', 18) }} Шумо иштирок мекунед! <small>Вы участвуете · билетов: {{ rf.tickets | length }}</small></b>
+    <b class="rfp-h ok">{{ icon('check', 18) }} Шумо иштирок мекунед! <small>Вы участвуете в розыгрыше</small></b>
     <span class="rfp-tk">{% for n in rf.tickets[:6] %}<i>№ {{ '%04d' % n }}</i>{% endfor %}{% if rf.tickets | length > 6 %}<i>+{{ rf.tickets | length - 6 }}</i>{% endif %}</span>
-    <small>Боз ${{ rf.next_need }} харед — боз 1 чипта · ещё ${{ rf.next_need }} — ещё 1 билет</small>
+    <small>Натиҷа — {{ rf.draw }}, пахши мустақим · итоги {{ rf.draw }} в прямом эфире</small>
   {% elif rf.percent >= 100 %}
     <b class="rfp-h">Тугмаи «Иштирок мекунам»-ро пахш кунед <small>Покупок достаточно — нажмите «Участвую» и напишите ник Instagram</small></b>
     <span class="rfp-bar"><i style="width:100%"></i></span>

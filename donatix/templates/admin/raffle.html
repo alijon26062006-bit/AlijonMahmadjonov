@@ -3,8 +3,8 @@
 {% block title %}Розыгрыш — админка{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Розыгрыш за покупки</h1>
-  <p>Клиент покупает для себя от ${{ c.min_usd }} (сайт, бот, приложение), нажимает «Участвую» и пишет ник Instagram — получает билеты:
-    каждые ${{ c.min_usd }} = 1 билет. Подписку на Telegram-канал проверяет бот. Итоги — здесь, кнопкой, в прямом эфире.</p></section>
+  <p>Клиент покупает для себя от ${{ c.min_usd }} (сайт, бот, приложение), нажимает «Участвую» и пишет ник Instagram — получает один билет
+    (один человек — один билет, шансы у всех равные). Подписку на Telegram-канал проверяет бот. Итоги — здесь, кнопкой, в прямом эфире.</p></section>
 
 <div class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px">
   <div style="flex:1;min-width:200px">
@@ -59,7 +59,7 @@
   <label>Призы — каждая строка «сколько мест x сомони», сверху вниз с 1 места<textarea name="prizes" rows="5">{{ prizes_text }}</textarea></label>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
     <label>Дата итогов<input type="date" name="draw" value="{{ c.draw }}"></label>
-    <label>Минимум покупок, $ (= 1 билет)<input name="min_usd" inputmode="numeric" value="{{ c.min_usd }}"></label>
+    <label>Минимум покупок для участия, $<input name="min_usd" inputmode="numeric" value="{{ c.min_usd }}"></label>
   </div>
   <label>Канал для проверки подписки: @имя_канала или ID (-100…)<input name="channel_id" value="{{ c.channel.chat_id or '' }}" placeholder="@donatix_tj"></label>
   <label>Ссылка на канал (если канал закрытый — пригласительная)<input name="channel_url" value="{{ c.channel.url or '' }}" placeholder="https://t.me/…"></label>

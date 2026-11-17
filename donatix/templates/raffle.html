@@ -40,8 +40,8 @@
       {% if rf.joined and rf.tickets %}
         <div class="rf-ok">{{ icon('check', 20) }} Шумо иштирок мекунед! <span>Вы участвуете!</span></div>
         <div class="rf-tk">{% for n in rf.tickets %}<span>№ {{ '%04d' % n }}</span>{% endfor %}</div>
-        <p class="muted">Чиптаҳои шумо: {{ rf.tickets | length }}. Боз ${{ rf.next_need }} харед — боз 1 чипта.<br>
-          Ваших билетов: {{ rf.tickets | length }}. Купите ещё на ${{ rf.next_need }} — получите ещё 1 билет.</p>
+        <p class="muted">Ин чиптаи шумост. Натиҷа — {{ rf.draw }}, дар пахши мустақим.<br>
+          Это ваш билет. Итоги — {{ rf.draw }}, в прямом эфире Instagram.</p>
       {% else %}
         <h2>{% if rf.percent >= 100 %}Харид кофист! <span>· Покупок достаточно</span>{% else %}Боз <b>${{ rf.need }}</b> харед <span>· купите ещё на ${{ rf.need }}</span>{% endif %}</h2>
         <div class="rf-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rf.percent }}" aria-label="Прогресс до участия"><i style="width:{{ rf.percent }}%"></i></div>
@@ -98,7 +98,7 @@
       <li><b>Ба канали Telegram обуна шавед</b><small>Подпишитесь на наш Telegram-канал — проверяем автоматически.{% if rf.channel_url %} <a href="{{ rf.channel_url }}" target="_blank" rel="noopener">Открыть канал</a>{% endif %}</small></li>
       <li><b>Ба Instagram обуна шавед ва номи худро нависед</b><small>Подпишитесь на наш Instagram и напишите свой ник — проверим в эфире.{% if rf.instagram_url %} <a href="{{ rf.instagram_url }}" target="_blank" rel="noopener">Открыть Instagram</a>{% endif %}</small></li>
       <li><b>Тугмаи «Иштирок мекунам»-ро пахш кунед</b><small>Нажмите «Участвую». Без кнопки участие не считается.</small></li>
-      <li><b>Ҳар ${{ rf.min_usd }} = 1 чипта</b><small>Каждые ${{ rf.min_usd }} покупок = 1 билет. Больше покупок — больше шансов.</small></li>
+      <li><b>Як нафар — як чипта</b><small>Один человек — один билет. Шансы у всех участников равные.</small></li>
     </ol>
     <div class="rf-livebox">{{ icon('play', 18) }}<span><b>{{ rf.draw }} — пахши мустақим дар Instagram</b><small>Победителей выбираем вживую, в прямом эфире Instagram: случайный билет на экране. Не подписан — приз переходит другому.</small></span></div>
   </section>

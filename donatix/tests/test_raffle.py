@@ -46,10 +46,10 @@ def test_tickets_only_for_own_completed_purchases_after_join(on, config):
     assert "Участвую" in raffle.new_ticket_note(conn, uid)
     got = raffle.join(conn, config, uid, "https://instagram.com/Ali_2006/", api=member({9001}))
     assert got["instagram"] == "ali_2006" and len(got["new_tickets"]) == 1
-    buy(conn, uid, 12, source="shopbot")        # 32 → 2 билета
-    assert "№" in raffle.new_ticket_note(conn, uid)
+    buy(conn, uid, 100, source="shopbot")       # купил ещё — второго билета нет: один человек — один билет
+    assert raffle.new_ticket_note(conn, uid) == ""
     st = raffle.status(conn, config, uid)
-    assert st["joined"] and len(st["tickets"]) == 2 and st["next_need"] == "13.00" and st["tg_ok"] is True
+    assert st["joined"] and len(st["tickets"]) == 1 and st["tg_ok"] is True
 
 
 def test_progress_before_minimum(on, config):
@@ -88,7 +88,7 @@ def test_live_draw_from_last_place_one_win_per_person_and_prize_to_balance(conn,
         buy(conn, uid, 15 * (i + 1))
         raffle.join(conn, config, uid, f"nick{i}")
         users.append(uid)
-    assert raffle.board(conn)["tickets"] == 15 and raffle.places(conn) == [250, 200, 40, 40]
+    assert raffle.board(conn)["tickets"] == 5 and raffle.places(conn) == [250, 200, 40, 40]
     first = raffle.draw_next(conn, config)
     assert first["place"] == 4                                           # с последнего места к первому
     with pytest.raises(raffle.RaffleError):
@@ -139,7 +139,7 @@ def test_site_banner_page_join_and_profile(app, conn, config, monkeypatch):
     buy(conn, uid, 10)
     r = c.post("/raffle/join", data={"csrf": token, "instagram": "@rf_web"}, follow_redirects=True)
     assert "Вы участвуете" in r.text and "№ 0001" in r.text
-    assert "билетов: 1" in c.get("/panel").text
+    assert "Вы участвуете" in c.get("/panel").text
 
 
 def test_admin_runs_live_draw(app, conn, config, monkeypatch):
@@ -162,7 +162,7 @@ def test_admin_runs_live_draw(app, conn, config, monkeypatch):
     page = post(action="draw").text
     assert "8 место" in page and "@rfadm_ig" in page and "Подтвердить" in page
     assert "зачислен" in post(action="confirm").text and balance(conn, uid) > 0
-    assert "СБРОС" in post(action="reset", sure="").text and raffle.board(conn)["tickets"] == 2
+    assert "СБРОС" in post(action="reset", sure="").text and raffle.board(conn)["tickets"] == 1
     post(action="reset", sure="СБРОС")
     assert raffle.board(conn)["tickets"] == 0 and not raffle.active(conn)
 
