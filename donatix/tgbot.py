@@ -799,14 +799,14 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import paycards
     card = paycards.get(conn, p["card_id"]) if "card_id" in p.keys() else None
     owner = cashiers.active(conn, card["owner_tg"]) if card is not None and card["owner_tg"] else None
-    if card is not None and owner is not None:   # карта кассира — чек только ему
+    if only_chat is None:   # главный админ получает ВСЕ чеки, в том числе по картам кассиров
+        mid = notify_admin_file(config, caption, buttons, path, photo=photo)
+        cashiers.remember(conn, payment_id, str(config.alert_telegram_chat_id).strip(), mid, caption)
+    if card is not None and owner is not None:   # карта кассира — из кассиров чек только ему
         if only_chat is None or only_chat == owner["tg_id"]:
             mid = cashiers.send_file(config, owner["tg_id"], caption, buttons, path, photo=photo)
             cashiers.remember(conn, payment_id, owner["tg_id"], mid, caption)
         return
-    if only_chat is None:
-        mid = notify_admin_file(config, caption, buttons, path, photo=photo)
-        cashiers.remember(conn, payment_id, str(config.alert_telegram_chat_id).strip(), mid, caption)
     if card is not None:   # карта владельца (или кассир выключен) — только в админ-чат
         return
     for c in cashiers.targets(conn, config, p["method"]):
@@ -1237,7 +1237,8 @@ def screen_settings(conn: sqlite3.Connection, config: Config) -> Screen:
     v = sitecfg.view(conn, config)
     on = {True: "✅", False: "⛔"}
     text = ("⚙️ <b>Настройки</b>\n"
-            "Наценка: " + " · ".join(f"{t} {v['markups'][t]}%" for t in TIERS) + "\n"
+            "🛒 Сайт и бот магазина: " + " · ".join(f"{t} {v['markups'][t]}%" for t in TIERS) + "\n"
+            f"🔑 API-ключи и боты партнёров: {v['api_markup']}%\n"
             + "⭐ Stars: " + (f"{v['kind_markups']['telegram_stars']}%" if v["kind_markups"]["telegram_stars"]
                              is not None else "как по уровню")
             + " · 👑 Premium: " + (f"{v['kind_markups']['telegram_premium']}%"
@@ -1248,6 +1249,7 @@ def screen_settings(conn: sqlite3.Connection, config: Config) -> Screen:
     rows: Buttons = [[(f"{t} −0.5%", f"mk:{t}:-5"), (f"{t} +0.5%", f"mk:{t}:5")] for t in TIERS]
     for kind, short in (("telegram_stars", "⭐ Stars"), ("telegram_premium", "👑 Premium")):
         rows.append([(f"{short} −0.5%", f"mk:{kind}:-5"), (f"{short} +0.5%", f"mk:{kind}:5")])
+    rows.append([("🔑 API −0.5%", "mk:api:-5"), ("🔑 API +0.5%", "mk:api:5")])
     rows += [
         [(f"{on[v['reg_open']]} Регистрация", "set:reg_open:0"),
          (f"{on[v['require_approval']]} Проверка новых", "set:require_approval:0")],
@@ -1371,6 +1373,9 @@ def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> s
         base = bot.config.kind_markups.get(tier, bot.config.markups["bronze"])
         value = max(Decimal("0"), min(Decimal("100"), base + Decimal(delta) / 10))
         sitecfg.save(conn, bot.config, {f"markup_{tier}": str(value)})
+    elif tier == "api":
+        value = max(Decimal("0"), min(Decimal("100"), bot.config.api_markup + Decimal(delta) / 10))
+        sitecfg.save(conn, bot.config, {"markup_api": str(value)})
     return screen_settings(conn, bot.config)
 
 

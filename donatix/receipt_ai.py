@@ -39,11 +39,14 @@ PROMPT = (
     '{"is_receipt": true/false, "bank": "название банка или кошелька", "amount": число, '
     '"currency": "TJS|USD|RUB|USDT|…", "datetime": "YYYY-MM-DD HH:MM", '
     '"txn_id": "номер операции/квитанции/транзакции", "recipient": "получатель: номер карты, телефона или имя", '
-    '"status": "success|pending|failed|unknown", "recipient_ok": "yes|no|unknown", '
+    '"status": "success|pending|failed|unknown", "recipient_ok": "yes|no|unknown", "our_card": число, '
     '"forgery": "real|suspicious|fake", "signs": ["признак подделки", …]}\n'
     "Если поля нет на изображении — пустая строка (для amount — 0). Ничего не придумывай.\n"
     "recipient_ok — совпадает ли получатель в чеке с НАШИМИ реквизитами (ниже): номер карты/телефона/счёта "
     "(учитывай маску ****1234 и пробелы) или имя (учитывай латиницу/кириллицу). Не видно получателя — unknown.\n"
+    "our_card — у нас несколько карт, каждая помечена «[карта #N]». Найди, на КАКУЮ ИМЕННО нашу карту пришли деньги: "
+    "сравни номер получателя (последние 4 цифры карты, телефон целиком, маски вида 4444 55** **** 1234) и имя получателя "
+    "с каждой нашей картой и верни её число N. Подходят несколько или ни одна — 0. Не угадывай.\n"
     "Затем как эксперт-криминалист проверь, не подделан ли чек. Ищи:\n"
     "• цифры суммы, даты, номера или получателя другим шрифтом, размером, жирностью, цветом или сглаживанием, "
     "чем остальной текст; неровная строка, сдвиг, разный межбуквенный интервал;\n"
@@ -74,7 +77,7 @@ def read(config: Config, data: bytes, ext: str, transport: httpx.BaseTransport |
         "model": config.receipt_model, "temperature": 0, "max_tokens": 700,
         "response_format": {"type": "json_object"},
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": PROMPT + "\nНАШИ реквизиты: " + (re.sub(r"\s+", " ", our_details)[:500]
+            {"type": "text", "text": PROMPT + "\nНАШИ реквизиты: " + (re.sub(r"[ \t]+", " ", our_details)[:2500]
                                                                    or "не указаны")},
             {"type": "image_url", "image_url": {"url": url, "detail": "high"}}]}],
     }
@@ -105,8 +108,16 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
             "currency": s("currency").upper()[:8], "datetime": s("datetime")[:16], "txn_id": s("txn_id"),
             "recipient": s("recipient"), "status": s("status").lower() or "unknown",
             "recipient_ok": _pick(raw.get("recipient_ok"), ("yes", "no"), "unknown"),
+            "our_card": _int(raw.get("our_card")),
             "forgery": _pick(raw.get("forgery"), ("suspicious", "fake"), "real"),
             "signs": [re.sub(r"\s+", " ", str(x)).strip()[:150] for x in signs if str(x).strip()][:6]}
+
+
+def _int(value: Any) -> int:
+    try:
+        return max(0, int(str(value or 0).strip().lstrip("#")))
+    except ValueError:
+        return 0
 
 
 def _pick(value: Any, allowed: tuple[str, ...], default: str) -> str:

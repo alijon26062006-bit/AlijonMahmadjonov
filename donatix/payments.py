@@ -849,8 +849,8 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise
     if own_tx:
         conn.execute("COMMIT")
-    if seen and seen.get("recipient"):   # перевёл на другую нашу карту — заявка уходит хозяину той карты
-        note = paycards.reroute(conn, payment_id, str(seen["recipient"]))
+    if seen and (seen.get("recipient") or seen.get("our_card")):   # на какую нашу карту пришли деньги — её хозяину
+        note = paycards.reroute(conn, payment_id, seen)
         if note:
             row = conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (payment_id,)).fetchone()
             try:

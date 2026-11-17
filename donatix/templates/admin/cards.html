@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-hero"><h1>Карты для оплаты</h1>
   <p>Несколько карт на один банк. Клиенту показывается карта, на которую сегодня пришло меньше всего — суммы по картам выходят ровные.
-    Чек приходит <b>только хозяину карты</b>. Перевёл клиент по привычке на другую нашу карту — ИИ по номеру получателя в чеке
+    Чек приходит хозяину карты (из кассиров — только ему) и всегда вам в админ-бот. Перевёл клиент по привычке на другую нашу карту — ИИ по номеру получателя в чеке
     сам отправит заявку хозяину той карты. Если у банка нет ни одной включённой карты — показываются реквизиты из «Способов оплаты», как раньше.</p></section>
 <form method="post" action="/admin/cards" class="card" style="margin-bottom:12px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -11,6 +11,14 @@
     onchange="this.form.action.value=this.checked?'rest_on':'rest_off';this.form.submit()"> <b>Отдых карт:</b> у банка с 2 и больше картами
     каждый день одна карта не показывается клиентам, завтра — следующая по кругу</label>
   <input type="hidden" name="action" value="">
+</form>
+<form method="post" action="/admin/cards" class="card" style="margin-bottom:12px;display:grid;gap:8px">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="channel">
+  <b>📢 Канал-журнал чеков</b>
+  <span class="muted" style="font-size:13px">Каждый принятый или отклонённый чек придёт в этот канал: фото чека, сумма, чья карта и кто решил.
+    Создайте закрытый канал в Telegram и добавьте туда админ-бота администратором (право «Публикация сообщений»). Пусто — выключено.</span>
+  <div style="display:flex;gap:8px"><input name="details" value="{{ channel }}" placeholder="@my_receipts или -1001234567890" style="flex:1">
+    <button class="btn">Сохранить</button></div>
 </form>
 <form method="post" action="/admin/cards" class="card" style="margin-bottom:16px;display:grid;gap:10px">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">

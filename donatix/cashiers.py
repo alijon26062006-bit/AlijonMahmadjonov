@@ -256,6 +256,7 @@ def settle(conn: sqlite3.Connection, config: Config, payment_id: int, result: st
     чтобы веб-страница не ждала Telegram."""
     rows = [dict(r) for r in conn.execute(
         "SELECT chat_id, message_id, caption FROM payment_msgs WHERE payment_id = ?", (payment_id,)).fetchall()]
+    to_channel(conn, config, payment_id, result, rows[0]["caption"] if rows else "")
     if not rows:
         return
     edits = [{"chat_id": r["chat_id"], "message_id": r["message_id"], "parse_mode": "HTML",
@@ -292,6 +293,61 @@ def settle(conn: sqlite3.Connection, config: Config, payment_id: int, result: st
             log.info("чек #%s: %s: %s", payment_id, method, exc)
             return False
     threading.Thread(target=one, args=(via_http,), name="donatix-settle", daemon=True).start()
+
+
+# ── Канал-журнал чеков: каждый решённый чек (фото + кто принял/отклонил) — в отдельный канал ──
+
+CHANNEL_KEY = "receipts.channel"
+
+
+def channel(conn: sqlite3.Connection) -> str:
+    return (db.get_setting(conn, CHANNEL_KEY) or "").strip()
+
+
+def set_channel(conn: sqlite3.Connection, raw: str) -> str:
+    """@имя_канала, ссылка t.me/имя или числовой ID (-100…). Пусто — журнал выключен."""
+    import re
+    raw = (raw or "").strip()
+    m = re.fullmatch(r"(?:https?://)?t\.me/([A-Za-z0-9_]{5,64})/?", raw)
+    if m:
+        raw = "@" + m.group(1)
+    if raw and not re.fullmatch(r"@[A-Za-z0-9_]{5,64}|-100\d{6,20}", raw):
+        raise ValueError("Канал: @имя_канала, ссылка https://t.me/имя или ID вида -100…")
+    db.set_setting(conn, CHANNEL_KEY, raw)
+    return raw
+
+
+def to_channel(conn: sqlite3.Connection, config: Config, payment_id: int, result: str, caption: str = "") -> None:
+    """Решённый чек — в канал-журнал: фото чека, заявка, чья карта, итог и кто решил. Фоном — решение не ждёт."""
+    chat = channel(conn)
+    if not chat or not config.alert_telegram_token:
+        return
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    if p is None or not p["receipt_file"]:
+        return
+    if not caption:
+        from .tgbot import receipt_text
+        try:
+            caption = receipt_text(conn, config, payment_id)
+        except Exception as exc:  # noqa: BLE001 — журнал не должен ломать решение по заявке
+            log.info("журнал чека #%s: %s", payment_id, exc)
+            caption = f"Заявка #{payment_id}"
+    from . import paycards
+    from .payments import receipts_dir
+    card = paycards.get(conn, p["card_id"]) if "card_id" in p.keys() else None
+    owner = ""
+    if card is not None:
+        row = conn.execute("SELECT name FROM cashiers WHERE tg_id = ?", (card["owner_tg"],)).fetchone() \
+            if card["owner_tg"] else None
+        owner = f"\n💳 Карта ****{paycards.tail(card)} — " + (_e(row["name"]) if row else "владелец" if not card["owner_tg"]
+                                                               else str(card["owner_tg"]))
+    from datetime import timedelta, timezone
+    when = (datetime.now(timezone.utc) + timedelta(hours=config.tz_offset)).strftime("%d.%m %H:%M")
+    text = f"<b>{_e(result)}</b> · {when}{owner}\n\n{caption}"
+    path = receipts_dir(config) / p["receipt_file"]
+    photo = not p["receipt_file"].endswith(".pdf")
+    threading.Thread(target=send_file, args=(config, chat, text, None, path), kwargs={"photo": photo},
+                     name="donatix-receipt-log", daemon=True).start()
 
 
 def _e(value: Any) -> str:

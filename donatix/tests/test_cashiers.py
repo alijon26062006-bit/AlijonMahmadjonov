@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import pytest
 
 from conftest import add_receipt, balance, make_client
 
@@ -200,3 +201,56 @@ def test_full_admin_cashier_uses_bot_like_owner_but_no_login_codes(config, conn,
     sent.clear()
     worker.notify_admin(config, "🔐 Код входа: 123456", secret=True)
     assert list(map(str, sent)) == [ADMIN_CHAT]
+
+
+def test_cashier_card_receipt_also_goes_to_admin_and_decision_lands_in_channel(config, conn, monkeypatch):
+    """Чек по карте кассира: ему и админу (другим кассирам — нет). Решение — в канал-журнал с именем решившего."""
+    from donatix import paycards
+    uid, _ = make_client(conn, balance="0")
+    cashiers.add(conn, ALI, "Али")
+    cashiers.add(conn, VALI, "Вали")
+    card = paycards.add(conn, "alif", "Карта 4444 5555 6666 4321", ALI)
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file",
+                        lambda cfg, caption, buttons, path, photo: sent.append(("admin", caption)) or 100)
+    monkeypatch.setattr("donatix.cashiers.send_file",
+                        lambda cfg, chat, caption, buttons, path, photo: sent.append((chat, caption)) or 201)
+
+    class Now:   # поток журнала — сразу, чтобы проверить
+        def __init__(self, target, args=(), kwargs=None, **_):
+            self.run = lambda: target(*args, **(kwargs or {}))
+
+        def start(self):
+            self.run()
+    monkeypatch.setattr("donatix.cashiers.threading.Thread", Now)
+    pid = _payment(conn, uid, "alif")
+    conn.execute("UPDATE payments SET card_id = ? WHERE id = ?", (card, pid))
+    config.alert_telegram_chat_id = ADMIN_CHAT
+    config.alert_telegram_token = config.alert_telegram_token or "1:x"
+    tgbot.send_receipt(conn, config, pid)
+    assert [who for who, _ in sent] == ["admin", ALI]                     # Вали не получил, админ — получил
+
+    with pytest.raises(ValueError):
+        cashiers.set_channel(conn, "не канал")
+    assert cashiers.set_channel(conn, "https://t.me/dx_receipts") == "@dx_receipts"
+    sent.clear()
+    calls = []
+    _press(tgbot.AdminBot(config, api=lambda m, **p: calls.append((m, p)) or {}), conn, ALI, f"pay:ok:{pid}",
+           message_id=201)
+    log_posts = [c for who, c in sent if who == "@dx_receipts"]
+    assert len(log_posts) == 1 and "Зачислено" in log_posts[0] and "Али" in log_posts[0] and "****4321" in log_posts[0]
+
+
+def test_admin_bot_changes_api_markup_separately(config, conn):
+    calls = []
+    bot = _bot(config, calls)
+    site = dict(config.markups)
+    before = config.api_markup
+    _press(bot, conn, int(ADMIN_CHAT), "mk:api:5")
+    assert config.api_markup == before + __import__("decimal").Decimal("0.5") and config.markups == site
+    assert db_setting(conn) == str(config.api_markup)
+
+
+def db_setting(conn):
+    from donatix import db
+    return db.get_setting(conn, "markup.api")

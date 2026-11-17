@@ -89,3 +89,27 @@ def test_one_card_rests_each_day_by_turns(conn, app, monkeypatch):
     paycards.set_active(conn, ids[2], False)
     db.set_setting(conn, "cards.rest", "1")
     assert paycards.resting_id(conn, method) == 0                        # одна карта — не отдыхает
+
+
+def test_ai_and_masks_route_receipt_to_the_card_that_got_money(conn, app):
+    """ИИ назвал нашу карту, или видна маска/имя — заявка уходит хозяину ИМЕННО той карты, даже если карту не показывали."""
+    from conftest import make_client
+    config = app.state.config
+    method = _method(conn, config)
+    a = paycards.add(conn, method, "Карта 4444 5555 6666 1111\nПолучатель: Фаррух", 777011)
+    b = paycards.add(conn, method, "Карта 5555 7777 8888 2222\nПолучатель: Шахзод", 777012)
+    tel = paycards.add(conn, method, "Телефон +992 93 555 44 33\nПолучатель: Бахтиёр", 0)
+    assert "[карта #%d]" % a in paycards.all_details(conn, method)                      # ИИ видит каждую карту отдельно
+    assert paycards.match(conn, "5555 77** **** 2222")["id"] == b                     # маска карты
+    assert paycards.match(conn, "**** 2222")["id"] == b
+    assert paycards.match(conn, "4444 55** **** 2222") is None                        # начало от одной, конец от другой
+    assert paycards.match(conn, "935554433")["id"] == tel                            # телефон без кода страны
+    assert paycards.match(conn, "Шахзод М.")["id"] == b                              # по имени, если цифр нет
+    uid = make_client(conn, login="pay9")[0]
+    pid = payments.create(conn, config, conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone(), method, "", amount_tjs="70")
+    conn.execute("UPDATE payments SET card_id = NULL WHERE id = ?", (pid,))          # карту не показывали
+    assert paycards.reroute(conn, pid, {"recipient": "", "our_card": b})               # ИИ сказал: карта b
+    assert conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == b
+    assert not paycards.reroute(conn, pid, {"our_card": 99999, "recipient": "чужой 9999"})   # выдуманную карту не берём
+    note = paycards.reroute(conn, pid, {"recipient": "4444 55** **** 1111"})
+    assert "****1111" in note and conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == a

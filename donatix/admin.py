@@ -832,7 +832,8 @@ def cards_page(request: Request, admin=Depends(admin_user), conn=Depends(get_con
     rows = paycards.report(conn, config.tz_offset)
     titles = {m["code"]: m["title"] for m in payments.methods(conn, config)}
     return render(request, "admin/cards.html", {"user": admin, "banks": banks, "rows": rows, "titles": titles,
-                                                "cashiers": cashiers.listing(conn), "rest": paycards.rest_on(conn), "rate": float(payments.settings(conn, config)["tjs_rate"])})
+                                                "cashiers": cashiers.listing(conn), "rest": paycards.rest_on(conn),
+                                                "channel": cashiers.channel(conn), "rate": float(payments.settings(conn, config)["tjs_rate"])})
 
 
 @router.post("/cards", dependencies=[Depends(check_csrf)])
@@ -850,7 +851,12 @@ def cards_save(request: Request, action: str = Form(""), card_id: int = Form(0),
             flash(request, "Карта удалена.")
         elif action in ("rest_on", "rest_off"):
             db.set_setting(conn, "cards.rest", "1" if action == "rest_on" else "0")
-    except paycards.CardError as exc:
+        elif action == "channel":
+            from . import cashiers
+            got = cashiers.set_channel(conn, details)
+            flash(request, f"Канал-журнал: {got}. Не забудьте добавить админ-бота в канал администратором."
+                  if got else "Канал-журнал выключен.")
+    except (paycards.CardError, ValueError) as exc:
         flash(request, str(exc), "error")
     return RedirectResponse("/admin/cards", status_code=303)
 
