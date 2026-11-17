@@ -307,3 +307,22 @@ def test_prompt_knows_tajik_recipient_words():
     from donatix import receipt_ai
     for word in ("Гиранда", "Қабулкунанда", "Ба корт", "Рақами телефон", "Фиристанда", "Аз корт"):
         assert word in receipt_ai.PROMPT and word in receipt_ai.FIND_PROMPT
+
+
+# Настоящий чек «Душанбе Сити»: «Қабулкунанда: 992102208383», «Таъминкунанда: DC (по номеру телефона)»
+@pytest.mark.parametrize("saved", ["Телефон +992 10 220 83 83", "DC: 102208383", "992102208383 Али",
+                                   "Номер: 10 220 8383", "+992-102-20-83-83"])
+def test_real_dc_receipt_phone_992_found_whatever_way_we_saved_it(conn, app, saved):
+    db.set_setting(conn, "cards.rest", "0")
+    cashiers.add(conn, 777201, "Кассир DC")
+    ours = paycards.add(conn, "dc", saved, 777201)
+    paycards.add(conn, "dc", "Телефон +992 93 555 44 33", 0)            # другая наша карта — не перепутать
+    seen = {"bank": "DC (по номеру телефона)", "amount": 9, "recipient": "992102208383"}
+    card, why = paycards.which_card(conn, "dc", seen)
+    assert card is not None and card["id"] == ours, why
+    assert paycards.which_card(conn, "dc", {"recipient": "Қабулкунанда: 992102208383"})[0]["id"] == ours
+
+
+def test_prompt_has_real_dc_receipt_example():
+    from donatix import receipt_ai
+    assert "Қабулкунанда: 992102208383" in receipt_ai.PROMPT and "Таъминкунанда" in receipt_ai.FIND_PROMPT
