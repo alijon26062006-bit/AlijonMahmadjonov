@@ -762,7 +762,23 @@ def read_receipt(config: Config, data: bytes, our_details: str = "") -> dict | N
     ext = receipt_kind(data)
     if not ext or len(data) > MAX_RECEIPT_BYTES:
         return None
-    return receipt_ai.read(config, data, ext, our_details=our_details)
+    seen = receipt_ai.read(config, data, ext, our_details=our_details)
+    from .paycards import labelled_hits
+    if "[карта #" not in (our_details or "") or (seen and (seen.get("our_card")
+                                                           or len(labelled_hits(our_details, seen.get("recipient"))) == 1)):
+        return seen
+    # Первое чтение не узнало нашу карту — второй запрос только про получателя (кому ушли деньги)
+    again = receipt_ai.find_card(config, data, ext, our_details)
+    if not again:
+        return seen
+    seen = dict(seen or {"is_receipt": True})
+    if again.get("recipient") and (labelled_hits(our_details, again["recipient"])
+                                   or not seen.get("recipient")):
+        seen["recipient_first"], seen["recipient"] = seen.get("recipient", ""), again["recipient"]
+    if again.get("our_card"):
+        seen["our_card"] = again["our_card"]
+    seen["card_why_ai"] = again.get("why", "")
+    return seen
 
 
 class ReceiptRejected(PaymentError):
@@ -849,16 +865,8 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise
     if own_tx:
         conn.execute("COMMIT")
-    if seen and (seen.get("recipient") or seen.get("our_card")):   # на какую нашу карту пришли деньги — её хозяину
-        note = paycards.reroute(conn, payment_id, seen)
-        if note:
-            row = conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (payment_id,)).fetchone()
-            try:
-                data_ai = json.loads(row["receipt_ai"]) if row and row["receipt_ai"] else {}
-            except ValueError:
-                data_ai = {}
-            conn.execute("UPDATE payments SET receipt_ai = ? WHERE id = ?",
-                         (json.dumps({**data_ai, "card_note": note}, ensure_ascii=False), payment_id))
+    if seen:   # на какую нашу карту пришли деньги — заявка её хозяину; не узнали — кассиру не отправляем
+        paycards.reroute(conn, payment_id, seen)
     return name
 
 

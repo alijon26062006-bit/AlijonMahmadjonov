@@ -175,12 +175,14 @@ def details_for(conn: sqlite3.Connection, user_id: int, method: str, default: st
 
 
 def all_details(conn: sqlite3.Connection, method: str, default: str = "") -> str:
-    """Все наши реквизиты этого банка — для ИИ. Каждая карта помечена «[карта #N]»: ИИ называет,
-    на какую именно пришли деньги (our_card), и чек уходит хозяину этой карты."""
+    """Все наши реквизиты — для ИИ. Каждая карта помечена «[карта #N]»: ИИ называет, на какую именно пришли деньги
+    (our_card), и чек уходит хозяину этой карты. Сначала карты выбранного банка, потом наши карты других банков —
+    клиент мог по привычке перевести на нашу карту другого банка."""
     ensure(conn)
-    rows = conn.execute("SELECT id, details FROM pay_cards WHERE method = ?", (method,)).fetchall()
+    rows = conn.execute("SELECT id, method, details FROM pay_cards ORDER BY method != ?, method, id", (method,)).fetchall()
     lines = [default] if default else []
-    lines += [f"[карта #{r['id']}] " + re.sub(r"\s+", " ", r["details"]) for r in rows]
+    lines += [f"[карта #{r['id']}] " + ("" if r["method"] == method else f"(банк {r['method']}) ")
+              + re.sub(r"\s+", " ", r["details"]) for r in rows]
     return "\n".join(lines).strip()
 
 
@@ -226,6 +228,16 @@ def _fits(chunk: str, num: str) -> bool:
     return len(seen) >= 4 and num.endswith(seen)
 
 
+def labelled_hits(details_text: str, recipient: str | None) -> list[int]:
+    """По тексту «[карта #N] реквизиты» (как его видит ИИ): номера наших карт, к которым подходит получатель по цифрам."""
+    chunks = _chunks(recipient or "")
+    hits = []
+    for m in re.finditer(r"\[карта #(\d+)\]([^\n]*)", details_text or ""):
+        if any(_fits(ch, n) for ch in chunks for n in numbers(m.group(2))):
+            hits.append(int(m.group(1)))
+    return hits
+
+
 def match(conn: sqlite3.Connection, recipient: str, method: str = "") -> sqlite3.Row | None:
     """Наша карта по получателю из чека: номер карты/телефона (с масками и без), иначе имя.
     Подходит несколько карт — не гадаем (None)."""
@@ -255,7 +267,8 @@ def which_card(conn: sqlite3.Connection, method: str, seen: dict | None) -> tupl
     chunks = _chunks(text)
     by_num = [c for c in cards if any(_fits(ch, n) for ch in chunks for n in numbers(c["details"]))]
     ai_card = get(conn, seen.get("our_card") or 0)
-    if ai_card is not None and ai_card["method"] != method:
+    seen_ai = ai_card if ai_card is not None and ai_card["method"] != method else None
+    if seen_ai is not None:
         ai_card = None
     if len(by_num) == 1:
         return by_num[0], "номер получателя в чеке"
@@ -268,27 +281,61 @@ def which_card(conn: sqlite3.Connection, method: str, seen: dict | None) -> tupl
     named = match(conn, text, method)
     if named is not None:
         return named, "имя получателя"
+    every = conn.execute("SELECT * FROM pay_cards").fetchall()   # перевёл на нашу карту ДРУГОГО банка
+    other = [c for c in every if any(_fits(ch, n) for ch in chunks for n in numbers(c["details"]))]
+    if len(other) == 1:
+        return other[0], "номер получателя — наша карта другого банка"
+    if not other and seen_ai is not None:
+        return seen_ai, "ИИ узнал нашу карту другого банка"
     return None, "в чеке нет номера/имени нашей карты" if text else "ИИ не нашёл получателя в чеке"
 
 
 def reroute(conn: sqlite3.Connection, payment_id: int, seen: dict | str) -> str:
     """Заявка переходит на карту, куда реально пришли деньги, — чек получает хозяин этой карты.
-    Возвращает пометку для чека (или пустую строку)."""
+    Записывает в заявку, узнана ли карта (card_ok) и почему. Возвращает пометку для чека (или пустую строку)."""
+    import json
     if isinstance(seen, str):
         seen = {"recipient": seen}
     ensure(conn)
-    p = conn.execute("SELECT card_id, method FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    p = conn.execute("SELECT card_id, method, receipt_ai FROM payments WHERE id = ?", (payment_id,)).fetchone()
     if p is None:
         return ""
-    real, _ = which_card(conn, p["method"], seen)
-    if real is None or real["id"] == p["card_id"]:
-        return ""
+    real, why = which_card(conn, p["method"], seen)
     shown = get(conn, p["card_id"])
-    conn.execute("UPDATE payments SET card_id = ? WHERE id = ?", (real["id"], payment_id))
-    if shown is None:
-        return f"💳 ИИ: деньги пришли на карту ****{tail(real)} — заявка у хозяина этой карты"
-    return (f"↪️ Клиент перевёл на карту ****{tail(real)} вместо показанной ****{tail(shown)} — "
-            f"заявка у хозяина карты ****{tail(real)}")
+    note = ""
+    if real is not None and real["id"] != p["card_id"]:
+        conn.execute("UPDATE payments SET card_id = ? WHERE id = ?", (real["id"], payment_id))
+        note = (f"💳 ИИ: деньги пришли на карту ****{tail(real)} — заявка у хозяина этой карты" if shown is None else
+                f"↪️ Клиент перевёл на карту ****{tail(real)} вместо показанной ****{tail(shown)} — "
+                f"заявка у хозяина карты ****{tail(real)}")
+    elif real is None and shown is not None:
+        note = (f"❓ ИИ не узнал в чеке нашу карту ({why}). Показали клиенту ****{tail(shown)} — "
+                f"проверьте в банке, на какую карту пришли деньги. Кассиру чек не отправлен.")
+    try:
+        data = json.loads(p["receipt_ai"]) if p["receipt_ai"] else {}
+    except ValueError:
+        data = {}
+    if data or seen:
+        data = {**data, "card_ok": real is not None, "card_why": why}
+        if note:
+            data["card_note"] = note
+        conn.execute("UPDATE payments SET receipt_ai = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), payment_id))
+    return note
+
+
+def confirmed(conn: sqlite3.Connection, config: Any, payment: sqlite3.Row) -> bool:
+    """Подтверждено ли, что деньги пришли именно на карту этой заявки — только тогда чек и кнопки у кассира-хозяина.
+    ИИ выключен (нет ключа) — как раньше: верим показанной карте."""
+    import json
+
+    from . import receipt_ai
+    if not receipt_ai.enabled(config):
+        return True
+    try:
+        data = json.loads(payment["receipt_ai"]) if payment["receipt_ai"] else {}
+    except (ValueError, TypeError):
+        data = {}
+    return bool(data.get("card_ok"))
 
 
 def owner_name(conn: sqlite3.Connection, card: sqlite3.Row | None) -> str:
@@ -338,7 +385,7 @@ def explain(conn: sqlite3.Connection, config: Any, data: bytes) -> str:
     if not methods:
         return "⚠️ Нет ни одной включённой карты (Админка → Карты)."
     conf = payments.settings(conn, config)["details"]
-    details = "\n".join(all_details(conn, m, conf.get(m, "")) for m in methods)
+    details = "\n".join([conf.get(m, "") for m in methods if conf.get(m)] + [all_details(conn, "")])
     seen = receipt_ai.read(config, data, ext, our_details=details)
     if not seen:
         return "⚠️ ИИ не ответил (ключ, баланс OpenAI или сеть). Попробуйте ещё раз."
@@ -347,21 +394,21 @@ def explain(conn: sqlite3.Connection, config: Any, data: bytes) -> str:
              f"Банк в чеке: {e(seen.get('bank') or '—')} · сумма: {seen.get('amount') or '—'} {e(seen.get('currency') or '')}",
              f"Получатель (прочитал ИИ): <code>{e(seen.get('recipient') or '—')}</code>",
              f"ИИ назвал нашу карту: {('#' + str(seen['our_card'])) if seen.get('our_card') else 'нет'}", ""]
-    hits = []
+    hits: dict[int, tuple[sqlite3.Row, str]] = {}
     for m in methods:
         card, why = which_card(conn, m, seen)
         if card is not None:
-            hits.append((m, card, why))
+            hits.setdefault(card["id"], (card, why))
     if len(hits) == 1:
-        m, card, why = hits[0]
-        lines.append(f"✅ Деньги пришли на карту <b>****{tail(card)}</b> ({e(m)}) — {e(why)}")
+        card, why = next(iter(hits.values()))
+        lines.append(f"✅ Деньги пришли на карту <b>****{tail(card)}</b> ({e(card['method'])}) — {e(why)}")
         lines.append(f"📨 Чек получит: <b>{e(owner_name(conn, card))}</b> + копия вам")
     elif hits:
-        lines.append("⚠️ Подходят карты разных банков: " + ", ".join(f"****{tail(c)} ({e(m)})" for m, c, _ in hits)
-                     + " — в настоящей заявке выберется карта банка, который выбрал клиент.")
+        lines.append("⚠️ Подходят несколько карт: " + ", ".join(f"****{tail(c)} ({e(c['method'])})" for c, _ in hits.values())
+                     + " — в заявке выберется карта банка, который выбрал клиент.")
     else:
         lines.append("❓ Ни одна наша карта не подошла — " + e(which_card(conn, methods[0], seen)[1]) + ".")
-        lines.append("Чек уйдёт хозяину карты, которую показали клиенту, и вам.")
+        lines.append("Чек придёт только вам (кассирам — нет): проверьте в банке, куда пришли деньги.")
     if seen.get("forgery") in ("suspicious", "fake"):
         lines.append("🚨 Признаки подделки: " + e("; ".join(seen.get("signs") or [seen["forgery"]])))
     return "\n".join(lines)

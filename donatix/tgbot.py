@@ -806,6 +806,8 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     if only_chat is None:   # главный админ получает ВСЕ чеки, в том числе по картам кассиров
         mid = notify_admin_file(config, caption, buttons, path, photo=photo)
         cashiers.remember(conn, payment_id, str(config.alert_telegram_chat_id).strip(), mid, caption)
+    if card is not None and not paycards.confirmed(conn, config, p):
+        return   # ИИ не подтвердил, что деньги пришли на эту карту — кассиру не шлём, решает админ (пометка в чеке)
     if card is not None and owner is not None:   # карта кассира — из кассиров чек только ему
         if only_chat is None or only_chat == owner["tg_id"]:
             mid = cashiers.send_file(config, owner["tg_id"], caption, buttons, path, photo=photo)

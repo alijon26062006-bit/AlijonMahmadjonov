@@ -33,6 +33,17 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 TIMEOUT = 25
 MIME = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
+RECIPIENT_WORDS = (
+    "Получатель — это КУДА ушли деньги. В чеке он может быть подписан по-русски, по-таджикски или по-английски: "
+    "«Получатель», «Кому», «На карту», «На номер», «Номер телефона», «Карта получателя», «Счёт зачисления», "
+    "«Гиранда», «Қабулкунанда», «Гирандаи маблағ», «Ба кӣ», «Ба корт», «Ба рақами», «Рақами корт», «Рақами телефон», "
+    "«Рақами ҳисоб», «Recipient», «To», «Beneficiary». Номер может стоять и без подписи — под именем или внизу чека. "
+    "НЕ путай с отправителем: «Отправитель», «Откуда», «Со счёта», «С карты», «Фиристанда», «Аз корт», «Аз ҳисоб», "
+    "«From», «Sender» — это карта клиента, она нам не нужна. "
+    "Перепиши номер получателя цифра в цифру, звёздочки/точки маски оставь как есть "
+    "(например «4444 55** **** 1234», «+992 93 *** 44 33», «•• 1234»), затем имя получателя."
+)
+
 PROMPT = (
     "Это скриншот или фото банковского чека/перевода (банки Таджикистана: Алиф, Душанбе Сити, Эсхата, "
     "Амонатбонк, Спитамен и др.; также крипто-переводы). Прочитай его и верни ТОЛЬКО JSON:\n"
@@ -42,9 +53,7 @@ PROMPT = (
     '"status": "success|pending|failed|unknown", "recipient_ok": "yes|no|unknown", "our_card": число, '
     '"forgery": "real|suspicious|fake", "signs": ["признак подделки", …]}\n'
     "Если поля нет на изображении — пустая строка (для amount — 0). Ничего не придумывай.\n"
-    "recipient: прочитай чек ЦЕЛИКОМ (получатель, «Кому», «На карту», «Номер телефона», «Счёт зачисления», "
-    "«Карта получателя», низ чека). Перепиши номер цифра в цифру, звёздочки/точки маски оставь как есть "
-    "(например «4444 55** **** 1234», «+992 93 *** 44 33»), затем имя. Не путай с картой ОТПРАВИТЕЛЯ («Откуда», «Со счёта»).\n"
+    "recipient: прочитай чек ЦЕЛИКОМ. " + RECIPIENT_WORDS + "\n"
     "recipient_ok — совпадает ли получатель в чеке с НАШИМИ реквизитами (ниже): номер карты/телефона/счёта "
     "(учитывай маску ****1234 и пробелы) или имя (учитывай латиницу/кириллицу). Не видно получателя — unknown.\n"
     "our_card — у нас несколько карт, каждая помечена «[карта #N]». Найди, на КАКУЮ ИМЕННО нашу карту пришли деньги: "
@@ -95,6 +104,45 @@ def read(config: Config, data: bytes, ext: str, transport: httpx.BaseTransport |
         log.exception("чек: не прочитан")
         return None
     return clean(raw)
+
+
+FIND_PROMPT = (
+    "Это банковский чек перевода (Таджикистан). Задача одна: найти, НА КАКУЮ ИЗ НАШИХ КАРТ ушли деньги.\n"
+    + RECIPIENT_WORDS + "\n"
+    "Внимательно прочитай ВСЕ строки чека, включая мелкий текст. Сравни номер получателя с каждой нашей картой "
+    "(последние 4 цифры карты; телефон — все видимые цифры, +992 можно не учитывать; маски — звёздочки) и имя.\n"
+    'Верни ТОЛЬКО JSON: {"recipient": "получатель точно как в чеке", "recipient_label": "как подписано в чеке", '
+    '"our_card": N или 0, "why": "коротко почему"}. our_card — число N из «[карта #N]». '
+    "Не совпало или совпало с несколькими — 0. Не угадывай.\nНАШИ карты:\n"
+)
+
+
+def find_card(config: Config, data: bytes, ext: str, our_details: str,
+              transport: httpx.BaseTransport | None = None) -> dict[str, Any] | None:
+    """Второй, отдельный запрос только про получателя — когда первое чтение не узнало нашу карту."""
+    mime = MIME.get(ext)
+    if not enabled(config) or mime is None or "[карта #" not in (our_details or ""):
+        return None
+    url = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+    body = {
+        "model": config.receipt_model, "temperature": 0, "max_tokens": 300,
+        "response_format": {"type": "json_object"},
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": FIND_PROMPT + re.sub(r"[ \t]+", " ", our_details)[:2500]},
+            {"type": "image_url", "image_url": {"url": url, "detail": "high"}}]}],
+    }
+    try:
+        with httpx.Client(timeout=TIMEOUT, transport=transport) as client:
+            resp = client.post(OPENAI_URL, json=body, headers={"Authorization": f"Bearer {config.openai_api_key}"})
+        if resp.status_code != 200:
+            log.warning("чек (получатель): OpenAI %s %s", resp.status_code, resp.text[:200])
+            return None
+        raw = json.loads(resp.json()["choices"][0]["message"]["content"])
+    except Exception:  # noqa: BLE001
+        log.exception("чек: получатель не прочитан")
+        return None
+    return {"recipient": re.sub(r"\s+", " ", str(raw.get("recipient") or "")).strip()[:200],
+            "our_card": _int(raw.get("our_card")), "why": re.sub(r"\s+", " ", str(raw.get("why") or "")).strip()[:200]}
 
 
 def clean(raw: dict[str, Any]) -> dict[str, Any]:

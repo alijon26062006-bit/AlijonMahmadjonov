@@ -110,7 +110,8 @@ def test_ai_and_masks_route_receipt_to_the_card_that_got_money(conn, app):
     conn.execute("UPDATE payments SET card_id = NULL WHERE id = ?", (pid,))          # карту не показывали
     assert paycards.reroute(conn, pid, {"recipient": "", "our_card": b})               # ИИ сказал: карта b
     assert conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == b
-    assert not paycards.reroute(conn, pid, {"our_card": 99999, "recipient": "чужой 9999"})   # выдуманную карту не берём
+    note = paycards.reroute(conn, pid, {"our_card": 99999, "recipient": "чужой 9999"})       # выдуманную карту не берём
+    assert "не узнал" in note and conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == b
     note = paycards.reroute(conn, pid, {"recipient": "4444 55** **** 1111"})
     assert "****1111" in note and conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == a
 

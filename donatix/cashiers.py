@@ -164,7 +164,10 @@ def may_decide(conn: sqlite3.Connection, config: Config, row: sqlite3.Row | None
         from .paycards import get
         card = get(conn, card_id)
         if card is not None:
-            return is_full(row) or (bool(card["owner_tg"]) and card["owner_tg"] == row["tg_id"])
+            if is_full(row):
+                return True
+            from .paycards import confirmed
+            return bool(card["owner_tg"]) and card["owner_tg"] == row["tg_id"] and confirmed(conn, config, payment)
     return handles(conn, config, row, payment["method"])
 
 

@@ -179,7 +179,8 @@ def test_ai_sees_every_card_labelled(conn, cards):
     text = paycards.all_details(conn, "alif", "Алиф: +992 90 000 00 00")
     for k in ("A1", "A2", "A3"):
         assert f"[карта #{cards[k]}]" in text
-    assert "9762" not in text                                        # карты другого банка ИИ не путают
+    assert f"[карта #{cards['D1']}] (банк dc)" in text                # наши карты другого банка — с пометкой банка
+    assert text.index(f"#{cards['A3']}]") < text.index(f"#{cards['D1']}]")   # сначала карты выбранного банка
 
 
 def test_warning_not_ours_uses_same_matching(conn, cards):
@@ -226,3 +227,83 @@ def test_admin_bot_chek_command(conn, app, cards, monkeypatch):
     bot.handle(conn, {"update_id": 2, "message": {**msg, "photo": [{"file_id": "f"}]}})
     reply = [p["text"] for m, p in calls if m == "sendMessage"][-1]
     assert "****2244" in reply and "Мурод" in reply
+
+
+# ── ИИ включён: кассиру — только если карта ПОДТВЕРЖДЕНА чеком ──
+
+@pytest.fixture
+def ai_on(monkeypatch):
+    from donatix import receipt_ai
+    monkeypatch.setattr(receipt_ai, "enabled", lambda config: True)
+
+
+def test_ai_on_unrecognised_receipt_goes_to_admin_only(app, conn, monkeypatch, cards, ai_on):
+    """Клиент перевёл на старую сохранённую чужую карту / ИИ не нашёл номер — кассиру показанной карты НЕ шлём."""
+    monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
+    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": "**** 9999", "amount": 0}, "aion1")
+    assert sent == ["admin"]
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert "Кассиру чек не отправлен" in p["receipt_ai"]
+    for tg in (FARRUKH, SHAHZOD):                                      # и решить её кассир не может
+        assert not cashiers.may_decide(conn, app.state.config, cashiers.get(conn, tg), p)
+
+
+@pytest.mark.parametrize("recipient,want", [
+    ("Гиранда: 5058 27** **** 2222", "A2"),
+    ("Қабулкунанда Бахтиёр К. +992 93 *** 44 33", "A3"),
+    ("**** 3333", "D1"),                                               # заявка «Алиф», а перевёл на нашу карту DC
+])
+def test_ai_on_recognised_receipt_goes_to_card_owner(app, conn, monkeypatch, cards, ai_on, recipient, want):
+    monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
+    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": recipient, "amount": 0},
+                            f"aion{cards[want]}")
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert p["card_id"] == cards[want]
+    owner = OWNER[want]
+    assert sent == (["admin", owner] if owner else ["admin"])
+    if owner:
+        assert cashiers.may_decide(conn, app.state.config, cashiers.get(conn, owner), p)
+
+
+def test_second_ai_pass_when_first_read_missed_the_number(app, conn, monkeypatch, cards, ai_on):
+    """Первое чтение не нашло номер получателя → второй запрос только про получателя → чек хозяину карты."""
+    from donatix import receipt_ai
+    calls = []
+    monkeypatch.setattr(receipt_ai, "read", lambda config, data, ext, transport=None, our_details="":
+                        calls.append("read") or {"is_receipt": True, "recipient": "Шахзод", "our_card": 0, "amount": 0})
+
+    def find(config, data, ext, our_details, transport=None):
+        calls.append("find")
+        assert f"[карта #{cards['A2']}]" in our_details
+        return {"recipient": "Ба корт: 5058 27** **** 2222", "our_card": cards["A2"], "why": "последние 4 цифры"}
+    monkeypatch.setattr(receipt_ai, "find_card", find)
+    from fastapi.testclient import TestClient
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: sent.append("admin") or 100)
+    monkeypatch.setattr("donatix.cashiers.send_file",
+                        lambda cfg, chat, caption, buttons, path, photo: sent.append(int(chat)) or 200)
+    make_client(conn, login="twopass")
+    c = TestClient(app)
+    web_login(c, "twopass@example.com", "password123")
+    token = csrf_of(c.get("/panel/balance").text)
+    c.post("/panel/balance", data={"csrf": token, "method": "alif", "amount_tjs": "100"}, files=RECEIPT,
+           follow_redirects=False)
+    pid = conn.execute("SELECT MAX(id) FROM payments").fetchone()[0]
+    assert calls == ["read", "find"]
+    assert conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == cards["A2"]
+    assert sent == ["admin", SHAHZOD]
+
+
+def test_no_second_pass_when_number_already_clear(conn, app, cards, monkeypatch, ai_on):
+    from donatix import receipt_ai
+    monkeypatch.setattr(receipt_ai, "read", lambda *a, **k: {"recipient": "**** 1111", "our_card": 0})
+    monkeypatch.setattr(receipt_ai, "find_card", lambda *a, **k: pytest.fail("лишний запрос к ИИ"))
+    from conftest import RECEIPT_PNG
+    seen = payments.read_receipt(app.state.config, RECEIPT_PNG, paycards.all_details(conn, "alif"))
+    assert seen["recipient"] == "**** 1111"
+
+
+def test_prompt_knows_tajik_recipient_words():
+    from donatix import receipt_ai
+    for word in ("Гиранда", "Қабулкунанда", "Ба корт", "Рақами телефон", "Фиристанда", "Аз корт"):
+        assert word in receipt_ai.PROMPT and word in receipt_ai.FIND_PROMPT
