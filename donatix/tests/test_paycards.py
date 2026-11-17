@@ -113,3 +113,24 @@ def test_ai_and_masks_route_receipt_to_the_card_that_got_money(conn, app):
     assert not paycards.reroute(conn, pid, {"our_card": 99999, "recipient": "чужой 9999"})   # выдуманную карту не берём
     note = paycards.reroute(conn, pid, {"recipient": "4444 55** **** 1111"})
     assert "****1111" in note and conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0] == a
+
+
+def test_cards_go_strictly_by_turn_new_card_does_not_take_all(conn, app):
+    """Новую карту добавили посреди дня — она НЕ забирает всех: клиенты идут по кругу А, Б, В, А, Б, В…"""
+    from conftest import make_client
+    config = app.state.config
+    method = _method(conn, config)
+    db.set_setting(conn, "cards.rest", "0")
+    a = paycards.add(conn, method, "Карта 4444 5555 6666 1111", 0)
+    b = paycards.add(conn, method, "Карта 4444 5555 6666 2222", 0)
+    users = [make_client(conn, login=f"turn{i}")[0] for i in range(7)]
+    for uid in users[:2]:                                    # утром было две карты, пришли большие суммы
+        u = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        pid = payments.create(conn, config, u, method, "", amount_tjs="900")
+        conn.execute("UPDATE payments SET status = 'paid', resolved_at = created_at WHERE id = ?", (pid,))
+    c = paycards.add(conn, method, "Карта 4444 5555 6666 3333", 0)   # добавили новую
+    got = [paycards.pick(conn, uid, method)["id"] for uid in users[2:]]
+    assert sorted(got[:3]) == sorted([a, b, c]) and got[3:] == got[:2]   # по одному на каждую, потом снова по кругу
+    assert got.count(c) == 2 and got.count(a) + got.count(b) == 3
+    assert paycards.pick(conn, users[2], method)["id"] == got[0]          # тот же клиент — та же карта, очередь не сдвигается
+    assert paycards.pick(conn, users[3], method)["id"] == got[1]

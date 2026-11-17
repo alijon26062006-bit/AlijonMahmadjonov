@@ -3,8 +3,8 @@
 Как работает:
 - у банка (способа оплаты, например «Душанбе Сити» или «Алиф») может быть несколько карт; у каждой — хозяин:
   кассир (его Telegram ID) или владелец магазина (0);
-- клиент открывает пополнение → ему показывается карта, на которую СЕГОДНЯ пришло меньше всего денег
-  (с учётом ещё не оплаченных заявок); при равенстве — случайная. Так за день у всех карт почти одинаковые суммы;
+- клиент открывает пополнение → карты выдаются строго по очереди: 1-й клиент — А, 2-й — Б, 3-й — В, 4-й — снова А.
+  Новая карта не забирает все переводы — каждая получает поровну с момента, как её добавили;
 - выбранная карта держится за клиентом 2 часа (форма → заявка → чек — одна и та же карта) и записывается в заявку;
 - чек приходит ТОЛЬКО хозяину этой карты (владельцу — в админ-чат, кассиру — ему одному);
 - ИИ читает в чеке номер получателя: клиент по привычке перевёл на другую нашу карту — заявка сама уходит
@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import random
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -138,12 +137,14 @@ def resting_id(conn: sqlite3.Connection, method: str, tz_offset: int = 5) -> int
 
 
 def pick(conn: sqlite3.Connection, user_id: int, method: str, tz_offset: int = 5) -> sqlite3.Row | None:
-    """Карта для этого клиента и банка: держим прежнюю 2 часа, иначе — та, на которую сегодня пришло меньше.
+    """Карта для этого клиента и банка — СТРОГО ПО ОЧЕРЕДИ: 1-й клиент — карта А, 2-й — Б, 3-й — В, 4-й — снова А…
+    Так новая карта не забирает все переводы, а каждая получает поровну с момента запуска.
+    Тот же клиент 2 часа видит ту же карту (форма → заявка → чек), это не новая очередь.
     Отдыхающую сегодня карту не показываем никому."""
     ensure(conn)
     rest = resting_id(conn, method, tz_offset)
-    cards = [c for c in conn.execute("SELECT * FROM pay_cards WHERE method = ? AND active = 1", (method,)).fetchall()
-             if c["id"] != rest]
+    cards = [c for c in conn.execute("SELECT * FROM pay_cards WHERE method = ? AND active = 1 ORDER BY id",
+                                     (method,)).fetchall() if c["id"] != rest]
     if not cards:
         return None
     fresh = (datetime.now(timezone.utc) - timedelta(hours=HOLD_HOURS)).strftime("%Y-%m-%dT%H:%M:%S")
@@ -154,9 +155,13 @@ def pick(conn: sqlite3.Connection, user_id: int, method: str, tz_offset: int = 5
             card = next((c for c in cards if c["id"] == held["card_id"]), None)
             if card is not None:
                 return card
-    loads = {c["id"]: load(conn, c["id"], tz_offset) for c in cards}
-    low = min(loads.values())
-    card = random.choice([c for c in cards if loads[c["id"]] == low])
+    key = f"cards.turn.{method}"
+    try:
+        last = int(db.get_setting(conn, key) or 0)
+    except ValueError:
+        last = 0
+    card = next((c for c in cards if c["id"] > last), cards[0])   # следующая после выданной в прошлый раз, по кругу
+    db.set_setting(conn, key, str(card["id"]))
     if user_id:
         conn.execute("INSERT INTO pay_card_hold (user_id, method, card_id, at) VALUES (?, ?, ?, ?) "
                      "ON CONFLICT(user_id, method) DO UPDATE SET card_id = excluded.card_id, at = excluded.at",
