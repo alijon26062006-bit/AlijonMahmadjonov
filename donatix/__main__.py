@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     relink.add_argument("order_id", nargs="?", type=int, default=None)
     sub.add_parser("bots-drain")   # перед обновлением: мягко остановить ботов партнёров, пока сайт работает
     sub.add_parser("geo-update")   # скачать базу «IP → страна» и курсы СНГ сейчас, не дожидаясь воркера
+    rc = sub.add_parser("receipt-check")   # настоящий ИИ читает чек: на какую нашу карту и кому уйдёт (ничего не пишет)
+    rc.add_argument("photo")
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
     args = parser.parse_args(argv)
@@ -94,6 +96,17 @@ def main(argv: list[str] | None = None) -> int:
 
     db.init(config.db_path)
     conn = db.connect(config.db_path)
+    if args.cmd == "receipt-check":
+        import html
+        import re as _re
+        from pathlib import Path as _P
+
+        from . import paycards, sitecfg
+        sitecfg.load(conn, config)
+        report = paycards.explain(conn, config, _P(args.photo).read_bytes())
+        print(html.unescape(_re.sub(r"<[^>]+>", "", report)))
+        conn.close()
+        return 0
     try:
         if args.cmd == "sync":
             import time as _t

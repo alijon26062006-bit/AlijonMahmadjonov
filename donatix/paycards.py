@@ -187,56 +187,95 @@ def _names(details: str) -> set[str]:
             if w not in skip}
 
 
+MASK = "*•●xXхХ#…"
+
+
+def _strip992(d: str) -> str:
+    """+992 93 555 44 33 и 93 555 44 33 — один и тот же номер."""
+    return d[3:] if d.startswith("992") and len(d) >= 12 else d
+
+
+def _chunks(recipient: str) -> list[str]:
+    """Номера в строке получателя: «Фаррух +992 93 *** 44 33, карта 4444 55** **** 1111» → два куска."""
+    return [c.strip() for c in re.findall(r"\+?[\d" + re.escape(MASK) + r"][\d" + re.escape(MASK) + r" \-.]*", recipient or "")
+            if sum(ch.isdigit() for ch in c) >= 4]
+
+
+def _fits(chunk: str, num: str) -> bool:
+    """Подходит ли кусок из чека к нашему номеру num (только цифры).
+    С маской: видимое начало — начало номера, видимый конец — конец номера, всего видно не меньше 4 цифр.
+    Без маски: телефон/счёт — последние 9 цифр; карта целиком — равна; только 4 цифры — конец номера."""
+    num = _strip992(num)
+    mask_at = [i for i, ch in enumerate(chunk) if ch in MASK]
+    if mask_at:
+        head = re.sub(r"\D", "", chunk[:mask_at[0]])
+        if head.startswith("992") and (chunk.lstrip().startswith("+") or len(num) <= 9):   # код страны у телефона
+            head = head[3:]
+        tail = re.sub(r"\D", "", chunk[mask_at[-1] + 1:])
+        if len(head) + len(tail) < 4 or len(tail) < 2 or len(head) + len(tail) > len(num):
+            return False
+        return num.endswith(tail) and num.startswith(head)
+    seen = _strip992(re.sub(r"\D", "", chunk))
+    if len(seen) >= 9:
+        return num.endswith(seen[-9:]) or seen.endswith(num[-9:])
+    return len(seen) >= 4 and num.endswith(seen)
+
+
 def match(conn: sqlite3.Connection, recipient: str, method: str = "") -> sqlite3.Row | None:
-    """Наша карта по получателю из чека. Сверяем:
-    - телефон/счёт — последние 9 цифр;
-    - карту — последние 4 цифры (и первые 4, если видны), маски вида 4444 55** **** 1234 тоже;
-    - имя получателя — если по цифрам не нашли.
+    """Наша карта по получателю из чека: номер карты/телефона (с масками и без), иначе имя.
     Подходит несколько карт — не гадаем (None)."""
     ensure(conn)
-    raw = recipient or ""
-    masked = bool(re.search(r"\d\s*[*•xXхХ]|[*•xXхХ]\s*\d", raw))   # 4444 55** **** 1234
-    seen = re.sub(r"\D", "", raw)
-    groups = re.findall(r"\d+", raw)
     sql, args = "SELECT * FROM pay_cards", ()
     if method:
         sql, args = sql + " WHERE method = ?", (method,)
     cards = conn.execute(sql, args).fetchall()
-
-    def by_digits(c) -> bool:
-        for num in numbers(c["details"]):
-            if len(seen) >= 9 and not masked and (num.endswith(seen[-9:]) or seen.endswith(num[-9:])):
-                return True
-            if len(num) >= 16 and len(seen) >= 4:
-                tail_ok = (groups[-1][-4:] if groups else seen[-4:]) == num[-4:]
-                head_ok = not masked or len(groups) < 2 or len(groups[0]) < 4 or num.startswith(groups[0][:6])
-                if tail_ok and head_ok:
-                    return True
-        return False
-
-    found = [c for c in cards if len(seen) >= 4 and by_digits(c)]
+    chunks = _chunks(recipient)
+    found = [c for c in cards if any(_fits(ch, n) for ch in chunks for n in numbers(c["details"]))]
     if not found:   # цифр нет или не совпали — по имени получателя
-        words = _names(raw)
+        words = _names(recipient)
         if words:
             found = [c for c in cards if words & _names(c["details"])]
     return found[0] if len(found) == 1 else None
 
 
+def which_card(conn: sqlite3.Connection, method: str, seen: dict | None) -> tuple[sqlite3.Row | None, str]:
+    """На какую НАШУ карту этого банка пришли деньги — по тому, что ИИ прочитал в чеке. Возвращает (карта, почему).
+    1) номер в чеке однозначно совпал с одной нашей картой — это факт;
+    2) иначе — карта, которую назвал ИИ, если цифры ей не противоречат;
+    3) иначе — по имени получателя. Ничего однозначного — (None, причина): не гадаем."""
+    ensure(conn)
+    seen = seen or {}
+    text = str(seen.get("recipient") or "")
+    cards = conn.execute("SELECT * FROM pay_cards WHERE method = ?", (method,)).fetchall()
+    chunks = _chunks(text)
+    by_num = [c for c in cards if any(_fits(ch, n) for ch in chunks for n in numbers(c["details"]))]
+    ai_card = get(conn, seen.get("our_card") or 0)
+    if ai_card is not None and ai_card["method"] != method:
+        ai_card = None
+    if len(by_num) == 1:
+        return by_num[0], "номер получателя в чеке"
+    if len(by_num) > 1:
+        if ai_card is not None and ai_card["id"] in {c["id"] for c in by_num}:
+            return ai_card, "номер подходит к нескольким картам — выбрал ИИ"
+        return None, "номер подходит к нескольким нашим картам"
+    if ai_card is not None:
+        return ai_card, "ИИ узнал карту в чеке"
+    named = match(conn, text, method)
+    if named is not None:
+        return named, "имя получателя"
+    return None, "в чеке нет номера/имени нашей карты" if text else "ИИ не нашёл получателя в чеке"
+
+
 def reroute(conn: sqlite3.Connection, payment_id: int, seen: dict | str) -> str:
-    """Деньги пришли не на показанную карту, а на другую нашу — заявка переходит на ту карту, чек — её хозяину.
-    Сначала верим ИИ (он назвал номер нашей карты), потом сверяем сами по номеру и имени.
+    """Заявка переходит на карту, куда реально пришли деньги, — чек получает хозяин этой карты.
     Возвращает пометку для чека (или пустую строку)."""
     if isinstance(seen, str):
         seen = {"recipient": seen}
+    ensure(conn)
     p = conn.execute("SELECT card_id, method FROM payments WHERE id = ?", (payment_id,)).fetchone()
     if p is None:
         return ""
-    real = None
-    ai_card = get(conn, (seen or {}).get("our_card") or 0)
-    if ai_card is not None and ai_card["method"] == p["method"]:
-        real = ai_card
-    if real is None and (seen or {}).get("recipient"):
-        real = match(conn, str(seen["recipient"]), p["method"])
+    real, _ = which_card(conn, p["method"], seen)
     if real is None or real["id"] == p["card_id"]:
         return ""
     shown = get(conn, p["card_id"])
@@ -245,6 +284,17 @@ def reroute(conn: sqlite3.Connection, payment_id: int, seen: dict | str) -> str:
         return f"💳 ИИ: деньги пришли на карту ****{tail(real)} — заявка у хозяина этой карты"
     return (f"↪️ Клиент перевёл на карту ****{tail(real)} вместо показанной ****{tail(shown)} — "
             f"заявка у хозяина карты ****{tail(real)}")
+
+
+def owner_name(conn: sqlite3.Connection, card: sqlite3.Row | None) -> str:
+    if card is None:
+        return ""
+    if not card["owner_tg"]:
+        return "владелец (админ-чат)"
+    row = conn.execute("SELECT name, active FROM cashiers WHERE tg_id = ?", (card["owner_tg"],)).fetchone()
+    if row is None:
+        return f"кассир {card['owner_tg']} (не найден — чек уйдёт в админ-чат)"
+    return f"кассир {row['name']}" + ("" if row["active"] else " (выключен — чек уйдёт в админ-чат)")
 
 
 def tail(card: sqlite3.Row) -> str:
@@ -265,3 +315,48 @@ def report(conn: sqlite3.Connection, tz_offset: int = 5) -> list[dict[str, Any]]
         out.append({**dict(c), "tail": tail(c), "owner_name": owner or "Вы (владелец)", "today_n": r["n"], "today_micro": r["s"],
                     "resting": resting.get(c["method"]) == c["id"]})
     return out
+
+
+def explain(conn: sqlite3.Connection, config: Any, data: bytes) -> str:
+    """Проверка вживую: настоящий ИИ читает этот чек → что прочитал → на какую нашу карту и кому уйдёт чек.
+    Ничего не записывает. Для админ-бота (/chek) и команды на сервере (python -m donatix receipt-check фото.jpg)."""
+    import html
+
+    from . import payments, receipt_ai
+    ensure(conn)
+    ext = payments.receipt_kind(data)
+    if not receipt_ai.enabled(config):
+        return "⚠️ ИИ выключен: нет ключа OpenAI на сервере (deploy/openai.sh) — чеки читает только человек."
+    if ext not in receipt_ai.MIME:
+        return "⚠️ Пришлите чек картинкой (фото или скриншот). PDF ИИ не читает."
+    methods = [r[0] for r in conn.execute("SELECT DISTINCT method FROM pay_cards WHERE active = 1 ORDER BY method")]
+    if not methods:
+        return "⚠️ Нет ни одной включённой карты (Админка → Карты)."
+    conf = payments.settings(conn, config)["details"]
+    details = "\n".join(all_details(conn, m, conf.get(m, "")) for m in methods)
+    seen = receipt_ai.read(config, data, ext, our_details=details)
+    if not seen:
+        return "⚠️ ИИ не ответил (ключ, баланс OpenAI или сеть). Попробуйте ещё раз."
+    e = html.escape
+    lines = ["🧪 <b>Проверка чека ИИ</b> (ничего не записано)",
+             f"Банк в чеке: {e(seen.get('bank') or '—')} · сумма: {seen.get('amount') or '—'} {e(seen.get('currency') or '')}",
+             f"Получатель (прочитал ИИ): <code>{e(seen.get('recipient') or '—')}</code>",
+             f"ИИ назвал нашу карту: {('#' + str(seen['our_card'])) if seen.get('our_card') else 'нет'}", ""]
+    hits = []
+    for m in methods:
+        card, why = which_card(conn, m, seen)
+        if card is not None:
+            hits.append((m, card, why))
+    if len(hits) == 1:
+        m, card, why = hits[0]
+        lines.append(f"✅ Деньги пришли на карту <b>****{tail(card)}</b> ({e(m)}) — {e(why)}")
+        lines.append(f"📨 Чек получит: <b>{e(owner_name(conn, card))}</b> + копия вам")
+    elif hits:
+        lines.append("⚠️ Подходят карты разных банков: " + ", ".join(f"****{tail(c)} ({e(m)})" for m, c, _ in hits)
+                     + " — в настоящей заявке выберется карта банка, который выбрал клиент.")
+    else:
+        lines.append("❓ Ни одна наша карта не подошла — " + e(which_card(conn, methods[0], seen)[1]) + ".")
+        lines.append("Чек уйдёт хозяину карты, которую показали клиенту, и вам.")
+    if seen.get("forgery") in ("suspicious", "fake"):
+        lines.append("🚨 Признаки подделки: " + e("; ".join(seen.get("signs") or [seen["forgery"]])))
+    return "\n".join(lines)

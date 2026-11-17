@@ -38,10 +38,13 @@ PROMPT = (
     "Амонатбонк, Спитамен и др.; также крипто-переводы). Прочитай его и верни ТОЛЬКО JSON:\n"
     '{"is_receipt": true/false, "bank": "название банка или кошелька", "amount": число, '
     '"currency": "TJS|USD|RUB|USDT|…", "datetime": "YYYY-MM-DD HH:MM", '
-    '"txn_id": "номер операции/квитанции/транзакции", "recipient": "получатель: номер карты, телефона или имя", '
+    '"txn_id": "номер операции/квитанции/транзакции", "recipient": "получатель ТОЧНО как в чеке: все номера (карта, телефон, счёт) со звёздочками-масками и имя", '
     '"status": "success|pending|failed|unknown", "recipient_ok": "yes|no|unknown", "our_card": число, '
     '"forgery": "real|suspicious|fake", "signs": ["признак подделки", …]}\n'
     "Если поля нет на изображении — пустая строка (для amount — 0). Ничего не придумывай.\n"
+    "recipient: прочитай чек ЦЕЛИКОМ (получатель, «Кому», «На карту», «Номер телефона», «Счёт зачисления», "
+    "«Карта получателя», низ чека). Перепиши номер цифра в цифру, звёздочки/точки маски оставь как есть "
+    "(например «4444 55** **** 1234», «+992 93 *** 44 33»), затем имя. Не путай с картой ОТПРАВИТЕЛЯ («Откуда», «Со счёта»).\n"
     "recipient_ok — совпадает ли получатель в чеке с НАШИМИ реквизитами (ниже): номер карты/телефона/счёта "
     "(учитывай маску ****1234 и пробелы) или имя (учитывай латиницу/кириллицу). Не видно получателя — unknown.\n"
     "our_card — у нас несколько карт, каждая помечена «[карта #N]». Найди, на КАКУЮ ИМЕННО нашу карту пришли деньги: "
@@ -106,7 +109,7 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
     signs = raw.get("signs") if isinstance(raw.get("signs"), list) else []
     return {"is_receipt": bool(raw.get("is_receipt", True)), "bank": s("bank"), "amount": amount,
             "currency": s("currency").upper()[:8], "datetime": s("datetime")[:16], "txn_id": s("txn_id"),
-            "recipient": s("recipient"), "status": s("status").lower() or "unknown",
+            "recipient": re.sub(r"\s+", " ", str(raw.get("recipient") or "")).strip()[:200], "status": s("status").lower() or "unknown",
             "recipient_ok": _pick(raw.get("recipient_ok"), ("yes", "no"), "unknown"),
             "our_card": _int(raw.get("our_card")),
             "forgery": _pick(raw.get("forgery"), ("suspicious", "fake"), "real"),
@@ -321,14 +324,15 @@ def amount_matches(d: dict[str, Any], pay_amount: Any, pay_currency: str) -> boo
 
 
 def recipient_matches(d: dict[str, Any], our_details: str) -> bool | None:
-    """Совпадает ли получатель в чеке с нашими реквизитами: сравниваем последние 4 цифры
-    номера карты/телефона. None — сравнить нечем."""
-    seen = re.sub(r"\D", "", d.get("recipient") or "")
+    """Совпадает ли получатель в чеке с нашими реквизитами: номер карты/телефона, с масками и без.
+    None — сравнить нечем (в чеке нет номера)."""
+    from .paycards import _chunks, _fits
+    chunks = _chunks(d.get("recipient") or "")
     ours = [re.sub(r"\D", "", x) for x in re.findall(r"[\d][\d\s-]{5,}\d", our_details or "")]
     ours = [x for x in ours if len(x) >= 6]
-    if len(seen) < 4 or not ours:
+    if not chunks or not ours:
         return None
-    return any(x[-4:] == seen[-4:] for x in ours)
+    return any(_fits(ch, x) for ch in chunks for x in ours)
 
 
 def time_problem(d: dict[str, Any], created_at: str | None, tz_hours: int = 5) -> str:

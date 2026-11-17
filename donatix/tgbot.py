@@ -408,6 +408,10 @@ class AdminBot:
                 self.send("🔎 Пример: <code>/find 125</code> или просто напишите номер заявки.")
             else:
                 self.find(conn, self.chat_id, query)
+        elif cmd in ("/chek", "/check"):   # проверка вживую: какую карту ИИ узнает в чеке и кому уйдёт чек
+            self.wizard = {"step": "rc_test"}
+            self.send("🧪 Пришлите <b>фото чека</b> — ИИ прочитает его как настоящий и скажет, на какую нашу карту "
+                      "пришли деньги и какому кассиру уйдёт чек. Ничего не зачисляется.", [[("Отмена", "m:home:0")]])
         elif cmd in ("/stats", "📊"):
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
@@ -1261,6 +1265,9 @@ def screen_settings(conn: sqlite3.Connection, config: Config) -> Screen:
 
 def _menu(bot: AdminBot, conn: sqlite3.Connection, action: str, _: int) -> str | Screen:
     cfg = bot.config
+    if action == "chek":
+        bot.wizard = {"step": "rc_test"}
+        return "🧪 Пришлите следующее <b>фото чека</b>.", [_back()]
     if action == "home":
         return screen_home(conn, cfg)
     if action == "stats":
@@ -1639,6 +1646,12 @@ def wizard_step(bot: AdminBot, conn: sqlite3.Connection, msg: dict[str, Any]) ->
     w = bot.wizard or {}
     if str(w.get("step", "")).startswith("cashier_"):
         return cashier_wizard_step(bot, conn, msg)
+    if w.get("step") == "rc_test":
+        from . import paycards
+        got = _photo_bytes(bot, msg)
+        if got is None:
+            return "Пришлите чек <b>фото</b> или картинкой.", [[("Отмена", "m:home:0")]]
+        return paycards.explain(conn, bot.config, got[0]), [[("🧪 Ещё чек", "m:chek:0")], _back()]
     text = (msg.get("text") or "").strip()
     step = w.get("step")
     try:
