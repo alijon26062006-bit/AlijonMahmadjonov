@@ -5,6 +5,13 @@
   <p>Несколько карт на один банк. Клиенту показывается карта, на которую сегодня пришло меньше всего — суммы по картам выходят ровные.
     Чек приходит <b>только хозяину карты</b>. Перевёл клиент по привычке на другую нашу карту — ИИ по номеру получателя в чеке
     сам отправит заявку хозяину той карты. Если у банка нет ни одной включённой карты — показываются реквизиты из «Способов оплаты», как раньше.</p></section>
+<form method="post" action="/admin/cards" class="card" style="margin-bottom:12px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label style="font-weight:400"><input type="checkbox" style="width:auto;min-height:0" {{ 'checked' if rest }}
+    onchange="this.form.action.value=this.checked?'rest_on':'rest_off';this.form.submit()"> <b>Отдых карт:</b> у банка с 2 и больше картами
+    каждый день одна карта не показывается клиентам, завтра — следующая по кругу</label>
+  <input type="hidden" name="action" value="">
+</form>
 <form method="post" action="/admin/cards" class="card" style="margin-bottom:16px;display:grid;gap:10px">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">
   <b>Добавить карту</b>
@@ -19,7 +26,7 @@
   {% if r.method != ns.m %}{% set ns.m = r.method %}<h2 style="margin:18px 0 8px">{{ titles.get(r.method, r.method) }}</h2>{% endif %}
   <div class="card" style="margin-bottom:10px;{{ '' if r.active else 'opacity:.55' }}">
     <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div style="min-width:0"><b>****{{ r.tail }}</b> · {{ r.owner_name }}{% if not r.active %} · <span class="muted">выключена</span>{% endif %}
+      <div style="min-width:0"><b>****{{ r.tail }}</b> · {{ r.owner_name }}{% if not r.active %} · <span class="muted">выключена</span>{% elif r.resting %} · <span style="color:#d97706">😴 сегодня отдыхает</span>{% endif %}
         <div class="muted small" style="white-space:pre-line;overflow-wrap:anywhere">{{ r.details }}</div></div>
       <div class="right"><div class="amount">{{ '%.2f' % (r.today_micro / 10000 * rate) }} с.</div><div class="muted small">сегодня · {{ r.today_n }} заявок</div></div>
     </div>

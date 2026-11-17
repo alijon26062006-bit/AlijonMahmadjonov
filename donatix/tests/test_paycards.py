@@ -12,6 +12,7 @@ def test_cards_balance_hold_and_reroute(conn, app):
     from conftest import make_client
     config = app.state.config
     method = _method(conn, config)
+    db.set_setting(conn, "cards.rest", "0")      # здесь проверяем распределение, без отдыха карт
     a = paycards.add(conn, method, "Карта 4444 5555 6666 1111\nАли", 0)
     b = paycards.add(conn, method, "Карта 4444 5555 6666 2222\nФаррух", 777001)
     u1, u2 = make_client(conn, login="pay1")[0], make_client(conn, login="pay2")[0]
@@ -64,3 +65,27 @@ def test_admin_cards_page(app, conn):
     r = c.post("/admin/cards", data={"csrf": token, "action": "add", "method": "alif",
                                      "details": "Карта 4444 5555 6666 9999", "owner_tg": "0"}, follow_redirects=False)
     assert r.status_code == 303 and "****9999" in c.get("/admin/cards").text
+
+
+def test_one_card_rests_each_day_by_turns(conn, app, monkeypatch):
+    from datetime import datetime, timezone
+    from conftest import make_client
+    method = _method(conn, app.state.config)
+    ids = [paycards.add(conn, method, f"Карта 4444 5555 6666 70{i}0", 0) for i in range(3)]
+    seen = set()
+    for day in range(3):                                   # три дня подряд — отдыхают разные карты, по кругу
+        fixed = datetime(2026, 11, 17 + day, 12, tzinfo=timezone.utc)
+        monkeypatch.setattr(paycards, "datetime", type("D", (datetime,), {"now": staticmethod(lambda tz=None, f=fixed: f)}))
+        rest = paycards.resting_id(conn, method)
+        seen.add(rest)
+        uid = make_client(conn, login=f"rest{day}")[0]
+        for _ in range(5):
+            assert paycards.pick(conn, uid, method)["id"] != rest       # отдыхающую карту не показываем
+            conn.execute("DELETE FROM pay_card_hold")
+    assert seen == set(ids)
+    db.set_setting(conn, "cards.rest", "0")
+    assert paycards.resting_id(conn, method) == 0                        # отдых выключен в админке
+    paycards.set_active(conn, ids[1], False)
+    paycards.set_active(conn, ids[2], False)
+    db.set_setting(conn, "cards.rest", "1")
+    assert paycards.resting_id(conn, method) == 0                        # одна карта — не отдыхает

@@ -119,10 +119,31 @@ def load(conn: sqlite3.Connection, card_id: int, tz_offset: int = 5) -> int:
         (card_id, since, recent)).fetchone()[0])
 
 
-def pick(conn: sqlite3.Connection, user_id: int, method: str, tz_offset: int = 5) -> sqlite3.Row | None:
-    """Карта для этого клиента и банка: держим прежнюю 2 часа, иначе — та, на которую сегодня пришло меньше."""
+def rest_on(conn: sqlite3.Connection) -> bool:
+    """Отдых карт: у банка с 2+ картами каждый день одна карта не показывается (по кругу). Выключается в админке."""
+    return db.get_setting(conn, "cards.rest", "1") == "1"
+
+
+def resting_id(conn: sqlite3.Connection, method: str, tz_offset: int = 5) -> int:
+    """Какая карта этого банка сегодня отдыхает: включённые карты по порядку, сегодня — следующая по кругу.
+    Меньше двух карт — не отдыхает никто (иначе клиенту нечего показать)."""
     ensure(conn)
-    cards = conn.execute("SELECT * FROM pay_cards WHERE method = ? AND active = 1", (method,)).fetchall()
+    if not rest_on(conn):
+        return 0
+    ids = [r[0] for r in conn.execute("SELECT id FROM pay_cards WHERE method = ? AND active = 1 ORDER BY id", (method,))]
+    if len(ids) < 2:
+        return 0
+    day = (datetime.now(timezone.utc) + timedelta(hours=tz_offset)).date().toordinal()
+    return ids[day % len(ids)]
+
+
+def pick(conn: sqlite3.Connection, user_id: int, method: str, tz_offset: int = 5) -> sqlite3.Row | None:
+    """Карта для этого клиента и банка: держим прежнюю 2 часа, иначе — та, на которую сегодня пришло меньше.
+    Отдыхающую сегодня карту не показываем никому."""
+    ensure(conn)
+    rest = resting_id(conn, method, tz_offset)
+    cards = [c for c in conn.execute("SELECT * FROM pay_cards WHERE method = ? AND active = 1", (method,)).fetchall()
+             if c["id"] != rest]
     if not cards:
         return None
     fresh = (datetime.now(timezone.utc) - timedelta(hours=HOLD_HOURS)).strftime("%Y-%m-%dT%H:%M:%S")
@@ -196,10 +217,12 @@ def report(conn: sqlite3.Connection, tz_offset: int = 5) -> list[dict[str, Any]]
     ensure(conn)
     since = _day_start(tz_offset)
     out = []
+    resting = {m: resting_id(conn, m, tz_offset) for m in {c["method"] for c in listing(conn)}}
     for c in listing(conn):
         r = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(amount_micro), 0) AS s FROM payments "
                          "WHERE card_id = ? AND status = 'paid' AND resolved_at >= ?", (c["id"], since)).fetchone()
         owner = "" if not c["owner_tg"] else (conn.execute("SELECT name FROM cashiers WHERE tg_id = ?",
                                                            (c["owner_tg"],)).fetchone() or {"name": str(c["owner_tg"])})["name"]
-        out.append({**dict(c), "tail": tail(c), "owner_name": owner or "Вы (владелец)", "today_n": r["n"], "today_micro": r["s"]})
+        out.append({**dict(c), "tail": tail(c), "owner_name": owner or "Вы (владелец)", "today_n": r["n"], "today_micro": r["s"],
+                    "resting": resting.get(c["method"]) == c["id"]})
     return out
