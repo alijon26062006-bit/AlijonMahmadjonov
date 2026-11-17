@@ -62,17 +62,20 @@
           {% if rf.instagram_url %}<a href="{{ rf.instagram_url }}" target="_blank" rel="noopener">Обуна · Подписаться →</a>{% endif %}</li>
       </ul>
 
-      {% if not rf.closed %}
+      {% if rf.can_join %}
       <form method="post" action="/raffle/join" class="rf-join" id="join">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label for="rf-ig">Номи Instagram-и шумо <small>· ваш ник в Instagram (проверим подписку в эфире)</small></label>
         <div class="rf-row">
           <input id="rf-ig" name="instagram" value="{{ rf.instagram }}" placeholder="@ali_2006" required maxlength="60"
                  autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text">
-          <button class="btn primary rf-btn" type="submit">{% if rf.joined %}Сохранить{% else %}Иштирок мекунам · Участвую{% endif %}</button>
+          <button class="btn primary rf-btn" type="submit">Иштирок мекунам · Участвую</button>
         </div>
-        {% if not rf.joined %}<p class="muted" style="margin:0">Бе пахши ин тугма харидҳо ба қуръакашӣ дохил намешаванд.<br>Без нажатия этой кнопки вы не участвуете. Покупки с начала розыгрыша засчитаются.</p>{% endif %}
+        <p class="muted" style="margin:0">Бе пахши ин тугма шумо иштирок намекунед.<br>Без нажатия этой кнопки вы не участвуете.</p>
       </form>
+      {% elif not rf.joined and not rf.closed %}
+      <p class="rf-lock">🔒 Пас аз хариди ${{ rf.min_usd }} тугмаи «Иштирок мекунам» пайдо мешавад.<br>
+        <span>Кнопка «Участвую» появится после покупки на ${{ rf.min_usd }}.</span></p>
       {% endif %}
       <a class="btn rf-btn rf-buy" href="/">Харидан · Купить {{ icon('chevron', 16) }}</a>
     {% endif %}
@@ -97,7 +100,7 @@
       <li><b>Барои худ аз ${{ rf.min_usd }} харед</b><small>Купите для себя от ${{ rf.min_usd }} — алмазы, UC, Stars, любые товары: на сайте, в боте или в приложении. Считаются выполненные заказы с начала розыгрыша.</small></li>
       <li><b>Ба канали Telegram обуна шавед</b><small>Подпишитесь на наш Telegram-канал — проверяем автоматически.{% if rf.channel_url %} <a href="{{ rf.channel_url }}" target="_blank" rel="noopener">Открыть канал</a>{% endif %}</small></li>
       <li><b>Ба Instagram обуна шавед ва номи худро нависед</b><small>Подпишитесь на наш Instagram и напишите свой ник — проверим в эфире.{% if rf.instagram_url %} <a href="{{ rf.instagram_url }}" target="_blank" rel="noopener">Открыть Instagram</a>{% endif %}</small></li>
-      <li><b>Тугмаи «Иштирок мекунам»-ро пахш кунед</b><small>Нажмите «Участвую». Без кнопки участие не считается.</small></li>
+      <li><b>Баъд аз харид «Иштирок мекунам»-ро пахш кунед</b><small>После покупки на ${{ rf.min_usd }} нажмите «Участвую». Без кнопки участие не считается.</small></li>
       <li><b>Як нафар — як чипта</b><small>Один человек — один билет. Шансы у всех участников равные.</small></li>
     </ol>
     <div class="rf-livebox">{{ icon('play', 18) }}<span><b>{{ rf.draw }} — пахши мустақим дар Instagram</b><small>Победителей выбираем вживую, в прямом эфире Instagram: случайный билет на экране. Не подписан — приз переходит другому.</small></span></div>
@@ -148,6 +151,8 @@
   font-weight: 900; font-size: .75rem; background: var(--warn-soft); color: var(--warn); }
 .rf-chk li.ok i { background: var(--ok-soft); color: var(--ok); }
 .rf-chk b, .rf-chk a { font-size: .78rem; font-weight: 800; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rf-lock { margin: 4px 0 0; padding: 12px; border-radius: 14px; background: var(--surface-2); font-weight: 700; font-size: .88rem; line-height: 1.45; }
+.rf-lock span { font-weight: 500; color: var(--muted); }
 .rf-join { display: grid; gap: 8px; margin-top: 4px; } .rf-join label { font-weight: 700; font-size: .9rem; }
 .rf-row { display: flex; gap: 8px; flex-wrap: wrap; } .rf-row input { flex: 1; min-width: 160px; min-height: 48px; font-size: 16px; }
 .rf-btn { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; }

@@ -1024,16 +1024,17 @@ function rfDraw() {
     <div class="rfm-me">${mine}</div>
     <div class="rfm-more">
       <ul class="rfm-pz">${prizes}</ul>
-      <ol class="rfm-st"><li>Барои худ аз $${RF.min_usd} харед <small>Купите для себя от $${RF.min_usd}</small></li>
+      <ol class="rfm-st"><li>Аввал барои худ $${RF.min_usd} харед <small>Сначала купите для себя на $${RF.min_usd}</small></li>
         <li>Ба канали Telegram обуна шавед <small>Подписка на канал — проверим сами</small>${RF.channel_url ? ` <a data-rfl="${rfEsc(RF.channel_url)}">Канал →</a>` : ""}</li>
         <li>Ба Instagram обуна шавед <small>Подписка на Instagram — проверим в эфире</small>${RF.instagram_url ? ` <a data-rfl="${rfEsc(RF.instagram_url)}">Instagram →</a>` : ""}</li>
         <li>Як нафар — як чипта <small>Один человек — один билет</small></li></ol>
-      ${RF.closed ? "" : `<label class="rfm-l" for="rf-ig">Номи Instagram-и шумо · ваш ник Instagram</label>
+      ${RF.can_join ? `<label class="rfm-l" for="rf-ig">Номи Instagram-и шумо · ваш ник Instagram</label>
       <div class="rfm-row"><input id="rf-ig" value="${rfEsc(RF.instagram)}" placeholder="@ali_2006" maxlength="60" autocapitalize="none" autocomplete="off" spellcheck="false">
-        <button class="rfm-btn press" type="button" id="rf-join">${RF.joined ? "Сабт · Сохранить" : "Иштирок мекунам · Участвую"}</button></div>
-      ${RF.joined ? "" : `<small>Бе ин тугма иштирок ҳисоб намешавад · без этой кнопки участие не считается.</small>`}`}
+        <button class="rfm-btn press" type="button" id="rf-join">Иштирок мекунам · Участвую</button></div>
+      <small>Бе ин тугма иштирок ҳисоб намешавад · без этой кнопки участие не считается.</small>`
+      : (RF.joined || RF.closed ? "" : `<small>🔒 Пас аз хариди $${RF.min_usd} тугмаи «Иштирок мекунам» пайдо мешавад · кнопка «Участвую» появится после покупки на $${RF.min_usd}.</small>`)}
     </div>
-    ${RFOPEN ? "" : `<button class="rfm-btn press wide" type="button" id="rf-open">${RF.joined ? "Муфассал · Подробнее" : "Иштирок кардан · Участвовать"}</button>`}
+    ${RFOPEN ? "" : `<button class="rfm-btn press wide" type="button" id="rf-open">${RF.can_join ? "Иштирок мекунам · Участвую" : "Муфассал · Подробнее"}</button>`}
   </section>`;
 }
 async function rfLoad() { try { const r = await api("raffle", {}); RF = r && r.raffle || null; rfDraw(); } catch (e) {} }

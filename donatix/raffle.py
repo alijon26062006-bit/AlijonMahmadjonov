@@ -284,8 +284,11 @@ def join(conn: sqlite3.Connection, config: Config, user_id: int, instagram: str,
     c = cfg(conn)
     if not (c["on"] and c["start"]) or c["closed"]:
         raise RaffleError("Розыгрыш сейчас не идёт. / Ҳоло қуръакашӣ нест.")
+    if spent_micro(conn, user_id, c["start"]) < c["min_usd"] * 10_000:
+        raise RaffleError("NEED_BUY")   # сначала покупка на $15 с начала розыгрыша — потом «Участвую»
     nick = clean_instagram(instagram)
-    taken = conn.execute("SELECT user_id FROM raffle_entries WHERE instagram = ? AND user_id != ?",
+    taken = conn.execute("SELECT e.user_id FROM raffle_entries e WHERE e.instagram = ? AND e.user_id != ? "
+                         "AND EXISTS (SELECT 1 FROM raffle_tickets t WHERE t.user_id = e.user_id)",
                          (nick, user_id)).fetchone()
     if taken:
         raise RaffleError("Этот Instagram уже участвует с другого аккаунта. / Ин Instagram аллакай иштирок мекунад.")
@@ -322,7 +325,7 @@ def status(conn: sqlite3.Connection, config: Config, user_id: int | None) -> dic
         "channel_url": c["channel"].get("url") or config.tg_channel, "instagram_url": c["instagram"],
         "check_tg": bool(c["channel"].get("chat_id")),
         "joined": False, "instagram": "", "spent": "0.00", "need": f"{c['min_usd']:.2f}", "percent": 0,
-        "tickets": [], "tg_linked": False, "tg_ok": None, "next_need": "",
+        "tickets": [], "tg_linked": False, "tg_ok": None, "next_need": "", "can_join": False,
     }
     if not user_id:
         return out
@@ -334,9 +337,10 @@ def status(conn: sqlite3.Connection, config: Config, user_id: int | None) -> dic
     out["need"] = f"{max(0, step - spent) / 10_000:.2f}"
     out["percent"] = min(100, int(spent * 100 // step))
     out["next_need"] = f"{(step - spent % step) / 10_000:.2f}"
-    if e is not None:
-        sync(conn, user_id)
-        out.update(joined=True, instagram=e["instagram"], tickets=my_tickets(conn, user_id),
+    tickets = my_tickets(conn, user_id)
+    out["can_join"] = spent >= step and not tickets and not c["closed"]
+    if e is not None and tickets:
+        out.update(joined=True, instagram=e["instagram"], tickets=tickets,
                    tg_ok=None if e["tg_ok"] is None else bool(e["tg_ok"]))
     won = conn.execute("SELECT place, prize_tjs FROM raffle_winners WHERE user_id = ? AND status = 'paid'",
                        (user_id,)).fetchone()
@@ -350,17 +354,11 @@ def new_ticket_note(conn: sqlite3.Connection, user_id: int) -> str:
         c = cfg(conn)
         if not (c["on"] and c["start"]) or c["closed"]:
             return ""
-        if entry(conn, user_id) is None:
-            spent = spent_micro(conn, user_id, c["start"])
-            if spent >= c["min_usd"] * 10_000:
-                return ("🎁 Шумо метавонед дар қуръакашӣ иштирок кунед — тугмаи «Иштирок мекунам»-ро пахш кунед!\n"
-                        "Вы можете участвовать в розыгрыше — нажмите «Участвую»!")
+        if my_tickets(conn, user_id):
             return ""
-        new = sync(conn, user_id)
-        if new:
-            nums = ", ".join(f"№ {n:04d}" for n in new)
-            return (f"🎟 Шумо иштирок мекунед! Чипта: <b>{nums}</b>\n"
-                    f"Вы участвуете в розыгрыше! Билет: <b>{nums}</b>")
+        if spent_micro(conn, user_id, c["start"]) >= c["min_usd"] * 10_000:
+            return ("🎁 Шумо ${0} харидед — акнун тугмаи «Иштирок мекунам»-ро пахш кунед!\n"
+                    "Вы купили на ${0} — теперь нажмите «Участвую», чтобы участвовать в розыгрыше!").format(c["min_usd"])
     except sqlite3.Error:
         log.exception("розыгрыш: билет после заказа")
     return ""
@@ -379,7 +377,7 @@ def board(conn: sqlite3.Connection) -> dict[str, Any]:
     todo = [p for p in range(len(ps), 0, -1) if p not in rows]
     return {"places": [{"place": i + 1, "tjs": t, "w": rows.get(i + 1)} for i, t in enumerate(ps)],
             "pending": pending, "next_place": todo[0] if todo else None, "left": len(todo),
-            "participants": conn.execute("SELECT COUNT(*) FROM raffle_entries").fetchone()[0],
+            "participants": conn.execute("SELECT COUNT(DISTINCT user_id) FROM raffle_tickets").fetchone()[0],
             "with_tickets": conn.execute("SELECT COUNT(DISTINCT user_id) FROM raffle_tickets").fetchone()[0],
             "tickets": conn.execute("SELECT COUNT(*) FROM raffle_tickets").fetchone()[0]}
 
@@ -387,7 +385,6 @@ def board(conn: sqlite3.Connection) -> dict[str, Any]:
 def draw_next(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     """Следующее место (с последнего к первому): случайный билет среди тех, кто ещё не выиграл."""
     ensure(conn)
-    sync_all(conn)
     b = board(conn)
     if b["pending"]:
         raise RaffleError("Сначала подтвердите или перевыберите победителя, которого уже выбрали.")
@@ -434,7 +431,8 @@ def participants(conn: sqlite3.Connection, limit: int = 300) -> list[dict[str, A
     c = cfg(conn)
     rows = conn.execute(
         "SELECT e.*, u.login, (SELECT COUNT(*) FROM raffle_tickets t WHERE t.user_id = e.user_id) AS tickets "
-        "FROM raffle_entries e JOIN users u ON u.id = e.user_id ORDER BY tickets DESC, e.joined_at LIMIT ?",
+        "FROM raffle_entries e JOIN users u ON u.id = e.user_id "
+        "WHERE EXISTS (SELECT 1 FROM raffle_tickets t WHERE t.user_id = e.user_id) ORDER BY e.joined_at LIMIT ?",
         (limit,)).fetchall()
     return [{**dict(r), "spent": f"{spent_micro(conn, r['user_id'], c['start'] or db.now()) / 10_000:.2f}"}
             for r in rows]

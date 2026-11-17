@@ -64,6 +64,16 @@ def test_progress_before_minimum(on, config):
 def test_join_needs_instagram_telegram_and_subscription(on, config):
     conn = on
     uid = make_client(conn, login="rf3")[0]
+    tg(conn, uid, 9003)
+    with pytest.raises(raffle.RaffleError, match="NEED_BUY"):            # без покупки на $15 записаться нельзя
+        raffle.join(conn, config, uid, "@ali", api=member({9003}))
+    assert raffle.entry(conn, uid) is None and not raffle.status(conn, config, uid)["can_join"]
+    buy(conn, uid, 14.99)
+    with pytest.raises(raffle.RaffleError, match="NEED_BUY"):            # $14.99 — ещё мало
+        raffle.join(conn, config, uid, "@ali", api=member({9003}))
+    buy(conn, uid, 0.01)
+    assert raffle.status(conn, config, uid)["can_join"]                   # набрал $15 — кнопка появилась
+    conn.execute("DELETE FROM shop_users WHERE tg_id = 9003")
     with pytest.raises(raffle.RaffleError):
         raffle.join(conn, config, uid, "", api=member(set()))
     with pytest.raises(raffle.RaffleError, match="NEED_TG"):
@@ -74,6 +84,7 @@ def test_join_needs_instagram_telegram_and_subscription(on, config):
     raffle.join(conn, config, uid, "@ali", api=member({9003}))
     other = make_client(conn, login="rf3b")[0]
     tg(conn, other, 9004)
+    buy(conn, other, 15)
     with pytest.raises(raffle.RaffleError, match="уже участвует"):
         raffle.join(conn, config, other, "ali", api=member({9004}))      # один Instagram — один аккаунт
 
@@ -133,10 +144,14 @@ def test_site_banner_page_join_and_profile(app, conn, config, monkeypatch):
     page = c.get("/raffle").text
     assert "$6.50" in page and "56%" in page
     assert "$6.50" in c.get("/panel").text                                               # профиль: сколько осталось
-    token = csrf_of(page)
+    token = csrf_of(c.get("/panel/balance").text)
+    assert 'action="/raffle/join"' not in page and "появится после покупки" in page    # $8.50 — кнопки нет
+    r = c.post("/raffle/join", data={"csrf": token, "instagram": "@rf_web"}, follow_redirects=True)
+    assert "Сначала купите" in r.text and raffle.entry(conn, uid) is None              # и в обход — не пускаем
+    buy(conn, uid, 10)
+    assert 'action="/raffle/join"' in c.get("/raffle").text                             # $18.50 — кнопка появилась
     r = c.post("/raffle/join", data={"csrf": token, "instagram": "??"}, follow_redirects=True)
     assert "ник Instagram" in r.text and raffle.entry(conn, uid) is None
-    buy(conn, uid, 10)
     r = c.post("/raffle/join", data={"csrf": token, "instagram": "@rf_web"}, follow_redirects=True)
     assert "Вы участвуете" in r.text and "№ 0001" in r.text
     assert "Вы участвуете" in c.get("/panel").text
@@ -182,6 +197,12 @@ def test_shop_bot_join_flow_with_channel_check(app, config, conn, supplier):
     assert not any("Розыгрыш" in b["text"] for b in api.last_buttons())                 # не запущен — кнопки нет
     raffle.save_settings(conn, {"channel_id": "@dx_news", "instagram": "donatix.tj"})
     raffle.start(conn)
+    bot.handle(conn, tb.msg("/start"))
+    bot.handle(conn, tb.press(api.button("Розыгрыш")))
+    assert not any("Участвую" in b["text"] for b in api.last_buttons())                 # без покупки кнопки нет
+    bot.handle(conn, tb.press("rfj"))
+    bot.handle(conn, tb.msg("@sneaky"))
+    assert "Сначала купите" in api.last_text() and raffle.entry(conn, su["user_id"]) is None   # и в обход — нет
     buy(conn, su["user_id"], 16, source="shopbot")
     bot.handle(conn, tb.msg("/start"))
     bot.handle(conn, tb.press(api.button("Розыгрыш")))
@@ -206,9 +227,11 @@ def test_mini_app_raffle_status_and_join(app, conn, config, monkeypatch):
     assert c.post("/tg/api/raffle", json={}, headers=tc.H).json()["raffle"] is None
     raffle.start(conn)
     uid = conn.execute("SELECT user_id FROM shop_users WHERE tg_id = 5501").fetchone()[0]
+    r = c.post("/tg/api/raffle", json={"join": 1, "instagram": "ali.app"}, headers=tc.H).json()
+    assert not r["ok"] and "купите" in r["error"]                                       # до покупки — нельзя
     buy(conn, uid, 15, source="tgapp")
     st = c.post("/tg/api/raffle", json={}, headers=tc.H).json()["raffle"]
-    assert st["percent"] == 100 and not st["joined"]
+    assert st["percent"] == 100 and not st["joined"] and st["can_join"]
     r = c.post("/tg/api/raffle", json={"join": 1, "instagram": "ali.app"}, headers=tc.H).json()
     assert r["ok"] and r["new_tickets"] == [1] and r["raffle"]["joined"]
     assert c.post("/tg/api/raffle", json={}).status_code == 403

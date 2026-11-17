@@ -1127,20 +1127,20 @@ class ShopBot:
             nums = ", ".join(f"№ {n:04d}" for n in st["tickets"][:20]) + (" …" if len(st["tickets"]) > 20 else "")
             text += (f"✅ <b>Шумо иштирок мекунед! · Вы участвуете!</b>\n🎟 Чиптаи шумо · ваш билет: <b>{nums}</b>\n"
                      f"📸 Instagram: @{_e(st['instagram'])}")
-        elif st["joined"]:
-            text += (f"✅ Шумо сабт шудед · вы записаны (📸 @{_e(st['instagram'])})\n{bar} {st['percent']}%\n"
-                     f"Боз <b>${st['need']}</b> харед — чипта мегиред · купите ещё на <b>${st['need']}</b> — получите билет")
+        elif st["can_join"]:
+            text += (f"{bar} 100%  (${st['spent']} / ${st['min_usd']})\n"
+                     "✅ Харид кофист! 👇 Акнун «Иштирок мекунам»-ро пахш кунед.\n"
+                     "Покупок достаточно! 👇 Теперь нажмите «Участвую» — без этой кнопки участие не считается.")
         else:
             text += (f"{bar} {st['percent']}%  (${st['spent']} / ${st['min_usd']})\n"
-                     + (f"Боз <b>${st['need']}</b> харед · осталось купить на <b>${st['need']}</b>\n" if st["percent"] < 100 else "")
-                     + "👇 «Иштирок мекунам»-ро пахш кунед — бе ин тугма иштирок ҳисоб намешавад.\n"
-                       "Нажмите «Участвую» — без этой кнопки участие не считается.")
+                     f"Боз <b>${st['need']}</b> харед · купите ещё на <b>${st['need']}</b>\n"
+                     f"Пас аз ${st['min_usd']} тугмаи «Иштирок мекунам» пайдо мешавад · "
+                     f"после покупки на ${st['min_usd']} появится кнопка «Участвую».")
         if note:
             text = note + "\n\n" + text
         rows: list[list[Btn]] = []
-        if not st["closed"]:
-            rows.append([("✅ Иштирок мекунам · Участвую" if not st["joined"] else "✏️ Instagram-ро иваз кардан · сменить ник",
-                          "rfj", "success")])
+        if st["can_join"]:
+            rows.append([("✅ Иштирок мекунам · Участвую", "rfj", "success")])
         if st["channel_url"]:
             rows.append([("📢 Канал Telegram", None, st["channel_url"])])
         if st["instagram_url"]:
@@ -1154,6 +1154,11 @@ class ShopBot:
             got = raffle.join(conn, self.config, su["user_id"], nick, api=self.api)
         except raffle.RaffleError as exc:
             code = str(exc)
+            if code == "NEED_BUY":
+                self.state.pop(su["tg_id"], None)
+                self.screen_raffle(conn, su, note="⚠️ Аввал барои худ $15 харед, баъд «Иштирок мекунам».\n"
+                                                  "Сначала купите для себя на $15 — потом нажмите «Участвую».")
+                return
             if code == "NEED_SUB":
                 self.state[su["tg_id"]] = {"step": "rfsub", "nick": nick[:60]}
                 url = raffle.cfg(conn)["channel"].get("url") or self.config.tg_channel

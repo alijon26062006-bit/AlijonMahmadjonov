@@ -532,6 +532,7 @@ async def api_raffle(request: Request, conn=Depends(get_conn), config: Config = 
             code = str(exc)
             out = {"ok": False, "code": code if code in ("NEED_TG", "NEED_SUB") else "", "error": {
                 "NEED_SUB": "Аввал ба канали Telegram обуна шавед. / Сначала подпишитесь на наш Telegram-канал.",
+                "NEED_BUY": "Аввал барои худ $15 харед. / Сначала купите для себя на $15 — потом «Участвую».",
                 "NEED_TG": "Қуръакаширо дар боти Telegram кушоед. / Откройте розыгрыш в нашем Telegram-боте.",
             }.get(code, code)}
     out["raffle"] = raffle.status(conn, config, user["id"])
