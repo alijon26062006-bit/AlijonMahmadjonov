@@ -8,8 +8,9 @@ import {
   makeExercise, TYPES, checkStreak, registerActivity, levelInfo, markLessonDone, buildPracticeQueue,
 } from '../js/engine.js';
 
-const en = buildCourse(UNITS, COURSES.en);
-const ru = buildCourse(UNITS, COURSES.ru);
+const en = buildCourse(UNITS, COURSES.en_ru);
+const tg = buildCourse(UNITS, COURSES.en_tg);
+const ru = buildCourse(UNITS, COURSES.ru_en);
 
 test('ids are unique across the course', () => {
   const ids = UNITS.flatMap((u) => [...u.words, ...u.sentences].map((x) => x.id));
@@ -30,6 +31,19 @@ test('checkAnswer accepts alternatives, typos and latin input for Russian', () =
   assert.ok(checkAnswer('privet', ['привет'], 'ru').ok);
   assert.ok(checkAnswer('spasibo', ['спасибо'], 'ru').ok);
   assert.ok(!checkAnswer('', ['спасибо'], 'ru').ok);
+});
+
+test('every item and tip has text for every course language', () => {
+  for (const u of UNITS) {
+    for (const lang of ['en', 'ru', 'tg']) assert.ok(u.title[lang], `${u.id} title ${lang}`);
+    for (const c of Object.keys(COURSES)) assert.ok(u.tip[c], `${u.id} tip ${c}`);
+    for (const x of [...u.words, ...u.sentences]) for (const lang of ['en', 'ru', 'tg']) assert.ok(x[lang], `${x.id} ${lang}`);
+  }
+});
+
+test('Tajik answers accept Russian-keyboard letters', () => {
+  assert.ok(checkAnswer('хуб, ташаккур', ['Хуб, ташаккур.'], 'tg').ok);
+  assert.ok(checkAnswer('Ман об менушам', ['Ман об менӯшам.'], 'tg').ok);
 });
 
 test('translit and tokenize', () => {
@@ -56,7 +70,7 @@ test('new words start with recognition, never with typing', () => {
 
 test('every exercise type builds and its correct answer passes', () => {
   const rng = mulberry32(7);
-  for (const c of [en, ru]) {
+  for (const c of [en, tg, ru]) {
     for (const item of Object.values(c.items)) {
       for (const [type, def] of Object.entries(TYPES)) {
         if (def.for !== item.kind || (type === 'pick_image' && !item.e)) continue;

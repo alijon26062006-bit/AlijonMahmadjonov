@@ -45,9 +45,13 @@ const EN_CONTRACTIONS = [
   [/\bisn't\b/g, 'is not'], [/\baren't\b/g, 'are not'], [/\bthat's\b/g, 'that is'],
 ];
 
+// Таджикские буквы → русские: многие пишут без таджикской раскладки (ҳ→х, ӯ→у…).
+const TG_FOLD = { 'ҳ': 'х', 'қ': 'к', 'ғ': 'г', 'ҷ': 'ч', 'ӣ': 'и', 'ӯ': 'у' };
+
 export function normalize(s, lang) {
   let t = String(s).toLowerCase().replace(/[’`]/g, "'").replace(/ё/g, 'е');
   if (lang === 'en') for (const [re, rep] of EN_CONTRACTIONS) t = t.replace(re, rep);
+  if (lang === 'tg') t = t.replace(/[ҳқғҷӣӯ]/g, (c) => TG_FOLD[c]);
   t = t
     .replace(/[.,!?;:«»"“”()…]/g, ' ')
     .replace(/(^|\s)[-–—]+|[-–—]+(\s|$)/g, ' ') // тире как знак препинания, но не дефис внутри слова

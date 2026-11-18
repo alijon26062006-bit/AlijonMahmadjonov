@@ -1,0 +1,11 @@
+{
+  "name": "Буки — англисӣ бо забони модарӣ",
+  "short_name": "Буки",
+  "description": "Барномаи ройгон барои омӯзиши забони англисӣ бо тоҷикӣ ва русӣ.",
+  "lang": "tg",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#FFF8EC",
+  "theme_color": "#FFF8EC",
+  "icons": [{ "src": "img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

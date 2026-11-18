@@ -1,12 +1,79 @@
 // Тексты интерфейса. Язык интерфейса = родной язык ученика (native курса).
+// Таджикский — основной. Правило: короткие фразы и простые повседневные слова.
 
 const S = {
+  tg: {
+    appTagline: 'Англисиро рӯзе 5 дақиқа омӯз — осон ва бо суръати худ',
+    learn: 'Омӯзиш', practice: 'Машқ', stats: 'Натиҷаҳо', profile: 'Профил',
+    continue: 'Идома', check: 'Санҷидан', skip: 'Гузаштан', start: 'Оғоз', next: 'Баъдӣ', close: 'Пӯшидан',
+    gotIt: 'Фаҳмидам!', back: 'Ба қафо',
+    obNameQ: 'Номат чист?', obNamePh: 'Ном (метавонӣ нанависӣ)',
+    obWhyQ: 'Англисӣ барои чӣ лозим?',
+    why: { travel: 'Сафар', work: 'Кор', study: 'Таҳсил', people: 'Гап задан бо одамон', fun: 'Барои шавқ' },
+    obGoalQ: 'Рӯзе чанд вақт меомӯзӣ?',
+    goals: { 10: ['5 дақиқа', 'Осон'], 20: ['10 дақиқа', 'Миёна'], 30: ['15 дақиқа', 'Ҷиддӣ'], 50: ['20 дақиқа', 'Пурзӯр'] },
+    obGoalHint: 'Ҳар рӯз каме — беҳтар аз ҳафтае як соат.',
+    obLevelQ: 'Англисиро чӣ қадар медонӣ?',
+    lvl: { zero: ['Аз сифр сар мекунам', 'Аз дарси аввал сар мекунем'], some: ['Каме медонам', 'Санҷиши кӯтоҳ — сатҳатро меёбем'], good: ['Хуб медонам', 'Санҷиш аз саволҳои душвортар сар мешавад'] },
+    placementTitle: 'Санҷиши сатҳ', placementIntro: '8 саволи кӯтоҳ. Тахмин накун — агар надонӣ, «Намедонам»-ро пахш кун. Ҳамин тавр дарсҳоро дуруст меёбем.',
+    dontKnow: 'Намедонам',
+    placementDone: (u) => `Офарин! Аз қисми «${u}» сар мекунем. Қисмҳои пештараро дар «Машқ» такрор мекунем.`,
+    placementZero: 'Аз асос сар мекунем — ҳамин тавр осонтар аст.',
+    unit: 'Қисм', lessonN: (n) => `Дарси ${n}`, review: 'Такрор', courseDone: 'Курс тамом шуд! 🎉 Қисмҳои нав ба зудӣ.',
+    tipTitle: 'Маслиҳат', dailyGoal: 'Ҳадафи рӯз', streakDays: (n) => `${n} рӯз пай дар пай`,
+    startLesson: 'Оғоз', locked: 'Аввал дарсҳои пештараро гузар', redo: 'Боз такрор кун', minutesShort: 'дақ',
+    q: {
+      pick_image: (w) => `Интихоб кун: «${w}»`,
+      choose_n2t: (w) => `Ба англисӣ «${w}» чӣ мешавад?`,
+      choose_t2n: () => 'Маънояш чист?',
+      listen_choose: () => 'Чӣ мешунавӣ?',
+      type_n2t: () => 'Ба англисӣ навис',
+      bank_t2n: () => 'Тарҷума кун',
+      bank_n2t: () => 'Тарҷумаро ҷамъ кун',
+      listen_bank: () => 'Чиро мешунавӣ — ҷамъ кун',
+      type_sent: () => 'Тарҷумаро навис',
+      match: () => 'Ҷуфтҳоро ёб',
+      teach: () => 'Калимаи нав',
+    },
+    typePh: 'Ҷавобро навис…', typePhRu: '',
+    newWord: 'НАВ', tapHint: 'Ба калима пахш кун — тарҷумаашро мебинӣ',
+    right: ['Офарин!', 'Дуруст!', 'Аъло!', 'Ҳамин тавр давом деҳ!', 'Хуб!'],
+    typo: 'Қариб! Хатои хурд ҳаст:', wrong: 'Ҷавоби дуруст:', almost: 'Қариб шуд!',
+    wrongSoft: ['Ҳеҷ гап не — каме баъд боз бармегардем.', 'Хато — қисми омӯзиш аст.', 'Дар ёд гир — ба зудӣ боз меояд.'],
+    combo: (n) => `${n} пай дар пай! 🔥`,
+    support: (name) => `${name ? name + ', х' : 'Х'}афа нашав — саволи баъдӣ осонтар мешавад. Ту метавонӣ!`,
+    listenSlow: 'Оҳиста', noAudio: 'Овоз нест? Овозро баланд кун.',
+    lessonDone: 'Дарс тамом шуд!', practiceDone: 'Машқ тамом шуд!',
+    xpEarned: 'Хол', accuracy: 'Дурустӣ', time: 'Вақт', bestCombo: 'Пай дар пай',
+    praise: { perfect: 'Бе хато! Аъло.', great: 'Кори хуб!', good: 'Натиҷаи хуб — машқ кори худро мекунад.', ok: 'Офарин, ки даст накашидӣ. Пагоҳ осонтар мешавад!' },
+    goalReached: 'Ҳадафи рӯз иҷро шуд! 🎯', newWords: (n) => `${n} калимаи нав омӯхтӣ`,
+    practiceTitle: 'Машқ', practiceSmart: 'Такрори оқилона', practiceSmartD: 'Калимаҳое, ки вақти такрорашон расид',
+    practiceListen: 'Шунидан', practiceListenD: 'Танҳо бо гӯш',
+    practiceEmpty: 'Аввал як дарсро гузар — баъд ин ҷо калимаҳо барои такрор пайдо мешаванд.',
+    dueNow: (n) => `${n} калима интизори такрор аст`,
+    statsTitle: 'Натиҷаҳо', level: 'Сатҳ', toNext: (c) => `то ${c}`, courseProgress: 'Аз курс гузаштӣ',
+    streak: 'Силсила', bestStreak: 'Рекорд', freezes: 'Ҳимоя', freezesD: 'Агар як рӯз дарс нахонӣ, силсиларо нигоҳ медорад',
+    totalXp: 'Ҳамаи хол', lessons: 'Дарсҳо', wordsLearned: 'Калимаҳои омӯхта', mastered: 'Хуб ёд гирифтӣ', minutes: 'Дақиқа',
+    week: 'Хол дар ҳафта', skills: 'Малакаҳо', skillNames: { vocab: 'Калимаҳо', listen: 'Шунидан', write: 'Навиштан', sentence: 'Ҷумлаҳо' },
+    weak: 'Бояд такрор кард', noWeak: 'Ҳоло калимаи заиф нест — офарин!', reviewWeak: 'Такрор кардан',
+    days: ['Дш', 'Сш', 'Чш', 'Пш', 'Ҷм', 'Шб', 'Яш'],
+    profileTitle: 'Профил', name: 'Ном', goal: 'Ҳадафи рӯз', theme: 'Намуд', themes: { sunny: 'Офтобӣ', night: 'Шабона' },
+    sound: 'Садо', translit: 'Транслитератсия', course: 'Забони шарҳ', reset: 'Аз нав сар кардан',
+    resetConfirm: 'Ҳамаи натиҷаҳои ин курс нест мешаванд. Розӣ ҳастӣ?',
+    about: 'Дар бораи барнома',
+    aboutText: 'Буки — барномаи ройгон барои омӯзиши забони англисӣ бо забони модарӣ. Дарсҳоро муаллимон ва Claude (AI) тайёр кардаанд.',
+    courseNames: { en_tg: 'Англисӣ · бо тоҷикӣ', en_ru: 'Англисӣ · бо русӣ', ru_en: 'Русӣ · бо англисӣ' },
+    mascot: {
+      hello: (n) => `Салом${n ? ', ' + n : ''}! Ман Буки. Ба ту дар омӯзиши англисӣ ёрӣ медиҳам — қадам ба қадам, бе ташвиш.`,
+      home: (n) => [`${n ? n + ', и' : 'И'}мрӯз барои чанд калимаи нав рӯзи хуб аст!`, 'Танҳо як дарс — ва ҳадафи рӯз наздиктар.', 'Такрор — модари омӯзиш!'],
+      why: { travel: 'Дар сафар ҳар калима ба кор меояд!', work: 'Англисӣ дарҳои нави корро мекушояд.', study: 'Бо ҳар дарс таҳсил осонтар мешавад.', people: 'Ба зудӣ бо одамони тамоми дунё гап мезанӣ!', fun: 'Кунҷковӣ — беҳтарин муаллим!' },
+    },
+  },
   ru: {
     appTagline: 'Учи язык по 5 минут в день — легко и в своём темпе',
     learn: 'Учёба', practice: 'Практика', stats: 'Статистика', profile: 'Профиль',
     continue: 'Продолжить', check: 'Проверить', skip: 'Пропустить', start: 'Начать', next: 'Дальше', close: 'Закрыть',
     gotIt: 'Понятно!', back: 'Назад',
-    // онбординг
     obNameQ: 'Как тебя зовут?', obNamePh: 'Имя (можно пропустить)',
     obWhyQ: 'Зачем тебе английский?',
     why: { travel: 'Путешествия', work: 'Работа и карьера', study: 'Учёба', people: 'Общение с людьми', fun: 'Просто интересно' },
@@ -19,11 +86,9 @@ const S = {
     dontKnow: 'Не знаю',
     placementDone: (u) => `Отлично! Начнём с юнита «${u}». Всё, что раньше, мы отметили как знакомое — повторим в «Практике».`,
     placementZero: 'Начнём с самых основ — так будет комфортнее всего.',
-    // главная
     unit: 'Юнит', lessonN: (n) => `Урок ${n}`, review: 'Закрепление', courseDone: 'Курс пройден! 🎉 Новые юниты уже в работе.',
     tipTitle: 'Подсказка юнита', dailyGoal: 'Цель дня', streakDays: (n) => `${n} ${plural(n, 'день', 'дня', 'дней')} подряд`,
-    startLesson: 'Начать урок', locked: 'Сначала пройди предыдущие уроки', redo: 'Повторить урок',
-    // задания
+    startLesson: 'Начать', locked: 'Сначала пройди предыдущие уроки', redo: 'Повторить урок', minutesShort: 'мин',
     q: {
       pick_image: (w) => `Выбери: «${w}»`,
       choose_n2t: (w) => `Как сказать «${w}»?`,
@@ -40,39 +105,34 @@ const S = {
     typePh: 'Напиши ответ…', typePhRu: '',
     newWord: 'НОВОЕ', tapHint: 'Нажми на слово — увидишь перевод',
     right: ['Отлично!', 'Верно!', 'Супер!', 'Так держать!', 'Молодец!'],
-    typo: 'Почти! Есть опечатка:', wrong: 'Правильный ответ:',
+    typo: 'Почти! Есть опечатка:', wrong: 'Правильный ответ:', almost: 'Почти получилось!',
     wrongSoft: ['Ничего страшного — вернёмся к этому чуть позже.', 'Ошибки — это часть обучения.', 'Запомни — скоро встретится снова.'],
     combo: (n) => `${n} подряд! 🔥`,
     support: (name) => `${name ? name + ', н' : 'Н'}е переживай — сделаем следующее задание попроще. Ты справишься!`,
     listenSlow: 'Медленнее', noAudio: 'Нет звука? Включи громкость.',
-    // итоги
     lessonDone: 'Урок пройден!', practiceDone: 'Тренировка завершена!',
     xpEarned: 'Опыт', accuracy: 'Точность', time: 'Время', bestCombo: 'Серия',
     praise: { perfect: 'Безупречно! Ни одной ошибки.', great: 'Отличная работа!', good: 'Хороший результат — практика делает чудеса.', ok: 'Ты молодец, что не сдался. Завтра будет легче!' },
-    goalReached: 'Цель дня выполнена! 🎯',
-    // практика
+    goalReached: 'Цель дня выполнена! 🎯', newWords: (n) => `Новых слов: ${n}`,
     practiceTitle: 'Практика', practiceSmart: 'Умное повторение', practiceSmartD: 'Слова, которые пора освежить',
     practiceListen: 'Аудирование', practiceListenD: 'Только на слух',
     practiceEmpty: 'Пройди хотя бы один урок — и здесь появятся слова для повторения.',
     dueNow: (n) => `${n} ${plural(n, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения`,
-    // статистика
     statsTitle: 'Статистика', level: 'Уровень', toNext: (c) => `до ${c}`, courseProgress: 'Пройдено курса',
     streak: 'Серия', bestStreak: 'Рекорд', freezes: 'Заморозки', freezesD: 'Спасают серию, если пропустишь день',
     totalXp: 'Всего опыта', lessons: 'Уроков', wordsLearned: 'Слов изучено', mastered: 'Выучено прочно', minutes: 'Минут',
     week: 'Опыт за неделю', skills: 'Навыки', skillNames: { vocab: 'Слова', listen: 'Аудирование', write: 'Письмо', sentence: 'Предложения' },
-    weak: 'Стоит повторить', noWeak: 'Пока нет слабых слов — так держать!',
+    weak: 'Стоит повторить', noWeak: 'Пока нет слабых слов — так держать!', reviewWeak: 'Повторить',
     days: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-    // профиль
     profileTitle: 'Профиль', name: 'Имя', goal: 'Цель дня', theme: 'Дизайн', themes: { sunny: 'Солнечный', night: 'Ночной' },
-    sound: 'Звуки', translit: 'Транслитерация', course: 'Курс', addCourse: 'Добавить курс', reset: 'Сбросить прогресс',
+    sound: 'Звуки', translit: 'Транслитерация', course: 'Язык объяснений', reset: 'Сбросить прогресс',
     resetConfirm: 'Удалить весь прогресс этого курса? Это нельзя отменить.',
-    plusTitle: 'Буки Plus', plusSoon: 'Скоро',
-    plusList: ['Без рекламы и ограничений', 'Разговор с ИИ-собеседником', 'Упражнения на произношение', 'Подробная аналитика ошибок', 'Офлайн-режим'],
-    plusCta: 'Сообщить, когда появится', plusThanks: 'Спасибо! Напомним, когда Plus будет готов.',
-    courseNames: { en: 'Английский', ru: 'Русский' },
+    about: 'О приложении',
+    aboutText: 'Буки — бесплатное приложение для изучения английского на родном языке. Уроки подготовлены вместе с Claude (AI).',
+    courseNames: { en_tg: 'Английский · по-таджикски', en_ru: 'Английский · по-русски', ru_en: 'Русский · по-английски' },
     mascot: {
       hello: (n) => `Привет${n ? ', ' + n : ''}! Я Буки. Помогу тебе выучить английский — без стресса и шаг за шагом.`,
-      home: (n) => [`${n ? n + ', с' : 'С'}егодня отличный день для пары новых слов!`, 'Всего один урок — и цель дня ближе.', 'Повторение — мать учения. А ещё — путь к свободной речи!'],
+      home: (n) => [`${n ? n + ', с' : 'С'}егодня отличный день для пары новых слов!`, 'Всего один урок — и цель дня ближе.', 'Повторение — мать учения!'],
       why: { travel: 'В путешествии пригодится каждое слово!', work: 'Английский откроет новые карьерные двери.', study: 'Учёба пойдёт легче с каждым уроком.', people: 'Скоро сможешь болтать с людьми со всего мира!', fun: 'Любопытство — лучший двигатель обучения!' },
     },
   },
@@ -95,7 +155,7 @@ const S = {
     placementZero: 'Let’s start from the basics — that’ll feel most comfortable.',
     unit: 'Unit', lessonN: (n) => `Lesson ${n}`, review: 'Review', courseDone: 'Course complete! 🎉 New units are on the way.',
     tipTitle: 'Unit tip', dailyGoal: 'Daily goal', streakDays: (n) => `${n}-day streak`,
-    startLesson: 'Start lesson', locked: 'Finish the previous lessons first', redo: 'Redo lesson',
+    startLesson: 'Start', locked: 'Finish the previous lessons first', redo: 'Redo lesson', minutesShort: 'min',
     q: {
       pick_image: (w) => `Select “${w}”`,
       choose_n2t: (w) => `How do you say “${w}”?`,
@@ -112,7 +172,7 @@ const S = {
     typePh: 'Type your answer…', typePhRu: 'No Cyrillic keyboard? Latin letters work too (privet).',
     newWord: 'NEW', tapHint: 'Tap a word to see its translation',
     right: ['Great!', 'Correct!', 'Awesome!', 'Keep it up!', 'Nice!'],
-    typo: 'Almost! Watch the spelling:', wrong: 'Correct answer:',
+    typo: 'Almost! Watch the spelling:', wrong: 'Correct answer:', almost: 'Almost!',
     wrongSoft: ['No worries — we’ll come back to this soon.', 'Mistakes are part of learning.', 'Remember this one — it’ll show up again.'],
     combo: (n) => `${n} in a row! 🔥`,
     support: (name) => `${name ? name + ', d' : 'D'}on’t worry — the next one will be easier. You’ve got this!`,
@@ -120,7 +180,7 @@ const S = {
     lessonDone: 'Lesson complete!', practiceDone: 'Practice complete!',
     xpEarned: 'XP', accuracy: 'Accuracy', time: 'Time', bestCombo: 'Combo',
     praise: { perfect: 'Flawless! Not a single mistake.', great: 'Great work!', good: 'Nice — practice works wonders.', ok: 'Well done for sticking with it. Tomorrow will be easier!' },
-    goalReached: 'Daily goal reached! 🎯',
+    goalReached: 'Daily goal reached! 🎯', newWords: (n) => `${n} new words`,
     practiceTitle: 'Practice', practiceSmart: 'Smart review', practiceSmartD: 'Words that need a refresh',
     practiceListen: 'Listening', practiceListenD: 'By ear only',
     practiceEmpty: 'Finish at least one lesson and review words will appear here.',
@@ -129,15 +189,14 @@ const S = {
     streak: 'Streak', bestStreak: 'Best', freezes: 'Freezes', freezesD: 'Save your streak if you miss a day',
     totalXp: 'Total XP', lessons: 'Lessons', wordsLearned: 'Words learned', mastered: 'Mastered', minutes: 'Minutes',
     week: 'XP this week', skills: 'Skills', skillNames: { vocab: 'Vocabulary', listen: 'Listening', write: 'Writing', sentence: 'Sentences' },
-    weak: 'Worth reviewing', noWeak: 'No weak words yet — keep it up!',
+    weak: 'Worth reviewing', noWeak: 'No weak words yet — keep it up!', reviewWeak: 'Review',
     days: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
     profileTitle: 'Profile', name: 'Name', goal: 'Daily goal', theme: 'Design', themes: { sunny: 'Sunny', night: 'Night' },
-    sound: 'Sounds', translit: 'Transliteration', course: 'Course', addCourse: 'Add course', reset: 'Reset progress',
+    sound: 'Sounds', translit: 'Transliteration', course: 'Course', reset: 'Reset progress',
     resetConfirm: 'Delete all progress in this course? This can’t be undone.',
-    plusTitle: 'Buki Plus', plusSoon: 'Soon',
-    plusList: ['No ads, no limits', 'Chat with an AI partner', 'Pronunciation exercises', 'Detailed mistake analytics', 'Offline mode'],
-    plusCta: 'Notify me when it’s ready', plusThanks: 'Thanks! We’ll let you know when Plus is ready.',
-    courseNames: { en: 'English', ru: 'Russian' },
+    about: 'About',
+    aboutText: 'Buki is a free app for learning languages in your native language. Lessons were prepared with Claude (AI).',
+    courseNames: { en_tg: 'English · in Tajik', en_ru: 'English · in Russian', ru_en: 'Russian · in English' },
     mascot: {
       hello: (n) => `Hi${n ? ', ' + n : ''}! I’m Buki. I’ll help you learn Russian — step by step, no stress.`,
       home: (n) => [`${n ? n + ', t' : 'T'}oday is a great day for a few new words!`, 'Just one lesson brings your daily goal closer.', 'Practice makes progress!'],
@@ -153,8 +212,19 @@ function plural(n, one, few, many) {
   return many;
 }
 
-let lang = 'ru';
-export const setLang = (l) => { lang = l; };
+let lang = 'tg';
+export const setLang = (l) => { lang = S[l] ? l : 'tg'; };
 export const getLang = () => lang;
 export const t = () => S[lang];
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Экран выбора языка показывается до выбора курса — подписи сразу на всех языках.
+export const WELCOME = {
+  title: 'Бо кадом забон меомӯзӣ?',
+  subtitle: 'На каком языке объяснять?',
+  options: [
+    { course: 'en_tg', title: 'Англисӣ бо тоҷикӣ', sub: 'Шарҳҳо ба забони тоҷикӣ' },
+    { course: 'en_ru', title: 'Английский по-русски', sub: 'Объяснения на русском языке' },
+    { course: 'ru_en', title: 'Russian for English speakers', sub: 'Learn Russian in English' },
+  ],
+};
