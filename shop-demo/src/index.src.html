@@ -399,6 +399,64 @@ h1,h2,h3{color:var(--ink)}
   .f-pay{display:block}
 }
 
+
+/* ================= Part 3: login / sign-up views ================= */
+.auth{padding:33px 12px 56px}
+.auth.su{padding-top:25px;padding-bottom:72px}
+.auth-card{max-width:448px;margin:0 auto;background:rgba(255,255,255,.4);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,.08),0 8px 10px -6px rgba(0,0,0,.08)}
+.auth-head{padding:28px 20px 15px;border-bottom:1px solid var(--line)}
+.back{display:inline-flex;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--text)}
+.back:hover{color:var(--ink)}
+.back .ico{width:16px;height:16px}
+.auth-title{margin-top:21px;display:flex;align-items:flex-start;gap:13px}
+.auth-title .tile{width:44px;height:44px;background:var(--acc);color:#fff;box-shadow:var(--sh-sm)}
+.auth-title .tile .ico{width:22px;height:22px}
+.auth-title h1{font-size:20px;line-height:28px;font-weight:700;letter-spacing:-.01em}
+.auth-title p{margin-top:2px;font-size:14px;line-height:20px}
+.auth-body{padding:20px}
+.su .auth-body{padding:12px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:4px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.4)}
+.seg button{height:40px;border-radius:12px;font-size:12px;line-height:16px;font-weight:500;color:var(--text)}
+.seg button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:var(--sh-sm)}
+.field{display:block;margin-top:16px}
+.su .field{margin-top:18px}
+.su .field.first{margin-top:16px}
+.field > span{display:block;margin-bottom:6px;font-size:14px;line-height:20px;font-weight:500;color:var(--ink)}
+.inp{display:block;width:100%;height:54px;padding:0 16px;border:1px solid var(--line);border-radius:16px;background:#fff;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+.inp::placeholder{color:#9ca3af}
+.inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(126,91,255,.15)}
+.inp[aria-invalid="true"]{border-color:#dc2626}
+.err{display:block;margin-top:6px;font-size:13px;line-height:18px;color:#dc2626}
+.forgot{display:block;margin-top:13px;text-align:right;font-size:14px;line-height:20px;color:var(--acc)}
+.forgot a:hover{color:var(--acc-hover)}
+.auth-btn{display:flex;align-items:center;justify-content:center;width:100%;height:60px;margin-top:36px;border-radius:14px;background:var(--acc);color:#fff;font-size:18px;line-height:28px;font-weight:600;box-shadow:var(--sh-sm);transition:background .2s,transform .15s}
+.auth-btn:hover{background:var(--acc-hover)}
+.auth-btn:active{transform:scale(.99)}
+.su .auth-btn{margin-top:20px}
+.auth-alt{margin-top:16px;text-align:center;font-size:14px;line-height:20px;color:var(--text)}
+.auth-alt a{color:var(--acc)}
+.auth-alt a:hover{color:var(--acc-hover)}
+.form-msg{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--tile);color:var(--ink);font-size:14px;line-height:20px;text-align:center}
+.incl-h{margin-top:24px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.incl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.incl li{display:flex;align-items:center;gap:9px;font-size:13px;line-height:20px;color:var(--ink)}
+.incl li .ico{width:16px;height:16px;color:var(--acc)}
+.incl-box{margin-top:12px;border:1px solid var(--line);border-radius:16px;padding:16px 18px 14px}
+.incl-box h2{font-size:14px;line-height:20px;font-weight:600;letter-spacing:.02em;color:var(--ink)}
+.incl-box .incl{margin-top:8px}
+/* plan select */
+.tarif-l{display:block;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
+.sel{position:relative;margin-top:8px}
+.sel-btn{display:flex;align-items:center;justify-content:space-between;width:100%;height:54px;padding:0 18px 0 17px;border:1px solid var(--line);border-radius:16px;background:#fff;font-size:16px;line-height:24px;color:var(--ink);text-align:left}
+.sel-btn:focus{outline:none}
+.sel-btn:focus-visible{border-color:var(--acc);box-shadow:0 0 0 3px rgba(126,91,255,.15)}
+.sel-btn .ico{width:20px;height:20px;color:#374151;transition:transform .2s}
+.sel-btn[aria-expanded="true"] .ico{transform:rotate(180deg)}
+.sel-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;list-style:none;margin:0;padding:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1)}
+.sel-list li{height:48px;display:flex;align-items:center;padding:0 17px;font-size:16px;color:var(--ink);cursor:pointer}
+.sel-list li.act{background:#f3f0ff}
+.sel-list li[aria-selected="true"]{background:var(--acc);color:#fff}
+
 </style>
 
 {{SPRITE}}
@@ -427,7 +485,7 @@ h1,h2,h3{color:var(--ink)}
     </nav>
     <div class="h-right">
       <button class="lang-btn" type="button" data-soon="Английская версия появится на следующем шаге" aria-label="Switch to English">EN</button>
-      <a class="btn-login" href="#" data-soon>Вход в панель</a>
+      <a class="btn-login" href="#login">Вход в панель</a>
       <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
         <svg class="ico"><use href="#i-menu"/></svg>
       </button>
@@ -447,8 +505,8 @@ h1,h2,h3{color:var(--ink)}
         <a class="m-link" href="#faq">FAQ</a>
       </nav>
       <div class="m-actions">
-        <a class="m-p" href="#pricing">Попробовать бесплатно</a>
-        <a class="m-s" href="#" data-soon>Вход в панель</a>
+        <a class="m-p" href="#signup" data-plan="trial">Попробовать бесплатно</a>
+        <a class="m-s" href="#login">Вход в панель</a>
       </div>
     </div>
   </div>
@@ -488,7 +546,7 @@ h1,h2,h3{color:var(--ink)}
         <h1>Продавайте цифровые продукты&nbsp;с&nbsp;<span class="brand-word">Gemora</span></h1>
         <p class="lead">10 000+ продуктов в одном API — подарочные карты, ключи игр, Steam, пополнения игр и подписки по 700+ играм и 1 000+ категориям. Постройте свой магазин или бота. Мгновенная доставка, оптовые цены.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="#pricing">Начать бесплатно — 5 дней Gold <svg class="ico"><use href="#i-arrow"/></svg></a>
+          <a class="btn btn-primary" href="#signup" data-plan="trial">Начать бесплатно — 5 дней Gold <svg class="ico"><use href="#i-arrow"/></svg></a>
           <a class="btn btn-ghost" href="#catalog">Каталог</a>
         </div>
         <p class="note">Карта не нужна · полный доступ · 5 дней</p>
@@ -711,7 +769,7 @@ h1,h2,h3{color:var(--ink)}
       <div class="trial">
         <span class="tile"><svg class="ico"><use href="#i-gift"/></svg></span>
         <div><h3>Попробуйте бесплатно</h3><p>Получите бесплатную 5-дневную подписку Gold — полный доступ, карта не нужна</p></div>
-        <a class="btn btn-primary lg" href="#" data-soon>Получить пробный период</a>
+        <a class="btn btn-primary lg" href="#signup" data-plan="trial">Получить пробный период</a>
       </div>
       <div class="sec-head">
         <h2>Простое и прозрачное ценообразование</h2>
@@ -723,19 +781,19 @@ h1,h2,h3{color:var(--ink)}
           <h3>Bronze</h3>
           <p class="price"><b>$3.99</b><span>/мес</span></p>
           <ul><li><svg class="ico"><use href="#i-check"/></svg>Полный каталог 10 000+ продуктов</li><li><svg class="ico"><use href="#i-check"/></svg>Доступ к API и webhooks</li><li><svg class="ico"><use href="#i-check"/></svg>Веб-панель управления</li><li><svg class="ico"><use href="#i-check"/></svg>Базовые скидки</li><li><svg class="ico"><use href="#i-check"/></svg>Steam пополнение — скидка 2,5%</li><li><svg class="ico"><use href="#i-check"/></svg>Документация и примеры кода</li></ul>
-          <div class="foot"><a class="btn btn-ghost sm" href="#" data-soon>Начать</a></div>
+          <div class="foot"><a class="btn btn-ghost sm" href="#signup" data-plan="bronze">Начать</a></div>
         </article>
         <article class="card plan">
           <h3>Silver</h3>
           <p class="price"><b>$6.99</b><span>/мес</span></p>
           <ul><li><svg class="ico"><use href="#i-check"/></svg>Полный каталог 10 000+ продуктов</li><li><svg class="ico"><use href="#i-check"/></svg>Доступ к API и webhooks</li><li><svg class="ico"><use href="#i-check"/></svg>Веб-панель управления</li><li><svg class="ico"><use href="#i-check"/></svg>Расширенные скидки</li><li><svg class="ico"><use href="#i-check"/></svg>Steam пополнение — скидка 3%</li><li><svg class="ico"><use href="#i-check"/></svg>Помощь с интеграцией API</li></ul>
-          <div class="foot"><a class="btn btn-ghost sm" href="#" data-soon>Начать</a></div>
+          <div class="foot"><a class="btn btn-ghost sm" href="#signup" data-plan="silver">Начать</a></div>
         </article>
         <article class="card plan pop"><span class="badge">Популярный</span>
           <h3>Gold</h3>
           <p class="price"><b>$9.99</b><span>/мес</span></p>
           <ul><li><svg class="ico"><use href="#i-check"/></svg>Полный каталог 10 000+ продуктов</li><li><svg class="ico"><use href="#i-check"/></svg>Доступ к API и webhooks</li><li><svg class="ico"><use href="#i-check"/></svg>Веб-панель управления</li><li><svg class="ico"><use href="#i-check"/></svg>Максимальные скидки</li><li><svg class="ico"><use href="#i-check"/></svg>Steam пополнение — скидка 3,55%</li><li><svg class="ico"><use href="#i-check"/></svg>Персональная помощь с интеграцией</li></ul>
-          <div class="foot"><a class="btn btn-primary" href="#" data-soon>Начать</a></div>
+          <div class="foot"><a class="btn btn-primary" href="#signup" data-plan="gold">Начать</a></div>
         </article>
       </div>
     </div>
@@ -813,11 +871,100 @@ h1,h2,h3{color:var(--ink)}
         <div class="hs"><img src="img/cta-hands.webp" alt="" width="480" height="264" loading="lazy" decoding="async"></div>
         <h2>Готовы начать продавать?</h2>
         <p>Присоединяйтесь к тысячам реселлеров, развивающих бизнес с Gemora.</p>
-        <a class="btn btn-primary lg" href="#pricing">Начать бесплатно</a>
+        <a class="btn btn-primary lg" href="#signup" data-plan="trial">Начать бесплатно</a>
       </div>
     </div>
   </section>
 </main>
+
+<main id="v-login" class="auth" hidden>
+  <div class="auth-card">
+    <div class="auth-head">
+      <a class="back" href="#top"><svg class="ico"><use href="#i-back"/></svg>На главную</a>
+      <div class="auth-title">
+        <span class="tile"><svg class="ico"><use href="#i-grid2"/></svg></span>
+        <div><h1>Вход в панель</h1><p>Введите почту и пароль для доступа</p></div>
+      </div>
+    </div>
+    <div class="auth-body">
+      <div class="seg" role="tablist" aria-label="Версия панели">
+        <button type="button" role="tab" aria-selected="true">Панель V2</button>
+        <button type="button" role="tab" aria-selected="false">Перенос</button>
+        <button type="button" role="tab" aria-selected="false">Панель V1</button>
+      </div>
+      <form id="loginForm" novalidate>
+        <label class="field"><span>Email</span>
+          <input class="inp" id="li-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="your@email.com" aria-describedby="li-email-e">
+          <small class="err" id="li-email-e" hidden></small>
+        </label>
+        <label class="field"><span>Пароль</span>
+          <input class="inp" id="li-pass" name="password" type="password" autocomplete="current-password" placeholder="Ваш пароль" aria-describedby="li-pass-e">
+          <small class="err" id="li-pass-e" hidden></small>
+        </label>
+        <p class="forgot"><a href="#" data-soon="Восстановление пароля появится на шаге с сервером">Забыли пароль?</a></p>
+        <button class="auth-btn" type="submit">Войти</button>
+        <p class="form-msg" id="li-msg" role="status" hidden></p>
+      </form>
+      <p class="auth-alt">Нет аккаунта? <a href="#signup">Получить пробный период</a></p>
+      <h2 class="incl-h">В панели вам доступны</h2>
+      <ul class="incl">
+        <li><svg class="ico"><use href="#i-check"/></svg>Полный каталог 10 000+ продуктов</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Доступ к API и webhooks</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Веб-панель управления</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Документация и примеры кода</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<main id="v-signup" class="auth su" hidden>
+  <div class="auth-card">
+    <div class="auth-head">
+      <a class="back" href="#top"><svg class="ico"><use href="#i-back"/></svg>На главную</a>
+      <div class="auth-title">
+        <span class="tile"><svg class="ico"><use href="#i-gift"/></svg></span>
+        <div><h1>Получить пробный период</h1><p>5 дней Gold — полный доступ, карта не нужна</p></div>
+      </div>
+    </div>
+    <div class="auth-body">
+      <form id="signupForm" novalidate>
+        <span class="tarif-l" id="su-plan-l">Тариф</span>
+        <div class="sel">
+          <button class="sel-btn" id="su-plan" type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="su-plan-l su-plan-v"><span id="su-plan-v">Пробный период</span><svg class="ico"><use href="#i-down"/></svg></button>
+          <ul class="sel-list" id="su-plan-list" role="listbox" aria-labelledby="su-plan-l" tabindex="-1" hidden>
+            <li role="option" id="pl-trial" data-v="trial" aria-selected="true">Пробный период</li>
+            <li role="option" id="pl-bronze" data-v="bronze" aria-selected="false">Bronze</li>
+            <li role="option" id="pl-silver" data-v="silver" aria-selected="false">Silver</li>
+            <li role="option" id="pl-gold" data-v="gold" aria-selected="false">Gold</li>
+          </ul>
+        </div>
+        <label class="field first"><span>Email</span>
+          <input class="inp" id="su-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="your@email.com" aria-describedby="su-email-e">
+          <small class="err" id="su-email-e" hidden></small>
+        </label>
+        <label class="field"><span>Имя пользователя</span>
+          <input class="inp" id="su-user" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Выберите имя пользователя" aria-describedby="su-user-e">
+          <small class="err" id="su-user-e" hidden></small>
+        </label>
+        <label class="field"><span>Пароль</span>
+          <input class="inp" id="su-pass" name="password" type="password" autocomplete="new-password" placeholder="Мин. 8 символов" aria-describedby="su-pass-e">
+          <small class="err" id="su-pass-e" hidden></small>
+        </label>
+        <label class="field"><span>Повторите пароль</span>
+          <input class="inp" id="su-pass2" name="password2" type="password" autocomplete="new-password" placeholder="Подтвердите пароль" aria-describedby="su-pass2-e">
+          <small class="err" id="su-pass2-e" hidden></small>
+        </label>
+        <button class="auth-btn" type="submit">Создать аккаунт</button>
+        <p class="form-msg" id="su-msg" role="status" hidden></p>
+      </form>
+      <div class="incl-box">
+        <h2>что входит</h2>
+        <ul class="incl" id="su-incl"></ul>
+      </div>
+    </div>
+  </div>
+</main>
+
 
 <footer class="footer" id="footer">
   <div class="wrap">
@@ -836,7 +983,7 @@ h1,h2,h3{color:var(--ink)}
       <small>Наши соцсети</small>
       <div class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#229ed9"/><path fill="#fff" d="m5.4 11.7 11.2-4.6c.5-.2 1 .1.8.9l-1.9 9c-.1.6-.5.8-1 .5l-2.9-2.2-1.4 1.4c-.2.2-.3.3-.6.3l.2-3 5.4-4.9c.2-.2 0-.3-.4-.1l-6.7 4.2-2.9-.9c-.6-.2-.6-.6.2-.9Z"/></svg>Telegram</div>
     </div>
-    <div class="f-legal"><a href="#" data-soon>API Reference</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Партнёрство</a> <span aria-hidden="true">·</span> <a href="#" data-soon>White Label</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Поставщикам</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Условия использования</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Политика конфиденциальности</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Контакты</a></div>
+    <div class="f-legal"><a href="#" data-soon>API Reference</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Партнёрство</a> <span aria-hidden="true">·</span> <a href="#" data-soon>White Label</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Поставщикам</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Условия использования</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Политика конфиденциальности</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Контакты</a> <span aria-hidden="true">·</span> <a href="#" data-soon>Карта сайта</a> <span aria-hidden="true">·</span> <a href="#" data-soon>llms.txt</a> <span aria-hidden="true">·</span> <a href="#" data-soon>GitHub</a></div>
     <p class="f-copy">© <span id="year">2026</span> Gemora. Независимый сервис, не связан с правообладателями игр. Названия игр и сервисов принадлежат их владельцам и указаны только для описания товаров.</p>
   </div>
 </footer>
@@ -954,6 +1101,101 @@ h1,h2,h3{color:var(--ink)}
       b.setAttribute('aria-expanded',String(!open));
       document.getElementById(b.getAttribute('aria-controls')).hidden=open;
     });
+  });
+
+  // ---------- views: home / login / signup (hash routing) ----------
+  (function(){
+    var views={login:document.getElementById('v-login'),signup:document.getElementById('v-signup')},home=document.getElementById('main');
+    var current=null;
+    function show(h){
+      var v=views[h]?h:'home',changed=v!==current;
+      if(changed){
+        home.hidden=v!=='home';
+        Object.keys(views).forEach(function(k){views[k].hidden=k!==v});
+        current=v;
+        if(v!=='home'){window.scrollTo({top:0,behavior:'instant'});var t=views[v].querySelector('h1');if(t){t.setAttribute('tabindex','-1');t.focus({preventScroll:true})}}
+      }
+      if(v==='home'){
+        if(h==='top'||!h){if(h==='top'&&changed)window.scrollTo({top:0,behavior:'instant'});return}
+        var el=document.getElementById(h);
+        if(el&&changed) requestAnimationFrame(function(){el.scrollIntoView({block:'start',behavior:'instant'})});
+      }
+    }
+    window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+    show(location.hash.slice(1));
+    // a link to the current hash does not fire hashchange: handle it here
+    document.addEventListener('click',function(e){
+      var a=e.target.closest('a[href^="#"]'); if(!a||a.hasAttribute('data-soon')) return;
+      if(a.getAttribute('href')===location.hash){e.preventDefault();show(location.hash.slice(1));if(current==='home'&&location.hash==='#top')window.scrollTo(0,0)}
+    });
+  })();
+
+  // ---------- login tabs ----------
+  document.querySelectorAll('.seg button').forEach(function(b,i,all){
+    b.addEventListener('click',function(){all.forEach(function(x){x.setAttribute('aria-selected',String(x===b))})});
+  });
+
+  // ---------- forms (demo: no server yet) ----------
+  function setErr(id,msg){
+    var inp=document.getElementById(id),e=document.getElementById(id+'-e');
+    if(msg){inp.setAttribute('aria-invalid','true');e.textContent=msg;e.hidden=false}
+    else{inp.removeAttribute('aria-invalid');e.hidden=true}
+    return !msg;
+  }
+  var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  function first(form){var x=form.querySelector('[aria-invalid="true"]');if(x)x.focus()}
+  document.getElementById('loginForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var em=document.getElementById('li-email').value.trim(),pw=document.getElementById('li-pass').value,m=document.getElementById('li-msg');
+    var ok=setErr('li-email',!em?'Введите почту':!EMAIL.test(em)?'Почта указана неверно, например: name@mail.com':'');
+    ok=setErr('li-pass',!pw?'Введите пароль':'')&&ok;
+    if(!ok){m.hidden=true;first(this);return}
+    m.textContent='Это демо: вход заработает, когда подключим сервер.';m.hidden=false;
+  });
+
+  var INCL={
+    trial:['Полный каталог 10 000+ продуктов','Доступ к API и webhooks','Веб-панель управления','Максимальные скидки','Steam пополнение — скидка 3,55%','Персональная помощь с интеграцией'],
+    bronze:['Полный каталог 10 000+ продуктов','Доступ к API и webhooks','Веб-панель управления','Базовые скидки','Steam пополнение — скидка 2,5%','Документация и примеры кода'],
+    silver:['Полный каталог 10 000+ продуктов','Доступ к API и webhooks','Веб-панель управления','Расширенные скидки','Steam пополнение — скидка 3%','Помощь с интеграцией API']
+  };
+  INCL.gold=INCL.trial;
+  var selBtn=document.getElementById('su-plan'),list=document.getElementById('su-plan-list'),opts=[].slice.call(list.children),plan='trial',hi=0;
+  function setPlan(v){
+    plan=v;
+    opts.forEach(function(o){o.setAttribute('aria-selected',String(o.dataset.v===v))});
+    document.getElementById('su-plan-v').textContent=opts.filter(function(o){return o.dataset.v===v})[0].textContent;
+    document.getElementById('su-incl').innerHTML=INCL[v].map(function(t){return '<li><svg class="ico"><use href="#i-check"/></svg>'+t+'</li>'}).join('');
+  }
+  function mark(i){hi=(i+opts.length)%opts.length;opts.forEach(function(o,k){o.classList.toggle('act',k===hi)});list.setAttribute('aria-activedescendant',opts[hi].id)}
+  function openSel(){list.hidden=false;selBtn.setAttribute('aria-expanded','true');mark(opts.findIndex(function(o){return o.dataset.v===plan}));list.focus()}
+  function closeSel(back){list.hidden=true;selBtn.setAttribute('aria-expanded','false');if(back)selBtn.focus()}
+  selBtn.addEventListener('click',function(){list.hidden?openSel():closeSel(true)});
+  selBtn.addEventListener('keydown',function(e){if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();openSel()}});
+  list.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){e.preventDefault();mark(hi+1)}
+    else if(e.key==='ArrowUp'){e.preventDefault();mark(hi-1)}
+    else if(e.key==='Enter'||e.key===' '){e.preventDefault();setPlan(opts[hi].dataset.v);closeSel(true)}
+    else if(e.key==='Escape'||e.key==='Tab'){closeSel(e.key==='Escape')}
+  });
+  opts.forEach(function(o,k){
+    o.addEventListener('mousemove',function(){if(hi!==k)mark(k)});
+    o.addEventListener('click',function(){setPlan(o.dataset.v);closeSel(true)});
+  });
+  document.addEventListener('click',function(e){if(!list.hidden&&!e.target.closest('.sel'))closeSel(false)});
+  setPlan('trial');
+  // plan buttons on the home page preselect the plan
+  document.querySelectorAll('[data-plan]').forEach(function(a){a.addEventListener('click',function(){setPlan(a.dataset.plan)})});
+
+  document.getElementById('signupForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var em=document.getElementById('su-email').value.trim(),us=document.getElementById('su-user').value.trim(),
+        p1=document.getElementById('su-pass').value,p2=document.getElementById('su-pass2').value,m=document.getElementById('su-msg');
+    var ok=setErr('su-email',!em?'Введите почту':!EMAIL.test(em)?'Почта указана неверно, например: name@mail.com':'');
+    ok=setErr('su-user',!us?'Придумайте имя пользователя':!/^[A-Za-z0-9_.-]{3,32}$/.test(us)?'От 3 до 32 символов: латинские буквы, цифры, точка, дефис, подчёркивание':'')&&ok;
+    ok=setErr('su-pass',!p1?'Придумайте пароль':p1.length<8?'Пароль должен быть не короче 8 символов':'')&&ok;
+    ok=setErr('su-pass2',!p2?'Повторите пароль':p2!==p1?'Пароли не совпадают':'')&&ok;
+    if(!ok){m.hidden=true;first(this);return}
+    m.textContent='Это демо: регистрация заработает, когда подключим сервер.';m.hidden=false;
   });
 
   document.getElementById('year').textContent=new Date().getFullYear();
