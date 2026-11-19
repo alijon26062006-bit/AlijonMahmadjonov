@@ -35,3 +35,14 @@
 ## Вебхук
 - `PUT /account/webhook` {url, enabled}, секрет HMAC (`/secret/regenerate`), `POST /account/webhook/test`, `GET /account/webhook/deliveries`.
 - Названия событий, формат тела и заголовок подписи в документации НЕ описаны (есть только `webhook.test`). Пока нет ответа поставщика — опрашивать `GET /orders/{id}`.
+
+## Дополнено после полного прочтения (все разделы, кроме FunPay)
+- Цены в каталоге уже с учётом вашего тарифа (Bronze/Silver/Gold) — это ваша закупочная цена.
+- Steam: `POST /steam-topup/check-login` → `can_refill`, и `unverified: true`, если проверка недоступна (заказ можно делать, неизвестный логин вернут автоматически).
+  Заказ `{steamLogin, currency USD|RUB|UAH|KZT, amount}`: USD — до 2 знаков, остальные — до 4; сумма в USD округляется вверх до цента.
+- Steam гифты: цены по регионам кэшируются у поставщика до 24 часов; список игр обновляется раз в 3 часа.
+- Ключи игр: `stock`, `min/max_order_quantity`; ограничения по странам — `GET /gamekeys/region-restriction?game_id=` (available/unavailable, ISO-коды).
+- Ручные услуги: ответ заказа сразу содержит `order_id`, `status: created`, `deadline_at`, `chat_required`, `chat_status`
+  (`not_required | not_opened | waiting_reply | idle | read_only`); чат — текст и картинка (multipart).
+- Проверка ID: 422 — ID не удалось подтвердить (покупателя просить обратиться в поддержку), 429 — слишком часто.
+- В документации НЕ описаны: поля объекта заказа (`order` — произвольный объект), список статусов заказа, события и подпись вебхука.
