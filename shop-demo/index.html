@@ -1062,6 +1062,114 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
 .tk-back .ico{width:16px;height:16px}
 .tk-msg{height:auto;min-height:110px;padding:12px 16px;resize:vertical;line-height:22px}
 
+
+/* ================= Part 15: top-up sheet + payment page ================= */
+.tp-h{align-items:flex-start;margin:0 -17px 0;padding:0 17px 14px;border-bottom:1px solid var(--s2)}
+.tp-h p{margin-top:2px;font-size:14px;color:var(--s5)}
+.tp-l{display:block;margin-top:14px;font-size:14px;font-weight:700;color:#5f6c84}
+.tp-inp-w{display:flex;align-items:center;gap:10px;margin-top:8px;height:58px;padding:0 15px;border:1.5px solid #8b7bf5;border-radius:16px;box-shadow:0 0 0 4px rgba(126,91,255,.1)}
+.tp-inp-w input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:20px;color:var(--s9)}
+.tp-inp-w input::placeholder{color:#94a3b8}
+.tp-cur{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;color:#475569}
+.tp-cur i{width:24px;height:24px;border-radius:50%;background:#26a17b;color:#fff;display:grid;place-items:center;font-style:normal;font-size:14px;font-weight:800}
+.tp-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.tp-chips button{height:46px;border:1px solid var(--s2);border-radius:14px;font-size:15px;font-weight:600;color:var(--s9);font-variant-numeric:tabular-nums}
+.tp-chips button[aria-pressed="true"]{background:#efecfd;border-color:#c9c2f7;color:#6d4bff}
+.tp-hint{margin-top:10px;font-size:13px;color:#5f6c84}
+.tp-nets{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px 0;border-top:1px solid var(--s2);border-bottom:1px solid var(--s2);font-size:13.5px;color:#5f6c84}
+.tp-dots{display:flex}
+.tp-dots i{width:24px;height:24px;margin-left:-6px;border-radius:50%;border:2px solid #fff;display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:800;color:#fff}
+.tp-dots i:first-child{margin-left:0}
+.tp-go{margin-top:14px;height:52px}
+/* payment page */
+body.in-pay{background:#fff}
+body.in-pay > .header,body.in-pay > #footer{display:none}
+.pay{max-width:480px;margin:0 auto;padding:14px max(16px,env(safe-area-inset-right,0px)) 150px max(16px,env(safe-area-inset-left,0px));color:var(--s9)}
+.pay-top{display:flex;align-items:center;justify-content:space-between;height:48px}
+.pay-brand{font-size:16px;font-weight:800}
+.pay-lang{height:34px;border-radius:12px}
+.pay-lang button{width:40px;font-size:12px}
+.pay-title{margin-top:12px;padding-bottom:16px;border-bottom:1px solid var(--s2);font-size:22px;line-height:30px;font-weight:800;letter-spacing:-.01em}
+.pay-total{display:flex;align-items:center;gap:10px;padding:18px 0;border-bottom:1px solid var(--s2)}
+.pay-total span{font-size:15px;color:#475569}
+.pay-total > i{flex:1;border-top:1.5px dotted #cbd5e1;margin-top:4px}
+.pay-total b{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+.pay-total small{font-size:13px;font-weight:700;color:#475569}
+.pay-muted{margin-top:12px;font-size:13.5px;line-height:20px;color:#5f6c84}
+.pay-step{display:flex;justify-content:space-between;align-items:flex-end;margin-top:26px}
+.pay-n{font-size:13.5px;font-weight:700;color:#6d4bff}
+.pay-step h2{margin-top:6px;font-size:19px;line-height:24px;font-weight:800}
+.pay-left{text-align:right}
+.pay-left span{display:block;font-size:13.5px;color:#5f6c84}
+.pay-left b{display:block;margin-top:6px;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.pay-nets{display:grid;gap:9px;margin-top:14px}
+.pay-nb{display:grid;grid-template-columns:38px 1fr 16px;column-gap:14px;align-items:center;width:100%;min-height:62px;padding:10px 14px 10px 12px;border:1px solid #dfe3ea;border-radius:16px;text-align:left}
+.pay-nb:hover{border-color:#b9adf7;background:#fbfaff}
+.pay-nb > i{width:38px;height:38px;border-radius:50%;border:1px solid var(--s2);display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:800;color:#fff}
+.pay-nb b{display:block;font-size:16px;line-height:21px;font-weight:800}
+.pay-nb small{display:block;font-size:13px;color:#5f6c84}
+.pay-nb em{display:block;margin-top:3px;font-style:normal;font-size:12.5px;line-height:17px;color:#a16207}
+.pay-nb > .ico{width:16px;height:16px;color:#475569}
+.pay-nb:disabled{opacity:.45;cursor:default;grid-template-columns:38px 1fr auto}
+.pay-nb:disabled > small{font-size:12.5px;white-space:nowrap;color:#475569}
+.pay-back{display:inline-block;margin-top:20px;font-size:14px;font-weight:600;color:#6d4bff}
+.pay-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:20px}
+.pay-row > div{min-width:0}
+.pay-cap{display:block;font-size:13.5px;color:#5f6c84}
+.pay-gap{margin-top:18px}
+.pay-amt{margin-top:4px;line-height:1}
+.pay-amt b{font-size:40px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pay-amt small{font-size:19px;font-weight:700;color:#475569}
+.pay-copy{width:44px;height:44px;flex:none;border-radius:13px;background:#efecfd;color:#6d4bff;display:grid;place-items:center}
+.pay-copy .ico{width:20px;height:20px}
+.pay-copy.ok{background:#e4f8eb;color:#16a34a}
+.pay-tail{margin-top:10px;padding:10px 12px;border-radius:12px;background:#f2f0fd;font-size:13px;line-height:19px;color:#4c3bb5}
+.pay-tail:empty{display:none}
+.pay hr{margin:18px 0 0;border:0;border-top:1px solid var(--s2)}
+.pay hr + .pay-cap{margin-top:16px}
+.pay-net{display:flex;align-items:center;gap:12px;margin-top:10px}
+.pay-net i{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:800;color:#fff}
+.pay-net b{font-size:16px;font-weight:800}
+.pay-warn{display:flex;gap:10px;margin-top:14px;padding:11px 13px;border:1.5px solid #f3d27a;border-radius:13px;background:#fffaeb}
+.pay-warn .ico{width:20px;height:20px;color:#d97706;flex:none;margin-top:1px}
+.pay-warn p{font-size:13.5px;line-height:20px;color:#92400e}
+.pay-warn p b{color:var(--s9)}
+.pay-addr{margin-top:6px;font-family:var(--mono);font-size:15px;line-height:24px;letter-spacing:.02em;overflow-wrap:anywhere}
+.pay-demo{margin-top:8px;font-size:12px;color:#dc2626}
+.pay-apps{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.pay-app{display:flex;align-items:center;gap:11px;height:48px;padding:0 13px;border:1px solid #dfe3ea;border-radius:13px;font-size:15px;font-weight:700;color:var(--s9)}
+.pay-app:hover{border-color:#b9adf7}
+.pay-app i{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-style:normal;font-size:9.5px;font-weight:800;color:#fff;flex:none}
+.pay-qr-row{display:grid;grid-template-columns:140px 1fr;gap:18px;align-items:center;margin-top:18px}
+.pay-qr-row .pay-muted{margin-top:0}
+.pay-qr{width:140px;height:140px;padding:12px;border:1px solid var(--s2);border-radius:16px;display:grid;place-items:center;font-size:12px;color:var(--s5);text-align:center}
+.pay-qr svg{width:100%;height:100%;display:block}
+.pay-info{display:flex;gap:10px;margin-top:18px}
+.pay-info .ico{width:18px;height:18px;color:#475569;flex:none;margin-top:2px}
+.pay-info p{font-size:13.5px;line-height:20px;color:#5f6c84}
+.pay-info p + p{margin-top:10px}
+.pay-info a{color:#6d4bff;text-decoration:underline}
+.pay-sim{display:block;width:100%;margin-top:22px;padding:11px;border:1.5px dashed #cbd5e1;border-radius:13px;font-size:13px;font-weight:600;color:#5f6c84}
+.pay-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;max-width:520px;margin:0 auto;padding:14px max(18px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));background:#fff;border:1px solid var(--s2);border-bottom:0;border-radius:22px 22px 0 0;box-shadow:0 -8px 24px rgba(15,23,42,.08)}
+.pay-dot{width:20px;height:20px;border-radius:50%;background:#e9e5fd;display:grid;place-items:center}
+.pay-dot::after{content:"";width:10px;height:10px;border-radius:50%;background:#7e5bff;animation:payPulse 1.6s ease-in-out infinite}
+@keyframes payPulse{50%{transform:scale(.6);opacity:.6}}
+.pay-bar b{display:block;font-size:16px;line-height:21px;font-weight:800}
+.pay-bar > div > span{display:block;font-size:12.5px;color:#5f6c84}
+.pay-timer{display:flex;align-items:center;gap:8px;height:40px;padding:0 13px;border:1px solid var(--s2);border-radius:13px;background:#f8fafc}
+.pay-timer .ico{width:16px;height:16px;color:#475569}
+.pay-timer b{font-size:18px;font-variant-numeric:tabular-nums}
+.pay-prog{grid-column:1 / -1;display:block;height:4px;border-radius:2px;background:#eef1f5;overflow:hidden}
+.pay-prog i{display:block;height:100%;width:100%;background:#9d8bf7;border-radius:2px;transition:width 1s linear}
+.pay-bar.late .pay-dot::after{background:#dc2626;animation:none}
+.pay-done{margin-top:40px;text-align:center}
+.pay-ok{width:64px;height:64px;margin:0 auto;border-radius:50%;background:#e4f8eb;color:#16a34a;display:grid;place-items:center}
+.pay-ok .ico{width:30px;height:30px;stroke-width:2.6}
+.pay-done h2{margin-top:18px;font-size:22px;font-weight:800}
+.pay-done p{margin-top:10px;font-size:14.5px;line-height:21px;color:#5f6c84}
+.pay-done .st-go{margin-top:24px}
+.pay-done.fail .pay-ok{background:#fde8e8;color:#dc2626}
+
 </style>
 
 <!-- Icons: Lucide (ISC License) -->
@@ -1087,6 +1195,9 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <line x1="12" x2="12" y1="8" y2="12" /> <line x1="12" x2="12.01" y1="16" y2="16" /></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <polyline points="12 6 12 12 16 14" /></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <path d="m21 21-4.3-4.3" /></symbol>
@@ -1658,7 +1769,7 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
       <h1>Обзор</h1>
       <p class="a-sub">Ключевые показатели и недавняя активность.</p>
       <div class="a-hero-btns">
-        <a class="a-pbtn" href="#" data-soon="Пополнение баланса сделаем на следующем шаге">Пополнить баланс</a>
+        <a class="a-pbtn" href="#balance" data-sheet="shTopup">Пополнить баланс</a>
         <a class="a-gbtn" href="#profile">Профиль</a>
       </div>
     </section>
@@ -1942,7 +2053,7 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
     <section class="b-card">
       <p class="b-sum">$58.4100</p>
       <p class="b-lbl">Доступно</p>
-      <button class="b-top" type="button" data-soon="Экран пополнения сделаем, когда пришлёте его скриншоты">Пополнить</button>
+      <button class="b-top" type="button" data-sheet="shTopup">Пополнить</button>
       <div class="b-st"><span>Всего потрачено</span><b>$1,248.5320</b><small>За всё время</small></div>
       <div class="b-st"><span>Всего заказов</span><b>214</b><small>Создано</small></div>
     </section>
@@ -2142,11 +2253,82 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
       <button class="st-go sh-save" type="submit">Отправить заявку</button>
     </form>
   </div>
+  <div class="sheet tp-sheet" id="shTopup" role="dialog" aria-modal="true" aria-labelledby="shTopupT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h tp-h"><div><h2 id="shTopupT">Пополнить</h2><p>Введите сумму</p></div><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <form id="tpForm" novalidate>
+      <label class="tp-l" for="tpAmt">Сумма пополнения</label>
+      <div class="tp-inp-w"><input id="tpAmt" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="tpHint tpAmt-e"><span class="tp-cur"><i aria-hidden="true">₮</i>USDT</span></div>
+      <div class="tp-chips"><button type="button" data-a="100">100</button><button type="button" data-a="500">500</button><button type="button" data-a="1000">1 000</button><button type="button" data-a="3000">3 000</button></div>
+      <p class="tp-hint" id="tpHint">От 1 до 30 000 USDT за один платёж</p>
+      <small class="err" id="tpAmt-e" hidden></small>
+      <div class="tp-nets"><span class="tp-dots" aria-hidden="true"><i style="background:#ef4444">T</i><i style="background:#f3ba2f">B</i><i style="background:#0098ea">◆</i><i style="background:#f7a600">Y</i><i style="background:#111827">P</i></span><span>Сеть выберете на следующем шаге</span></div>
+      <button class="st-go tp-go" type="submit">Продолжить</button>
+    </form>
+  </div>
   <div class="app-menu" id="appMenu" role="dialog" aria-modal="true" aria-label="Меню кабинета" hidden>
     <div class="am-top"><button class="a-btn" id="appMenuClose" type="button" aria-label="Закрыть меню"><svg class="ico"><use href="#i-close"/></svg></button></div>
     <nav class="am-nav" id="appMenuNav"></nav>
   </div>
 </div>
+
+<main id="v-pay" class="pay" hidden>
+  <header class="pay-top">
+    <b class="pay-brand">Gemora</b>
+    <div class="a-lang pay-lang" role="group" aria-label="Язык"><button type="button" aria-pressed="true">RU</button><button type="button" aria-pressed="false" data-soon="Английская версия появится на следующем шаге">EN</button></div>
+  </header>
+  <h1 class="pay-title">Пополнение баланса Gemora</h1>
+
+  <section id="payS1">
+    <div class="pay-total"><span>К оплате</span><i aria-hidden="true"></i><b id="payTotal">100.00 <small>USDT</small></b></div>
+    <p class="pay-muted">После выбора сети появятся адрес и QR-код — на перевод будет 30 минут.</p>
+    <div class="pay-step"><div><span class="pay-n">Шаг 1 из 2</span><h2>Выберите сеть</h2></div><div class="pay-left"><span>Осталось</span><b id="payT1">10:00</b></div></div>
+    <p class="pay-muted">При отправке выберите в кошельке или на бирже ту же сеть. Выбрать её можно только один раз.</p>
+    <div class="pay-nets" id="payNets"></div>
+    <a class="pay-back" href="#balance">← Вернуться в кабинет</a>
+  </section>
+
+  <section id="payS2" hidden>
+    <div class="pay-row"><div><span class="pay-cap">Отправьте ровно</span><p class="pay-amt"><b id="payAmt">100.0037</b> <small>USDT</small></p></div><button class="pay-copy" type="button" data-copy="amt" aria-label="Скопировать сумму"><svg class="ico"><use href="#i-copy"/></svg></button></div>
+    <p class="pay-muted" id="payAmtNote">С биржи — добавьте её комиссию сверху</p>
+    <p class="pay-tail" id="payTailNote"></p>
+    <hr>
+    <span class="pay-cap">Сеть</span>
+    <div class="pay-net"><i id="payNetIco"></i><b id="payNetName">TRON (TRC20)</b></div>
+    <div class="pay-warn"><svg class="ico"><use href="#i-alert"/></svg><p id="payWarn"></p></div>
+    <hr>
+    <div class="pay-row"><div><span class="pay-cap" id="payAddrL">Адрес</span><p class="pay-addr" id="payAddr"></p></div><button class="pay-copy" type="button" data-copy="addr" aria-label="Скопировать адрес"><svg class="ico"><use href="#i-copy"/></svg></button></div>
+    <p class="pay-demo">Это пример адреса для демо. Не отправляйте сюда деньги.</p>
+    <hr>
+    <div id="payWallets">
+      <span class="pay-cap">Открыть в кошельке</span>
+      <div class="pay-apps one"><button type="button" class="pay-app" data-app="Trust Wallet"><i style="background:#0500ff">TW</i>Trust Wallet</button></div>
+      <p class="pay-muted">Адрес и сумма подставятся сами</p>
+    </div>
+    <span class="pay-cap pay-gap">Открыть биржу или Crypto Bot</span>
+    <div class="pay-apps"><button type="button" class="pay-app" data-app="Binance"><i style="background:#181a20;color:#f3ba2f">BN</i>Binance</button><button type="button" class="pay-app" data-app="Bybit"><i style="background:#111;color:#f7a600">BY</i>Bybit</button><button type="button" class="pay-app" data-app="Crypto Bot"><i style="background:#2aa6e8">CB</i>Crypto Bot</button></div>
+    <p class="pay-muted">Адрес скопируется: вставьте его и введите сумму</p>
+    <hr>
+    <div class="pay-qr-row"><div class="pay-qr" id="payQr" aria-label="QR-код адреса"></div><p class="pay-muted">В QR-коде только адрес — сумму введите в кошельке сами</p></div>
+    <hr>
+    <div class="pay-info"><svg class="ico"><use href="#i-info"/></svg><div><p>Неточная сумма или перевод после таймера не зачисляются сами — напишите в поддержку магазина: если перевод можно зачислить, его зачислят.</p><p>Отправляя перевод, вы принимаете <a href="#" data-soon>правила оплаты</a>.</p></div></div>
+    <button type="button" class="pay-sim" id="paySim">Демо: показать, как выглядит зачисление</button>
+  </section>
+
+  <section id="payS3" class="pay-done" hidden>
+    <span class="pay-ok"><svg class="ico"><use href="#i-check"/></svg></span>
+    <h2 id="payDoneT">Баланс пополнен</h2>
+    <p id="payDoneP"></p>
+    <a class="st-go" href="#balance">Вернуться в кабинет</a>
+  </section>
+
+  <div class="pay-bar" id="payBar" hidden>
+    <span class="pay-dot" aria-hidden="true"></span>
+    <div><b id="payBarT">Ожидаем перевод</b><span id="payBarS">Страница сама увидит перевод</span></div>
+    <span class="pay-timer"><svg class="ico"><use href="#i-clock"/></svg><b id="payT2">30:00</b></span>
+    <i class="pay-prog"><i id="payProg"></i></i>
+  </div>
+</main>
 
 <footer class="footer" id="footer">
   <div class="wrap">
@@ -2173,6 +2355,7 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
 <button class="to-top off" id="toTop" type="button" aria-label="Наверх"><svg class="ico"><use href="#i-up"/></svg></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
 (function(){
   // ---------- service illustrations (own drawings, no third-party logos) ----------
@@ -2287,16 +2470,16 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app',settings:'v-app',support:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage',settings:'appSettingsPage',support:'appSupportPage'};
+    var V={pay:'v-pay',login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app',settings:'v-app',support:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage',settings:'appSettingsPage',support:'appSupportPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
       if(changed){
         home.hidden=v!=='home';
-        ['v-login','v-signup','v-app'].forEach(function(id){document.getElementById(id).hidden=V[v]!==id});
+        ['v-login','v-signup','v-app','v-pay'].forEach(function(id){document.getElementById(id).hidden=V[v]!==id});
         Object.keys(PAGES).forEach(function(k){document.getElementById(PAGES[k]).hidden=k!==v});
         current=v;
-        document.body.classList.toggle('in-app',V[v]==='v-app');document.body.classList.toggle('in-sup',v==='support');
+        document.body.classList.toggle('in-app',V[v]==='v-app');document.body.classList.toggle('in-sup',v==='support');document.body.classList.toggle('in-pay',v==='pay');
         if(v!=='home'){
           window.scrollTo({top:0,behavior:'instant'});
           var box=document.getElementById(PAGES[v]||V[v]),t=box&&box.querySelector('h1');
@@ -2991,7 +3174,7 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
     function close(){if(!cur)return;cur.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';var b=back;cur=null;if(b)b.focus({preventScroll:true})}
     window.GemSheet={open:open,close:close};
     document.addEventListener('click',function(e){var b=e.target.closest('[data-sheet]');if(b){e.preventDefault();open(b.dataset.sheet,b)}});
-    ['shSec','shNotif','shTz','shHook','shTicket'].forEach(function(id){$(id).querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',close)})});
+    ['shSec','shNotif','shTz','shHook','shTicket','shTopup'].forEach(function(id){$(id).querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',close)})});
     scrim.addEventListener('click',close);
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&cur)close()});
     window.addEventListener('hashchange',function(){if(cur){cur.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';cur=null}});
@@ -3067,6 +3250,84 @@ body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:3
       renderT();window.GemSheet.close();var el=$('toast');if(el){el.textContent='Заявка создана';el.hidden=false;setTimeout(function(){el.hidden=true},2400)}
     });
     renderT();
+  })();
+
+  // ---------- top-up sheet → payment page (demo: fake addresses, no real payments) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    function toast(t){var el=$('toast');if(!el)return;el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true},2800)}
+    // sheet
+    var amtIn=$('tpAmt');
+    function setChip(){var v=amtIn.value.replace(',','.');document.querySelectorAll('.tp-chips button').forEach(function(b){b.setAttribute('aria-pressed',String(+b.dataset.a===+v&&v!==''))})}
+    document.querySelector('.tp-chips').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;amtIn.value=b.dataset.a;setChip();err('')});
+    amtIn.addEventListener('input',function(){this.value=this.value.replace(/[^\d.,]/g,'').replace(/([.,]\d{0,2}).*$/,'$1');setChip();if(this.getAttribute('aria-invalid'))chk()});
+    function err(m){var e=$('tpAmt-e');if(m){amtIn.setAttribute('aria-invalid','true');e.textContent=m;e.hidden=false}else{amtIn.removeAttribute('aria-invalid');e.hidden=true}return !m}
+    function chk(){var v=parseFloat(amtIn.value.replace(',','.'));return err(!amtIn.value?'Введите сумму пополнения':!(v>=1)?'Минимум 1 USDT':v>30000?'Максимум 30 000 USDT за один платёж':'')}
+    $('shTopup').onopen=function(){err('');setTimeout(function(){amtIn.focus()},50)};
+    $('tpForm').addEventListener('submit',function(e){e.preventDefault();if(!chk()){amtIn.focus();return}
+      PAY.amount=Math.round(parseFloat(amtIn.value.replace(',','.'))*100)/100;window.GemSheet.close();location.hash='pay'});
+    // payment page
+    var NETS=[
+      {id:'trc',n:'TRON',s:'TRC20',c:'#ef4444',g:'T',name:'TRON (TRC20)',lbl:'Адрес',addr:'TDemoGemoraAddrNotReal7xQ1k9Pz3Wm',tail:true,wallet:true,
+        warn:'<b>Только USDT в сети TRON (TRC20).</b> Другая монета или сеть — можно потерять деньги'},
+      {id:'bep',n:'BNB Chain',s:'BEP20',c:'#f3ba2f',g:'B',name:'BNB Chain (BEP20)',lbl:'Адрес',addr:'0xDe00DemoGemora0000NotReal00000000Beef',tail:true,wallet:true,
+        warn:'<b>Только USDT в сети BNB Chain (BEP20).</b> Другая монета или сеть — можно потерять деньги'},
+      {id:'ton',n:'TON',s:'',c:'#0098ea',g:'◆',name:'TON',lbl:'Адрес',addr:'UQDemoGemoraNotRealAddress000000000000000TonX',tail:true,wallet:true,
+        warn:'<b>Только USDT в сети TON.</b> Другая монета или сеть — можно потерять деньги'},
+      {id:'bybit',n:'Bybit',s:'Перевод по UID, без комиссии',c:'#1f2937',g:'BY',name:'Bybit — перевод по UID',lbl:'UID получателя в Bybit',addr:'100000000',tail:true,wallet:false,
+        warn:'<b>Внутренний перевод Bybit по UID.</b> В Bybit: Активы → Перевести → «UID», монета USDT'},
+      {id:'bpay',n:'Binance Pay',s:'Перевод по Pay ID',c:'#181a20',g:'BP',name:'Binance Pay',lbl:'Binance Pay ID получателя',addr:'000000000',tail:true,wallet:false,
+        warn:'<b>Только через Binance Pay.</b> В Binance: Pay → Отправить → Pay ID, монета USDT'},
+      {id:'sol',n:'Solana',s:'SPL',c:'#9945ff',g:'S',off:true}
+    ];
+    var PAY={amount:100},net=null,t1=null,t2=null,end1=0,end2=0,sendAmt=0;
+    $('payNets').innerHTML=NETS.map(function(x){return '<button type="button" class="pay-nb" data-net="'+x.id+'"'+(x.off?' disabled':'')+'><i style="background:'+x.c+'">'+x.g+'</i><span><b>'+x.n+'</b>'+(x.s?'<small>'+x.s+'</small>':'')+'</span>'+(x.off?'<small>временно недоступна</small>':'<svg class="ico"><use href="#i-chev"/></svg>')+'</button>'}).join('');
+    function fmt(ms){ms=Math.max(0,ms);var s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+('0'+s%60).slice(-2)}
+    function stop(){clearInterval(t1);clearInterval(t2)}
+    function show(n){$('payS1').hidden=n!==1;$('payS2').hidden=n!==2;$('payS3').hidden=n!==3;$('payBar').hidden=n!==2}
+    function done(ok,text){stop();show(3);$('payS3').classList.toggle('fail',!ok);$('payDoneT').textContent=ok?'Баланс пополнен':'Время на оплату вышло';$('payDoneP').textContent=text;
+      document.querySelector('#payS3 .pay-ok use').setAttribute('href',ok?'#i-check':'#i-close');window.scrollTo(0,0)}
+    function start(){
+      stop();net=null;show(1);window.scrollTo(0,0);
+      $('payTotal').innerHTML=PAY.amount.toFixed(2)+' <small>USDT</small>';
+      end1=Date.now()+10*60000;$('payT1').textContent='10:00';
+      t1=setInterval(function(){var l=end1-Date.now();$('payT1').textContent=fmt(l);if(l<=0)done(false,'Сеть не выбрана за 10 минут. Создайте новый платёж в кабинете.')},1000);
+    }
+    $('payNets').addEventListener('click',function(e){
+      var b=e.target.closest('.pay-nb');if(!b||b.disabled)return;net=NETS.filter(function(x){return x.id===b.dataset.net})[0];
+      // unique "tail": 1..99 hundredths of a cent, so each open payment has its own exact amount
+      var tail=1+Math.floor(Math.random()*99);sendAmt=(Math.round(PAY.amount*100)*100+tail)/10000;
+      $('payAmt').textContent=sendAmt.toFixed(4);
+      $('payTailNote').textContent='Последние цифры ('+('0'+tail).slice(-2)+') — номер вашего платежа. По точной сумме мы узнаём, что перевод ваш, и зачисляем баланс сами, без чека.';
+      $('payAmtNote').textContent=net.wallet?'С биржи — добавьте её комиссию сверху':'Перевод внутри биржи — без комиссии';
+      $('payNetIco').style.background=net.c;$('payNetIco').textContent=net.g;$('payNetName').textContent=net.name;
+      $('payWarn').innerHTML=net.warn;$('payAddrL').textContent=net.lbl;$('payAddr').textContent=net.addr;$('payWallets').hidden=!net.wallet;
+      qr(net.addr);clearInterval(t1);show(2);window.scrollTo(0,0);
+      end2=Date.now()+30*60000;var tot=30*60000;$('payBar').classList.remove('late');
+      t2=setInterval(function(){var l=end2-Date.now();$('payT2').textContent=fmt(l);$('payProg').style.width=(Math.max(0,l)/tot*100)+'%';
+        if(l<5*60000)$('payBar').classList.add('late');if(l<=0)done(false,'Если вы уже отправили перевод — напишите в поддержку, укажите сумму и TxID: если перевод можно зачислить, его зачислят.')},1000);
+      $('payT2').textContent='30:00';$('payProg').style.width='100%';
+    });
+    function qr(text){
+      var box=$('payQr');
+      if(typeof window.qrcode!=='function'){box.textContent='QR-код появится при подключении к интернету';return}
+      var q=window.qrcode(0,'M');q.addData(text);q.make();var n=q.getModuleCount(),d='';
+      for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(q.isDark(r,c))d+='M'+c+' '+r+'h1v1h-1z';
+      box.innerHTML='<svg viewBox="0 0 '+n+' '+n+'" shape-rendering="crispEdges" role="img" aria-label="QR-код: '+text+'"><rect width="'+n+'" height="'+n+'" fill="#fff"/><path d="'+d+'" fill="#0f172a"/></svg>';
+    }
+    function copy(text,btn){
+      var ok=function(){btn.classList.add('ok');btn.querySelector('use').setAttribute('href','#i-check');setTimeout(function(){btn.classList.remove('ok');btn.querySelector('use').setAttribute('href','#i-copy')},1600)};
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){ok();toast('Скопировано: '+text)},function(){toast('Скопируйте вручную: '+text)})}else toast('Скопируйте вручную: '+text);
+    }
+    document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){copy(b.dataset.copy==='amt'?sendAmt.toFixed(4):net.addr,b)})});
+    document.querySelectorAll('.pay-app').forEach(function(b){b.addEventListener('click',function(){
+      var app=b.dataset.app;
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(net.addr).catch(function(){});
+      toast(app==='Trust Wallet'?'Демо: здесь откроется Trust Wallet с адресом и суммой '+sendAmt.toFixed(4)+' USDT':'Демо: адрес скопирован. Откройте '+app+', вставьте адрес и введите '+sendAmt.toFixed(4)+' USDT');
+    })});
+    $('paySim').addEventListener('click',function(){done(true,'Получено '+sendAmt.toFixed(4)+' USDT в сети '+net.name+'. На баланс зачислено $'+sendAmt.toFixed(4)+'. Это демо: настоящий баланс не изменился.')});
+    function route(){if(location.hash==='#pay')start();else stop()}
+    window.addEventListener('hashchange',route);route();
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
