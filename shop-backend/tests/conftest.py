@@ -3,6 +3,7 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789-abcdefghijklmnop")
 os.environ.setdefault("ADMIN_EMAILS", "boss@example.com")
 os.environ.setdefault("DEFAULT_MARKUP_PERCENT", "10")
+os.environ["ORDER_SYNC_ENABLED"] = "false"
 TEST_DB = os.environ.get("TEST_DATABASE_URL", "sqlite:///./test.db")
 os.environ["DATABASE_URL"] = TEST_DB
 

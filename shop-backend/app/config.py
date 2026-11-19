@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     catalog_cache_seconds: int = 600
 
     default_markup_percent: Decimal = Decimal("10")
+    # safety limits (can be changed in the admin panel)
+    default_max_order_usd: Decimal = Decimal("200")
+    default_daily_user_usd: Decimal = Decimal("1000")
+    order_sync_enabled: bool = True
+    order_sync_interval_seconds: int = 20
     admin_emails: str = ""
     cors_origins: str = "http://localhost:5173"
     cookie_secure: bool = False

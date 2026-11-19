@@ -63,6 +63,13 @@ class Order(Base):
     supplier_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     supplier_response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     delivery: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # codes etc. shown to buyer
+    # True when we do not know if the supplier accepted the order (timeout etc.) — must be checked
+    needs_check: Mapped[bool] = mapped_column(Boolean, default=False)
+    # True when a person must look at it (cannot be retried safely)
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    error: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sync_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 

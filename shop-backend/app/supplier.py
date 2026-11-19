@@ -21,6 +21,16 @@ class SupplierError(Exception):
         self.status = status
         self.code = code
 
+    @property
+    def outcome_unknown(self) -> bool:
+        """True when we can't know whether the supplier accepted (and charged) the request:
+        timeout / connection error / 5xx / unreadable success. 4xx means it was rejected."""
+        if self.code in ("unreachable",):
+            return True
+        if self.code == "no_key":
+            return False
+        return self.status is None or self.status >= 500 or (self.code == "bad_json" and self.status < 400)
+
 
 class SupplierClient:
     def __init__(self, base_url: str, api_key: str, timeout: float = 20.0, transport=None):
@@ -86,12 +96,27 @@ class SupplierClient:
     def validate_id(self, category_id: str, fields: dict[str, str]) -> dict:
         return self._req("POST", "/topups/validate-id", json={"category_id": category_id, "fields": fields})
 
+    def topup_order(self, category_id: str, offer_id: str, fields: dict[str, str], idempotency_key: str) -> dict:
+        return self._req("POST", "/topups/order", headers={"Idempotency-Key": idempotency_key},
+                         json={"category_id": category_id, "offer_id": offer_id, "fields": fields})
+
     # ---- telegram ----
     def telegram_stars(self) -> dict:
         return self._req("GET", "/telegram/stars")
 
     def telegram_premium(self) -> dict:
         return self._req("GET", "/telegram/premium")
+
+    def telegram_stars_buy(self, username: str, quantity: int) -> dict:
+        # NB: the supplier documents no Idempotency-Key for Telegram — never auto-retry this call
+        return self._req("POST", "/telegram/stars/buy", json={"telegram_username": username, "quantity": quantity})
+
+    def telegram_premium_buy(self, username: str, months: int) -> dict:
+        return self._req("POST", "/telegram/premium/buy", json={"telegram_username": username, "months": months})
+
+    # ---- orders ----
+    def get_order(self, supplier_order_id: str) -> dict:
+        return self._req("GET", f"/orders/{supplier_order_id}")
 
 
 class TTLCache:
