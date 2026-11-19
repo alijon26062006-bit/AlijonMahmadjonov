@@ -31,7 +31,7 @@ def test_popular_has_images(conn):
 
 def test_home_shows_covers(client):
     html = client.get("/").text
-    assert "/static/img/tg-stars.svg" in html and "cat-cover" in html
+    assert "/static/img/tg-stars.svg" in html and 'class="card dx-game"' in html   # «Выберите игру» с обложками
 
 
 def test_static_versioned_and_cached_a_year(client):
@@ -46,7 +46,10 @@ def test_static_versioned_and_cached_a_year(client):
 def test_fonts_local_and_preloaded(client):
     html = client.get("/").text
     assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html
-    assert 'rel="preload" href="/static/fonts/onest-cyrillic.woff2?v=11"' in html and "font-display: swap" in html
-    assert "Onest Fallback" in html
+    # новая главная — шрифт Inter со своего сервера (кириллица заранее), Onest — на остальных страницах
+    assert 'rel="preload" href="/static/fonts/inter-cyrillic.woff2"' in html
+    css = client.get("/static/redesign/site.css").text
+    assert "font-display:swap" in css and "/static/fonts/inter-cyrillic-ext.woff2" in css   # таджикские буквы
+    assert "Onest Fallback" in client.get("/login").text
     r = client.get("/static/fonts/onest-cyrillic.woff2?v=11")
     assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
