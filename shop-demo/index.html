@@ -92,35 +92,62 @@ p{margin:0}
 /* ---------- Hero ---------- */
 .hero{padding-block:36px 64px}
 .hero .wrap{display:flex;flex-direction:column;gap:48px}
-.mock-wrap{position:relative;padding:8px 6px 18px}
+.mock-wrap{position:relative;padding:8px 6px 18px 14px}
+.tilt{position:relative;transform:perspective(1600px) rotateY(-7deg) rotateX(5deg) rotateZ(-1.6deg);transform-origin:50% 50%;animation:sway 11s ease-in-out infinite}
+@keyframes sway{
+  0%,100%{transform:perspective(1600px) rotateY(-7deg) rotateX(5deg) rotateZ(-1.6deg)}
+  50%{transform:perspective(1600px) rotateY(-2.5deg) rotateX(2.5deg) rotateZ(-.5deg)}
+}
 .mock{position:relative;border:1.5px solid var(--acc-line);border-radius:24px;overflow:hidden;
-  background:radial-gradient(120% 80% at 95% 45%,var(--glow),transparent 60%),radial-gradient(70% 60% at 10% 100%,var(--tint),transparent 70%),var(--card);
-  transform:perspective(1600px) rotateY(-7deg) rotateX(5deg) rotateZ(-1.6deg);transform-origin:50% 50%;
+  background:radial-gradient(70% 60% at 10% 100%,var(--tint),transparent 70%),var(--card);
   box-shadow:0 30px 60px -28px rgba(13,27,22,.28),0 4px 14px rgba(13,27,22,.05)}
+.mock::before{content:"";position:absolute;left:0;top:0;width:80%;aspect-ratio:1;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,var(--glow) 0%,transparent 66%);animation:glowMove 12s ease-in-out infinite}
+@keyframes glowMove{
+  0%,100%{transform:translate(55%,55%)}
+  28%{transform:translate(-25%,45%)}
+  52%{transform:translate(15%,-30%)}
+  76%{transform:translate(40%,5%)}
+}
+.mock-bar,.mock-body{position:relative;z-index:1}
 .mock-bar{display:flex;align-items:center;gap:7px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .dot{width:12px;height:12px;border-radius:50%}
 .dot.r{background:#ef5f57}.dot.y{background:#f2bd3a}.dot.g{background:#38c25d}
 .mock-url{flex:1;text-align:center;font-size:13.5px;color:var(--text);margin-right:40px}
-.mock-body{padding:18px 18px 22px;display:grid;gap:12px}
+.mock-body{padding:18px 18px 22px 24px;display:grid;gap:12px}
 .mrow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 12px 0 14px;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:0 2px 8px rgba(13,27,22,.04);
-  font-family:var(--mono);font-weight:700;font-size:13px;color:var(--ink);letter-spacing:-.01em;animation:rowIn .5s cubic-bezier(.2,.8,.2,1) both}
+  font-family:var(--mono);font-weight:700;font-size:13px;color:var(--ink);letter-spacing:-.01em;
+  opacity:0;transform:translateY(14px) scale(.98);transition:opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1)}
+.mrow.on{opacity:1;transform:none}
+.rows{display:grid;gap:12px;min-height:236px;align-content:start}
 .mrow span.t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mrow .ico{color:var(--acc);width:21px;height:21px}
-.mrow .ok{width:32px;height:32px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;animation:okPop .4s cubic-bezier(.3,1.6,.5,1) both}
+.mrow .ok{width:32px;height:32px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;
+  opacity:0;transform:scale(.3);transition:opacity .2s ease,transform .45s cubic-bezier(.3,1.7,.5,1)}
+.mrow.done .ok{opacity:1;transform:none}
 .mrow .ok .ico{color:var(--ok);width:17px;height:17px;stroke-width:2.4}
-.mrow:nth-child(1){animation-delay:.05s}
-.mrow:nth-child(2){animation-delay:.25s}.mrow:nth-child(2) .ok{animation-delay:.6s}
-.mrow:nth-child(3){animation-delay:.45s}.mrow:nth-child(3) .ok{animation-delay:.8s}
-.mrow:nth-child(4){animation-delay:.65s}.mrow:nth-child(4) .ok{animation-delay:1s}
-.mbtn{display:flex;align-items:center;justify-content:center;gap:9px;height:48px;background:var(--card);border:1px solid var(--line);border-radius:15px;color:var(--acc);font-weight:700;font-size:15px;animation:rowIn .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:.9s}
+/* buttons: the window grows to reveal them */
+.mfold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1)}
+.mfold.on{grid-template-rows:1fr}
+.mfold > div{min-height:0;overflow:hidden;display:grid;gap:12px;padding:2px 1px}
+.mbtn{display:flex;align-items:center;justify-content:center;gap:9px;height:48px;background:var(--card);border:1px solid var(--line);border-radius:15px;color:var(--acc);font-weight:700;font-size:15px;
+  opacity:0;transform:translateY(10px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.8,.2,1)}
+.mfold.on .mbtn{opacity:1;transform:none;transition-delay:.25s}
+.mfold.on .mbtns .mbtn{transition-delay:.4s}
 .mbtn .ico{width:19px;height:19px}
 .mbtns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.mbtns .mbtn{height:44px;font-size:14px;animation-delay:1.05s}
+.mbtns .mbtn{height:44px;font-size:14px}
+.mock-body{gap:0!important}
+.mfold.on{margin-top:12px}
+.mfold{margin-top:0;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1),margin-top .6s}
 .tag{position:absolute;border-radius:999px;font-weight:700;font-size:14px;padding:6px 15px;box-shadow:0 6px 16px rgba(13,27,22,.1)}
-.tag-l{left:-6px;top:116px;background:var(--card);color:var(--acc);border:1px solid var(--line)}
+.tag-l{left:-6px;top:84px;font-size:13px;padding:5px 12px;background:var(--card);color:var(--acc);border:1px solid var(--line)}
 .tag-r{right:-6px;bottom:6px;background:var(--acc);color:#fff}
-@keyframes rowIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes okPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .tilt,.mock::before{animation:none}
+  .mrow,.mrow .ok,.mbtn{opacity:1;transform:none}
+  .mfold{grid-template-rows:1fr;margin-top:12px}
+}
 
 .hero-text{display:flex;flex-direction:column;align-items:center;text-align:center;gap:0}
 .pill{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 18px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--acc);font-weight:600;font-size:15px}
@@ -328,22 +355,28 @@ p{margin:0}
   <section class="hero" id="top">
     <div class="wrap">
       <div class="mock-wrap" aria-hidden="true">
+       <div class="tilt">
         <div class="mock">
           <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="mock-url">gemora.store</span></div>
           <div class="mock-body">
-            <div class="mrow"><svg class="ico"><use href="#i-hash"/></svg><span class="t">USDT TRC20 · 24.0037</span></div>
-            <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">PUBG 660 UC — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
-            <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Free Fire 520 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
-            <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">TG Stars 500 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
-            <div class="mbtn"><svg class="ico"><use href="#i-wallet"/></svg>Пополнить баланс</div>
-            <div class="mbtns">
-              <div class="mbtn"><svg class="ico"><use href="#i-plus"/></svg>Купить ещё</div>
-              <div class="mbtn"><svg class="ico"><use href="#i-redo"/></svg>Заказать снова</div>
+            <div class="rows" id="mockRows">
+              <div class="mrow"><svg class="ico"><use href="#i-hash"/></svg><span class="t">USDT TRC20 · 24.0037</span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">PUBG 660 UC — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Free Fire 520 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">TG Stars 500 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
             </div>
+            <div class="mfold" id="mockFold"><div>
+              <div class="mbtn"><svg class="ico"><use href="#i-wallet"/></svg>Пополнить баланс</div>
+              <div class="mbtns">
+                <div class="mbtn"><svg class="ico"><use href="#i-plus"/></svg>Купить ещё</div>
+                <div class="mbtn"><svg class="ico"><use href="#i-redo"/></svg>Заказать снова</div>
+              </div>
+            </div></div>
           </div>
         </div>
         <span class="tag tag-l">USDT</span>
         <span class="tag tag-r">~1 мин</span>
+       </div>
       </div>
 
       <div class="hero-text">
@@ -640,6 +673,30 @@ p{margin:0}
   function onScroll(){tb.classList.toggle('off',window.scrollY<500)}
   window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
   tb.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
+
+  // hero window: rows appear one by one, window grows for buttons, then the loop restarts
+  (function(){
+    var rows=[].slice.call(document.querySelectorAll('#mockRows .mrow')),fold=document.getElementById('mockFold');
+    var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function showAll(){rows.forEach(function(r){r.classList.add('on','done')});fold.classList.add('on')}
+    if(still){showAll();return}
+    var STEP=700,timers=[];
+    function at(ms,fn){timers.push(setTimeout(fn,ms))}
+    function cycle(){
+      timers.forEach(clearTimeout);timers=[];
+      rows.forEach(function(r){r.classList.remove('on','done')});fold.classList.remove('on');
+      rows.forEach(function(r,i){
+        at(500+i*STEP,function(){r.classList.add('on')});
+        if(i>0) at(500+i*STEP+420,function(){r.classList.add('done')});
+      });
+      var full=500+rows.length*STEP+250;
+      at(full,function(){fold.classList.add('on')});
+      at(full+4200,function(){fold.classList.remove('on');rows.slice().reverse().forEach(function(r,i){setTimeout(function(){r.classList.remove('on','done')},i*90)})});
+      at(full+5400,cycle);
+    }
+    cycle();
+    document.addEventListener('visibilitychange',function(){if(document.hidden){timers.forEach(clearTimeout);timers=[];showAll()}else{cycle()}});
+  })();
 
   // count-up (final values are already in the markup)
   var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
