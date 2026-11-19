@@ -389,7 +389,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         _bc = _bp.acquire()
         try:
             ctx["banners"] = banners.active(_bc)
-            if "raffle_banner" not in ctx and request.url.path != "/raffle":   # баннер розыгрыша — на всех страницах
+            if "raffle_banner" not in ctx and request.url.path != "/raffle" \
+                    and not request.url.path.startswith("/panel/p2p"):   # кнопка розыгрыша — везде, кроме самой биржи
                 from . import raffle
                 me = ctx.get("user")
                 try:   # для вошедшего клиента — его прогресс («осталось купить $…»)

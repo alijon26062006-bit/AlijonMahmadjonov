@@ -197,8 +197,8 @@
         if (empty && d.price > 0) empty.hidden = true;
       }).catch(function () {});
   }
-  // 1s/5s — спрашиваем каждую секунду, остальные масштабы — раз в 3 секунды
-  function loop() { clearTimeout(timer); if (!document.hidden) load(); timer = setTimeout(loop, tf === "1s" || tf === "5s" ? 1000 : 3000); }
+  // Живой график: каждую секунду на любом масштабе (прошлые свечи сервер держит в памяти — запрос быстрый)
+  function loop() { clearTimeout(timer); if (!document.hidden) load(); timer = setTimeout(loop, 1000); }
 
   root.querySelectorAll(".dc-tfs button").forEach(function (b) {
     b.addEventListener("click", function () {

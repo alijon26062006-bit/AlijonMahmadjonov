@@ -7,12 +7,84 @@
 {# Экран-приложение в стиле P2P бирж: свой тёмный фон, своя шапка и своё нижнее меню (только на этой странице) #}
 <style>
   @media (max-width: 899px) { header.top, .tabbar { display: none !important; } }
+  /* ── Компактно, как на Bybit: мелкий аккуратный шрифт, плотные строки ── */
+  .bx { font-size: 13px; padding-bottom: 80px; }
+  .bx-top { grid-template-columns: 36px 1fr auto; padding: 2px 0 6px; }
+  .bx-back { width: 36px; height: 36px; }
+  .bx-title { font-size: 16px; gap: 8px; } .bx-title .bx-dim { font-size: 13px; }
+  .bx-seg { padding: 3px; margin: 6px 0 6px; } .bx-seg a, .bx-seg span { padding: 6px 18px; font-size: 13px; }
+  .bx-filters { gap: 8px; padding: 7px 0; font-size: 12.5px; }
+  .bx-amt input { padding: 5px 8px; font-size: 12.5px; } .bx-pay { font-size: 11.5px; }
+  .bx-sorts { padding: 6px 0; gap: 6px; } .bx-sorts a { padding: 4px 10px; font-size: 11.5px; }
+  .bx-coin { width: 18px; height: 18px; font-size: 10px; }
+  .bxc { padding: 10px 0; gap: 4px; }
+  .bx-ad.top.bxc { padding: 10px 0; background: none; border-radius: 0; margin: 0; border-bottom: 1px solid var(--bx-line); }
+  .bxc .bx-who { font-size: 12.5px; gap: 6px; } .bxc .bx-orders { font-size: 11px; font-weight: 500; margin-left: 2px; }
+  .bx-vf { color: var(--bx-gold); font-size: 11px; }
+  .bxc .bx-ava { width: 20px; height: 20px; font-size: 10px; } .bxc .bx-ava i { width: 6px; height: 6px; border-width: 1.5px; }
+  .bxc-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+  .bxc .bx-price { font-size: 19px; letter-spacing: -.3px; gap: 4px; } .bxc .bx-price small { font-size: 11px; color: var(--bx-dim); font-weight: 600; margin: 0; }
+  .bxc-lm { color: var(--bx-dim); font-size: 11.5px; line-height: 1.55; } .bxc-lm b { color: var(--bx-text); font-weight: 600; }
+  .bxc .bx-fast { font-size: 10.5px; padding: 0 6px; }
+  .bxc .bx-go { position: static; padding: 7px 18px; border-radius: 7px; font-size: 12.5px; min-height: 34px; }
+  .bxc .bx-go.wide { min-height: 42px; font-size: 14px; border-radius: 9px; }
+  .bx-take { padding: 10px; gap: 6px; } .bx-in input { font-size: 15px; padding: 9px 10px; }
+  .bx-mine { font-size: 11.5px; }
+  .bx-nav { padding: 6px 4px calc(8px + env(safe-area-inset-bottom)); border-radius: 0; grid-template-columns: repeat(5, 1fr); }
+  .bx-nav a { font-size: 10.5px; font-weight: 600; gap: 2px; }
+  .bx-h { font-size: 16px; margin: 4px 0 6px; }
+  /* строка цены вверху списка */
+  .bx-ticker { display: flex; align-items: center; gap: 7px; padding: 8px 10px; margin: 0 0 4px; background: var(--bx-card); border-radius: 10px; text-decoration: none; font-size: 12.5px; }
+  .bx-tk-p { margin-left: auto; font-weight: 800; font-size: 15px; } .bx-tk-p.blink { animation: bxblink .6s ease; }
+  .bx-tk-c { font-weight: 700; font-size: 11.5px; padding: 2px 6px; border-radius: 5px; }
+  .bx-tk-c.up { background: #13281d; color: var(--bx-green); } .bx-tk-c.down { background: #2d1416; color: var(--bx-red); }
+  .bx-tk-go { display: inline-flex; align-items: center; color: var(--bx-dim); font-size: 11.5px; }
+  @keyframes bxblink { 0% { color: var(--bx-gold); } 100% { color: inherit; } }
+  /* рынок */
+  .bx-mkt { background: none; margin: 0; }
+  .bx-mk-top { display: grid; gap: 6px; margin-bottom: 6px; }
+  .bx-mk-p { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .bx-mk-p .dc-price { font-size: 24px; font-weight: 800; color: var(--bx-green); white-space: nowrap; }
+  .bx-mk-p .dc-chg { font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 5px; }
+  .bx-st { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 12px; font-size: 10.5px; color: var(--bx-dim); }
+  .bx-st b { display: block; color: var(--bx-text); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .bx-book { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+  .bx-bh, .bx-br { display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .bx-bh { color: var(--bx-dim); font-size: 10px; margin-bottom: 3px; }
+  .bx-br { position: relative; padding: 3px 4px; } .bx-br span { position: relative; }
+  .bx-br i { position: absolute; top: 0; bottom: 0; right: 0; opacity: .16; border-radius: 2px; }
+  .bx-br.g i { background: var(--bx-green); } .bx-br.r i { background: var(--bx-red); }
+  .bx-br.g span:first-child { color: var(--bx-green); } .bx-br.r span:first-child { color: var(--bx-red); }
+  .bx-sub { font-size: 13px; margin: 10px 0 4px; color: var(--bx-text); }
+  .bx-feed { font-variant-numeric: tabular-nums; }
+  .bx-fh, .bx-fr { display: grid; grid-template-columns: 44px 1fr 1fr 1.35fr; gap: 6px; font-size: 11px; padding: 4px 0; }
+  .bx-feed.big .bx-fh, .bx-feed.big .bx-fr { grid-template-columns: 76px 1fr 1fr 1.35fr; }
+  .bx-fh { color: var(--bx-dim); font-size: 10px; border-bottom: 1px solid var(--bx-line); }
+  .bx-fr span:nth-child(3), .bx-fh span:nth-child(3) { text-align: right; } .bx-fr span:last-child, .bx-fh span:last-child { text-align: right; }
+  .bx-fr.new { animation: bxnew 1.2s ease; } @keyframes bxnew { 0% { background: rgba(247,166,0,.18); } 100% { background: transparent; } }
+  .bx-mk-btns.sticky { position: sticky; bottom: calc(58px + env(safe-area-inset-bottom)); margin-top: 10px; padding: 8px 0; background: var(--bx-bg); gap: 8px; }
+  .bx-mk-btns.sticky .bx-big { padding: 11px 0; font-size: 14px; border-radius: 9px; }
+  /* ордера */
+  .bx-ord-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bx-chips { display: flex; gap: 6px; } .bx-chips a { border: 1px solid var(--bx-line); border-radius: 14px; padding: 3px 10px; font-size: 11px; font-weight: 600; color: var(--bx-dim); text-decoration: none; }
+  .bx-chips a.on { border-color: var(--bx-gold); color: var(--bx-text); }
+  .bx-tabs2 { display: flex; gap: 16px; border-bottom: 1px solid var(--bx-line); margin: 4px 0 2px; overflow-x: auto; scrollbar-width: none; }
+  .bx-tabs2 a { padding: 7px 0; font-size: 12.5px; font-weight: 700; color: var(--bx-dim); text-decoration: none; white-space: nowrap; }
+  .bx-tabs2 a.on { color: var(--bx-text); box-shadow: inset 0 -2px 0 var(--bx-gold); }
+  .bx-stt { margin-left: auto; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--bx-chip); color: var(--bx-dim); }
+  .bx-stt.done { background: #13281d; color: var(--bx-green); } .bx-stt.pending { background: #3a2a0e; color: #f3d48a; }
+  .bx-pair { font-size: 11.5px; color: var(--bx-dim); } .bx-pair b { color: var(--bx-text); }
+  .bx-kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 11.5px; color: var(--bx-dim); }
+  .bx-kv b { color: var(--bx-text); font-weight: 600; text-align: right; }
+  .bx-link { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--bx-dim) !important; text-decoration: none; margin-top: 2px; }
+  @media (min-width: 900px) { .bx { max-width: 980px; } .bx-feed.big .bx-fh, .bx-feed.big .bx-fr { font-size: 12px; } }
+  @media (prefers-reduced-motion: reduce) { .bx-tk-p.blink, .bx-fr.new { animation: none; } }
 </style>
 <div class="bx">
   <div class="bx-bg" aria-hidden="true"></div>
 
   <div class="bx-top">
-    <a class="bx-back" href="/panel/dcoin" aria-label="Назад к D-коину">{{ icon('arrow-left', 26) }}</a>
+    <a class="bx-back" href="{{ back_url }}" aria-label="Назад">{{ icon('arrow-left', 22) }}</a>
     <div class="bx-title"><b>P2P</b><span class="bx-dim">D-коин</span></div>
     {{ cur_button('bx-cur') }}
   </div>
@@ -22,15 +94,12 @@
   {% endif %}
 
   {% if tab in ('buy', 'sell') %}
-  {# ── Тот же живой график, что на странице D-коина ── #}
-  <div class="dc-app bx-chartbox" id="dc" data-tf="5s" data-cur="{{ cur_code }}" data-rate="{{ cur_rate or '' }}">
-    <div class="bx-tick-row">
-      <i class="bx-coin">D</i><b>D-коин</b>
-      <span class="bx-tick-price dc-price" id="dc-price">{{ dprice(d.price) }}</span>
-      <span class="dc-chg {{ 'up' if d.change >= 0 else 'down' }}" id="dc-chg">{{ '+' if d.change >= 0 }}{{ d.change }}%</span>
-    </div>
-    {{ dc_chart.chart_card(tfs, d) }}
-  </div>
+  <a class="bx-ticker" href="/panel/p2p?tab=market" aria-label="Рынок D-коина: график и стакан">
+    <i class="bx-coin">D</i><b>D / {{ cur_code }}</b>
+    <span class="bx-tk-p" id="tk-price">{{ dprice(d.price) }}</span>
+    <span class="bx-tk-c {{ 'up' if d.change >= 0 else 'down' }}" id="tk-chg">{{ '+' if d.change >= 0 }}{{ d.change }}%</span>
+    <span class="bx-tk-go">График {{ icon('chevron', 14) }}</span>
+  </a>
 
   <div class="bx-seg" role="tablist">
     <a role="tab" href="/panel/p2p?tab=buy&sort={{ sort }}" class="{{ 'on' if tab == 'buy' }}">Покупка</a>
@@ -53,20 +122,23 @@
   <div class="bx-list">
     {% for a in ads %}
     {% set ap = dprice_parts(a.price_usd) %}
-    <article class="bx-ad{{ ' top' if a.top }}">
-      {% if a.top %}<span class="bx-rec">Рекомендации</span>{% endif %}
+    <article class="bx-ad bxc{{ ' top' if a.top }}">
       <div class="bx-who">
         <span class="bx-ava c{{ a.color }}">{{ a.letter }}<i></i></span>
-        <b>{{ a.who }}</b>
-        <span class="bx-orders">{{ a.deals }} {{ plural(a.deals, 'ордер', 'ордера', 'ордеров') }} ({{ a.rate }}%)</span>
+        <b>{{ a.who }}</b>{% if a.top %}<span class="bx-vf" title="Больше всего сделок">✔</span>{% endif %}
+        <span class="bx-orders">{{ a.deals }} {{ plural(a.deals, 'сделка', 'сделки', 'сделок') }} · {{ a.rate }}%</span>
       </div>
-      <div class="bx-tags"><span class="bx-fast">{{ icon('bolt', 14) }}Мгновенно</span></div>
-      <div class="bx-price"><small>{{ ap[0] }}</small>{{ ap[1] }}</div>
-      <div class="bx-row"><span>Лимиты</span><b>{% if a.min_usd %}{{ dprice(a.min_usd) }} - {% else %}до {% endif %}{{ dprice(a.max_usd) }}</b></div>
-      <div class="bx-row"><span>Количество</span><b>{{ a.remaining_text }} D</b></div>
-      <div class="bx-method">Баланс Donatix</div>
+      <div class="bxc-mid">
+        <div class="bxc-l">
+          <div class="bx-price">{{ ap[1] }}<small>{{ ap[0] }} / D</small></div>
+          <div class="bxc-lm">Лимит <b>{% if a.min_usd %}{{ dprice(a.min_usd) }} – {% else %}до {% endif %}{{ dprice(a.max_usd) }}</b></div>
+          <div class="bxc-lm">Доступно <b>{{ a.remaining_text }} D</b> · <span class="bx-fast">{{ icon('bolt', 11) }}мгновенно</span></div>
+        </div>
+        {% if a.user_id != user.id %}
+        <button type="button" class="bx-go {{ 'buy' if tab == 'buy' else 'sell' }}" data-open="bx-f{{ a.id }}">{{ 'Купить' if tab == 'buy' else 'Продать' }}</button>
+        {% else %}<span class="bx-mine">Ваше</span>{% endif %}
+      </div>
       {% if a.user_id != user.id %}
-      <button type="button" class="bx-go {{ 'buy' if tab == 'buy' else 'sell' }}" data-open="bx-f{{ a.id }}">{{ 'Покупка' if tab == 'buy' else 'Продажа' }}</button>
       <form id="bx-f{{ a.id }}" class="bx-take" method="post" action="/panel/p2p/{{ a.id }}/take" data-price="{{ a.price_usd }}" hidden>
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label><span>Количество, D</span>
@@ -76,7 +148,7 @@
         <button class="bx-go wide {{ 'buy' if tab == 'buy' else 'sell' }}">{{ 'Купить' if tab == 'buy' else 'Продать' }}</button>
         <button type="button" class="bx-ghost" data-open="bx-f{{ a.id }}">Отмена</button>
       </form>
-      {% else %}<span class="bx-mine">Ваше объявление</span>{% endif %}
+      {% endif %}
     </article>
     {% else %}
     <div class="bx-empty">{{ 'Нет объявлений на такую сумму.' if amt else 'Пока объявлений нет.' }}
@@ -84,22 +156,75 @@
     {% endfor %}
   </div>
 
+  {% elif tab == 'market' %}
+  <div class="dc-app bx-chartbox bx-mkt" id="dc" data-tf="1m" data-cur="{{ cur_code }}" data-rate="{{ cur_rate or '' }}">
+    <div class="bx-mk-top">
+      <div><span class="bx-dim">D / {{ cur_code }}</span>
+        <div class="bx-mk-p"><span class="dc-price" id="dc-price">{{ dprice(d.price) }}</span>
+          <span class="dc-chg {{ 'up' if d.change >= 0 else 'down' }}" id="dc-chg">{{ '+' if d.change >= 0 }}{{ d.change }}%</span></div></div>
+      <div class="bx-st">
+        <span>Макс 24ч<b id="st-hi">{{ dprice(stats.high) }}</b></span>
+        <span>Мин 24ч<b id="st-lo">{{ dprice(stats.low) }}</b></span>
+        <span>Объём 24ч<b id="st-vol">{{ stats.volume_text }} D</b></span>
+      </div>
+    </div>
+    {{ dc_chart.chart_card(tfs, d) }}
+  </div>
+
+  <div class="bx-book">
+    <div><div class="bx-bh"><span>Покупают</span><span>D</span></div><div id="bk-buy">
+      {% for r in book.buy %}<div class="bx-br g"><i style="width:{{ r.fill }}%"></i><span>{{ dprice(r.price_usd) }}</span><span>{{ r.units_text }}</span></div>
+      {% else %}<div class="bx-br bx-dim">—</div>{% endfor %}</div></div>
+    <div><div class="bx-bh"><span>Продают</span><span>D</span></div><div id="bk-sell">
+      {% for r in book.sell %}<div class="bx-br r"><i style="width:{{ r.fill }}%"></i><span>{{ dprice(r.price_usd) }}</span><span>{{ r.units_text }}</span></div>
+      {% else %}<div class="bx-br bx-dim">—</div>{% endfor %}</div></div>
+  </div>
+
+  <h3 class="bx-sub">Последние сделки</h3>
+  <div class="bx-feed">
+    <div class="bx-fh"><span>Время</span><span>Цена</span><span>D</span><span>Кто → кому</span></div>
+    <div id="bx-feed">
+    {% for t in feed %}<div class="bx-fr"><span>{{ t.created_at | dt('%H:%M') }}</span><span class="{{ 'g' if t.up else 'r' }}">{{ dprice(t.price_usd) }}</span><span>{{ t.units_text }}</span><span class="bx-dim">{{ t.seller }} → {{ t.buyer }}</span></div>
+    {% else %}<div class="bx-empty">Сделок пока нет.</div>{% endfor %}
+    </div>
+  </div>
+  <div class="bx-mk-btns sticky">
+    <a class="bx-big buy on" href="/panel/p2p?tab=buy">Купить D</a>
+    <a class="bx-big sell on" href="/panel/p2p?tab=sell">Продать D</a>
+  </div>
+
   {% elif tab == 'orders' %}
-  <h2 class="bx-h">Ордера</h2>
+  <div class="bx-ord-top">
+    <h2 class="bx-h">Ордера</h2>
+    <div class="bx-chips">
+      <a href="/panel/p2p?tab=orders&who=mine&st={{ st }}" class="{{ 'on' if who == 'mine' }}">Мои</a>
+      <a href="/panel/p2p?tab=orders&who=all" class="{{ 'on' if who == 'all' }}">Все сделки рынка</a>
+    </div>
+  </div>
+  {% if who == 'mine' %}
+  <div class="bx-tabs2">
+    {% for k, t in [('all', 'Все'), ('pending', 'В процессе'), ('done', 'Завершены'), ('cancelled', 'Отменены')] %}
+    <a href="/panel/p2p?tab=orders&st={{ k }}" class="{{ 'on' if st == k }}">{{ t }}</a>{% endfor %}
+  </div>
   <div class="bx-list">
     {% for o in orders %}
-    <article class="bx-ad bx-order {{ o.status }}" id="{{ o.number }}">
-      <div class="bx-who"><b class="{{ 'g' if o.buying else 'r' }}">{{ 'Покупка' if o.buying else 'Продажа' }} {{ o.units_text }} D</b>
-        <span class="bx-num">{{ o.number }}</span></div>
-      <div class="bx-state {{ o.status }}">{{ icon('check' if o.status == 'done' else 'clock', 18) }}{{ {'done': 'Завершён', 'pending': 'В обработке', 'cancelled': 'Отменён', 'expired': 'Отменён — время вышло'}[o.status] }}</div>
-      <div class="bx-row"><span>{{ 'Продавец' if o.buying else 'Покупатель' }}</span><b>{{ o.other }}</b></div>
-      <div class="bx-row"><span>Сумма</span><b>{{ dprice(o.total_usd) }}</b></div>
-      <div class="bx-row"><span>Цена 1 D</span><b>{{ dprice(o.price_usd) }}</b></div>
-      <div class="bx-row"><span>Дата</span><b>{{ o.created_at | dt }}</b></div>
-      <a class="bx-ghost bx-complain" href="/panel/support/new?topic=p2p&order={{ o.number }}">{{ icon('chat', 18) }}Жалоба / тикет по {{ o.number }}</a>
+    <article class="bx-ad bx-order bxc {{ o.status }}" id="{{ o.number }}">
+      <div class="bx-who"><b class="{{ 'g' if o.buying else 'r' }}">{{ 'Покупка' if o.buying else 'Продажа' }} D</b>
+        <span class="bx-stt {{ o.status }}">{{ {'done': 'Завершён', 'pending': 'В процессе', 'cancelled': 'Отменён', 'expired': 'Отменён · время вышло'}[o.status] }}</span></div>
+      <div class="bx-pair">{% if o.buying %}<span>{{ o.other }}</span> → <b>вы</b>{% else %}<b>вы</b> → <span>{{ o.other }}</span>{% endif %}</div>
+      <div class="bx-kv"><span>Количество</span><b>{{ o.units_text }} D</b><span>Цена</span><b>{{ dprice(o.price_usd) }}</b>
+        <span>Сумма</span><b>{{ dprice(o.total_usd) }}</b><span>Ордер</span><b>{{ o.number }} · {{ o.created_at | dt }}</b></div>
+      <a class="bx-link" href="/panel/support/new?topic=p2p&order={{ o.number }}">{{ icon('chat', 14) }}Жалоба по {{ o.number }}</a>
     </article>
-    {% else %}<div class="bx-empty">Ордеров пока нет. <a href="/panel/p2p">Купите или продайте D-коины</a></div>{% endfor %}
+    {% else %}<div class="bx-empty">Ордеров нет. <a href="/panel/p2p">Купите или продайте D-коины</a></div>{% endfor %}
   </div>
+  {% else %}
+  <div class="bx-feed big">
+    <div class="bx-fh"><span>Время</span><span>Цена</span><span>D</span><span>Кто → кому</span></div>
+    {% for t in feed %}<div class="bx-fr"><span>{{ t.created_at | dt('%d.%m %H:%M') }}</span><span class="{{ 'g' if t.up else 'r' }}">{{ dprice(t.price_usd) }}</span><span>{{ t.units_text }}</span><span class="bx-dim">{{ t.seller }} → {{ t.buyer }}</span></div>
+    {% else %}<div class="bx-empty">Сделок пока нет.</div>{% endfor %}
+  </div>
+  {% endif %}
 
   {% elif tab == 'ads' %}
   <h2 class="bx-h">Новое объявление</h2>
@@ -174,14 +299,15 @@
   {% endif %}
 
   <nav class="bx-nav" aria-label="P2P">
-    <a href="/panel/p2p" class="{{ 'on' if tab in ('buy', 'sell') }}">{{ icon('home', 24) }}<span>P2P</span></a>
-    <a href="/panel/p2p?tab=orders" class="{{ 'on' if tab == 'orders' }}">{{ icon('book', 24) }}<span>Ордера</span></a>
-    <a href="/panel/p2p?tab=ads" class="{{ 'on' if tab == 'ads' }}">{{ icon('chart', 24) }}<span>Объявления</span></a>
-    <a href="/panel/p2p?tab=profile" class="{{ 'on' if tab == 'profile' }}">{{ icon('user', 24) }}<span>Профиль</span></a>
+    <a href="/panel/p2p" class="{{ 'on' if tab in ('buy', 'sell') }}">{{ icon('swap', 20) }}<span>P2P</span></a>
+    <a href="/panel/p2p?tab=market" class="{{ 'on' if tab == 'market' }}">{{ icon('chart', 20) }}<span>Рынок</span></a>
+    <a href="/panel/p2p?tab=orders" class="{{ 'on' if tab == 'orders' }}">{{ icon('book', 20) }}<span>Ордера</span></a>
+    <a href="/panel/p2p?tab=ads" class="{{ 'on' if tab == 'ads' }}">{{ icon('plus', 20) }}<span>Объявления</span></a>
+    <a href="/panel/p2p?tab=profile" class="{{ 'on' if tab == 'profile' }}">{{ icon('user', 20) }}<span>Профиль</span></a>
   </nav>
 </div>
 
-{% if tab in ('buy', 'sell') %}{{ dc_chart.chart_script() }}{% endif %}
+{% if tab == 'market' %}{{ dc_chart.chart_script() }}{% endif %}
 <script>
 (function () {
   function fmt(v) {
@@ -211,6 +337,36 @@
     if (all) all.addEventListener("click", function () { inp.value = all.dataset.all; upd(); });
     f.addEventListener("submit", function () { var b = f.querySelector(".bx-go.wide"); if (b) { b.disabled = true; b.textContent = "Сделка…"; } });
   });
+
+  // Живой рынок: цена, стакан и лента сделок — каждую секунду (вкладки «P2P» и «Рынок»)
+  var live = document.getElementById("tk-price") || document.getElementById("bk-buy");
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
+  function hhmm(iso) { var d = new Date(String(iso).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? "" : ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function rows(list, cls) {
+    return list.length ? list.map(function (r) { return '<div class="bx-br ' + cls + '"><i style="width:' + r.fill + '%"></i><span>' + cur(r.price_usd) + '</span><span>' + esc(r.units_text) + '</span></div>'; }).join("") : '<div class="bx-br bx-dim">—</div>';
+  }
+  var lastFeed = null;
+  function tick() {
+    if (document.hidden) return;
+    fetch("/panel/data/p2p", {credentials: "same-origin", cache: "no-store"}).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d) return;
+      var tp = document.getElementById("tk-price"), tc = document.getElementById("tk-chg");
+      if (tp) { var t = cur(d.price); if (tp.textContent !== t) { tp.textContent = t; tp.classList.remove("blink"); void tp.offsetWidth; tp.classList.add("blink"); } }
+      if (tc) { tc.textContent = (d.change >= 0 ? "+" : "") + d.change + "%"; tc.className = "bx-tk-c " + (d.change >= 0 ? "up" : "down"); }
+      var bb = document.getElementById("bk-buy"), bs = document.getElementById("bk-sell");
+      if (bb) bb.innerHTML = rows(d.book.buy, "g");
+      if (bs) bs.innerHTML = rows(d.book.sell, "r");
+      var hi = document.getElementById("st-hi"); if (hi) { hi.textContent = cur(d.stats.high); document.getElementById("st-lo").textContent = cur(d.stats.low); document.getElementById("st-vol").textContent = d.stats.volume_text + " D"; }
+      var f = document.getElementById("bx-feed"), top = d.feed.length ? d.feed[0].id : 0;
+      if (f && top !== lastFeed) {
+        f.innerHTML = d.feed.length ? d.feed.map(function (t, i) {
+          return '<div class="bx-fr' + (lastFeed !== null && t.id > lastFeed ? " new" : "") + '"><span>' + hhmm(t.created_at) + '</span><span class="' + (t.up ? "g" : "r") + '">' + cur(t.price_usd) + '</span><span>' + esc(t.units_text) + '</span><span class="bx-dim">' + esc(t.seller) + ' → ' + esc(t.buyer) + '</span></div>';
+        }).join("") : '<div class="bx-empty">Сделок пока нет.</div>';
+        lastFeed = top;
+      }
+    }).catch(function () {});
+  }
+  if (live) { setInterval(tick, 1000); document.addEventListener("visibilitychange", tick); }
 
   // Новое объявление: «Макс», подсказки цены, итог
   var form = document.querySelector(".bx-new");

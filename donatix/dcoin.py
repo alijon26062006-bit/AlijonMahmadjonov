@@ -608,7 +608,7 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
     s = state(conn)
     return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": int(bal / UNIT * price(conn) * 10_000),
             "waiting": wait, "waiting_text": fmt_d(wait), "free": max(0, bal - wait),
-            "price": price_of(s["pool"], s["supply"], s["reserve"]) * _scale(conn), "change": change_today(conn),
+            "price": price(conn), "change": change_today(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
             "exchange_off": EXCHANGE_OFF,

@@ -417,3 +417,49 @@ def trades(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict
 def last_price_usd(conn: sqlite3.Connection) -> float | None:
     row = conn.execute("SELECT price_m FROM p2p_trades ORDER BY id DESC LIMIT 1").fetchone()
     return row["price_m"] / 10_000 / PRICE_SCALE if row else None
+
+
+# ── Рынок, как на бирже: стакан, лента сделок, статистика за 24 часа ──
+
+def depth(conn: sqlite3.Connection, levels: int = 8) -> dict[str, list[dict[str, Any]]]:
+    """Стакан: продают (дешёвые сверху) и покупают (дорогие сверху), монеты по одной цене — вместе."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for side, order in (("sell", "ASC"), ("buy", "DESC")):
+        rows = conn.execute(f"SELECT * FROM p2p_ads WHERE status = 'open' AND side = ? AND remaining > 0 "
+                            f"ORDER BY price_m {order}, id", (side,)).fetchall()
+        levels_: dict[int, int] = {}
+        for r in rows:
+            can = available(r, r["price_m"])
+            if can > 0:
+                levels_[r["price_m"]] = levels_.get(r["price_m"], 0) + can
+        items = sorted(levels_.items(), reverse=(order == "DESC"))[:levels]
+        top = max((u for _, u in items), default=0)
+        out[side] = [{"price_usd": p / 10_000 / PRICE_SCALE, "units": u, "units_text": dcoin.fmt_d(u),
+                      "fill": round(u * 100 / top) if top else 0} for p, u in items]
+    return out
+
+
+def market_trades(conn: sqlite3.Connection, limit: int = 30) -> list[dict[str, Any]]:
+    """Все сделки рынка: кто кому продал (имена скрыты), сколько D, по какой цене, когда. Цвет — к прошлой сделке."""
+    rows = conn.execute(
+        "SELECT t.*, b.login AS buyer, s.login AS seller FROM p2p_trades t JOIN users b ON b.id = t.buyer_id "
+        "JOIN users s ON s.id = t.seller_id ORDER BY t.id DESC LIMIT ?", (limit + 1,)).fetchall()
+    out = []
+    for i, r in enumerate(rows[:limit]):
+        prev = rows[i + 1]["price_m"] if i + 1 < len(rows) else r["price_m"]
+        out.append({"id": r["id"], "seller": _mask(r["seller"]), "buyer": _mask(r["buyer"]),
+                    "units_text": dcoin.fmt_d(r["units"]), "price_usd": r["price_m"] / 10_000 / PRICE_SCALE,
+                    "total_usd": r["total_micro"] / 10_000, "up": r["price_m"] >= prev, "created_at": r["created_at"]})
+    return out
+
+
+def stats_24h(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Макс/мин цены за сутки (по графику) и объём сделок P2P за сутки."""
+    since = (_now_dt() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    hl = conn.execute("SELECT MAX(price) AS hi, MIN(price) AS lo FROM dcoin_points WHERE ts >= ? AND reason != 'peak' "
+                      "AND price > 0", (since,)).fetchone()
+    vol = conn.execute("SELECT COALESCE(SUM(units), 0) AS u, COALESCE(SUM(total_micro), 0) AS m, COUNT(*) AS n "
+                       "FROM p2p_trades WHERE created_at >= ?", (since,)).fetchone()
+    now = dcoin.price(conn)
+    return {"high": float(hl["hi"] or now), "low": float(hl["lo"] or now), "volume_units": int(vol["u"]),
+            "volume_text": dcoin.fmt_d(int(vol["u"])), "volume_usd": vol["m"] / 10_000, "trades": int(vol["n"])}

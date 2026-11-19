@@ -86,3 +86,13 @@ def test_site_app_uses_site_login_and_needs_session_token(client, conn):
     d = client.post("/tg/api/init", json={}, headers={"X-Dx-App": token}).json()
     assert d["me"]["id"] == uid and d["me"]["name"] == "appuser" and d["gifts"] == []
     assert client.post("/tg/api/catalog", json={}, headers={"X-Dx-App": token}).json()["games"]
+
+
+def test_mini_app_opens_same_p2p_under_same_account(tc, conn):
+    """Кнопка «P2P · D-коин» в мини-приложении: вход по подписи Telegram → та же биржа, что на сайте, «Назад» — в приложение."""
+    r = tc.post("/tg/api/session", json={"to": "p2p"}, headers=H).json()
+    assert r["url"] == "/panel/p2p"
+    page = tc.get("/panel/p2p").text
+    assert "P2P" in page and 'href="/tg"' in page                       # стрелка назад — в мини-приложение
+    assert tc.post("/tg/api/session", json={"to": "p2p"}).status_code == 403
+    assert 'data-act="p2p"' in tc.get("/tg").text

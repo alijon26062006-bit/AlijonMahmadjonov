@@ -152,7 +152,8 @@ def test_pages_instant_deal_number_and_complaint(app, conn, market):
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
     page = b.get("/panel/p2p").text
-    assert "sel***" in page and "Мгновенно" in page and "dc-canvas" in page and "покупают" not in page
+    assert "sel***" in page and "мгновенно" in page and 'id="tk-price"' in page and "покупают" not in page
+    assert "dc-canvas" in b.get("/panel/p2p?tab=market").text                    # живой график — во вкладке «Рынок»
     s_bal = balance(conn, seller)
     r = b.post(f"/panel/p2p/{ad['id']}/take", data={"csrf": csrf_of(page), "amount": "40"})
     assert "Куплено 40.00 D" in r.text and "P2P-000001" in r.text                 # сразу, без подтверждения
@@ -181,7 +182,7 @@ def test_book_sort_amount_filter_and_tabs(app, conn, market):
     assert [a["id"] for a in p2p.book(conn, "sell", amount_usd=big)] == [pricey]   # фильтр «Сумма»
     b = TestClient(app)
     web_login(b, "buyer@example.com", "password123")
-    for tab, text in (("orders", "Покупка 10.00 D"), ("profile", "В объявлениях, D"), ("ads", "Разместить объявление")):
+    for tab, text in (("orders", "10.00 D"), ("orders", "Покупка D"), ("profile", "В объявлениях, D"), ("ads", "Разместить объявление")):
         assert text in b.get(f"/panel/p2p?tab={tab}").text
 
 
@@ -204,3 +205,28 @@ def test_owner_sets_own_price_and_best_price_hint(conn, market):
         p2p.set_price(conn, seller, ad, _px(conn, 10))                        # слишком дёшево — нельзя
     res = p2p.execute(conn, buyer, ad, 10 * dcoin.UNIT)
     assert res["number"].startswith("P2P-") and dcoin.balance(conn, buyer) == 10 * dcoin.UNIT
+
+
+def test_market_tab_book_feed_and_live_data(app, conn, market):
+    """Как на бирже: стакан, лента всех сделок «кто → кому», статистика за сутки; живые данные — JSON раз в секунду."""
+    seller, buyer = market
+    ad = p2p.create_ad(conn, seller, "sell", _px(conn, 105), 300 * dcoin.UNIT)
+    p2p.execute(conn, buyer, ad, 100 * dcoin.UNIT)
+    book = p2p.depth(conn)
+    assert book["sell"] and book["sell"][0]["units"] == 200 * dcoin.UNIT and book["sell"][0]["fill"] == 100
+    feed = p2p.market_trades(conn)
+    assert feed[0]["seller"] == "sel***" and feed[0]["buyer"] == "buy***"
+    st = p2p.stats_24h(conn)
+    assert st["volume_units"] == 100 * dcoin.UNIT and st["trades"] == 1 and st["high"] >= st["low"] > 0
+    conn.execute("UPDATE users SET email = 'buyer@example.com' WHERE id = ?", (buyer,))
+    c = TestClient(app)
+    web_login(c, "buyer@example.com", "password123")
+    page = c.get("/panel/p2p?tab=market").text
+    assert "Покупают" in page and "Продают" in page and "sel*** → buy***" in page and "Объём 24ч" in page
+    d = c.get("/panel/data/p2p").json()
+    assert d["book"]["sell"] and d["feed"][0]["buyer"] == "buy***" and d["price"] > 0
+    assert "Все сделки рынка" in c.get("/panel/p2p?tab=orders").text
+    assert "sel*** → buy***" in c.get("/panel/p2p?tab=orders&who=all").text
+    done = c.get("/panel/p2p?tab=orders&st=done").text
+    assert "Завершён" in done and "Покупка D" in done
+    assert "Завершён" not in c.get("/panel/p2p?tab=orders&st=pending").text.split("bx-tabs2")[1]

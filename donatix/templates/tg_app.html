@@ -95,6 +95,9 @@ input, textarea { font: inherit; color: var(--text); }
 .strip { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; margin-top: 12px; padding: 16px; border-radius: var(--r-lg);
   background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
 .strip.promo { background: linear-gradient(110deg, #4b2fc9, #8a3bd6 60%, #c0459b); border: 0; color: #fff; }
+.strip.p2p { background: #0b0e11; border: 1px solid #2b3139; color: #eaecef; }
+.strip.p2p .ic { background: #f7a600; color: #0b0e11; font-weight: 900; }
+.strip.p2p small { color: #848e9c; }
 .strip .ic { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; flex: none; font-size: 28px; background: rgb(255 255 255 / .16); }
 .strip .grow { flex: 1; min-width: 0; } .strip b { display: block; font-size: 18px; font-weight: 800; } .strip small { font-size: 14px; opacity: .85; line-height: 1.35; display: block; }
 .rate .ic { background: var(--star-soft); color: var(--star); }
@@ -527,6 +530,7 @@ function home() {
       <button class="act press" data-act="support">${IC.chat}${t("support")}</button>
     </div></section>
   <div id="live">${liveHtml()}</div>
+  <button class="strip p2p press" data-act="p2p"><div class="ic">⇄</div><div class="grow"><b>P2P · D-коин</b><small>Харид ва фурӯш · купить и продать D, график и сделки</small></div><span class="chev">›</span></button>
   <button class="strip promo press" data-tab="friends"><div class="ic">🎁</div><div class="grow"><b>${t("invite_t")}</b><small>${t("invite_s", {p: D.ref.percent})}</small></div><span class="chev">›</span></button>
   ${rv.total ? `<button class="strip rate press" data-act="reviews"><div class="ic">${IC.star}</div><div class="grow" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="big num">${String(rv.avg.toFixed(1)).replace(".", ",")}</span><span class="stars">${"★".repeat(Math.round(rv.avg))}</span><span class="mut" style="font-size:14px">· ${t("reviews", {n: rv.total})}</span></div><span class="chev">›</span></button>` : ""}
   <div class="seg-big" id="gseg"><span class="pill" style="transform:translateX(${["games", "popular", "cards"].indexOf(GTAB) * 100}%)"></span>
@@ -914,6 +918,11 @@ document.addEventListener("click", async (e) => {
   if (act === "topup") topup(v);
   else if (act === "home") go("home");
   else if (act === "race") openRace();
+  else if (act === "p2p") {   // P2P — та же биржа, что на сайте, под этим же аккаунтом (вход по подписи Telegram)
+    haptic("medium"); a.disabled = true;
+    const r = await api("session", {to: "p2p"});
+    if (r.url) location.href = r.url; else { a.disabled = false; toast(r.error || "Хато / Ошибка", "bad"); }
+  }
   else if (act === "history") go("history");
   else if (act === "refs") go("friends");
   else if (act === "reviews") reviewsSheet();

@@ -2078,13 +2078,19 @@ def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_con
 # ── P2P D-коинов ─────────────────────────────────────────────
 
 @router.get("/panel/p2p")
-def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str = "", user=Depends(panel_user),
-              conn=Depends(get_conn), config: Config = Depends(get_config)):
+def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str = "", st: str = "all",
+              who: str = "mine", user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     """P2P в стиле бирж: Покупка / Продажа, фильтр «Сумма», сортировка; внизу — P2P, Ордера, Объявления, Профиль."""
     from . import dcoin, p2p
     p2p.expire(conn)   # просроченные ордера — отменить и разморозить до показа
     tab = {"mine": "ads"}.get(tab, tab)
-    tab = tab if tab in ("buy", "sell", "orders", "ads", "profile") else "buy"
+    tab = tab if tab in ("buy", "sell", "market", "orders", "ads", "profile") else "buy"
+    st = st if st in ("all", "pending", "done", "cancelled") else "all"
+    who = who if who in ("mine", "all") else "mine"
+    my_orders = p2p.orders(conn, user["id"], 60)
+    if st != "all":   # «Отменены» — и отменённые, и по таймеру
+        want = ("cancelled", "expired") if st == "cancelled" else (st,)
+        my_orders = [o for o in my_orders if o["status"] in want]
     sort = sort if sort in ("price", "deals") else "price"
     value = _num(amt)   # «Сумма» — в валюте человека, в объявлениях — доллары
     amount_usd = value / _per_usd(request, conn, config) if value is not None else None
@@ -2093,7 +2099,11 @@ def panel_p2p(request: Request, tab: str = "buy", sort: str = "price", amt: str 
         # «Покупка» — объявления продавцов, «Продажа» — объявления покупателей
         "ads": p2p.book(conn, "sell" if tab == "buy" else "buy", sort=sort, amount_usd=amount_usd)
         if tab in ("buy", "sell") else [],
-        "mine": p2p.mine(conn, user["id"]), "orders": p2p.orders(conn, user["id"]),
+        "mine": p2p.mine(conn, user["id"]), "orders": my_orders, "st": st, "who": who,
+        "book": p2p.depth(conn) if tab == "market" else None,
+        "feed": p2p.market_trades(conn) if tab == "market" or (tab == "orders" and who == "all") else [],
+        "stats": p2p.stats_24h(conn) if tab == "market" else None,
+        "back_url": "/tg" if request.session.get("tg_app") else "/panel/dcoin",
         "prof": p2p.profile(conn, user["id"]), "order_min": p2p.ORDER_MINUTES,
         "tfs": list(dcoin.TIMEFRAMES), "best": p2p.best_prices(conn, user["id"]),
         "free_d": p2p.free_coins(conn, user["id"]) / dcoin.UNIT, "bal_usd": user["balance_micro"] / 10_000,
@@ -2223,6 +2233,16 @@ def panel_dcoin_data(tf: str = "1m", n: int = 80, user=Depends(panel_user), conn
     # копилку и число монет не отдаём: их видит только админ
     data.update({"price": d["price"], "change": d["change"], "balance": d["balance_text"]})
     return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/panel/data/p2p")
+def panel_p2p_data(user=Depends(panel_user), conn=Depends(get_conn)):
+    """Стакан, лента сделок и статистика за сутки — вкладка «Рынок» спрашивает каждую секунду."""
+    from . import p2p
+    from . import dcoin
+    return JSONResponse({"book": p2p.depth(conn), "feed": p2p.market_trades(conn, 20), "stats": p2p.stats_24h(conn),
+                         "price": dcoin.price(conn), "change": dcoin.change_today(conn)},
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.post("/panel/dcoin/exchange", dependencies=[Depends(check_csrf)])

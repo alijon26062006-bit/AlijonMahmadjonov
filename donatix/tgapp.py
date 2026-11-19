@@ -24,7 +24,8 @@ router = APIRouter(prefix="/tg", include_in_schema=False)
 SOURCE = "tgapp"
 STAR_PACKS = (50, 75, 100, 150, 250, 350, 500, 750, 1000)
 # Куда мини-приложение пускает на сайт под аккаунтом Telegram (только эти страницы — без открытого редиректа)
-SITE_PAGES = {"games": "/panel/catalog?kind=topup", "cards": "/panel/catalog?kind=gift_card", "orders": "/panel/orders"}
+SITE_PAGES = {"games": "/panel/catalog?kind=topup", "cards": "/panel/catalog?kind=gift_card", "orders": "/panel/orders",
+              "p2p": "/panel/p2p"}
 USERNAME_RE = re.compile(r"^@?[A-Za-z][A-Za-z0-9_]{3,31}$")
 
 
