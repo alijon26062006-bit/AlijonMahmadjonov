@@ -530,13 +530,13 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .a-thumb .ico{width:28px;height:28px}
 .a-ob{min-width:0}
 .a-ot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.a-ot b{font-size:16px;line-height:24px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
-.a-ot strong{font-size:18px;line-height:24px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
-.a-od{margin-top:3px;font-size:14px;line-height:20px;color:var(--s5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a-ot b{font-size:14px;line-height:24px;font-weight:800;color:var(--s9)}
+.a-ot strong{font-size:18px;line-height:24px;font-weight:800;color:var(--s9)}
+.a-od{margin-top:3px;font-size:13px;line-height:20px;color:var(--s5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .a-os{display:flex;align-items:center;gap:8px;margin-top:10px}
 .a-os i{width:28px;height:28px;border-radius:50%;background:#e4f8eb;border:1px solid #bfe8cd;display:grid;place-items:center;color:#16a34a;flex:none}
 .a-os i .ico{width:16px;height:16px}
-.a-os time{height:30px;display:inline-flex;align-items:center;padding:0 10px;border-radius:10px;background:#f1f5f9;border:1px solid var(--chipb);font-size:14px;font-weight:600;color:#475569;font-variant-numeric:tabular-nums}
+.a-os time{height:30px;display:inline-flex;align-items:center;padding:0 10px;border-radius:10px;background:#f1f5f9;border:1px solid var(--chipb);font-size:13px;font-weight:600;color:#475569}
 
 .a-foot{margin:34px max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px));padding:14px 14px 28px;background:#fff;border:1px solid var(--s2);border-bottom:0;border-radius:20px 20px 0 0;max-width:760px}
 @media (min-width:780px){.a-foot{margin-left:auto;margin-right:auto}}
@@ -561,6 +561,55 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .am-sec a span{flex:1;min-width:0}
 .am-sec a .chev{width:16px;height:16px;color:var(--s4)}
 @media (min-width:640px){.a-stats{grid-template-columns:repeat(3,1fr)}}
+
+
+/* ================= Part 5: cabinet → orders ================= */
+.a-hero-sm{padding:15px 20px 18px}
+.a-hero-sm h1{margin-top:0}
+.o-wrap{padding:12px 12px 13px}
+.o-filter{border:1px solid var(--s2);border-radius:20px;padding:13px 13px 22px}
+.o-search{display:block;width:100%;height:43px;padding:0 13px;border:1px solid var(--chipb);border-radius:14px;background:#eef1f6;font:inherit;font-size:16px;color:var(--s9);outline:none;-webkit-appearance:none;appearance:none}
+.o-search::placeholder{color:var(--s4)}
+.o-search:focus{border-color:#a99bf7;background:#fff;box-shadow:0 0 0 3px rgba(126,91,255,.12)}
+.o-search::-webkit-search-cancel-button{-webkit-appearance:none}
+.o-sels{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:9px;padding-bottom:13px;border-bottom:1px solid var(--s2)}
+.o-f{min-width:0}
+.o-l{display:block;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--s4)}
+.o-sel{position:relative;margin-top:4px}
+.o-sel > button{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;height:41px;padding:0 11px 0 13px;border:1px solid var(--s2);border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);font-size:14px;color:var(--s9);text-align:left}
+.o-sel > button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.o-sel > button .ico{width:18px;height:18px;color:#334155;flex:none;transition:transform .2s}
+.o-sel > button[aria-expanded="true"] .ico{transform:rotate(180deg)}
+.o-sel > button:focus{outline:none}
+.o-sel > button:focus-visible{border-color:#a99bf7;box-shadow:0 0 0 3px rgba(126,91,255,.15)}
+.o-sel ul{position:absolute;left:0;right:0;top:calc(100% + 7px);z-index:25;list-style:none;margin:0;padding:6px;display:grid;gap:4px;background:#fff;border:1px solid var(--s2);border-radius:18px;box-shadow:0 20px 25px -5px rgba(15,23,42,.1),0 8px 10px -6px rgba(15,23,42,.08)}
+.o-sel li{height:32px;display:flex;align-items:center;padding:0 14px;border-radius:12px;font-size:12px;font-weight:600;color:var(--s9);cursor:pointer;white-space:nowrap}
+.o-sel li.act{background:#f6f5fe}
+.o-sel li[aria-selected="true"]{background:#ece8fd;color:#6d4bff}
+.o-pager{display:flex;align-items:center;gap:9px;margin-top:17px;flex-wrap:wrap}
+.o-pager button{height:39px;min-width:39px;padding:0 8px;border:1px solid var(--s2);border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.o-pager button[aria-current="page"]{background:#ece8fd;border-color:#c9c2f7;color:#6d4bff}
+.o-pager button.arr{width:33px;min-width:33px;height:33px;padding:0;border-radius:50%;font-weight:600;color:var(--s9)}
+.o-pager button:disabled{color:#cbd5e1;border-color:#eef1f5;cursor:default}
+.o-pager .dots{width:13px;text-align:center;color:var(--s5);font-weight:700;letter-spacing:1px}
+.o-list{display:grid;gap:11px;margin-top:23px;padding-top:22px;border-top:1px solid var(--s2)}
+.o-empty{padding:28px 12px;text-align:center;font-size:15px;line-height:22px;color:var(--s5)}
+.a-order.sm{grid-template-columns:49px 1fr;column-gap:11px;padding:9px 12px 10px}
+.a-order.sm .a-thumb{width:49px;height:49px;border-radius:13px}
+.a-order.sm .a-thumb .ico{width:24px;height:24px}
+.a-order.sm .a-ot b,.a-order.sm .a-ot strong{line-height:20px}
+.a-order.sm .a-ot b{font-size:13px}
+.a-order.sm .a-ot strong{font-size:14px}
+.a-order.sm .a-od{font-size:12px}
+.a-order.sm .a-os time{font-size:12px}
+.a-order.sm .a-ot{align-items:center;height:22px}
+.a-order.sm .a-od{margin-top:3px}
+.a-order.sm .a-os{margin-top:9px}
+.a-order.sm .a-os i{width:27px;height:27px}
+.a-order.sm .a-os time{height:29px}
+.a-os i.proc{background:#e5eeff;border-color:#b9cdf7;color:#2563eb}
+.a-os i.err{background:#fde8e8;border-color:#f6c1c1;color:#dc2626}
+.a-os i.ref{background:#fef3e2;border-color:#f6d7a6;color:#d97706}
 
 </style>
 
@@ -587,6 +636,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></symbol>
   <symbol id="i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
   <symbol id="i-bag" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /> <path d="M3 6h18" /> <path d="M16 10a4 4 0 0 1-8 0" /></symbol>
   <symbol id="i-swap" viewBox="0 0 24 24"><path d="m16 3 4 4-4 4" /> <path d="M20 7H4" /> <path d="m8 21-4-4 4-4" /> <path d="M4 17h16" /></symbol>
@@ -1168,7 +1218,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
     <section class="a-card a-quick">
       <h2>Быстрые действия</h2>
-      <a class="a-qi" href="#" data-soon="Раздел «Заказы» сделаем на следующих шагах"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#orders"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
@@ -1177,8 +1227,26 @@ body.in-app > .header,body.in-app > #footer{display:none}
     <section class="a-card a-orders">
       <h2>Последние заказы</h2>
       <p class="a-osub">Статусы и суммы последних операций</p>
-      <a class="a-all" href="#" data-soon="Раздел «Заказы» сделаем на следующих шагах">Все заказы</a>
+      <a class="a-all" href="#orders">Все заказы</a>
       <div id="appOrders"></div>
+    </section>
+  </main>
+
+    <main class="app-main" id="appOrdersPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Заказы</h1>
+      <p class="a-sub">История заказов и статусы обработки.</p>
+    </section>
+    <section class="a-card o-wrap">
+      <div class="o-filter">
+        <input class="o-search" id="oSearch" type="search" autocomplete="off" placeholder="Поиск заказов (номер или название)" aria-label="Поиск заказов по номеру или названию">
+        <div class="o-sels">
+          <div class="o-f"><span class="o-l" id="oStL">Статус</span><div class="o-sel" id="oSt"></div></div>
+          <div class="o-f"><span class="o-l" id="oTyL">Тип заказа</span><div class="o-sel" id="oTy"></div></div>
+        </div>
+        <nav class="o-pager" id="oPager" aria-label="Страницы заказов"></nav>
+      </div>
+      <div class="o-list" id="oList" aria-live="polite"></div>
     </section>
   </main>
 
@@ -1332,16 +1400,21 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var views={login:document.getElementById('v-login'),signup:document.getElementById('v-signup'),app:document.getElementById('v-app')},home=document.getElementById('main');
-    var current=null;
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage'};
+    var home=document.getElementById('main'),current=null;
     function show(h){
-      var v=views[h]?h:'home',changed=v!==current;
+      var v=V[h]?h:'home',changed=v!==current;
       if(changed){
         home.hidden=v!=='home';
-        Object.keys(views).forEach(function(k){views[k].hidden=k!==v});
+        ['v-login','v-signup','v-app'].forEach(function(id){document.getElementById(id).hidden=V[v]!==id});
+        Object.keys(PAGES).forEach(function(k){document.getElementById(PAGES[k]).hidden=k!==v});
         current=v;
-        document.body.classList.toggle('in-app',v==='app');
-        if(v!=='home'){window.scrollTo({top:0,behavior:'instant'});var t=views[v].querySelector('h1');if(t){t.setAttribute('tabindex','-1');t.focus({preventScroll:true})}}
+        document.body.classList.toggle('in-app',V[v]==='v-app');
+        if(v!=='home'){
+          window.scrollTo({top:0,behavior:'instant'});
+          var box=document.getElementById(PAGES[v]||V[v]),t=box&&box.querySelector('h1');
+          if(t){t.setAttribute('tabindex','-1');t.focus({preventScroll:true})}
+        }
       }
       if(v==='home'){
         if(h==='top'||!h){if(h==='top'&&changed)window.scrollTo({top:0,behavior:'instant'});return}
@@ -1428,23 +1501,9 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- cabinet: example orders + menu ----------
   (function(){
-    var IC={pad:'#i-pad',star:'#i-star',gem:'#i-gem',wallet:'#i-wallet'};
-    var ORD=[ // example data, not real orders
-      ['ord-1000231','$1.5509','Пополнение • Free Fire (CIS) • Weekly Membership','19.11.2026 15:51','gem','#7e5bff','#a78bfa'],
-      ['ord-1000230','$2.3781','Пополнение • Free Fire (CIS) • 341 Diamonds','19.11.2026 15:51','gem','#7e5bff','#a78bfa'],
-      ['ord-1000227','$0.8900','Пополнение • PUBG Mobile (Global) • 60 UC','19.11.2026 15:42','pad','#0f766e','#2dd4bf'],
-      ['ord-1000221','$0.7600','Пополнение • Telegram Stars • 50 Stars','19.11.2026 15:38','star','#0284c7','#38bdf8'],
-      ['ord-1000214','$5.5834','Пополнение • Mobile Legends • Weekly Diamond Pass','19.11.2026 15:31','gem','#6d28d9','#c084fc'],
-      ['ord-1000209','$10.2400','Steam • Пополнение по логину • $10','19.11.2026 15:14','wallet','#334155','#64748b']
-    ];
-    document.getElementById('appOrders').innerHTML=ORD.map(function(o){
-      return '<article class="a-order"><span class="a-thumb" style="background:linear-gradient(135deg,'+o[5]+','+o[6]+')" aria-hidden="true"><svg class="ico"><use href="'+IC[o[4]]+'"/></svg></span>'
-        +'<div class="a-ob"><div class="a-ot"><b>'+o[0]+'</b><strong>'+o[1]+'</strong></div><p class="a-od" title="'+o[2]+'">'+o[2]+'</p>'
-        +'<div class="a-os"><i aria-label="Выполнен"><svg class="ico"><use href="#i-check"/></svg></i><time>'+o[3]+'</time></div></div></article>';
-    }).join('');
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
-      ['Обзор',[['house','Главная','#app'],['bag','Заказы'],['swap','Транзакции']]],
+      ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции']]],
       ['Каталог',[['wallet','Пополнить Steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
@@ -1452,7 +1511,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     ];
     document.getElementById('appMenuNav').innerHTML=MENU.map(function(s){
       return '<section class="am-sec"><h2>'+s[0]+'</h2><ul>'+s[1].map(function(it){
-        var attr=it[2]?'href="'+it[2]+'"'+(it[2]==='#app'?' aria-current="page"':''):'href="#" data-soon="'+SOON+'"';
+        var attr=it[2]?'href="'+it[2]+'"':'href="#" data-soon="'+SOON+'"';
         return '<li><a '+attr+'><svg class="ico"><use href="#i-'+it[0]+'"/></svg><span>'+it[1]+'</span><svg class="ico chev"><use href="#i-chev"/></svg></a></li>';
       }).join('')+'</ul></section>';
     }).join('');
@@ -1468,6 +1527,95 @@ body.in-app > .header,body.in-app > #footer{display:none}
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!menu.hidden)setMenu(false)});
     window.addEventListener('hashchange',function(){if(!menu.hidden&&location.hash!=='#app'){menu.hidden=true;burger.setAttribute('aria-expanded','false');document.documentElement.style.overflow=''}});
     document.getElementById('appYear').textContent=new Date().getFullYear();
+  })();
+
+  // ---------- cabinet: example orders data, orders page (search, filters, pages) ----------
+  (function(){
+    // example data only (no real orders): seeded so it looks the same on every visit
+    var seed=7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646}
+    var T={ // type: [label, icon, gradient, items:[desc, price]]
+      topup:['Пополнение','gem',['#7e5bff','#a78bfa'],[['Пополнение • Free Fire (CIS) • 110 Diamonds',0.7754],['Пополнение • Free Fire (CIS) • Weekly Membership',1.5509],['Пополнение • Free Fire (CIS) • Level Up Package 10',0.5169],['Пополнение • PUBG Mobile (Global) • 60 UC',0.89],['Пополнение • PUBG Mobile (Global) • 325 UC',4.41],['Пополнение • Mobile Legends • 86 Diamonds',1.38],['Пополнение • Genshin Impact • 60 Genesis Crystals',0.84]]],
+      steam:['Пополнение Steam','wallet',['#334155','#64748b'],[['Пополнение Steam • По логину • $10',10.24],['Пополнение Steam • По логину • $5',5.12]]],
+      gift:['Steam гифты','gift',['#0f766e','#2dd4bf'],[['Steam гифты • Игра в подарок • Регион KZ',7.9]]],
+      tg:['Telegram','send',['#0284c7','#38bdf8'],[['Telegram • Stars • 50 Stars',0.76],['Telegram • Premium • 3 месяца',11.95]]],
+      card:['Подарочные карты','card',['#be185d','#f472b6'],[['Подарочные карты • Google Play • $10 (US)',10.35],['Подарочные карты • App Store • $15 (US)',15.4]]],
+      key:['Ключи игр','key',['#b45309','#fbbf24'],[['Ключи игр • PC • Ключ для активации',6.2]]],
+      manual:['Ручные услуги','clip',['#475569','#94a3b8'],[['Ручные услуги • Пополнение по запросу',3.5]]]
+    };
+    var W=['topup','topup','topup','topup','topup','topup','topup','tg','tg','steam','card','gift','key','manual'];
+    var ST={done:['Завершён','check'],proc:['В обработке','swap'],err:['Ошибка','close'],ref:['Возврат','undo']};
+    var DATA=[],t=Date.UTC(2026,10,19,16,17),id=1000245;
+    for(var n=0;n<45;n++){
+      var ty=W[Math.floor(rnd()*W.length)],it=T[ty][3][Math.floor(rnd()*T[ty][3].length)];
+      var st=n===31||n===33?'proc':n===12?'err':n===24?'ref':'done';
+      var d=new Date(t);DATA.push({id:'ord-'+(id-n*3-Math.floor(rnd()*3)),ty:ty,st:st,desc:it[0],price:'$'+it[1].toFixed(4),
+        time:('0'+d.getUTCDate()).slice(-2)+'.'+('0'+(d.getUTCMonth()+1)).slice(-2)+'.'+d.getUTCFullYear()+' '+('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)});
+      t-=Math.floor(1+rnd()*14)*60000;
+    }
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+    function card(o,sm){
+      var g=T[o.ty][2],s=ST[o.st];
+      return '<article class="a-order'+(sm?' sm':'')+'"><span class="a-thumb" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')" aria-hidden="true"><svg class="ico"><use href="#i-'+T[o.ty][1]+'"/></svg></span>'
+        +'<div class="a-ob"><div class="a-ot"><b>'+o.id+'</b><strong>'+o.price+'</strong></div><p class="a-od" title="'+esc(o.desc)+'">'+esc(o.desc)+'</p>'
+        +'<div class="a-os"><i class="'+o.st+'" role="img" aria-label="'+s[0]+'" title="'+s[0]+'"><svg class="ico"><use href="#i-'+s[1]+'"/></svg></i><time>'+o.time+'</time></div></div></article>';
+    }
+    // dashboard "recent orders" uses the same example data
+    document.getElementById('appOrders').innerHTML=DATA.slice(0,6).map(function(o){return card(o,false)}).join('');
+
+    // dropdown helper (same look as the reference)
+    function makeSel(root,labelId,opts,onChange){
+      var val=opts[0][0],hi=0,uid=root.id;
+      root.innerHTML='<button type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="'+labelId+' '+uid+'-v"><span id="'+uid+'-v">'+opts[0][1]+'</span><svg class="ico"><use href="#i-down"/></svg></button>'
+        +'<ul role="listbox" tabindex="-1" aria-labelledby="'+labelId+'" hidden>'+opts.map(function(o,i){return '<li role="option" id="'+uid+'-'+i+'" aria-selected="'+(i===0)+'">'+o[1]+'</li>'}).join('')+'</ul>';
+      var btn=root.firstChild,list=root.lastChild,li=[].slice.call(list.children);
+      function mark(i){hi=(i+li.length)%li.length;li.forEach(function(x,k){x.classList.toggle('act',k===hi&&x.getAttribute('aria-selected')!=='true')});list.setAttribute('aria-activedescendant',li[hi].id)}
+      function open(){closeAll(root);list.hidden=false;btn.setAttribute('aria-expanded','true');mark(opts.findIndex(function(o){return o[0]===val}));list.focus({preventScroll:true})}
+      function close(back){list.hidden=true;btn.setAttribute('aria-expanded','false');if(back)btn.focus()}
+      function pick(i){val=opts[i][0];li.forEach(function(x,k){x.setAttribute('aria-selected',String(k===i))});document.getElementById(uid+'-v').textContent=opts[i][1];onChange(val)}
+      root._close=close;
+      btn.addEventListener('click',function(){list.hidden?open():close(true)});
+      btn.addEventListener('keydown',function(e){if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();open()}});
+      list.addEventListener('keydown',function(e){
+        if(e.key==='ArrowDown'){e.preventDefault();mark(hi+1)}else if(e.key==='ArrowUp'){e.preventDefault();mark(hi-1)}
+        else if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(hi);close(true)}else if(e.key==='Escape'||e.key==='Tab'){close(e.key==='Escape')}
+      });
+      li.forEach(function(x,k){x.addEventListener('mousemove',function(){if(hi!==k)mark(k)});x.addEventListener('click',function(){pick(k);close(true)})});
+    }
+    function closeAll(except){document.querySelectorAll('.o-sel').forEach(function(s){if(s!==except&&s._close)s._close(false)})}
+    document.addEventListener('click',function(e){if(!e.target.closest('.o-sel'))closeAll(null)});
+
+    var f={q:'',st:'all',ty:'all',page:1},PER=10;
+    var listEl=document.getElementById('oList'),pager=document.getElementById('oPager');
+    function filtered(){
+      var q=f.q.toLowerCase();
+      return DATA.filter(function(o){return (f.st==='all'||o.st===f.st)&&(f.ty==='all'||o.ty===f.ty)&&(!q||o.id.toLowerCase().indexOf(q)>-1||o.desc.toLowerCase().indexOf(q)>-1)});
+    }
+    function pages(cur,total){
+      if(total<=5){var a=[];for(var i=1;i<=total;i++)a.push(i);return a}
+      var out=[1],from=Math.max(2,cur-1),to=Math.min(total-1,cur+1);
+      if(cur===1)to=2;if(cur===total)from=total-1;
+      if(from>2)out.push('…');for(var k=from;k<=to;k++)out.push(k);if(to<total-1)out.push('…');out.push(total);return out;
+    }
+    function render(scroll){
+      var rows=filtered(),total=Math.max(1,Math.ceil(rows.length/PER));
+      if(f.page>total)f.page=total;
+      var slice=rows.slice((f.page-1)*PER,f.page*PER);
+      listEl.innerHTML=slice.length?slice.map(function(o){return card(o,true)}).join(''):'<p class="o-empty">Ничего не найдено. Измените поиск или фильтры.</p>';
+      pager.innerHTML='<button type="button" class="arr" data-p="'+(f.page-1)+'" aria-label="Предыдущая страница"'+(f.page===1?' disabled':'')+'>‹</button>'
+        +pages(f.page,total).map(function(p){return p==='…'?'<span class="dots" aria-hidden="true">…</span>':'<button type="button" data-p="'+p+'"'+(p===f.page?' aria-current="page"':'')+' aria-label="Страница '+p+'">'+p+'</button>'}).join('')
+        +'<button type="button" class="arr" data-p="'+(f.page+1)+'" aria-label="Следующая страница"'+(f.page===total?' disabled':'')+'>›</button>';
+      if(scroll)document.querySelector('.o-wrap').scrollIntoView({block:'start',behavior:'smooth'});
+    }
+    pager.addEventListener('click',function(e){var b=e.target.closest('button[data-p]');if(!b||b.disabled)return;f.page=+b.dataset.p;render(true)});
+    var tq;document.getElementById('oSearch').addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value.trim();tq=setTimeout(function(){f.q=v;f.page=1;render(false)},150)});
+    makeSel(document.getElementById('oSt'),'oStL',[['all','Все'],['proc','В обработке'],['done','Завершён'],['err','Ошибка'],['ref','Возврат']],function(v){f.st=v;f.page=1;render(false)});
+    makeSel(document.getElementById('oTy'),'oTyL',[['all','Все'],['steam','Пополнение Steam'],['gift','Steam гифты'],['tg','Telegram'],['card','Подарочные карты'],['key','Ключи игр'],['topup','Пополнение'],['manual','Ручные услуги']],function(v){f.ty=v;f.page=1;render(false)});
+    render(false);
+
+    // cabinet menu: highlight the current section
+    function markMenu(){document.querySelectorAll('#appMenuNav a').forEach(function(a){if(a.getAttribute('href')===location.hash&&location.hash)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})}
+    window.addEventListener('hashchange',markMenu);markMenu();
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll(null)});
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
