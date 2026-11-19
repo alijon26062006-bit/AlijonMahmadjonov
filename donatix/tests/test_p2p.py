@@ -230,3 +230,26 @@ def test_market_tab_book_feed_and_live_data(app, conn, market):
     done = c.get("/panel/p2p?tab=orders&st=done").text
     assert "Завершён" in done and "Покупка D" in done
     assert "Завершён" not in c.get("/panel/p2p?tab=orders&st=pending").text.split("bx-tabs2")[1]
+
+
+def test_any_amount_even_one_coin_at_tiny_price(conn, market, monkeypatch):
+    """Цена 1 D — доли копейки: сделка на 1 монету всё равно проходит (не «слишком маленькая»),
+    покупатель платит минимум $0.0001 (≈ 0.001 с.), деньги и монеты не пропадают и не появляются из воздуха."""
+    seller, buyer = market
+    monkeypatch.setattr(p2p, "check_price", lambda conn, price_m: 100)        # цена как на сервере — крошечная
+    tiny = 8                                                                   # ≈ $0.00000008 за 1 D
+    money0, coins0 = _money_all(conn), _coins_total(conn)
+    ad = p2p.create_ad(conn, seller, "sell", tiny, 700 * dcoin.UNIT)
+    view = p2p.book(conn, "sell")[0]
+    assert view["max_usd"] > 0                                                 # лимит не «0.0000»
+    b0 = balance(conn, buyer)
+    res = p2p.execute(conn, buyer, ad, 1 * dcoin.UNIT)                         # одна монета
+    assert res["units"] == 1 * dcoin.UNIT and res["total"] == 1                # минимум 1 микро-доллар
+    assert balance(conn, buyer) == b0 - 1 and dcoin.balance(conn, buyer) == 1 * dcoin.UNIT
+    p2p.execute(conn, buyer, ad, 699 * dcoin.UNIT)                             # и весь остаток
+    assert _money_all(conn) == money0 and _coins_total(conn) == coins0
+    # «Покупаю» по крошечной цене: резерв — минимум 1 микро, продать в него можно
+    bad = p2p.create_ad(conn, buyer, "buy", tiny, 10 * dcoin.UNIT)
+    assert conn.execute("SELECT locked_micro FROM p2p_ads WHERE id = ?", (bad,)).fetchone()[0] == 1
+    p2p.execute(conn, seller, bad, 5 * dcoin.UNIT)
+    assert _money_all(conn) == money0 and _coins_total(conn) == coins0

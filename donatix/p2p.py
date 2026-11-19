@@ -58,6 +58,12 @@ def _cost_up(units: int, price_m: int) -> int:
     return -(-units * price_m // (dcoin.UNIT * PRICE_SCALE))
 
 
+def deal_cost(units: int, price_m: int) -> int:
+    """Сколько платит покупатель за units: вверх до микро-доллара и не меньше 1 микро ($0.0001 ≈ 0.001 с.).
+    Так можно купить и продать любое количество, даже 1 монету: дешёвые монеты не отдаются бесплатно."""
+    return max(1, _cost_up(units, price_m)) if units > 0 else 0
+
+
 def free_coins(conn: sqlite3.Connection, user_id: int) -> int:
     return max(0, dcoin.balance(conn, user_id) - dcoin.waiting(conn, user_id))
 
@@ -115,9 +121,7 @@ def create_ad(conn: sqlite3.Connection, user_id: int, side: str, price_m: int, u
                 raise P2PError("Столько свободных D-коинов у вас нет (монеты за невыполненные заказы продавать нельзя).")
             _coins(conn, user_id, -units, f"P2P: выставлено на продажу (объявление #{ad_id})")
         else:
-            lock = _cost_up(units, price_m)
-            if lock <= 0:
-                raise P2PError("Слишком маленькая сумма — укажите больше D.")
+            lock = deal_cost(units, price_m)
             _money(conn, user_id, -lock, f"P2P: резерв на покупку {dcoin.fmt_d(units)} D (объявление #{ad_id})")
             conn.execute("UPDATE p2p_ads SET locked_micro = ? WHERE id = ?", (lock, ad_id))
     return ad_id
@@ -148,9 +152,11 @@ def open_order(conn: sqlite3.Connection, user_id: int, ad_id: int, units: int) -
             raise P2PError(f"Доступно {dcoin.fmt_d(can)} D.")
         if units < ad["min_units"] and units != can:
             raise P2PError(f"Минимум в этом объявлении — {dcoin.fmt_d(ad['min_units'])} D.")
-        total = cost(units, price_m)
-        if total <= 0:
-            raise P2PError("Слишком маленькая сделка — возьмите больше D.")
+        total = deal_cost(units, price_m)
+        if ad["side"] == "buy":   # деньги — из резерва покупателя: не больше, чем там осталось
+            total = min(total, ad["locked_micro"])
+            if total <= 0:
+                raise P2PError("У покупателя в этом объявлении закончились деньги.")
         busy = conn.execute("SELECT COUNT(*) FROM p2p_orders WHERE taker_id = ? AND status = 'pending'",
                             (user_id,)).fetchone()[0]
         if busy >= MAX_PENDING:
@@ -343,7 +349,7 @@ def _view(r: sqlite3.Row, ref_m: int) -> dict[str, Any]:
     return {"id": r["id"], "side": r["side"], "pct": r["pct"], "price_usd": price_m / 10_000 / PRICE_SCALE,
             "remaining": can, "remaining_text": dcoin.fmt_d(can), "price_m": price_m,
             "min_text": dcoin.fmt_d(r["min_units"]) if r["min_units"] else "",
-            "total_usd": cost(can, price_m) / 10_000, "status": r["status"],
+            "total_usd": deal_cost(can, price_m) / 10_000, "status": r["status"],
             "created_at": r["created_at"]}
 
 
@@ -366,7 +372,7 @@ def book(conn: sqlite3.Connection, side: str, limit: int = 50, sort: str = "pric
              "letter": (r["login"] or "?")[:1].upper(), "color": r["user_id"] % 6,
              "rate": round(100 * r["ok"] / r["ended"]) if r["ended"] else 100,
              "diff": round(r["price_m"] * 100 / ref) - 100 if ref else 0}
-        v["min_usd"] = cost(min(r["min_units"], v["remaining"]), v["price_m"]) / 10_000 if r["min_units"] else 0.0
+        v["min_usd"] = deal_cost(min(r["min_units"], v["remaining"]), v["price_m"]) / 10_000 if r["min_units"] else 0.0
         v["max_usd"] = v["total_usd"]
         if v["remaining"] <= 0:
             continue
