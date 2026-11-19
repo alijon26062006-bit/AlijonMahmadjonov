@@ -827,6 +827,73 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .c-card .k-star{top:8px;right:8px}
 @media (min-width:640px){.c-grid.two{grid-template-columns:repeat(3,1fr)}.c-grid.one{grid-template-columns:1fr 1fr}}
 
+
+/* ================= Part 12: top-ups catalogue, balance, statistics ================= */
+.ov .c-art{aspect-ratio:198/192}
+#appTopupsPage .a-hero h1{font-size:22px;line-height:30px}
+#appTopupsPage .a-sub{font-size:14px;line-height:20px}
+#appTopupsPage .a-hero-sm{padding:13px 16px 15px}
+.ov .c-art::after{content:"";position:absolute;inset:auto 0 0;height:34%;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.9) 72%,#fff)}
+.two.ov .c-name{position:relative;z-index:1;margin-top:-36px;min-height:0;padding:0 12px 16px;font-size:14.5px;line-height:19px}
+/* balance */
+.b-card{padding:16px 13px 13px;border:1px solid #e3e0f7;border-radius:20px;background:linear-gradient(160deg,#efedfc,#f4f3fd)}
+.b-sum{font-size:26px;line-height:32px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.b-lbl{margin-top:0;font-size:17px;line-height:24px;color:var(--s5)}
+.b-top{display:flex;align-items:center;justify-content:center;width:100%;height:44px;margin-top:8px;border-radius:14px;background:linear-gradient(90deg,#6e54f5,#7f66f5);color:#fff;font-size:13px;font-weight:600;box-shadow:0 12px 24px -10px rgba(110,84,245,.6)}
+.b-st{margin-top:12px;padding:10px 13px 10px;background:#fff;border:1px solid #ebe9f8;border-radius:16px}
+.b-top + .b-st{margin-top:20px}
+.b-st span{display:block;font-size:16px;line-height:22px;color:var(--s4)}
+.b-st b{display:block;margin-top:2px;font-size:21px;line-height:28px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.b-st small{display:block;margin-top:1px;font-size:13px;line-height:18px;color:var(--s5)}
+.b-quick{padding:16px 18px 16px}
+.b-quick .a-osub{margin-top:2px}
+.b-quick .a-qi{margin-top:12px;padding:14px 14px 14px 15px}
+.b-quick .a-qi + .a-qi{margin-top:10px}
+.b-quick .a-qi i{width:28px;height:30px;border-radius:10px}
+/* statistics */
+.s-tabs{display:inline-flex;justify-self:start;gap:2px;padding:4px;border:1px solid var(--s2);border-radius:14px;background:#eef1f5}
+.s-tabs button{height:33px;padding:0 13px;border-radius:10px;font-size:13px;font-weight:600;color:#5f6c84;white-space:nowrap}
+.s-tabs button[aria-selected="true"]{background:#fff;color:var(--s9);box-shadow:0 2px 6px rgba(15,23,42,.1)}
+.s-tz{margin-top:-6px;font-size:12px;line-height:16px;color:#475569}
+.s-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.s-tile{padding:14px 16px 13px;background:#fff;border:1px solid var(--s2);border-radius:18px;min-width:0}
+.s-tile span{display:block;font-size:12.5px;line-height:18px;font-weight:600;color:#5f6c84}
+.s-tile b{display:block;margin-top:5px;font-size:21px;line-height:26px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-tile b.v{color:#6d4bff}.s-tile b.g{color:#3f9c45}.s-tile b.r{color:#dc4c43}
+.s-tile small{display:block;margin-top:6px;font-size:12px;line-height:16px;color:var(--s5)}
+.s-chart,.s-types{padding:18px 18px 14px}
+.s-ch-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.s-ch-h h2{font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.s-ch-h span{font-size:11.5px;line-height:16px;color:var(--s5)}
+.s-leg{display:flex;flex-wrap:wrap;gap:6px 16px;list-style:none;margin:8px 0 0;padding:0}
+.s-leg li{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--s5)}
+.s-leg i{width:10px;height:10px;border-radius:50%;display:block}
+.s-leg i.dash{width:14px;height:0;border-radius:0;border-top:2px dashed #ef4444}
+.s-plot{position:relative;margin-top:10px}
+.s-plot svg{display:block;width:100%;height:auto;overflow:visible}
+.s-plot text{font-family:var(--font);font-size:9px;fill:#475569}
+.s-tip{position:absolute;z-index:3;pointer-events:none;min-width:150px;padding:8px 10px;border-radius:10px;background:#0f172a;color:#fff;font-size:12px;line-height:17px;box-shadow:0 10px 20px -8px rgba(15,23,42,.4)}
+.s-tip b{display:block;margin-bottom:3px;font-size:12px;color:#cbd5e1}
+.s-tip div{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.s-tip i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.s-tbl-d{margin-top:8px}
+.s-tbl-d summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--s5);padding:4px 0}
+.s-tbl-w{max-height:220px;overflow:auto;margin-top:6px}
+.s-tbl-w table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.s-tbl-w th,.s-tbl-w td{padding:5px 6px;border-bottom:1px solid var(--s2);text-align:right}
+.s-tbl-w th:first-child,.s-tbl-w td:first-child{text-align:left}
+.s-th,.s-row-top{display:grid;grid-template-columns:1fr 54px 54px 54px;gap:6px;align-items:center}
+.s-th{margin-top:10px;padding:0 12px 9px;border-bottom:1px dashed #d8dde5}
+.s-th span{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;text-align:right}
+.s-th span:first-child{text-align:left}
+.s-th2{padding:12px 12px 10px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b}
+.s-row{margin-bottom:9px;padding:12px 12px 10px;background:#f0f3f8;border:1px solid #dfe4ea;border-radius:14px}
+.s-row-top b{font-size:14px;line-height:19px;font-weight:800;color:var(--s9)}
+.s-row-top span{font-size:14px;text-align:right;font-variant-numeric:tabular-nums;color:var(--s9)}
+.s-row-top span.g{color:#16a34a}.s-row-top span.r{color:#ef4444}
+.s-row strong{display:block;margin-top:10px;padding-top:10px;border-top:1px dashed #cdd4de;font-size:17px;line-height:22px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+@media (max-width:370px){.s-tabs button{padding:0 9px}.s-th,.s-row-top{grid-template-columns:1fr 44px 44px 44px}}
+
 </style>
 
 {{SPRITE}}
@@ -1381,7 +1448,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     <section class="a-card a-quick">
       <h2>Быстрые действия</h2>
       <a class="a-qi" href="#orders"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
-      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#topups"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#cards"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#steam"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
     </section>
@@ -1615,6 +1682,70 @@ body.in-app > .header,body.in-app > #footer{display:none}
     <div class="k-more" id="cMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загружаем ещё…</div>
   </main>
 
+  <main class="app-main" id="appTopupsPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Пополнение игр и сервисов</h1>
+      <p class="a-sub">Каталог пополнений для игр и сервисов.</p>
+    </section>
+    <section class="a-card c-filter">
+      <div class="c-top"><label class="o-l" for="tpSearch">Поиск по каталогу</label><span class="o-l" aria-hidden="true">Избранное</span></div>
+      <div class="c-row">
+        <input class="o-search" id="tpSearch" type="search" autocomplete="off" placeholder="Поиск по названию категории…">
+        <button class="k-fav c-fav" id="tpFav" type="button" aria-pressed="false" aria-label="Только избранное"><svg class="ico"><use href="#i-star"/></svg></button>
+      </div>
+    </section>
+    <div class="c-grid two ov" id="tpGrid" aria-live="polite"></div>
+    <div class="k-more" id="tpMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загружаем ещё…</div>
+  </main>
+
+  <main class="app-main" id="appBalancePage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Баланс</h1>
+      <p class="a-sub">Доступные средства и информация по оплатам.</p>
+    </section>
+    <section class="b-card">
+      <p class="b-sum">$58.4100</p>
+      <p class="b-lbl">Доступно</p>
+      <button class="b-top" type="button" data-soon="Экран пополнения сделаем, когда пришлёте его скриншоты">Пополнить</button>
+      <div class="b-st"><span>Всего потрачено</span><b>$1,248.5320</b><small>За всё время</small></div>
+      <div class="b-st"><span>Всего заказов</span><b>214</b><small>Создано</small></div>
+    </section>
+    <section class="a-card a-quick b-quick">
+      <h2>Быстрые действия</h2>
+      <p class="a-osub">Профиль, движения и поддержка</p>
+      <a class="a-qi" href="#" data-soon="Профиль сделаем на одном из следующих шагов"><span><b>Профиль</b><small>Данные и безопасность</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
+      <a class="a-qi" href="#tx"><span><b>Транзакции</b><small>Все движения баланса</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
+      <a class="a-qi" href="#" data-soon="Поддержку сделаем на одном из следующих шагов"><span><b>Поддержка</b><small>Связаться с поддержкой</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
+    </section>
+  </main>
+
+  <main class="app-main" id="appStatsPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Статистика</h1>
+      <p class="a-sub">Заказы, обороты и пополнения за выбранный период.</p>
+    </section>
+    <div class="s-tabs" role="tablist" aria-label="Период">
+      <button type="button" role="tab" data-p="24h" aria-selected="false">24 часа</button>
+      <button type="button" role="tab" data-p="7d" aria-selected="false">7 дней</button>
+      <button type="button" role="tab" data-p="30d" aria-selected="false">30 дней</button>
+      <button type="button" role="tab" data-p="all" aria-selected="true">Всё время</button>
+    </div>
+    <p class="s-tz">Часовой пояс: Asia/Dushanbe · данные примерные</p>
+    <div class="s-grid" id="sTiles"></div>
+    <section class="a-card s-chart">
+      <div class="s-ch-h"><h2>Динамика заказов</h2><span>Создано · выполнено · возвраты</span></div>
+      <ul class="s-leg" aria-hidden="true"><li><i style="background:#6d4bff"></i>Создано заказов</li><li><i style="background:#16a34a"></i>Выполнено</li><li><i class="dash"></i>Возвраты</li></ul>
+      <div class="s-plot" id="sPlot"></div>
+      <details class="s-tbl-d"><summary>Показать таблицей</summary><div class="s-tbl-w" id="sTable"></div></details>
+    </section>
+    <section class="a-card s-types">
+      <div class="s-ch-h"><h2>По типам товаров</h2><span>Разбивка по категориям</span></div>
+      <div class="s-th"><span>Тип</span><span>Созд.</span><span>Вып.</span><span>Возвр.</span></div>
+      <p class="s-th2">Оборот</p>
+      <div id="sTypes"></div>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1765,7 +1896,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1869,10 +2000,10 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги','#manual'],['card','Подарочные карты','#cards'],['zap','Пополнение сервисов']]],
-      ['Финансы',[['wallet','Баланс']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги','#manual'],['card','Подарочные карты','#cards'],['zap','Пополнение сервисов','#topups']]],
+      ['Финансы',[['wallet','Баланс','#balance']]],
       ['Дополнительно',[['zap','Дополнительно']]],
-      ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
+      ['Аккаунт',[['chartl','Статистика','#stats'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
     ];
     document.getElementById('appMenuNav').innerHTML=MENU.map(function(s){
       return '<section class="am-sec"><h2>'+s[0]+'</h2><ul>'+s[1].map(function(it){
@@ -2318,9 +2449,98 @@ body.in-app > .header,body.in-app > #footer{display:none}
     catalog({page:'appManualPage',grid:'mGrid',more:'mMore',search:'mSearch',fav:'mFav',key:'gem-man-fav',manual:true,w:410,h:152,step:6,
       soon:'Страницу услуги с ценами сделаем на следующем шаге',
       items:[['9+ iTunes Loaded Accounts (US)'],['Xbox Loaded Accounts (US)'],['Razer Gold Loaded Accounts (Global)'],['Razer Gold Loaded Accounts (China)',1],['PlayStation Loaded Accounts (US)'],['Steam Loaded Accounts (KZ)'],['Nintendo eShop Loaded Accounts (US)'],['Google Play Loaded Accounts (TR)'],['Battle.net Balance Top-up (EU)',1],['EA Play Activation (Global)']]});
+    catalog({page:'appTopupsPage',grid:'tpGrid',more:'tpMore',search:'tpSearch',fav:'tpFav',key:'gem-top-fav',w:198,h:192,step:8,
+      soon:'Страницу пополнения с пакетами и полем ID игрока сделаем на следующем шаге',
+      items:[['PUBG Mobile (Auto)'],['PUBG Mobile (Manual)'],['Free Fire (CIS)'],['Free Fire (MENA)'],['Free Fire (LATAM)'],['Wuthering Waves'],['Zenless Zone Zero (Global)'],['Honkai: Star Rail (Global)'],['Mobile Legends (RU)'],['Mobile Legends (Philippines)'],['Mobile Legends (Indonesia)'],['Genshin Impact (Global)'],['Badlanders'],['Ballistic Hero VNG'],['Be The King'],['Bigo Live'],['Black Clover M (Asia)'],['Call of Duty Mobile (Global)'],['Clash of Clans'],['Brawl Stars'],['Honor of Kings (Global)',1],['Delta Force (Global)']]});
     catalog({page:'appCardsPage',grid:'cGrid',more:'cMore',search:'cSearch',fav:'cFav',key:'gem-card-fav',w:198,h:170,step:8,
       soon:'Страницу карты с номиналами сделаем на следующем шаге',
       items:[['App Store & iTunes (TR) · Instant use'],['PUBG: BATTLEGROUNDS (Global) · Instant use'],['Jawaker Gift Card · Instant use'],['IMO · Instant use'],['Black Clover M Redeem Card'],['Blacknut Gift Card'],['Candy Crush Gift Card (US)'],['Carrom Gold'],['Cherry Credits Gift Card'],['Delta Force Coins (Steam)'],['Google Play (US) · Instant use'],['Steam Wallet Code (Global)'],['PlayStation Store (US)'],['Xbox Gift Card (US)'],['Netflix (TR)'],['Spotify Premium (US)'],['Roblox Gift Card (Global)'],['Razer Gold (Global)'],['Nintendo eShop (US)'],['Amazon Gift Card (US)',1],['Discord Nitro (Global)'],['Valorant Points (TR)'],['Free Fire Diamonds Voucher'],['Mobile Legends Diamonds Voucher']]});
+  })();
+
+  // ---------- cabinet: statistics (example numbers, seeded) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    var NS='http://www.w3.org/2000/svg',seed=11;
+    function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646}
+    function nf(n){return Math.round(n).toLocaleString('ru-RU')}
+    function usd(n){return '$'+n.toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4})}
+    var MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+    function build(p){
+      seed={'24h':3,'7d':5,'30d':7,all:11}[p];
+      var n={'24h':24,'7d':7,'30d':30,all:4}[p],base={'24h':2.5,'7d':45,'30d':48,all:1560}[p],pts=[];
+      var now=new Date(Date.UTC(2026,10,19,16));
+      for(var i=0;i<n;i++){
+        var wave=p==='all'?[1,1.15,0.95,0.55][i]:(0.55+rnd()*0.9+(p==='30d'&&rnd()>0.9?1.4:0));
+        var c=Math.max(0,Math.round(base*wave)),r=Math.floor(c*0.075+rnd()),d=Math.max(0,c-r-Math.floor(c*0.02+rnd()*0.5));
+        var t=new Date(now);
+        if(p==='24h')t.setUTCHours(now.getUTCHours()-(n-1-i));
+        else if(p==='all')t.setUTCMonth(now.getUTCMonth()-(n-1-i));
+        else t.setUTCDate(now.getUTCDate()-(n-1-i));
+        var lab=p==='24h'?('0'+t.getUTCHours()).slice(-2)+':00':p==='all'?MON[t.getUTCMonth()]+' 26':t.getUTCDate()+' '+MON[t.getUTCMonth()];
+        pts.push({lab:lab,c:c,d:d,r:r});
+      }
+      var C=0,D=0,Rf=0;pts.forEach(function(x){C+=x.c;D+=x.d;Rf+=x.r});
+      var avg=1.93,spent=D*avg,top=spent+(p==='all'?42.9:p==='30d'?30.2:p==='7d'?18:-4.03);
+      var types=[['Пополнение игр и сервисов',.86],['Steam',.06],['Telegram Stars',.05],['Telegram Premium',.03]].map(function(t,i){
+        var c=Math.round(C*t[1]),d=Math.round(D*t[1]),r=Math.round(Rf*t[1]);return [t[0],c,d,r,d*avg*[1,2.9,1.1,6.1][i]]}).filter(function(t){return t[1]>0});
+      return {pts:pts,C:C,D:D,R:Rf,spent:spent,top:Math.max(0,top),types:types};
+    }
+    function tiles(m){
+      var T=[['Создано заказов',nf(m.C),'v','За период'],['Выполнено',nf(m.D),'g','Успешные заказы'],['Возвраты',nf(m.R),'r','Заказы с возвратом'],['Сумма выполненных',usd(m.spent),'','Потрачено на выполненные'],['Пополнено',usd(m.top),'','Зачислено на баланс']];
+      $('sTiles').innerHTML=T.map(function(t){return '<div class="s-tile"><span>'+t[0]+'</span><b class="'+t[2]+'">'+t[1]+'</b><small>'+t[3]+'</small></div>'}).join('');
+    }
+    function nice(v){if(v<=0)return 4;var e=Math.pow(10,Math.floor(Math.log10(v))),f=v/e,s=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10;return s*e}
+    function path(P){ // monotone cubic
+      if(P.length<2)return '';var n=P.length,dx=[],m=[],t=[];
+      for(var i=0;i<n-1;i++){dx[i]=P[i+1][0]-P[i][0];m[i]=(P[i+1][1]-P[i][1])/dx[i]}
+      t[0]=m[0];t[n-1]=m[n-2];for(i=1;i<n-1;i++)t[i]=m[i-1]*m[i]<=0?0:(m[i-1]+m[i])/2;
+      for(i=0;i<n-1;i++){if(m[i]===0){t[i]=t[i+1]=0;continue}var a=t[i]/m[i],b=t[i+1]/m[i],h=a*a+b*b;if(h>9){var k=3/Math.sqrt(h);t[i]=k*a*m[i];t[i+1]=k*b*m[i]}}
+      var d='M'+P[0][0].toFixed(1)+' '+P[0][1].toFixed(1);
+      for(i=0;i<n-1;i++){var h3=dx[i]/3;d+='C'+(P[i][0]+h3).toFixed(1)+' '+(P[i][1]+t[i]*h3).toFixed(1)+' '+(P[i+1][0]-h3).toFixed(1)+' '+(P[i+1][1]-t[i+1]*h3).toFixed(1)+' '+P[i+1][0].toFixed(1)+' '+P[i+1][1].toFixed(1)}
+      return d;
+    }
+    function chart(m){
+      var W=380,H=300,L=34,Rr=8,Tp=12,B=26,pw=W-L-Rr,ph=H-Tp-B,pts=m.pts,n=pts.length;
+      var max=0;pts.forEach(function(x){max=Math.max(max,x.c)});var step=nice(max/4),top=step*4;if(top<max)top=step*5;
+      var X=function(i){return L+(n===1?pw/2:pw*i/(n-1))},Y=function(v){return Tp+ph-ph*v/top};
+      var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="График заказов: создано, выполнено, возвраты"><defs><linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d4bff" stop-opacity=".22"/><stop offset="1" stop-color="#6d4bff" stop-opacity="0"/></linearGradient></defs>';
+      for(var k=0;k<=4;k++){var v=top*k/4,y=Y(v);s+='<line x1="'+L+'" x2="'+(W-Rr)+'" y1="'+y+'" y2="'+y+'" stroke="#e8ebf0" stroke-width="1"/><text x="'+(L-6)+'" y="'+(y+3)+'" text-anchor="end">'+nf(v)+'</text>'}
+      var lab=n<=4?pts.map(function(_,i){return i}):[0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1];
+      lab.forEach(function(i){s+='<text x="'+X(i)+'" y="'+(H-8)+'" text-anchor="'+(i===0?'start':i===n-1?'end':'middle')+'">'+pts[i].lab+'</text>'});
+      function P(key){return pts.map(function(x,i){return [X(i),Y(x[key])]})}
+      var pc=path(P('c'));
+      s+='<path d="'+pc+'L'+X(n-1)+' '+Y(0)+'L'+X(0)+' '+Y(0)+'Z" fill="url(#sFill)"/>';
+      s+='<path d="'+path(P('r'))+'" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>';
+      s+='<path d="'+path(P('d'))+'" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>';
+      s+='<path d="'+pc+'" fill="none" stroke="#6d4bff" stroke-width="2" stroke-linecap="round"/>';
+      s+='<g id="sHover" visibility="hidden"><line id="sHl" y1="'+Tp+'" y2="'+(Tp+ph)+'" stroke="#94a3b8" stroke-width="1"/><circle id="sHc" r="4.5" fill="#6d4bff" stroke="#fff" stroke-width="2"/><circle id="sHd" r="4.5" fill="#16a34a" stroke="#fff" stroke-width="2"/><circle id="sHr" r="4.5" fill="#ef4444" stroke="#fff" stroke-width="2"/></g>';
+      s+='<rect id="sHit" x="'+L+'" y="'+Tp+'" width="'+pw+'" height="'+ph+'" fill="transparent"/></svg><div class="s-tip" id="sTip" hidden></div>';
+      $('sPlot').innerHTML=s;
+      var svg=$('sPlot').querySelector('svg'),tip=$('sTip'),g=$('sHover');
+      function at(ev){
+        var r=svg.getBoundingClientRect(),x=(ev.clientX-r.left)*W/r.width,i=n===1?0:Math.round((x-L)/pw*(n-1));i=Math.max(0,Math.min(n-1,i));
+        var p=pts[i],cx=X(i);g.setAttribute('visibility','visible');$('sHl').setAttribute('x1',cx);$('sHl').setAttribute('x2',cx);
+        [['sHc','c'],['sHd','d'],['sHr','r']].forEach(function(a){$(a[0]).setAttribute('cx',cx);$(a[0]).setAttribute('cy',Y(p[a[1]]))});
+        tip.innerHTML='<b>'+p.lab+'</b><div><span><i style="background:#6d4bff"></i>Создано</span><span>'+nf(p.c)+'</span></div><div><span><i style="background:#16a34a"></i>Выполнено</span><span>'+nf(p.d)+'</span></div><div><span><i style="background:#ef4444"></i>Возвраты</span><span>'+nf(p.r)+'</span></div>';
+        tip.hidden=false;var px=cx*r.width/W,left=px+12;if(left+160>r.width)left=px-172;tip.style.left=Math.max(0,left)+'px';tip.style.top='10px';
+      }
+      $('sHit').addEventListener('pointermove',at);$('sHit').addEventListener('pointerdown',at);
+      $('sHit').addEventListener('pointerleave',function(){g.setAttribute('visibility','hidden');tip.hidden=true});
+      $('sTable').innerHTML='<table><thead><tr><th>Период</th><th>Создано</th><th>Выполнено</th><th>Возвраты</th></tr></thead><tbody>'+pts.map(function(p){return '<tr><td>'+p.lab+'</td><td>'+nf(p.c)+'</td><td>'+nf(p.d)+'</td><td>'+nf(p.r)+'</td></tr>'}).join('')+'</tbody></table>';
+    }
+    function types(m){
+      $('sTypes').innerHTML=m.types.map(function(t){return '<div class="s-row"><div class="s-row-top"><b>'+t[0]+'</b><span>'+nf(t[1])+'</span><span class="g">'+nf(t[2])+'</span><span class="r">'+nf(t[3])+'</span></div><strong>'+usd(t[4])+'</strong></div>'}).join('');
+    }
+    function show(p){
+      document.querySelectorAll('.s-tabs button').forEach(function(b){var on=b.dataset.p===p;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1});
+      var m=build(p);tiles(m);chart(m);types(m);
+    }
+    document.querySelector('.s-tabs').addEventListener('click',function(e){var b=e.target.closest('button');if(b)show(b.dataset.p)});
+    document.querySelector('.s-tabs').addEventListener('keydown',function(e){
+      var bs=[].slice.call(this.children),i=bs.findIndex(function(b){return b.getAttribute('aria-selected')==='true'});
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length;show(bs[j].dataset.p);bs[j].focus()}
+    });
+    show('all');
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
