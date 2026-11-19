@@ -10,7 +10,7 @@ from donatix import accounts, db, dcoin, p2p
 
 @pytest.fixture
 def market(conn, monkeypatch):
-    monkeypatch.setattr(dcoin, "START_PRICE", 1.0)                      # цена «взрослая», без запаса
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.01)                     # 1 D = 1 цент: 100 D = $1
     monkeypatch.setattr(dcoin, "exchange_open", lambda *a, **k: True)
     seller, buyer = _user(conn, "seller"), _user(conn, "buyer")
     for _ in range(5):

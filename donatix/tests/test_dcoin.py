@@ -40,15 +40,16 @@ def test_price_starts_at_zero_and_coins_come_from_purchases(conn):
 
 
 def test_bigger_order_moves_up_more(conn):
+    """Цена — от покупки относительно предыдущей: мельче — чуть вниз, намного крупнее — заметно вверх."""
     uid = _user(conn)
     _buy(conn, uid, 10_000, cost=5_000)
     _buy(conn, uid, 10_000, cost=5_000)
     p1 = dcoin.price(conn)
-    _buy(conn, uid, 5_000, cost=2_500)                              # мельче обычного — чуть вверх
+    _buy(conn, uid, 5_000, cost=2_500)                              # мельче предыдущей — чуть вниз
     p2 = dcoin.price(conn)
-    _buy(conn, uid, 30_000, cost=15_000)                                       # крупнее обычного — заметно вверх
+    _buy(conn, uid, 30_000, cost=15_000)                            # намного крупнее — заметно вверх
     p3 = dcoin.price(conn)
-    assert p1 < p2 < p3 and (p3 - p2) / p2 > (p2 - p1) / p1
+    assert p2 < p1 < p3 and (p3 - p2) / p2 > (p1 - p2) / p1
 
 
 def test_never_more_than_pool_and_owner_keeps_most(conn):
@@ -169,12 +170,9 @@ def test_launch_price_starts_near_zero_and_grows_softly(conn, monkeypatch):
     for _ in range(300):
         _buy(conn, uid, 100_000)                                       # $10 каждая
     prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason = 'buy' ORDER BY id")]
-    assert prices[-1] > first * 1.5                                   # растёт по мере покупок (+0.2% за каждую)
+    assert prices[-1] > first * 1.3                                   # растёт по мере покупок (+0.1% за одинаковую)
     for a, b in pairwise(prices[1:]):
         assert abs(b - a) / a <= 0.0401                                 # и мягко, без скачков
-    s = dcoin.state(conn)
-    everything = dcoin.quote(conn, s["supply"])
-    assert everything <= s["pool"]                                     # людям — не больше копилки
 
 
 def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
@@ -190,19 +188,31 @@ def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points").fetchone()[0] == 1
 
 
-def test_every_purchase_moves_price_up(conn):
-    """Любая покупка — вверх, крупнее — сильнее. Раньше шаг считался от предыдущей покупки,
-    и при разных суммах подряд график полз вниз."""
+def test_purchase_moves_price_relative_to_previous(conn):
+    """Как просил владелец: 50 с., потом 30 с. — чуть вниз (не обвал); снова 50 — вверх; одинаковые — чуть вверх.
+    При обычной торговле вперемешку график в целом растёт, а не ползёт вниз."""
     uid = _user(conn)
-    for total in (30_000, 30_000, 30_000):
-        _buy(conn, uid, total)
-    prices = [dcoin.price(conn)]
-    for total in (50_000, 10_000, 200_000, 5_000, 40_000, 30_000):    # больше, меньше, вперемешку
-        _buy(conn, uid, total)
-        prices.append(dcoin.price(conn))
-    assert all(b > a for a, b in zip(prices, prices[1:])), prices
-    assert dcoin.move_for(10) > dcoin.move_for(1) > dcoin.move_for(0.1) > 0
-    assert dcoin.move_for(1000) == dcoin.MAX_STEP
+    soms = lambda s_: int(s_ / 10.9 * 10_000)   # noqa: E731 — сомони → микро-доллары
+    _buy(conn, uid, soms(50))
+    p50 = dcoin.price(conn)
+    _buy(conn, uid, soms(30))
+    p30 = dcoin.price(conn)
+    assert p30 < p50 and (p50 - p30) / p50 < 0.01                         # чуть вниз: ≈ −0.5%
+    _buy(conn, uid, soms(50))
+    assert dcoin.price(conn) > p50                                        # снова 50 — выше, чем было
+    p = dcoin.price(conn)
+    _buy(conn, uid, soms(50))
+    assert dcoin.price(conn) > p                                          # одинаковая — чуть вверх
+    assert abs(dcoin.step_for(30, 50) + 0.0051) < 0.0005 and dcoin.step_for(500, 1) == dcoin.MAX_STEP
+    start = dcoin.price(conn)
+    import random
+    rnd = random.Random(7)
+    for _ in range(200):
+        _buy(conn, uid, soms(rnd.choice([10, 20, 30, 50, 100, 15, 25])))
+    assert dcoin.price(conn) > start                                      # вперемешку — в итоге вверх
+    ups = sum(1 for a, b in pairwise(r[0] for r in conn.execute(
+        "SELECT price FROM dcoin_points WHERE reason = 'buy' ORDER BY id")) if b > a)
+    assert 50 < ups < 200                                                  # и вверх, и вниз — как на бирже
 
 
 def test_exchange_moves_price_down(conn, monkeypatch):
@@ -322,26 +332,6 @@ def test_candles_have_wicks_like_an_exchange(conn):
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points WHERE reason = 'peak'").fetchone()[0] >= 2
 
 
-def test_too_many_zeros_rebased_once_with_history(conn, monkeypatch):
-    uid = _user(conn)
-    db.set_setting(conn, "dcoin.rebase1", "skip")                       # как было на сервере: цена в нулях
-    monkeypatch.setattr(dcoin, "START_PRICE", 1e-11)
-    monkeypatch.setattr(dcoin, "MIN_POOL", 0)                           # выход из «застоя» здесь не нужен
-    for total in (30_000, 50_000, 40_000):
-        _buy(conn, uid, total)
-    before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
-    assert dcoin.price(conn) < 1e-9
-    monkeypatch.setattr(dcoin, "START_PRICE", 0.000002)
-    conn.execute("DELETE FROM settings WHERE key = 'dcoin.rebase1'")
-    p = dcoin.price(conn)
-    assert 0.0000002 <= p <= 0.00002                                     # ≈ 0.0000197 с., а не 0.000000000197
-    after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
-    factor = after[-1] / before[-1]
-    assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)   # вся история сдвинута одинаково
-    assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
-    assert dcoin.price(conn) == p                                         # второй раз не двигает
-
-
 def test_change_resets_at_midnight_and_past_days_kept(conn):
     from donatix import timez
     uid = _user(conn)
@@ -360,27 +350,6 @@ def test_change_resets_at_midnight_and_past_days_kept(conn):
     past = dcoin.days(conn)
     assert past and past[0]["day"].date() == (today - timedelta(days=1)).date()           # вчера в истории
     assert past[0]["high"] >= past[0]["close"] and past[0]["low"] <= past[0]["open"]
-
-
-def test_stuck_after_promo_drained_pool_moves_again(conn):
-    """Акция выбрала копилку почти до нуля, запас на пределе — покупки не двигали цену (стояла на 2.5e-14).
-    Теперь: один скачок к «настоящей» цене, дальше цена снова растёт с каждой покупкой, копилка копится."""
-    uid = _user(conn)
-    _buy(conn, uid, 50_000)
-    s = dcoin.state(conn)
-    limit = max(dcoin.RESERVE0, s["supply"]) * 4
-    dcoin._point(conn, 1, s["supply"], "promo", reserve=limit)            # как на сервере: копилка $0.0001
-    stuck = dcoin.price(conn)
-    prices = []
-    for _ in range(5):
-        _buy(conn, uid, 50_000)
-        prices.append(dcoin.price(conn))
-    assert prices[0] > stuck * 100                                         # вышли из «нуля»
-    assert all(b > a for a, b in pairwise(prices))                         # и дальше растёт с каждой покупкой
-    for a, b in pairwise(prices):
-        assert (b - a) / a <= 0.0401
-    s = dcoin.state(conn)
-    assert s["pool"] > 1 and dcoin.quote(conn, s["supply"]) <= s["pool"]  # копилка снова копится, без минуса
 
 
 def test_earning_closes_at_deadline(conn, config):
@@ -404,26 +373,6 @@ def test_earning_closes_at_deadline(conn, config):
     sitecfg.save(conn, config, {"dcoin_earn_until": ""})                           # без срока — снова копятся
     _buy(conn, uid, 10_000)
     assert dcoin.balance(conn, uid) > before
-
-
-def test_running_chart_lifted_once_to_001_somoni(conn, monkeypatch):
-    """Уже работающий график: цена один раз поднимается к 0.001 с. за 1 D, история — тем же коэффициентом."""
-    uid = _user(conn)
-    db.set_setting(conn, "dcoin.retarget_001", "skip")                  # как на сервере до обновления
-    monkeypatch.setattr(dcoin, "START_PRICE", 0.000002)                   # старая стартовая цена
-    for total in (30_000, 50_000, 40_000):
-        _buy(conn, uid, total)
-    before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
-    db.set_setting(conn, "pay.tjs_rate", "10")
-    conn.execute("DELETE FROM settings WHERE key = 'dcoin.retarget_001'")
-    p = dcoin.price(conn)
-    real = dcoin.price_of(dcoin.state(conn)["pool"], dcoin.state(conn)["supply"])
-    assert abs(p - min(0.001 / 10, real)) / p < 0.01                      # 0.001 с. (или «настоящая», если меньше)
-    after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
-    factor = after[-1] / before[-1]
-    assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)
-    assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
-    assert dcoin.price(conn) == p                                          # второй раз не двигает
 
 
 def test_exchange_off_and_price_lifted_to_001(conn):
