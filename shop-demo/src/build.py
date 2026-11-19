@@ -1,6 +1,6 @@
 import re,sys,os
 S=os.path.dirname(os.path.abspath(__file__))
-ICONS={'box':'package','code':'code-xml','dash':'layout-dashboard','zap':'zap','gift':'gift','head':'headphones','globe':'globe','shield':'shield','pad':'gamepad-2','key':'key-round','music':'music','tablet':'tablet','send':'send','plus':'plus','redo':'refresh-cw','menu':'menu','close':'x','up':'arrow-up','arrow':'arrow-right','chev':'chevron-right','check':'check'}
+ICONS={'box':'package','code':'code-xml','dash':'layout-dashboard','zap':'zap','gift':'gift','head':'headphones','globe':'globe','shield':'shield','pad':'gamepad-2','key':'key-round','music':'music','tablet':'tablet','send':'send','plus':'plus','redo':'refresh-cw','menu':'menu','close':'x','up':'arrow-up','arrow':'arrow-right','chev':'chevron-right','check':'check','userplus':'user-plus','plug':'plug','grid':'layout-grid','trend':'trending-up','star':'star','compare':'git-compare','rocket':'rocket','compass':'compass','book':'book-text','chart':'chart-column','down':'chevron-down','shake':'handshake','cart':'shopping-cart','cloud':'cloud-upload','bulb':'lightbulb'}
 sym=[]
 for k,f in ICONS.items():
     s=open(os.path.join(os.environ.get('LUCIDE_DIR',f'{S}/lucide'),'package/icons',f+'.svg')).read()
