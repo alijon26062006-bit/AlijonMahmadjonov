@@ -23,6 +23,7 @@
 <section class="page-hero">
   {% if kind in ('telegram_stars', 'telegram_premium') %}<a class="back" href="/panel/catalog?kind=telegram">{{ icon('arrow-left', 18) }}Telegram</a>{% endif %}
   <h1>{{ kind_titles.get(kind, 'Каталог') }}</h1>
+  <p>{{ {'topup': 'Каталог пополнений для игр и сервисов.', 'gift_card': 'Коды и ваучеры — выдаются сразу после оплаты.', 'game_key': 'Ключи игр для Steam и других платформ.'}.get(kind, 'Все товары Donatix по оптовым ценам.') }}</p>
 </section>
 <form class="search" method="get" action="/panel/catalog" role="search">
   {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}

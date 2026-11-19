@@ -32,7 +32,7 @@
   @media (max-width: 560px) { .cx-go .btn { width: 100%; } }
   .pay-warn { margin: 8px 0 12px; padding: 9px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: .82rem; }
 </style>
-<section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1></section>
+<section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1><p>{{ 'Оплатите — заказ оформится сам.' if buy else 'Доступные средства и информация по оплатам.' }}</p></section>
 
 <div class="grid two" style="align-items:start">
   <div class="stack">
