@@ -1,302 +1,256 @@
-<title>Gemora Top-Up</title>
+<title>Gemora Reseller</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Пополнение игр, Telegram Stars и подарочные карты с оплатой криптовалютой.">
+<meta name="description" content="B2B платформа для реселлеров цифровых товаров.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap">
 <style>
-/* Layout: one centered column on phones (mockup → hero text → sections), 2-column hero and card grids from 900px. Light theme only, by design. */
+/* Layout: single centered column on phones (window mockup → hero text → sections), measured against the reference at 430px. Light theme only, by design. */
 :root{
   color-scheme: light;
-  /* Palette A — «Изумруд» (default) */
-  --acc:#087f5b;        /* buttons, links */
-  --acc-strong:#056347; /* hover */
-  --acc-bright:#12b886; /* gradients, glow */
-  --acc-soft:#8ee0bf;   /* illustrations */
-  --acc-deep:#06402f;   /* illustrations, dark parts */
-  --tint:#e6f6ef;       /* icon tiles */
-  --tint-2:#cdeedf;
-  --acc-line:rgba(8,127,91,.32);
-  --glow:rgba(18,184,134,.26);
-  --ink:#0d1b16;        /* headings */
-  --text:#45534e;       /* body */
-  --muted:#6a7873;
-  --line:#e2e8e5;
-  --bg:#f7f9f8;
-  --card:#ffffff;
-  --ok:#14915a; --ok-bg:#dcf5e8;
-  --shadow:0 1px 2px rgba(13,27,22,.04),0 8px 24px rgba(13,27,22,.05);
-  --font: "Manrope", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --r-card:18px; --r-btn:14px; --r-tile:14px;
+  --acc:#7e5bff; --acc-hover:#6c47f2; --tile:#efebff; --glow:rgba(126,91,255,.18);
+  --ink:#1a1d24; --text:#4b5563; --line:#e5e7eb; --bg:#fafbfc; --card:#ffffff;
+  --ok:#16a34a; --ok-bg:#def6e7;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Monaco,Consolas,"JetBrains Mono","Liberation Mono",monospace;
+  --sh-sm:0 1px 2px rgba(0,0,0,.05);
+  --sh-card:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-lg:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);
 }
-/* Palette B — «Сапфир» */
-:root[data-palette="sapphire"]{
-  --acc:#2c55e6; --acc-strong:#1d3fc0; --acc-bright:#4f7bff; --acc-soft:#a9bdff; --acc-deep:#16245f;
-  --tint:#ebf0ff; --tint-2:#d5dfff; --acc-line:rgba(44,85,230,.32); --glow:rgba(79,123,255,.28);
-  --ink:#0c1427; --text:#465068; --muted:#69728a; --line:#e2e6ef; --bg:#f7f8fb;
-}
-
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 a{color:inherit;text-decoration:none}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-h1,h2,h3{color:var(--ink);margin:0;text-wrap:balance;letter-spacing:-.02em}
-p{margin:0}
-.ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-:focus-visible{outline:2.5px solid var(--acc);outline-offset:3px;border-radius:10px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{color:var(--ink)}
+.ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:8px}
 .skip{position:absolute;left:-999px;top:8px;background:var(--card);padding:10px 14px;border-radius:10px;z-index:100}
 .skip:focus{left:16px}
-
 .wrap{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* ---------- Header ---------- */
-.header{background:var(--card);border-bottom:1px solid var(--line);position:relative;z-index:30}
-.header .wrap{height:60px;display:flex;align-items:center;gap:12px}
-.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em}
-.logo svg{width:34px;height:34px}
-.nav{display:none;gap:4px;margin-left:24px}
-.nav a{padding:8px 12px;border-radius:10px;font-weight:600;font-size:15px;color:var(--text)}
-.nav a:hover{background:var(--bg);color:var(--ink)}
-.h-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.lang{position:relative}
-.lang-btn{height:40px;padding:0 10px;font-weight:600;font-size:16px;color:var(--text);border-radius:10px;display:flex;align-items:center;gap:6px}
+.header{background:rgba(255,255,255,.5);border-bottom:1px solid var(--line);position:relative;z-index:30}
+.header .wrap{height:63px;display:flex;align-items:center}
+.logo{display:flex;align-items:center;gap:10px;margin-left:2px}
+.logo svg{width:36px;height:36px;display:block}
+.logo b{display:none;font-weight:700;font-size:18px;color:var(--ink)}
+.nav{display:none}
+.h-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.lang-btn{height:40px;padding:0 12px;font-weight:500;font-size:14px;color:var(--text);border-radius:10px}
 .lang-btn:hover{color:var(--ink)}
-.lang-menu{position:absolute;right:0;top:46px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;min-width:170px}
-.lang-menu button{display:flex;justify-content:space-between;width:100%;padding:10px 12px;border-radius:10px;font-size:15px;font-weight:600;text-align:left}
-.lang-menu button:hover{background:var(--bg)}
-.lang-menu .soon{color:var(--muted);font-weight:500;font-size:13px}
-.icon-btn{width:42px;height:42px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;color:var(--ink);background:var(--card)}
-.icon-btn:hover{border-color:var(--acc-line)}
-.btn-login{display:none;height:42px;padding:0 16px;border:1px solid var(--line);border-radius:12px;font-weight:700;font-size:15px;color:var(--ink);align-items:center;gap:8px}
-.btn-login:hover{border-color:var(--acc-line)}
+.burger{width:42px;height:42px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;color:var(--ink)}
+.btn-login{display:none}
 .menu{border-top:1px solid var(--line);background:var(--card)}
-.menu .wrap{padding-block:12px 18px;display:grid;gap:4px}
-.menu a.m-link{display:flex;justify-content:space-between;align-items:center;padding:13px 4px;font-weight:700;font-size:17px;color:var(--ink);border-bottom:1px solid var(--line)}
-.menu a.m-link .ico{color:var(--muted)}
+.menu .wrap{padding-block:8px 16px;display:grid}
+.menu a.m-link{display:flex;justify-content:space-between;align-items:center;padding:13px 2px;font-weight:500;font-size:16px;color:var(--ink);border-bottom:1px solid var(--line)}
+.menu a.m-link .ico{color:#9ca3af;width:18px;height:18px}
 .menu .m-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.menu .m-actions .btn{height:48px;padding:0 12px}
 
 /* ---------- Buttons ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:54px;padding:0 24px;border-radius:var(--r-btn);font-weight:700;font-size:17px;transition:background .2s,transform .15s,box-shadow .2s,border-color .2s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;font-weight:600;font-size:16px;line-height:24px;transition:background .2s,transform .15s,border-color .2s,box-shadow .2s}
 .btn:active{transform:scale(.98)}
-.btn-primary{background:var(--acc);color:#fff;box-shadow:0 10px 24px -8px var(--glow),0 2px 6px var(--glow)}
-.btn-primary:hover{background:var(--acc-strong)}
-.btn-ghost{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
-.btn-ghost:hover{border-color:var(--acc-line)}
-.link{display:inline-flex;align-items:center;gap:6px;color:var(--acc);font-weight:700}
-.link:hover{color:var(--acc-strong)}
-.link .ico{width:18px;height:18px;transition:transform .2s}
-.link:hover .ico{transform:translateX(3px)}
+.btn-primary{background:var(--acc);color:#fff;padding:16px 32px;box-shadow:var(--sh-lg)}
+.btn-primary:hover{background:var(--acc-hover)}
+.btn-primary.lg{font-size:18px;line-height:28px}
+.btn-ghost{border:2px solid var(--line);color:var(--ink);padding:16px 32px}
+.btn-ghost.sm{padding:12px 24px}
+.btn-ghost:hover{border-color:#d1d5db;background:#fff}
+.link{display:inline-flex;align-items:center;gap:8px;color:var(--acc);font-weight:500;font-size:14px;line-height:20px}
+.link:hover{color:var(--acc-hover)}
+.link .ico{width:16px;height:16px}
 
 /* ---------- Hero ---------- */
-.hero{padding-block:36px 64px}
-.hero .wrap{display:flex;flex-direction:column;gap:48px}
-.mock-wrap{position:relative;padding:8px 6px 18px 14px}
-.tilt{position:relative;transform:perspective(1600px) rotateY(-7deg) rotateX(5deg) rotateZ(-1.6deg);transform-origin:50% 50%;animation:sway 11s ease-in-out infinite}
+.hero{padding-block:40px 24px}
+.hero .wrap{display:flex;flex-direction:column}
+.mock-wrap{position:relative}
+.tilt{position:relative;transform-origin:50% 50%;transform:perspective(1060px) rotateX(9deg) rotateY(-9.8deg) rotateZ(.3deg);animation:sway 9s ease-in-out infinite}
 @keyframes sway{
-  0%,100%{transform:perspective(1600px) rotateY(-7deg) rotateX(5deg) rotateZ(-1.6deg)}
-  50%{transform:perspective(1600px) rotateY(-2.5deg) rotateX(2.5deg) rotateZ(-.5deg)}
+  0%,100%{transform:perspective(1060px) rotateX(9deg) rotateY(-9.8deg) rotateZ(.3deg)}
+  50%{transform:perspective(1060px) rotateX(7deg) rotateY(-7.4deg) rotateZ(-.6deg) translateY(-4px)}
 }
-.mock{position:relative;border:1.5px solid var(--acc-line);border-radius:24px;overflow:hidden;
-  background:radial-gradient(70% 60% at 10% 100%,var(--tint),transparent 70%),var(--card);
-  box-shadow:0 30px 60px -28px rgba(13,27,22,.28),0 4px 14px rgba(13,27,22,.05)}
-.mock::before{content:"";position:absolute;left:0;top:0;width:80%;aspect-ratio:1;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,var(--glow) 0%,transparent 66%);animation:glowMove 12s ease-in-out infinite}
+.mock{position:relative;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:#fafbfb;
+  box-shadow:0 0 0 1px #8fb4f0,0 25px 50px -12px rgba(0,0,0,.25)}
+.mock::before{content:"";position:absolute;left:0;top:0;width:95%;aspect-ratio:1;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(126,91,255,.22) 0%,rgba(126,91,255,.12) 38%,transparent 68%);animation:glowMove 10s ease-in-out infinite}
 @keyframes glowMove{
-  0%,100%{transform:translate(55%,55%)}
-  28%{transform:translate(-25%,45%)}
-  52%{transform:translate(15%,-30%)}
-  76%{transform:translate(40%,5%)}
+  0%,100%{transform:translate(52%,42%)}
+  25%{transform:translate(-38%,38%)}
+  50%{transform:translate(8%,-48%)}
+  75%{transform:translate(30%,-8%)}
 }
 .mock-bar,.mock-body{position:relative;z-index:1}
-.mock-bar{display:flex;align-items:center;gap:7px;padding:14px 18px;border-bottom:1px solid var(--line)}
-.dot{width:12px;height:12px;border-radius:50%}
-.dot.r{background:#ef5f57}.dot.y{background:#f2bd3a}.dot.g{background:#38c25d}
-.mock-url{flex:1;text-align:center;font-size:13.5px;color:var(--text);margin-right:40px}
-.mock-body{padding:18px 18px 22px 24px;display:grid;gap:12px}
-.mrow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 12px 0 14px;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:0 2px 8px rgba(13,27,22,.04);
-  font-family:var(--mono);font-weight:700;font-size:13px;color:var(--ink);letter-spacing:-.01em;
+.mock-bar{display:flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-bottom:1px solid var(--line)}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.dot.r{background:#f16869}.dot.y{background:#edc139}.dot.g{background:#4dd07d}
+.mock-url{flex:1;text-align:center;font-size:12px;line-height:16px;color:var(--text)}
+.mock-body{padding:24px}
+.rows{display:grid;gap:16px;min-height:244px;align-content:start}
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-sm);
+  font-family:var(--mono);font-weight:600;font-size:14px;line-height:20px;color:var(--ink);
   opacity:0;transform:translateY(14px) scale(.98);transition:opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1)}
 .mrow.on{opacity:1;transform:none}
-.rows{display:grid;gap:12px;min-height:236px;align-content:start}
 .mrow span.t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrow .ico{color:var(--acc);width:21px;height:21px}
-.mrow .ok{width:32px;height:32px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;
+.mrow > .ico{color:var(--acc);width:18px;height:18px}
+.mrow .ok{width:24px;height:24px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;
   opacity:0;transform:scale(.3);transition:opacity .2s ease,transform .45s cubic-bezier(.3,1.7,.5,1)}
 .mrow.done .ok{opacity:1;transform:none}
-.mrow .ok .ico{color:var(--ok);width:17px;height:17px;stroke-width:2.4}
+.mrow .ok .ico{width:14px;height:14px;stroke-width:2.6}
 /* buttons: the window grows to reveal them */
-.mfold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1)}
-.mfold.on{grid-template-rows:1fr}
-.mfold > div{min-height:0;overflow:hidden;display:grid;gap:12px;padding:2px 1px}
-.mbtn{display:flex;align-items:center;justify-content:center;gap:9px;height:48px;background:var(--card);border:1px solid var(--line);border-radius:15px;color:var(--acc);font-weight:700;font-size:15px;
+.mfold{display:grid;grid-template-rows:0fr;margin-top:0;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1),margin-top .6s}
+.mfold.on{grid-template-rows:1fr;margin-top:16px}
+.mfold > div{min-height:0;overflow:hidden;display:grid;gap:12px}
+.mbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:47px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--acc);font-weight:600;font-size:14px;
   opacity:0;transform:translateY(10px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.8,.2,1)}
 .mfold.on .mbtn{opacity:1;transform:none;transition-delay:.25s}
 .mfold.on .mbtns .mbtn{transition-delay:.4s}
-.mbtn .ico{width:19px;height:19px}
-.mbtns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.mbtns .mbtn{height:44px;font-size:14px}
-.mock-body{gap:0!important}
-.mfold.on{margin-top:12px}
-.mfold{margin-top:0;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1),margin-top .6s}
-.tag{position:absolute;border-radius:999px;font-weight:700;font-size:14px;padding:6px 15px;box-shadow:0 6px 16px rgba(13,27,22,.1)}
-.tag-l{left:-6px;top:84px;font-size:13px;padding:5px 12px;background:var(--card);color:var(--acc);border:1px solid var(--line)}
-.tag-r{right:-6px;bottom:6px;background:var(--acc);color:#fff}
-@media (prefers-reduced-motion:reduce){
-  .tilt,.mock::before{animation:none}
-  .mrow,.mrow .ok,.mbtn{opacity:1;transform:none}
-  .mfold{grid-template-rows:1fr;margin-top:12px}
-}
+.mbtn .ico{width:16px;height:16px}
+.mbtns{display:flex;gap:10px}
+.mbtns .mbtn{flex:1 1 auto;height:38px;font-size:13px;padding:0 12px;gap:6px}
+.mbtns .mbtn .ico{width:14px;height:14px}
+.tag{position:absolute;z-index:2;border-radius:999px;font-size:12px;line-height:16px}
+.tag-l{left:-12px;top:24.5%;background:#fff;color:var(--acc);font-weight:500;padding:4px 12px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);animation:floatA 5s ease-in-out infinite}
+.tag-r{right:-4px;bottom:-10px;background:var(--acc);color:#fff;font-weight:600;padding:5px 10px;box-shadow:var(--sh-lg);animation:floatA 6s ease-in-out -2s infinite}
+@keyframes floatA{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 
-.hero-text{display:flex;flex-direction:column;align-items:center;text-align:center;gap:0}
-.pill{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 18px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--acc);font-weight:600;font-size:15px}
-.pill .ico{width:18px;height:18px}
-.hero h1{margin-top:28px;font-size:clamp(31px,8.2vw,60px);line-height:1.12;font-weight:800;letter-spacing:-.035em}
-.brand-word{color:var(--acc);background:linear-gradient(100deg,var(--acc) 10%,var(--acc-bright) 90%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 14px var(--glow))}
-.hero .lead{margin-top:22px;font-size:17px;line-height:1.65;color:var(--text);max-width:560px}
-.hero .cta{margin-top:34px;display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
-.hero .cta .btn-primary{width:100%;max-width:420px;height:56px}
-.hero .cta .btn-ghost{height:58px;padding:0 30px}
-.hero .note{margin-top:18px;font-size:15px;color:var(--muted)}
+.hero-text{display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:52px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.5);color:var(--acc);font-weight:500;font-size:14px;line-height:20px;box-shadow:var(--sh-sm)}
+.pill .ico{width:16px;height:16px}
+.hero h1{margin-top:24px;font-size:30px;line-height:1.25;font-weight:700;letter-spacing:-.025em;text-wrap:balance}
+.brand-word{color:var(--acc);text-shadow:0 0 18px rgba(126,91,255,.5),0 0 40px rgba(126,91,255,.28)}
+.hero .lead{margin-top:21px;font-size:16px;line-height:26px;max-width:640px}
+.hero .cta{margin-top:40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.hero .note{margin-top:16px;font-size:14px;line-height:20px}
 
 /* ---------- Sections ---------- */
-.sec{padding-block:64px}
-.sec-head{text-align:center;max-width:640px;margin:0 auto 40px}
-.sec-head h2{font-size:clamp(30px,7.4vw,44px);line-height:1.15;font-weight:800}
-.sec-head p{margin-top:16px;font-size:17px;line-height:1.65}
+.sec{padding-block:80px}
+.sec-head{text-align:center;margin:0 auto 64px;max-width:720px}
+.sec-head.tight{margin-bottom:48px}
+.sec-head h2,.h2{font-size:30px;line-height:36px;font-weight:700;text-wrap:balance}
+.sec-head p{margin-top:16px;font-size:16px;line-height:24px}
 .divided{border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card)}
-.tile{width:46px;height:46px;border-radius:var(--r-tile);background:var(--tint);color:var(--acc);display:grid;place-items:center;flex:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-card)}
+.tile{width:48px;height:48px;border-radius:12px;background:var(--tile);color:var(--acc);display:grid;place-items:center;flex:none}
 .tile .ico{width:24px;height:24px}
 
 /* features */
-.features{display:grid;gap:16px}
-.feature{display:flex;align-items:center;gap:16px;padding:24px 18px}
-.feature h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
-.feature p{margin-top:6px;font-size:15.5px;line-height:1.6}
+.features{display:grid;gap:18px}
+.feature{display:flex;align-items:center;gap:16px;padding:15px 16px}
 .feature > div{min-width:0}
-.after-link{text-align:center;margin-top:40px;font-size:18px}
+.feature h3{font-size:16px;line-height:24px;font-weight:600}
+.feature p{margin-top:2px;font-size:14px;line-height:20px}
+.after-link{text-align:center;margin-top:48px}
+.after-link .link{font-size:16px;line-height:24px;font-weight:600}
+.after-link .link .ico{width:18px;height:18px}
 
 /* stats */
-.stats{display:grid;grid-template-columns:1fr 1fr;row-gap:40px;column-gap:16px;text-align:center;padding-block:64px}
-.stat b{display:block;font-size:clamp(32px,8vw,44px);line-height:1.1;font-weight:800;color:var(--acc);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.stat span{display:block;margin-top:6px;font-size:15.5px;color:var(--text)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:32px;text-align:center;padding-block:64px}
+.stat b{display:block;font-size:30px;line-height:36px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:4px;font-size:14px;line-height:20px}
 
 /* catalog */
-.cat-grid{display:grid;gap:22px}
-.cat{padding:28px 22px}
-.cat h3{font-size:24px;font-weight:800}
-.cat > p{margin-top:10px;font-size:15.5px;line-height:1.6}
-.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.chip{display:inline-flex;align-items:center;height:42px;padding:0 18px;border:1px solid var(--line);border-radius:999px;font-size:16px;color:var(--ink);background:var(--card);transition:border-color .2s,background .2s}
-.chip:hover{border-color:var(--acc-line);background:var(--tint)}
-.cat .link{margin-top:22px;font-size:16px}
-.center{display:flex;justify-content:center;margin-top:36px}
-.center .btn{min-width:min(100%,320px)}
+.cat-grid{display:grid;gap:24px}
+.cat{padding:24px 24px 22px}
+.cat h3{font-size:20px;line-height:28px;font-weight:700}
+.cat > p{margin-top:8px;font-size:14px;line-height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;line-height:20px;color:var(--ink);background:#fff;transition:border-color .2s,color .2s}
+.chip:hover{border-color:var(--acc);color:var(--acc)}
+.cat .link{margin-top:16px;gap:4px}
+.center{display:flex;justify-content:center}
+.mt-8{margin-top:32px}.mt-12{margin-top:48px}
 
 /* services */
-.svc-grid{display:grid;gap:22px}
-.svc{padding:28px 22px 26px;display:grid;grid-template-columns:46px 1fr;column-gap:18px;align-content:start}
-.svc h3{font-size:22px;font-weight:800;align-self:center}
-.svc .body{grid-column:2;margin-top:12px;min-width:0}
-.svc .body p{font-size:16px;line-height:1.65}
-.svc .body .link{margin-top:14px;font-size:16px}
-.svc .art{grid-column:1 / -1;margin-top:22px;border-radius:16px;overflow:hidden;background:var(--tint);aspect-ratio:16/9;max-width:100%}
+.svc-grid{display:grid;gap:28px}
+.svc{padding:21px 24px 24px;display:grid;grid-template-columns:48px 1fr;column-gap:16px;align-content:start}
+.svc h3{font-size:20px;line-height:28px;font-weight:600}
+.svc .body{grid-column:2;margin-top:-4px;min-width:0}
+.svc .body p{font-size:16px;line-height:24px}
+.svc .body .link{margin-top:12px;gap:6px}
+.arr{font-family:-apple-system,system-ui,"Segoe UI Symbol",sans-serif;font-weight:400}
+.svc .art{grid-column:1 / -1;justify-self:center;margin-top:24px;width:100%;max-width:278px;aspect-ratio:3/2}
 .svc .art svg{width:100%;height:100%;display:block}
-.f-acc{fill:var(--acc)} .f-bright{fill:var(--acc-bright)} .f-soft{fill:var(--acc-soft)} .f-deep{fill:var(--acc-deep)}
-.f-tint{fill:var(--tint)} .f-tint2{fill:var(--tint-2)} .f-w{fill:#fff} .f-ink{fill:var(--ink)} .f-line{fill:var(--line)}
-.s-w{stroke:#fff} .s-acc{stroke:var(--acc)} .s-deep{stroke:var(--acc-deep)} .s-soft{stroke:var(--acc-soft)}
 
 /* footer */
-.footer{background:var(--card);border-top:1px solid var(--line);padding-block:48px 28px;margin-top:40px}
-.f-grid{display:grid;gap:32px}
-.f-about p{margin-top:14px;font-size:15px;max-width:340px}
-.f-col h4{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.f-col a{display:block;padding:5px 0;font-weight:600;color:var(--ink);font-size:15.5px}
+.footer{border-top:1px solid var(--line);padding-block:40px 28px}
+.f-grid{display:grid;gap:28px}
+.f-about p{margin-top:12px;font-size:14px;line-height:20px;max-width:340px}
+.f-about .logo b{display:block}
+.f-col h4{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--ink)}
+.f-col a{display:block;padding:4px 0;color:var(--text);font-size:14px}
 .f-col a:hover{color:var(--acc)}
-.pay{display:flex;flex-wrap:wrap;gap:8px}
-.pay span{height:34px;display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;font-weight:700;color:var(--ink);background:var(--bg)}
-.f-bottom{margin-top:36px;padding-top:22px;border-top:1px solid var(--line);display:grid;gap:10px;font-size:13.5px;color:var(--muted)}
+.f-bottom{margin-top:32px;padding-top:20px;border-top:1px solid var(--line);display:grid;gap:8px;font-size:13px;line-height:19px}
 
 /* floating */
-.to-top{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:48px;height:48px;border-radius:14px;background:var(--acc);color:#fff;display:grid;place-items:center;box-shadow:0 10px 24px -6px var(--glow);z-index:40;transition:opacity .25s,transform .25s}
-.to-top .ico{width:22px;height:22px;stroke-width:2.2}
+.to-top{position:fixed;right:calc(32px + env(safe-area-inset-right,0px));bottom:calc(32px + env(safe-area-inset-bottom,0px));width:44px;height:44px;border-radius:12px;background:var(--acc);color:#fff;display:grid;place-items:center;box-shadow:var(--sh-lg);z-index:40;transition:opacity .25s,transform .25s}
+.to-top .ico{width:20px;height:20px}
 .to-top.off{opacity:0;transform:translateY(12px);pointer-events:none}
-.palette{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;display:flex;align-items:center;gap:4px;padding:4px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);font-size:13px;font-weight:700}
-.palette > span{padding:0 6px 0 8px;color:var(--muted)}
-.palette button{height:34px;padding:0 12px;border-radius:999px;display:flex;align-items:center;gap:6px;color:var(--text)}
-.palette button i{width:12px;height:12px;border-radius:50%;display:block}
-.palette button[aria-pressed="true"]{background:var(--ink);color:#fff}
-@media (max-width:899px){.palette>span{display:none}.palette button{height:30px;padding:0 10px;font-size:12.5px}}
-.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14.5px;font-weight:600;z-index:60;max-width:calc(100% - 32px);text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;font-weight:500;z-index:60;max-width:calc(100% - 32px);text-align:center}
 
 /* ---------- Desktop ---------- */
 @media (min-width:640px){
   .features{grid-template-columns:1fr 1fr}
   .stats{grid-template-columns:repeat(3,1fr)}
+  .mock-wrap{max-width:440px;margin:0 auto;width:100%}
 }
-@media (min-width:900px){
-  .header .wrap{height:68px}
-  .nav{display:flex}
-  .btn-login{display:inline-flex}
-  .burger{display:none}
-  .menu{display:none}
-  .hero{padding-block:72px 96px}
-  .hero .wrap{display:grid;grid-template-columns:1.05fr 1fr;align-items:center;gap:56px}
-  .hero-text{order:1;align-items:flex-start;text-align:left}
-  .mock-wrap{order:2}
-  .hero .cta{flex-direction:row;justify-content:flex-start}
-  .hero .cta .btn-primary{width:auto;padding:0 30px}
+@media (min-width:960px){
+  .header .wrap{height:67px}
+  .logo b{display:block}
+  .nav{display:flex;gap:4px;margin-left:28px}
+  .nav a{padding:8px 12px;border-radius:10px;font-weight:500;font-size:14px;color:var(--text)}
+  .nav a:hover{color:var(--ink);background:#f3f4f6}
+  .btn-login{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:12px;background:var(--acc);color:#fff;font-weight:600;font-size:14px}
+  .burger,.menu{display:none}
+  .hero{padding-block:72px 40px}
+  .hero .wrap{display:grid;grid-template-columns:1.05fr 1fr;align-items:center;gap:64px}
+  .hero-text{order:1;align-items:flex-start;text-align:left;margin-top:0}
+  .mock-wrap{order:2;max-width:460px}
+  .hero h1{font-size:52px;line-height:1.1}
+  .hero .lead{font-size:18px;line-height:30px}
+  .hero .cta{flex-direction:row}
   .sec{padding-block:96px}
-  .sec-head{margin-bottom:56px}
-  .stats{grid-template-columns:repeat(5,1fr);padding-block:72px}
+  .sec-head h2,.h2{font-size:36px;line-height:40px}
+  .sec-head p{font-size:18px;line-height:28px}
+  .stats{grid-template-columns:repeat(5,1fr)}
+  .stat b{font-size:36px;line-height:40px}
   .cat-grid{grid-template-columns:1fr 1fr}
-  .cat{padding:34px 32px}
   .svc-grid{grid-template-columns:1fr 1fr}
-  .svc{padding:32px 30px 30px}
-  .f-grid{grid-template-columns:1.6fr 1fr 1fr 1.3fr}
-  .f-bottom{grid-template-columns:auto 1fr;justify-items:start;gap:24px}
-  .f-bottom p:last-child{justify-self:end;text-align:right;max-width:560px}
-  .palette{left:auto;right:calc(80px + env(safe-area-inset-right,0px))}
+  .f-grid{grid-template-columns:1.6fr 1fr 1fr}
 }
-@media (min-width:1200px){
-  .svc-grid{grid-template-columns:repeat(3,1fr)}
-  .features{grid-template-columns:1fr 1fr}
-}
+@media (min-width:1200px){.svc-grid{grid-template-columns:repeat(3,1fr)}.features{grid-template-columns:repeat(4,1fr)}.feature{flex-direction:column;align-items:flex-start;padding:24px}}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
   html{scroll-behavior:auto}
+  .mrow,.mrow .ok,.mbtn{opacity:1;transform:none}
+  .mfold{grid-template-rows:1fr;margin-top:16px}
 }
 </style>
 
-<!-- icon sprite (own line icons) -->
+<!-- Icons: Lucide (ISC License) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 2.8 20 7.2v9.6L12 21.2 4 16.8V7.2Z"/><path d="m4 7.2 8 4.4 8-4.4M12 11.6v9.6"/></symbol>
-  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M9 3 7 21M17 3l-2 18M4 8.5h16M3.5 15.5h16"/></symbol>
-  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></symbol>
-  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5 4.5 14h7l-1 7.5 9-11.5h-7z"/></symbol>
-  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="4.2" rx="1"/><path d="M5.5 12.2V20h13v-7.8M12 8v12"/><path d="M12 8C10.5 4.5 7 4.3 7 6.4 7 8 9.2 8 12 8Zm0 0c1.5-3.5 5-3.7 5-1.6C17 8 14.8 8 12 8Z"/></symbol>
-  <symbol id="i-headset" viewBox="0 0 24 24"><path d="M4.5 15v-3a7.5 7.5 0 0 1 15 0v3"/><rect x="3.5" y="13.5" width="4.5" height="6.5" rx="2"/><rect x="16" y="13.5" width="4.5" height="6.5" rx="2"/></symbol>
-  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3Z"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.6c0 4.5 3.1 8.1 7.5 9.4 4.4-1.3 7.5-4.9 7.5-9.4V6Z"/></symbol>
-  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 8.3h8M12 8.3v8.4M8.6 11.6c2.2.8 4.6.8 6.8 0"/></symbol>
-  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M5 7.5V6.5A2 2 0 0 1 7 4.5h10v3"/><rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M15.5 13.5h2"/></symbol>
-  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4.2"/><path d="M11 12.5 20 3.5M16.5 7l2.5 2.5M14 9.5l2 2"/></symbol>
-  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.3" cy="18" r="2.7"/><circle cx="17.3" cy="16" r="2.7"/></symbol>
-  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.2 2.7 5.5 6 .9-4.3 4.2 1 6L12 17l-5.4 2.8 1-6-4.3-4.2 6-.9Z"/></symbol>
-  <symbol id="i-pad" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="11" rx="5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><path d="M15.2 11.4h.01M17.6 13.8h.01" stroke-width="2.6"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
-  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
-  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
-  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
-  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M19.5 11A7.5 7.5 0 0 0 6 7.2L4.5 9M4.5 4.5V9H9M4.5 13A7.5 7.5 0 0 0 18 16.8l1.5-1.8M19.5 19.5V15H15"/></symbol>
-  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
-  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
-  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.4-3.6 4.2-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7" /> <path d="m7.5 4.27 9 5.15" /></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m18 16 4-4-4-4" /> <path d="m6 8-4 4 4 4" /> <path d="m14.5 4-5 16" /></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1" /> <rect width="7" height="5" x="14" y="3" rx="1" /> <rect width="7" height="9" x="14" y="12" rx="1" /> <rect width="7" height="5" x="3" y="16" rx="1" /></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1" /> <path d="M12 8v13" /> <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /> <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></symbol>
+  <symbol id="i-head" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" /></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-pad" viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11" /> <line x1="8" x2="8" y1="9" y2="13" /> <line x1="15" x2="15.01" y1="12" y2="12" /> <line x1="18" x2="18.01" y1="10" y2="10" /> <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" /> <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13" /> <circle cx="6" cy="18" r="3" /> <circle cx="18" cy="16" r="3" /></symbol>
+  <symbol id="i-tablet" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /> <line x1="12" x2="12.01" y1="18" y2="18" /></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="M12 5v14" /></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="12" y2="12" /> <line x1="4" x2="20" y1="6" y2="6" /> <line x1="4" x2="20" y1="18" y2="18" /></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
 </svg>
 
 <a class="skip" href="#main">К содержимому</a>
@@ -304,47 +258,39 @@ p{margin:0}
 <header class="header">
   <div class="wrap">
     <a class="logo" href="#top" aria-label="Gemora — на главную">
-      <svg viewBox="0 0 34 34" aria-hidden="true">
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--acc-bright)"/><stop offset="1" style="stop-color:var(--acc-deep)"/></linearGradient></defs>
-        <rect width="34" height="34" rx="10" fill="url(#lg)"/>
-        <g fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round">
-          <path d="M8.5 14 12.5 9h9l4 5L17 25.5Z"/>
-          <path d="M8.5 14h17M14.6 9 13.6 14 17 25.5 20.4 14l-1-5"/>
-        </g>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b14bff"/><stop offset=".55" stop-color="#7e5bff"/><stop offset="1" stop-color="#3f6bff"/></linearGradient></defs>
+        <path d="M18 2.6 30.6 9.8v14.4L18 33.4 5.4 24.2V9.8Z" fill="#fff" stroke="url(#lg)" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M11 15.5 14.4 11h7.2l3.4 4.5L18 25.5Z" fill="url(#lg)"/>
+        <path d="M11 15.5h14M15.6 11l-1 4.5L18 25.5l3.4-10-1-4.5" fill="none" stroke="#fff" stroke-width="1.1" stroke-linejoin="round"/>
       </svg>
-      <span>Gemora</span>
+      <b>Gemora</b>
     </a>
     <nav class="nav" aria-label="Основное меню">
+      <a href="#features">Возможности</a>
       <a href="#catalog">Каталог</a>
-      <a href="#catalog">Пополнение игр</a>
-      <a href="#catalog">Подарочные карты</a>
-      <a href="#services">Telegram Stars</a>
-      <a href="#footer">Помощь</a>
+      <a href="#services">Услуги</a>
+      <a href="#" data-soon>Тарифы</a>
+      <a href="#" data-soon>API</a>
     </nav>
     <div class="h-right">
-      <div class="lang">
-        <button class="lang-btn" id="langBtn" aria-haspopup="true" aria-expanded="false">RU</button>
-        <div class="lang-menu" id="langMenu" hidden>
-          <button type="button" data-lang="ru">Русский <span aria-hidden="true">✓</span></button>
-          <button type="button" data-soon>English <span class="soon">скоро</span></button>
-        </div>
-      </div>
-      <a class="btn-login" href="#" data-soon><svg class="ico"><use href="#i-user"/></svg>Войти</a>
-      <button class="icon-btn burger" id="burger" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
-        <svg class="ico" style="width:24px;height:24px"><use href="#i-menu"/></svg>
+      <button class="lang-btn" type="button" data-soon="Английская версия появится на следующем шаге" aria-label="Switch to English">EN</button>
+      <a class="btn-login" href="#" data-soon>Войти</a>
+      <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
+        <svg class="ico"><use href="#i-menu"/></svg>
       </button>
     </div>
   </div>
   <div class="menu" id="menu" hidden>
     <div class="wrap">
+      <a class="m-link" href="#features">Возможности <svg class="ico"><use href="#i-chev"/></svg></a>
       <a class="m-link" href="#catalog">Каталог <svg class="ico"><use href="#i-chev"/></svg></a>
-      <a class="m-link" href="#catalog">Пополнение игр <svg class="ico"><use href="#i-chev"/></svg></a>
-      <a class="m-link" href="#catalog">Подарочные карты <svg class="ico"><use href="#i-chev"/></svg></a>
-      <a class="m-link" href="#services">Telegram Stars <svg class="ico"><use href="#i-chev"/></svg></a>
-      <a class="m-link" href="#footer">Помощь <svg class="ico"><use href="#i-chev"/></svg></a>
+      <a class="m-link" href="#services">Услуги <svg class="ico"><use href="#i-chev"/></svg></a>
+      <a class="m-link" href="#" data-soon>Тарифы <svg class="ico"><use href="#i-chev"/></svg></a>
+      <a class="m-link" href="#" data-soon>API <svg class="ico"><use href="#i-chev"/></svg></a>
       <div class="m-actions">
-        <a class="btn btn-ghost" href="#" data-soon style="height:48px;font-size:16px">Войти</a>
-        <a class="btn btn-primary" href="#" data-soon style="height:48px;font-size:16px">Пополнить</a>
+        <a class="btn btn-ghost" href="#" data-soon>Войти</a>
+        <a class="btn btn-primary" href="#" data-soon>Регистрация</a>
       </div>
     </div>
   </div>
@@ -357,16 +303,16 @@ p{margin:0}
       <div class="mock-wrap" aria-hidden="true">
        <div class="tilt">
         <div class="mock">
-          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="mock-url">gemora.store</span></div>
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="mock-url">reseller.gemora.com</span></div>
           <div class="mock-body">
             <div class="rows" id="mockRows">
-              <div class="mrow"><svg class="ico"><use href="#i-hash"/></svg><span class="t">USDT TRC20 · 24.0037</span></div>
-              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">PUBG 660 UC — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
-              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Free Fire 520 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
-              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">TG Stars 500 — Зачислено</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-code"/></svg><span class="t">GET /api/v2/orders</span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Steam $50 — Delivered</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Roblox 800 Robux — Delivered</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
+              <div class="mrow"><svg class="ico"><use href="#i-box"/></svg><span class="t">Discord Nitro — Delivered</span><span class="ok"><svg class="ico"><use href="#i-check"/></svg></span></div>
             </div>
             <div class="mfold" id="mockFold"><div>
-              <div class="mbtn"><svg class="ico"><use href="#i-wallet"/></svg>Пополнить баланс</div>
+              <div class="mbtn"><svg class="ico"><use href="#i-send"/></svg>Отправить запрос</div>
               <div class="mbtns">
                 <div class="mbtn"><svg class="ico"><use href="#i-plus"/></svg>Купить ещё</div>
                 <div class="mbtn"><svg class="ico"><use href="#i-redo"/></svg>Заказать снова</div>
@@ -374,233 +320,138 @@ p{margin:0}
             </div></div>
           </div>
         </div>
-        <span class="tag tag-l">USDT</span>
-        <span class="tag tag-r">~1 мин</span>
+        <span class="tag tag-l">API</span>
+        <span class="tag tag-r">Instant</span>
        </div>
       </div>
 
       <div class="hero-text">
-        <span class="pill"><svg class="ico"><use href="#i-bolt"/></svg>Пополнение игр за криптовалюту</span>
-        <h1>Пополняйте игры и&nbsp;сервисы с&nbsp;<span class="brand-word">Gemora</span></h1>
-        <p class="lead">Алмазы, UC, Telegram Stars и подарочные карты для игр и сервисов разных стран. Введите ID игрока и оплатите в USDT, TON или через Bybit. Зачисление обычно занимает пару минут.</p>
+        <span class="pill"><svg class="ico"><use href="#i-zap"/></svg>B2B платформа для реселлеров</span>
+        <h1>Продавайте цифровые продукты&nbsp;с&nbsp;<span class="brand-word">Gemora</span></h1>
+        <p class="lead">10 000+ продуктов в одном API — подарочные карты, ключи игр, Steam, пополнения игр и подписки по 700+ играм и 1 000+ категориям. Постройте свой магазин или бота. Мгновенная доставка, оптовые цены.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="#catalog">Выбрать игру <svg class="ico"><use href="#i-arrow"/></svg></a>
+          <a class="btn btn-primary" href="#" data-soon>Начать бесплатно — 5 дней Gold <svg class="ico"><use href="#i-arrow"/></svg></a>
           <a class="btn btn-ghost" href="#catalog">Каталог</a>
         </div>
-        <p class="note">Без регистрации · только крипта · поддержка 24/7</p>
+        <p class="note">Карта не нужна · полный доступ · 5 дней</p>
       </div>
     </div>
   </section>
 
   <!-- FEATURES -->
-  <section class="sec" style="padding-top:24px">
+  <section class="sec" id="features">
     <div class="wrap">
       <div class="sec-head">
-        <h2>В каждой покупке</h2>
-        <p>Без регистрации и скрытых комиссий. Каждый заказ проходит автоматически: от оплаты криптой до зачисления в игру.</p>
+        <h2>В каждом тарифе</h2>
+        <p>Полный доступ с первого дня. Без скрытых платежей и минимумов. Каждая подписка Gemora включает полный каталог, API, веб-панель и автоматическую доставку.</p>
       </div>
       <div class="features">
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-box"/></svg></span><div><h3>Сотни товаров</h3><p>Алмазы, UC, Telegram Stars, подарочные карты и подписки. Один каталог для всех цифровых покупок.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-coin"/></svg></span><div><h3>Оплата криптой</h3><p>USDT TRC20, TON, Bybit и Binance Pay. Платёж находится автоматически, чек присылать не нужно.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-grid"/></svg></span><div><h3>Личный кабинет</h3><p>Баланс, история заказов и пополнение в одном месте. Покупать можно и без регистрации.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-bolt"/></svg></span><div><h3>Мгновенная доставка</h3><p>Заказ уходит в игру сразу после оплаты. Большинство заказов проходят без участия оператора.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-gift"/></svg></span><div><h3>Карты и пополнения</h3><p>Steam, PlayStation, Xbox, Google Play, App Store и другие. Игры, сервисы и стриминг в одном месте.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-headset"/></svg></span><div><h3>Поддержка 24/7</h3><p>Поможем найти ID игрока, выбрать регион и проверить заказ. Отвечаем в Telegram круглосуточно.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-globe"/></svg></span><div><h3>Разные страны</h3><p>Товары для разных регионов. Цены в долларах, сайт на нескольких языках.</p></div></article>
-        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-shield"/></svg></span><div><h3>Безопасно</h3><p>Пароль от аккаунта не нужен, только ID игрока. Каждый платёж проверяется в блокчейне.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-box"/></svg></span><div><h3>10000+ продуктов</h3><p>10 000+ товаров в 1 000+ категориях и 700+ играх — подарочные карты, ключи игр, пополнения игр, Steam-кошелёк, гифты и подписки. Один каталог для всех цифровых товаров.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-code"/></svg></span><div><h3>Полный доступ к API</h3><p>REST API с webhooks и документацией. Интегрируйте заказы, статусы и доставку в ваш магазин или приложение.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-dash"/></svg></span><div><h3>Веб-панель</h3><p>Покупка товаров, отслеживание заказов, управление балансом и просмотр каталога. Код не требуется.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-zap"/></svg></span><div><h3>Мгновенная доставка</h3><p>Автоматическое выполнение за секунды. Большинство заказов — без участия оператора. Клиенты получают коды мгновенно.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-gift"/></svg></span><div><h3>Карты и пополнения</h3><p>Steam, Xbox, PlayStation, Discord, Spotify и сотни других. Ритейл, игры, стриминг — всё в одном месте.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-head"/></svg></span><div><h3>Поддержка 24/7</h3><p>Помощь с интеграцией API, масштабированием и решением проблем. Команда поддерживает реселлеров на всех этапах.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-globe"/></svg></span><div><h3>Глобальное покрытие</h3><p>Множество регионов и валют. Продавайте клиентам по всему миру с учётом локальной доступности товаров.</p></div></article>
+        <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-shield"/></svg></span><div><h3>Безопасно и надёжно</h3><p>99.9% uptime, шифрование, безопасная обработка платежей. Инфраструктура корпоративного уровня.</p></div></article>
       </div>
-      <p class="after-link"><a class="link" href="#catalog">Перейти в каталог <svg class="ico"><use href="#i-arrow"/></svg></a></p>
+      <p class="after-link"><a class="link" href="#" data-soon>Выбрать тариф <svg class="ico"><use href="#i-arrow"/></svg></a></p>
     </div>
   </section>
 
   <!-- STATS -->
   <section class="divided" aria-label="Цифры">
     <div class="wrap stats">
-      <div class="stat"><b data-to="150" data-suf="+">150+</b><span>товаров</span></div>
-      <div class="stat"><b data-to="30" data-suf="+">30+</b><span>стран</span></div>
-      <div class="stat"><b>~1 мин</b><span>среднее зачисление</span></div>
-      <div class="stat"><b data-to="4">4</b><span>способа оплаты</span></div>
-      <div class="stat"><b>24/7</b><span>поддержка</span></div>
+      <div class="stat"><b data-to="10000" data-suf="+">10000+</b><span>10000+ продуктов</span></div>
+      <div class="stat"><b data-to="1000" data-suf="+">1000+</b><span>Категорий</span></div>
+      <div class="stat"><b>Instant</b><span>Мгновенная доставка</span></div>
+      <div class="stat"><b data-to="99.9" data-dec="1" data-suf="%">99.9%</b><span>99.9% uptime</span></div>
+      <div class="stat"><b>24/7</b><span>Поддержка 24/7</span></div>
     </div>
   </section>
 
   <!-- CATALOG -->
   <section class="sec" id="catalog">
     <div class="wrap">
-      <div class="sec-head">
-        <h2>Каталог товаров</h2>
-        <p>Пополнение игр, Telegram Stars и подарочные карты. Выберите игру, введите ID и оплатите криптой.</p>
+      <div class="sec-head tight">
+        <h2>Каталог продуктов</h2>
+        <p>10 000+ цифровых товаров в одном месте. Подарочные карты и пополнения игр — оптом для магазинов и ботов.</p>
       </div>
       <div class="cat-grid">
         <article class="card cat">
-          <h3>Пополнение игр</h3>
-          <p>Алмазы, UC, кристаллы и пропуска. Зачисление по ID игрока, пароль не нужен.</p>
+          <h3>Подарочные карты</h3>
+          <p>Steam, Roblox, iTunes, Xbox, PlayStation, Netflix — оптом для магазинов и ботов.</p>
           <div class="chips">
-            <a class="chip" href="#" data-soon>PUBG Mobile</a><a class="chip" href="#" data-soon>Free Fire</a><a class="chip" href="#" data-soon>Mobile Legends</a>
-            <a class="chip" href="#" data-soon>Genshin Impact</a><a class="chip" href="#" data-soon>Honor of Kings</a><a class="chip" href="#" data-soon>Brawl Stars</a>
-            <a class="chip" href="#" data-soon>Clash of Clans</a><a class="chip" href="#" data-soon>Call of Duty Mobile</a><a class="chip" href="#" data-soon>Valorant</a>
-            <a class="chip" href="#" data-soon>Telegram Stars</a>
+            <a class="chip" href="#" data-soon>Amazon</a><a class="chip" href="#" data-soon>Steam</a><a class="chip" href="#" data-soon>Roblox</a><a class="chip" href="#" data-soon>PlayStation</a>
+            <a class="chip" href="#" data-soon>Xbox</a><a class="chip" href="#" data-soon>Google Play</a><a class="chip" href="#" data-soon>iTunes</a><a class="chip" href="#" data-soon>Netflix</a>
+            <a class="chip" href="#" data-soon>Spotify</a><a class="chip" href="#" data-soon>Nintendo</a><a class="chip" href="#" data-soon>Discord</a>
+            <a class="chip" href="#" data-soon>Battle.net</a><a class="chip" href="#" data-soon>Razer</a><a class="chip" href="#" data-soon>Apple</a><a class="chip" href="#" data-soon>Twitch</a>
+            <a class="chip" href="#" data-soon>Игровые ключи</a>
           </div>
-          <a class="link" href="#" data-soon>Все пополнения игр <svg class="ico"><use href="#i-chev"/></svg></a>
+          <a class="link" href="#" data-soon>Смотреть другие подарочные карты <svg class="ico"><use href="#i-chev"/></svg></a>
         </article>
         <article class="card cat">
-          <h3>Подарочные карты</h3>
-          <p>Коды для магазинов и сервисов разных регионов. Код приходит сразу после оплаты.</p>
+          <h3>Пополнение игр</h3>
+          <p>Steam по логину, Steam Gift, Telegram Stars, PUBG UC, Free Fire — автоматическая выдача.</p>
           <div class="chips">
-            <a class="chip" href="#" data-soon>Steam</a><a class="chip" href="#" data-soon>PlayStation</a><a class="chip" href="#" data-soon>Xbox</a>
-            <a class="chip" href="#" data-soon>Google Play</a><a class="chip" href="#" data-soon>App Store</a><a class="chip" href="#" data-soon>Nintendo</a>
-            <a class="chip" href="#" data-soon>Roblox</a><a class="chip" href="#" data-soon>Razer Gold</a><a class="chip" href="#" data-soon>Spotify</a>
-            <a class="chip" href="#" data-soon>Netflix</a>
+            <a class="chip" href="#" data-soon>PUBG</a><a class="chip" href="#" data-soon>Free Fire</a><a class="chip" href="#" data-soon>Genshin Impact</a>
+            <a class="chip" href="#" data-soon>Mobile Legends</a><a class="chip" href="#" data-soon>League of Legends</a>
+            <a class="chip" href="#" data-soon>Valorant</a><a class="chip" href="#" data-soon>Call of Duty</a><a class="chip" href="#" data-soon>Clash of Clans</a>
+            <a class="chip" href="#" data-soon>EA</a>
           </div>
-          <a class="link" href="#" data-soon>Все подарочные карты <svg class="ico"><use href="#i-chev"/></svg></a>
+          <a class="link" href="#" data-soon>Смотреть другие пополнения игр <svg class="ico"><use href="#i-chev"/></svg></a>
         </article>
       </div>
-      <div class="center"><a class="btn btn-primary" href="#" data-soon>Открыть весь каталог</a></div>
+      <div class="center mt-8"><a class="btn btn-primary lg" href="#" data-soon>Открыть полный каталог</a></div>
     </div>
   </section>
 
   <!-- SERVICES -->
-  <section class="sec" id="services" style="padding-top:24px">
+  <section class="sec" id="services">
     <div class="wrap">
       <div class="sec-head">
         <h2>Наши услуги</h2>
-        <p>Всё для игр и цифровых покупок в одном магазине. Оплата криптой, зачисление автоматически.</p>
+        <p>Всё необходимое для развития бизнеса цифровых продуктов. Gemora предлагает широкий спектр категорий — от игр и стриминга до ритейла и софта.</p>
       </div>
       <div class="svc-grid">
-
-        <article class="card svc">
-          <span class="tile"><svg class="ico"><use href="#i-pad"/></svg></span>
-          <h3>Пополнение игр</h3>
-          <div class="body"><p>Алмазы Free Fire и Mobile Legends, UC для PUBG Mobile, кристаллы Genshin Impact и другое. Нужен только ID игрока.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="250" cy="40" r="60" class="f-tint2"/>
-              <ellipse cx="160" cy="166" rx="92" ry="9" class="f-tint2"/>
-              <rect x="112" y="18" width="96" height="150" rx="18" class="f-deep"/>
-              <rect x="118" y="26" width="84" height="134" rx="13" class="f-w"/>
-              <rect x="126" y="38" width="32" height="32" rx="9" class="f-acc"/>
-              <rect x="162" y="38" width="32" height="32" rx="9" class="f-soft"/>
-              <rect x="126" y="74" width="32" height="32" rx="9" class="f-tint2"/>
-              <rect x="162" y="74" width="32" height="32" rx="9" class="f-bright"/>
-              <rect x="126" y="114" width="68" height="9" rx="4.5" class="f-line"/>
-              <rect x="126" y="132" width="68" height="18" rx="9" class="f-acc"/>
-              <path d="M62 70 76 54h22l14 16-25 30Z" class="f-bright"/><path d="M62 70h50L87 100Z" class="f-acc"/><path d="m76 54 11 16 11-16" fill="none" class="s-w" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M232 112 241 102h14l9 10-16 19Z" class="f-soft"/><path d="M232 112h32l-16 19Z" class="f-acc"/>
-              <path d="M240 52l6-7h10l6 7-11 13Z" class="f-acc"/>
-              <circle cx="72" cy="128" r="6" class="f-soft"/><circle cx="270" cy="150" r="4" class="f-bright"/>
-            </svg>
-          </div>
-        </article>
-
-        <article class="card svc">
-          <span class="tile"><svg class="ico"><use href="#i-star"/></svg></span>
-          <h3>Telegram Stars и Premium</h3>
-          <div class="body"><p>Звёзды и подписка Premium на любой username. Отправляем на аккаунт за пару минут.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="70" cy="150" r="70" class="f-tint2"/>
-              <ellipse cx="160" cy="160" rx="70" ry="9" class="f-tint2"/>
-              <g><ellipse cx="128" cy="140" rx="34" ry="11" class="f-deep"/><rect x="94" y="122" width="68" height="18" class="f-deep"/><ellipse cx="128" cy="122" rx="34" ry="11" class="f-acc"/></g>
-              <g><ellipse cx="128" cy="112" rx="34" ry="11" class="f-deep"/><rect x="94" y="96" width="68" height="16" class="f-deep"/><ellipse cx="128" cy="96" rx="34" ry="11" class="f-bright"/></g>
-              <g><ellipse cx="200" cy="146" rx="30" ry="10" class="f-deep"/><rect x="170" y="132" width="60" height="14" class="f-deep"/><ellipse cx="200" cy="132" rx="30" ry="10" class="f-soft"/></g>
-              <path d="m180 24 9.5 19.3 21.3 3.1-15.4 15 3.6 21.2-19-10-19 10 3.6-21.2-15.4-15 21.3-3.1Z" class="f-acc"/>
-              <path d="m180 36 5.6 11.4 12.6 1.8-9.1 8.9 2.1 12.5L180 64.7l-11.2 5.9 2.1-12.5-9.1-8.9 12.6-1.8Z" class="f-bright"/>
-              <path d="m252 70 4 8.2 9 1.3-6.5 6.4 1.5 9-8-4.2-8 4.2 1.5-9-6.5-6.4 9-1.3Z" class="f-soft"/>
-              <circle cx="92" cy="50" r="5" class="f-bright"/><circle cx="268" cy="130" r="6" class="f-acc"/>
-            </svg>
-          </div>
-        </article>
-
         <article class="card svc">
           <span class="tile"><svg class="ico"><use href="#i-gift"/></svg></span>
           <h3>Подарочные карты</h3>
-          <div class="body"><p>Коды Steam, PlayStation, Xbox, Google Play, App Store и других сервисов для разных регионов.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="260" cy="30" r="56" class="f-tint2"/>
-              <ellipse cx="150" cy="162" rx="100" ry="9" class="f-tint2"/>
-              <rect x="58" y="62" width="130" height="82" rx="14" class="f-soft" transform="rotate(-10 123 103)"/>
-              <rect x="66" y="56" width="130" height="82" rx="14" class="f-bright" transform="rotate(-4 131 97)"/>
-              <rect x="74" y="56" width="130" height="82" rx="14" class="f-acc"/>
-              <rect x="88" y="72" width="24" height="18" rx="4" class="f-soft"/>
-              <rect x="88" y="110" width="70" height="8" rx="4" class="f-w" opacity=".85"/>
-              <rect x="88" y="122" width="44" height="6" rx="3" class="f-w" opacity=".55"/>
-              <path d="m180 70 6 6-6 6-6-6Z" class="f-w" opacity=".8"/>
-              <rect x="214" y="96" width="62" height="54" rx="8" class="f-deep"/>
-              <rect x="208" y="84" width="74" height="18" rx="6" class="f-acc"/>
-              <rect x="239" y="84" width="12" height="66" class="f-soft"/>
-              <path d="M245 84c-8-16-24-16-24-7 0 7 12 7 24 7Zm0 0c8-16 24-16 24-7 0 7-12 7-24 7Z" class="f-soft"/>
-            </svg>
-          </div>
+          <div class="body"><p>1000+ позиций подарочных карт по сотням брендов и регионов для сервисов, игр и платформ. Глобальное покрытие по конкурентным оптовым ценам. Amazon, iTunes, Google Play и сотни других.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="cards" aria-hidden="true"></div>
         </article>
-
         <article class="card svc">
-          <span class="tile"><svg class="ico"><use href="#i-wallet"/></svg></span>
+          <span class="tile"><svg class="ico"><use href="#i-pad"/></svg></span>
           <h3>Пополнение Steam</h3>
-          <div class="body"><p>Пополнение кошелька Steam по логину для разных регионов. Сумму выбираете сами, от 1 доллара.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="60" cy="30" r="56" class="f-tint2"/>
-              <ellipse cx="160" cy="162" rx="104" ry="9" class="f-tint2"/>
-              <rect x="86" y="44" width="124" height="34" rx="10" class="f-soft" transform="rotate(-6 148 61)"/>
-              <rect x="80" y="62" width="150" height="94" rx="16" class="f-acc"/>
-              <rect x="80" y="62" width="150" height="22" rx="11" class="f-bright"/>
-              <rect x="186" y="96" width="56" height="32" rx="10" class="f-deep"/>
-              <circle cx="204" cy="112" r="6" class="f-soft"/>
-              <rect x="96" y="132" width="60" height="8" rx="4" class="f-w" opacity=".7"/>
-              <g><ellipse cx="266" cy="146" rx="24" ry="8" class="f-deep"/><rect x="242" y="132" width="48" height="14" class="f-deep"/><ellipse cx="266" cy="132" rx="24" ry="8" class="f-bright"/></g>
-              <g><ellipse cx="266" cy="124" rx="24" ry="8" class="f-deep"/><rect x="242" y="112" width="48" height="12" class="f-deep"/><ellipse cx="266" cy="112" rx="24" ry="8" class="f-soft"/></g>
-              <text x="266" y="116" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="10" class="f-deep">$</text>
-              <path d="M52 108h20M62 98v20" class="s-acc" stroke-width="3.5" stroke-linecap="round"/>
-            </svg>
-          </div>
+          <div class="body"><p>Пополнение кошелька Steam по логину для СНГ и других регионов: опт в рублях и соседних валютах, REST API, быстрая выдача. Скидки по подписке на линию: Bronze 2,5%, Silver 3%, Gold 3,55%; до 5% при большом обороте — подробности на странице сервиса.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="wallet" aria-hidden="true"></div>
         </article>
-
+        <article class="card svc">
+          <span class="tile"><svg class="ico"><use href="#i-box"/></svg></span>
+          <h3>Steam подарки</h3>
+          <div class="body"><p>Подарки игр из витрины Steam для 40+ регионов. Опт часто ниже цены в клиенте Steam — до порядка 15%. Достаточно ссылки-приглашения в друзья; выдача автоматическая, без ручной обработки.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="gift" aria-hidden="true"></div>
+        </article>
         <article class="card svc">
           <span class="tile"><svg class="ico"><use href="#i-key"/></svg></span>
           <h3>Ключи игр</h3>
-          <div class="body"><p>Цифровые ключи для ПК и консолей. Ключ появляется в личном кабинете сразу после оплаты.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="262" cy="150" r="64" class="f-tint2"/>
-              <ellipse cx="150" cy="162" rx="96" ry="9" class="f-tint2"/>
-              <rect x="70" y="40" width="140" height="110" rx="16" class="f-deep" transform="rotate(-5 140 95)"/>
-              <rect x="76" y="38" width="140" height="110" rx="16" class="f-acc"/>
-              <circle cx="122" cy="93" r="22" fill="none" class="s-w" stroke-width="9"/>
-              <path d="M144 93h50M180 93v16M194 93v12" fill="none" class="s-w" stroke-width="9" stroke-linecap="round"/>
-              <rect x="228" y="52" width="66" height="40" rx="10" class="f-w"/>
-              <rect x="238" y="64" width="46" height="6" rx="3" class="f-soft"/>
-              <rect x="238" y="76" width="30" height="6" rx="3" class="f-tint2"/>
-              <circle cx="54" cy="58" r="7" class="f-bright"/><circle cx="246" cy="122" r="5" class="f-acc"/>
-            </svg>
-          </div>
+          <div class="body"><p>Цифровые ключи для ПК и консольных витрин: Steam, Xbox, Epic Games Store, Rockstar Games Launcher и другие площадки. Более 500 игр и изданий для разных регионов — оптом для магазинов, ботов и интеграций.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="key" aria-hidden="true"></div>
         </article>
-
         <article class="card svc">
           <span class="tile"><svg class="ico"><use href="#i-music"/></svg></span>
           <h3>Подписки</h3>
-          <div class="body"><p>Музыка, видео и игровые пропуска на 1, 3 или 12 месяцев. Активация на ваш аккаунт.</p><a class="link" href="#" data-soon>Подробнее <svg class="ico"><use href="#i-arrow"/></svg></a></div>
-          <div class="art" aria-hidden="true">
-            <svg viewBox="0 0 320 180">
-              <circle cx="56" cy="150" r="60" class="f-tint2"/>
-              <ellipse cx="160" cy="164" rx="96" ry="8" class="f-tint2"/>
-              <rect x="88" y="120" width="150" height="34" rx="10" class="f-soft"/>
-              <rect x="80" y="84" width="150" height="34" rx="10" class="f-bright"/>
-              <rect x="72" y="48" width="150" height="34" rx="10" class="f-acc"/>
-              <rect x="86" y="61" width="60" height="8" rx="4" class="f-w"/>
-              <rect x="186" y="58" width="24" height="14" rx="7" class="f-w" opacity=".7"/>
-              <rect x="94" y="97" width="44" height="8" rx="4" class="f-w" opacity=".9"/>
-              <rect x="102" y="133" width="36" height="8" rx="4" class="f-deep" opacity=".6"/>
-              <path d="M128 20l10 12 9-16 9 16 10-12-4 22h-30Z" class="f-deep"/>
-              <rect x="250" y="40" width="46" height="46" rx="10" class="f-w"/>
-              <rect x="250" y="40" width="46" height="13" rx="6" class="f-acc"/>
-              <rect x="258" y="62" width="8" height="8" rx="2" class="f-tint2"/><rect x="270" y="62" width="8" height="8" rx="2" class="f-soft"/><rect x="282" y="62" width="8" height="8" rx="2" class="f-tint2"/>
-            </svg>
-          </div>
+          <div class="body"><p>Стриминговые и игровые подписки, внутриигровые донаты, складские аккаунты с играми или балансом и зачисление на Xbox, Apple ID и другие профили покупателя — где есть автоматизация API, плюс ручные линии поставщиков для нестандартных SKU.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="subs" aria-hidden="true"></div>
         </article>
-
+        <article class="card svc">
+          <span class="tile"><svg class="ico"><use href="#i-tablet"/></svg></span>
+          <h3>Пополнения платформ</h3>
+          <div class="body"><p>Пополнения для реселлеров: PUBG Mobile, Genshin Impact, MLBB, Free Fire, Zenless Zone Zero (ZZZ), Telegram Stars и Premium, Arena Breakout, Brawl Stars и другие — одно API.</p><a class="link" href="#" data-soon>Подробнее <span class="arr">→</span></a></div>
+          <div class="art" data-art="phone" aria-hidden="true"></div>
+        </article>
       </div>
-      <div class="center"><a class="btn btn-ghost" href="#" data-soon>Смотреть весь каталог</a></div>
+      <div class="center mt-12"><a class="btn btn-ghost sm" href="#" data-soon>Смотреть полный каталог</a></div>
     </div>
   </section>
 </main>
@@ -609,12 +460,11 @@ p{margin:0}
   <div class="wrap">
     <div class="f-grid">
       <div class="f-about">
-        <a class="logo" href="#top"><svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="url(#lg)"/><g fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M8.5 14 12.5 9h9l4 5L17 25.5Z"/><path d="M8.5 14h17M14.6 9 13.6 14 17 25.5 20.4 14l-1-5"/></g></svg><span>Gemora</span></a>
-        <p>Пополнение игр, Telegram Stars и подарочные карты с оплатой криптовалютой.</p>
+        <a class="logo" href="#top"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2.6 30.6 9.8v14.4L18 33.4 5.4 24.2V9.8Z" fill="#fff" stroke="url(#lg)" stroke-width="2.2" stroke-linejoin="round"/><path d="M11 15.5 14.4 11h7.2l3.4 4.5L18 25.5Z" fill="url(#lg)"/><path d="M11 15.5h14M15.6 11l-1 4.5L18 25.5l3.4-10-1-4.5" fill="none" stroke="#fff" stroke-width="1.1" stroke-linejoin="round"/></svg><b>Gemora</b></a>
+        <p>B2B платформа цифровых товаров для реселлеров, магазинов и ботов.</p>
       </div>
-      <div class="f-col"><h4>Магазин</h4><a href="#catalog">Каталог</a><a href="#catalog">Пополнение игр</a><a href="#catalog">Подарочные карты</a><a href="#services">Telegram Stars</a></div>
-      <div class="f-col"><h4>Помощь</h4><a href="#" data-soon>Как купить</a><a href="#" data-soon>Где найти ID игрока</a><a href="#" data-soon>Поддержка в Telegram</a><a href="#" data-soon>Условия</a></div>
-      <div class="f-col"><h4>Оплата</h4><div class="pay"><span>USDT TRC20</span><span>TON</span><span>Bybit</span><span>Binance Pay</span></div></div>
+      <div class="f-col"><h4>Платформа</h4><a href="#catalog">Каталог</a><a href="#services">Услуги</a><a href="#" data-soon>Тарифы</a><a href="#" data-soon>API</a></div>
+      <div class="f-col"><h4>Помощь</h4><a href="#" data-soon>Поддержка</a><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a></div>
     </div>
     <div class="f-bottom">
       <p>© <span id="year">2026</span> Gemora</p>
@@ -623,64 +473,126 @@ p{margin:0}
   </div>
 </footer>
 
-<button class="to-top off" id="toTop" aria-label="Наверх"><svg class="ico"><use href="#i-up"/></svg></button>
-
-<div class="palette" role="group" aria-label="Вариант цвета (демо)">
-  <span>Цвет</span>
-  <button type="button" data-pal="emerald" aria-pressed="true"><i style="background:#087f5b"></i>Изумруд</button>
-  <button type="button" data-pal="sapphire" aria-pressed="false"><i style="background:#2c55e6"></i>Сапфир</button>
-</div>
-
+<button class="to-top off" id="toTop" type="button" aria-label="Наверх"><svg class="ico"><use href="#i-up"/></svg></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
 (function(){
-  var root=document.documentElement;
-  // palette (demo)
-  function setPal(p){
-    if(p==='sapphire'){root.setAttribute('data-palette','sapphire')}else{root.removeAttribute('data-palette');p='emerald'}
-    document.querySelectorAll('[data-pal]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.pal===p))});
-    try{localStorage.setItem('gemora-pal',p)}catch(e){}
+  // ---------- service illustrations (own drawings, no third-party logos) ----------
+  var V='#7e5bff',VD='#5b3fd9',VL='#b9a9ff',VT='#efebff',TL='#2dd4bf',TD='#14a89a',INK='#1a1d24',G='#6b7280',W='#fff';
+  var OBJ={
+    cards:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="26" y="150" width="150" height="56" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="26" y="186" width="150" height="20" rx="10" fill="#e9e6f7"/>'
+      +'<g transform="rotate(-8 100 110)"><rect x="52" y="52" width="104" height="112" rx="12" fill="'+VL+'"/></g>'
+      +'<rect x="44" y="60" width="104" height="112" rx="12" fill="'+TL+'"/><rect x="36" y="68" width="104" height="112" rx="12" fill="'+VD+'"/><rect x="36" y="64" width="104" height="110" rx="12" fill="'+V+'"/>'
+      +'<rect x="50" y="80" width="26" height="20" rx="5" fill="'+VL+'"/><rect x="50" y="132" width="60" height="8" rx="4" fill="#fff" opacity=".9"/><rect x="50" y="146" width="38" height="6" rx="3" fill="#fff" opacity=".6"/>'
+      +'<circle cx="118" cy="92" r="12" fill="#fff" opacity=".2"/><path d="M112 92h12M118 86v12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'
+      +'<rect x="176" y="128" width="58" height="62" rx="8" fill="'+VD+'"/><rect x="170" y="116" width="70" height="20" rx="6" fill="'+V+'"/><rect x="199" y="116" width="12" height="74" fill="'+VL+'"/><path d="M205 116c-8-18-26-17-26-7 0 7 13 7 26 7Zm0 0c8-18 26-17 26-7 0 7-13 7-26 7Z" fill="'+VL+'"/>'
+      +'<ellipse cx="216" cy="212" rx="20" ry="7" fill="'+TD+'"/><rect x="196" y="204" width="40" height="8" fill="'+TD+'"/><ellipse cx="216" cy="204" rx="20" ry="7" fill="'+TL+'"/>'
+      +'<rect x="170" y="36" width="64" height="58" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="178" y="46" width="14" height="14" rx="4" fill="'+V+'"/><rect x="196" y="46" width="14" height="14" rx="4" fill="'+INK+'"/><rect x="214" y="46" width="14" height="14" rx="4" fill="'+TL+'"/><rect x="178" y="64" width="14" height="14" rx="4" fill="'+VL+'"/><rect x="196" y="64" width="14" height="14" rx="4" fill="'+V+'"/><rect x="214" y="64" width="14" height="14" rx="4" fill="'+VT+'"/>',
+    wallet:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="40" y="56" width="120" height="40" rx="10" fill="'+TL+'" transform="rotate(-7 100 76)"/>'
+      +'<rect x="28" y="80" width="160" height="112" rx="18" fill="'+VD+'"/><rect x="28" y="74" width="160" height="112" rx="18" fill="'+V+'"/><rect x="28" y="74" width="160" height="26" rx="13" fill="'+VL+'" opacity=".55"/>'
+      +'<rect x="136" y="116" width="66" height="38" rx="12" fill="'+VD+'"/><circle cx="156" cy="135" r="7" fill="'+TL+'"/><rect x="46" y="158" width="64" height="8" rx="4" fill="#fff" opacity=".75"/>'
+      +'<g><ellipse cx="206" cy="206" rx="26" ry="9" fill="'+TD+'"/><rect x="180" y="192" width="52" height="14" fill="'+TD+'"/><ellipse cx="206" cy="192" rx="26" ry="9" fill="'+TL+'"/></g>'
+      +'<g><ellipse cx="206" cy="184" rx="26" ry="9" fill="'+VD+'"/><rect x="180" y="172" width="52" height="12" fill="'+VD+'"/><ellipse cx="206" cy="172" rx="26" ry="9" fill="'+VL+'"/></g>'
+      +'<circle cx="210" cy="62" r="24" fill="#fff" stroke="#e5e7eb"/><path d="M200 62h20M210 52v20" stroke="'+V+'" stroke-width="5" stroke-linecap="round"/>'
+      +'<rect x="34" y="28" width="92" height="26" rx="13" fill="#fff" stroke="#e5e7eb"/><circle cx="48" cy="41" r="6" fill="'+TL+'"/><rect x="60" y="37" width="52" height="8" rx="4" fill="'+VT+'"/>',
+    gift:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="22" y="156" width="150" height="50" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="22" y="188" width="150" height="18" rx="9" fill="#e9e6f7"/>'
+      +'<rect x="58" y="62" width="96" height="112" rx="12" fill="'+VL+'"/><rect x="48" y="70" width="96" height="112" rx="12" fill="'+TL+'"/><rect x="38" y="78" width="96" height="112" rx="12" fill="'+VD+'"/><rect x="38" y="74" width="96" height="110" rx="12" fill="'+V+'"/>'
+      +'<circle cx="72" cy="112" r="14" fill="none" stroke="#fff" stroke-width="5"/><circle cx="72" cy="112" r="4" fill="#fff"/><rect x="52" y="146" width="52" height="8" rx="4" fill="#fff" opacity=".9"/><rect x="52" y="160" width="34" height="6" rx="3" fill="#fff" opacity=".6"/>'
+      +'<circle cx="124" cy="160" r="11" fill="'+TL+'"/><path d="M119 160h10M124 155v10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'
+      +'<rect x="170" y="124" width="64" height="70" rx="9" fill="'+VD+'"/><rect x="164" y="110" width="76" height="22" rx="7" fill="'+V+'"/><rect x="195" y="110" width="14" height="84" fill="'+VL+'"/><path d="M202 110c-9-20-30-19-30-8 0 8 15 8 30 8Zm0 0c9-20 30-19 30-8 0 8-15 8-30 8Z" fill="'+VL+'"/>'
+      +'<rect x="160" y="34" width="74" height="52" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="168" y="42" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="190" y="42" width="18" height="16" rx="4" fill="'+V+'"/><rect x="212" y="42" width="14" height="16" rx="4" fill="'+TL+'"/><rect x="168" y="66" width="58" height="12" rx="6" fill="'+V+'"/>',
+    key:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="22" y="156" width="150" height="50" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="22" y="188" width="150" height="18" rx="9" fill="#e9e6f7"/>'
+      +'<rect x="58" y="62" width="100" height="112" rx="12" fill="'+VL+'"/><rect x="48" y="70" width="100" height="112" rx="12" fill="'+TL+'"/><rect x="38" y="78" width="100" height="112" rx="12" fill="'+VD+'"/><rect x="38" y="74" width="100" height="110" rx="12" fill="'+V+'"/>'
+      +'<circle cx="66" cy="136" r="15" fill="none" stroke="#fff" stroke-width="8"/><path d="M82 136h40M108 136v13M120 136v10" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><rect x="52" y="90" width="50" height="7" rx="3.5" fill="#fff" opacity=".8"/>'
+      +'<rect x="160" y="34" width="74" height="70" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="168" y="42" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="190" y="42" width="18" height="16" rx="4" fill="'+V+'"/><rect x="212" y="42" width="14" height="16" rx="4" fill="'+TL+'"/><rect x="168" y="62" width="18" height="16" rx="4" fill="'+VL+'"/><rect x="190" y="62" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="212" y="62" width="14" height="16" rx="4" fill="'+VT+'"/><rect x="168" y="84" width="58" height="12" rx="6" fill="'+V+'"/>'
+      +'<rect x="168" y="132" width="42" height="42" rx="9" fill="'+V+'" transform="rotate(-10 189 153)"/><text x="189" y="162" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="24" fill="#fff">%</text>'
+      +'<g><ellipse cx="214" cy="204" rx="22" ry="8" fill="'+TD+'"/><rect x="192" y="190" width="44" height="14" fill="'+TD+'"/><ellipse cx="214" cy="190" rx="22" ry="8" fill="'+TL+'"/></g>',
+    subs:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="30" y="150" width="150" height="40" rx="11" fill="#d7d3e6"/><rect x="30" y="144" width="150" height="38" rx="11" fill="#eceaf5"/>'
+      +'<rect x="36" y="112" width="150" height="40" rx="11" fill="'+TD+'"/><rect x="36" y="106" width="150" height="38" rx="11" fill="'+TL+'"/>'
+      +'<rect x="42" y="74" width="150" height="40" rx="11" fill="'+VD+'"/><rect x="42" y="68" width="150" height="38" rx="11" fill="'+V+'"/>'
+      +'<path d="M58 96l4-16 9 9 8-13 8 13 9-9 4 16Z" fill="#fff"/><rect x="112" y="80" width="62" height="7" rx="3.5" fill="#fff" opacity=".9"/><rect x="112" y="92" width="40" height="6" rx="3" fill="#fff" opacity=".6"/>'
+      +'<rect x="52" y="120" width="34" height="10" rx="5" fill="#fff" opacity=".9"/><rect x="128" y="120" width="46" height="10" rx="5" fill="#fff" opacity=".6"/><rect x="46" y="158" width="40" height="10" rx="5" fill="'+G+'" opacity=".45"/><rect x="126" y="158" width="40" height="10" rx="5" fill="'+G+'" opacity=".3"/>'
+      +'<rect x="184" y="28" width="50" height="48" rx="9" fill="#fff" stroke="#e5e7eb"/><rect x="184" y="28" width="50" height="14" rx="7" fill="'+V+'"/><rect x="192" y="50" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="205" y="50" width="8" height="8" rx="2" fill="'+VL+'"/><rect x="218" y="50" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="192" y="62" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="205" y="62" width="8" height="8" rx="2" fill="'+VT+'"/>'
+      +'<circle cx="216" cy="110" r="16" fill="'+VT+'"/><circle cx="216" cy="105" r="6" fill="'+V+'"/><path d="M205 121c2-7 6-10 11-10s9 3 11 10" fill="'+V+'"/>'
+      +'<circle cx="212" cy="156" r="16" fill="#d5f7f1"/><circle cx="212" cy="151" r="6" fill="'+TD+'"/><path d="M201 167c2-7 6-10 11-10s9 3 11 10" fill="'+TD+'"/>'
+      +'<g><ellipse cx="214" cy="204" rx="22" ry="8" fill="'+VD+'"/><rect x="192" y="192" width="44" height="12" fill="'+VD+'"/><ellipse cx="214" cy="192" rx="22" ry="8" fill="'+VL+'"/></g>',
+    phone:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
+      +'<rect x="14" y="138" width="86" height="62" rx="10" fill="#e3def8"/><rect x="14" y="130" width="86" height="62" rx="10" fill="'+VL+'"/><rect x="26" y="112" width="24" height="24" rx="5" fill="'+V+'"/><rect x="54" y="118" width="20" height="18" rx="5" fill="'+TL+'"/><rect x="40" y="152" width="34" height="14" rx="4" fill="'+V+'"/>'
+      +'<g transform="rotate(8 150 120)"><rect x="100" y="24" width="96" height="184" rx="20" fill="'+VD+'"/><rect x="100" y="20" width="96" height="182" rx="20" fill="'+V+'"/><rect x="107" y="28" width="82" height="166" rx="14" fill="#fff"/>'
+      +'<rect x="116" y="38" width="40" height="7" rx="3.5" fill="'+INK+'"/><rect x="116" y="54" width="30" height="30" rx="8" fill="#3b4a6b"/><rect x="150" y="54" width="30" height="30" rx="8" fill="'+V+'"/><rect x="116" y="88" width="30" height="30" rx="8" fill="'+TL+'"/><rect x="150" y="88" width="30" height="30" rx="8" fill="#f5b83d"/>'
+      +'<rect x="116" y="126" width="64" height="8" rx="4" fill="#e5e7eb"/><rect x="116" y="140" width="64" height="8" rx="4" fill="#e5e7eb"/><rect x="116" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="133" y="156" width="14" height="12" rx="4" fill="'+V+'"/><rect x="150" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="167" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="116" y="174" width="64" height="14" rx="7" fill="'+V+'"/></g>'
+      +'<path d="M70 44 80 32h16l10 12-18 22Z" fill="'+VL+'"/><path d="M70 44h36L88 66Z" fill="'+V+'"/>'
+      +'<path d="M30 76l7-8h10l7 8-12 14Z" fill="'+TL+'"/><path d="M196 30l6-7h9l6 7-10 12Z" fill="'+TL+'"/>'
+      +'<circle cx="216" cy="150" r="24" fill="'+VL+'"/><path d="M196 144c8 4 12-4 20 0s8 10 18 6M200 162c8-4 14 4 30-2" fill="none" stroke="'+V+'" stroke-width="5" stroke-linecap="round"/><ellipse cx="216" cy="152" rx="34" ry="9" fill="none" stroke="'+V+'" stroke-width="2.5" transform="rotate(-18 216 152)"/>'
+      +'<path d="M222 192 222 176c0-10 20-10 20 0v8c0 12-8 18-10 20-2-2-10-6-10-12Z" fill="'+V+'"/><path d="m226 186 5 5 8-9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  var TXT={
+    cards:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Оптовые','подарочные карты','Сотни брендов и регионов по оптовым ценам.'],
+    wallet:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Пополнение','кошелька Steam','По логину, для СНГ и других регионов.'],
+    gift:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Оптовые','Steam гифты','Подарки игр оптом, выдача автоматическая.'],
+    key:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Оптовые','ключи игр','Ключи для ПК и консолей популярных платформ.'],
+    subs:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Оптовые','подписки','Премиум-доступ. Создано для бизнеса.'],
+    phone:['РЕШЕНИЕ ДЛЯ B2B РЕСЕЛЛЕРОВ','Мобильные игры','Оптовые пополнения','Автоматизация API · Мгновенная доставка']
+  };
+  var BUL=[['Оптовые цены','Низкие цены и высокая маржа'],['Мгновенная доставка','Автоматическая выдача за секунды'],['API и автоматизация','Интеграция и массовые заказы'],['Надёжно и безопасно','Защита транзакций и данных']];
+  var STEPS=['Выберите товар','Оплатите заказ','Получите мгновенно','Масштабируйте'];
+  var FOOT=['Конкурентные цены','Глобальное покрытие','Поддержка 24/7'];
+  function esc(s){return s.replace(/&/g,'&amp;')}
+  function art(k){
+    var t=TXT[k],s='<svg viewBox="0 0 540 360" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif"><rect width="540" height="360" rx="10" fill="#fff"/>';
+    s+='<rect x="18" y="14" width="'+(t[0].length*5.6+22)+'" height="18" rx="5" fill="'+VT+'"/><text x="29" y="26.5" font-size="8" font-weight="700" fill="'+V+'">'+esc(t[0])+'</text>';
+    s+='<text x="18" y="62" font-size="24" font-weight="700" fill="'+INK+'" letter-spacing="-.5">'+esc(t[1])+'</text><text x="18" y="90" font-size="24" font-weight="700" fill="'+V+'" letter-spacing="-.5">'+esc(t[2])+'</text>';
+    s+='<text x="18" y="108" font-size="8.5" fill="'+G+'">'+esc(t[3])+'</text>';
+    BUL.forEach(function(b,i){var y=124+i*36;
+      s+='<rect x="18" y="'+y+'" width="22" height="22" rx="6" fill="'+V+'"/><circle cx="29" cy="'+(y+11)+'" r="4" fill="none" stroke="#fff" stroke-width="2"/>';
+      s+='<text x="48" y="'+(y+9)+'" font-size="9.5" font-weight="700" fill="'+INK+'">'+b[0]+'</text><text x="48" y="'+(y+20)+'" font-size="7.5" fill="'+G+'">'+b[1]+'</text>';});
+    s+='<rect x="14" y="270" width="242" height="44" rx="8" fill="none" stroke="#eceaf5"/>';
+    STEPS.forEach(function(st,i){var x=44+i*60;
+      s+='<rect x="'+(x-8)+'" y="277" width="16" height="14" rx="4" fill="'+V+'" opacity="'+(1-i*.12)+'"/><text x="'+x+'" y="305" font-size="5.2" text-anchor="middle" fill="'+INK+'" font-weight="600">'+st+'</text>';
+      if(i<3)s+='<path d="M'+(x+20)+' 284h10m-3-3 3 3-3 3" fill="none" stroke="'+VL+'" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>';});
+    FOOT.forEach(function(f,i){var x=24+i*176;
+      s+='<circle cx="'+(x+6)+'" cy="336" r="7" fill="'+VT+'"/><circle cx="'+(x+6)+'" cy="336" r="3" fill="'+V+'"/><text x="'+(x+18)+'" y="339" font-size="8" font-weight="700" fill="'+INK+'">'+f+'</text>';});
+    s+='<g transform="translate(272,22)">'+OBJ[k]+'</g></svg>';
+    return s;
   }
-  var start=(location.hash==='#sapphire'||location.hash==='#emerald')?location.hash.slice(1):null;
-  if(!start){try{start=localStorage.getItem('gemora-pal')}catch(e){}}
-  setPal(start||'emerald');
-  document.querySelectorAll('[data-pal]').forEach(function(b){b.addEventListener('click',function(){setPal(b.dataset.pal)})});
+  document.querySelectorAll('[data-art]').forEach(function(el){el.innerHTML=art(el.getAttribute('data-art'))});
 
-  // burger
+  // ---------- burger ----------
   var burger=document.getElementById('burger'),menu=document.getElementById('menu');
   function setMenu(open){menu.hidden=!open;burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Закрыть меню':'Открыть меню');burger.querySelector('use').setAttribute('href',open?'#i-close':'#i-menu')}
   burger.addEventListener('click',function(){setMenu(menu.hidden)});
   menu.addEventListener('click',function(e){if(e.target.closest('a'))setMenu(false)});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')setMenu(false)});
 
-  // language
-  var lb=document.getElementById('langBtn'),lm=document.getElementById('langMenu');
-  lb.addEventListener('click',function(e){e.stopPropagation();lm.hidden=!lm.hidden;lb.setAttribute('aria-expanded',String(!lm.hidden))});
-  document.addEventListener('click',function(e){if(!lm.hidden&&!e.target.closest('.lang')){lm.hidden=true;lb.setAttribute('aria-expanded','false')}});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){lm.hidden=true;setMenu(false)}});
-
-  // placeholder links
+  // ---------- placeholder links ----------
   var toast=document.getElementById('toast'),tt;
   document.addEventListener('click',function(e){
     var a=e.target.closest('[data-soon]'); if(!a) return;
     e.preventDefault();
-    toast.textContent='Эта страница появится на следующем шаге';
+    toast.textContent=a.getAttribute('data-soon')||'Эта страница появится на следующем шаге';
     toast.hidden=false; clearTimeout(tt); tt=setTimeout(function(){toast.hidden=true},2600);
   });
 
-  // to top
+  // ---------- to top ----------
   var tb=document.getElementById('toTop');
-  function onScroll(){tb.classList.toggle('off',window.scrollY<500)}
+  function onScroll(){tb.classList.toggle('off',window.scrollY<300)}
   window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
   tb.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
 
-  // hero window: rows appear one by one, window grows for buttons, then the loop restarts
+  var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- hero window: rows appear one by one, window grows for buttons, loop ----------
   (function(){
     var rows=[].slice.call(document.querySelectorAll('#mockRows .mrow')),fold=document.getElementById('mockFold');
-    var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function showAll(){rows.forEach(function(r){r.classList.add('on','done')});fold.classList.add('on')}
     if(still){showAll();return}
-    var STEP=700,timers=[];
+    var STEP=750,timers=[];
     function at(ms,fn){timers.push(setTimeout(fn,ms))}
     function cycle(){
       timers.forEach(clearTimeout);timers=[];
@@ -691,20 +603,19 @@ p{margin:0}
       });
       var full=500+rows.length*STEP+250;
       at(full,function(){fold.classList.add('on')});
-      at(full+4200,function(){fold.classList.remove('on');rows.slice().reverse().forEach(function(r,i){setTimeout(function(){r.classList.remove('on','done')},i*90)})});
-      at(full+5400,cycle);
+      at(full+4500,function(){fold.classList.remove('on');rows.slice().reverse().forEach(function(r,i){setTimeout(function(){r.classList.remove('on','done')},i*90)})});
+      at(full+5700,cycle);
     }
     cycle();
     document.addEventListener('visibilitychange',function(){if(document.hidden){timers.forEach(clearTimeout);timers=[];showAll()}else{cycle()}});
   })();
 
-  // count-up (final values are already in the markup)
-  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(!reduce&&'IntersectionObserver' in window){
+  // ---------- count-up (final values are already in the markup) ----------
+  if(!still&&'IntersectionObserver' in window){
     var io=new IntersectionObserver(function(es){es.forEach(function(en){
       if(!en.isIntersecting) return; io.unobserve(en.target);
-      var el=en.target,to=+el.dataset.to,suf=el.dataset.suf||'',t0=null;
-      function step(t){if(!t0)t0=t;var k=Math.min(1,(t-t0)/1100);k=1-Math.pow(1-k,3);el.textContent=Math.round(to*k)+suf;if(k<1)requestAnimationFrame(step)}
+      var el=en.target,to=+el.dataset.to,dec=+(el.dataset.dec||0),suf=el.dataset.suf||'',t0=null;
+      function step(t){if(!t0)t0=t;var k=Math.min(1,(t-t0)/1600);k=1-Math.pow(1-k,3);el.textContent=(to*k).toFixed(dec)+suf;if(k<1)requestAnimationFrame(step)}
       requestAnimationFrame(step);
     })},{threshold:.6});
     document.querySelectorAll('.stat b[data-to]').forEach(function(el){io.observe(el)});

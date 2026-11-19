@@ -1,0 +1,14 @@
+import re,sys,os
+S=os.path.dirname(os.path.abspath(__file__))
+ICONS={'box':'package','code':'code-xml','dash':'layout-dashboard','zap':'zap','gift':'gift','head':'headphones','globe':'globe','shield':'shield','pad':'gamepad-2','key':'key-round','music':'music','tablet':'tablet','send':'send','plus':'plus','redo':'refresh-cw','menu':'menu','close':'x','up':'arrow-up','arrow':'arrow-right','chev':'chevron-right','check':'check'}
+sym=[]
+for k,f in ICONS.items():
+    s=open(f'{S}/lucide/package/icons/{f}.svg').read()
+    inner=re.search(r'<svg[^>]*>(.*)</svg>',s,re.S).group(1)
+    inner=re.sub(r'\s+',' ',inner).strip()
+    sym.append(f'  <symbol id="i-{k}" viewBox="0 0 24 24">{inner}</symbol>')
+sprite='<!-- Icons: Lucide (ISC License) -->\n<svg width="0" height="0" style="position:absolute" aria-hidden="true">\n'+'\n'.join(sym)+'\n</svg>'
+src=open(f'{S}/index.src.html').read()
+out=src.replace('{{SPRITE}}',sprite)
+open(sys.argv[1],'w').write(out)
+print('built',len(out))
