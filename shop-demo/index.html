@@ -674,6 +674,53 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .st-go:hover{filter:brightness(1.05)}
 @media (max-width:370px){.st-head{grid-template-columns:39px 1fr}.st-rates-w{grid-column:1 / -1;margin-top:12px}.st-pop{left:0;right:auto}.st-cur{gap:6px;font-size:14px}}
 
+
+/* ================= Part 8: cabinet → Steam gifts ================= */
+#appGiftPage .a-hero h1{font-size:22px;line-height:30px}
+#appGiftPage .a-hero-sm{padding:13px 16px 15px}
+#appGiftPage .a-sub{font-size:14px;line-height:20px}
+.g-wrap{margin-top:-14px;border-top-left-radius:0;border-top-right-radius:0;border-top:0}
+.g-wrap{padding:13px 12px 13px;display:grid;gap:12px}
+.g-box{border:1px solid var(--s2);border-radius:18px;padding:13px 13px 14px}
+.g-l{display:block;font-size:12px;line-height:18px;font-weight:600;color:#5f6c84}
+.g-box .st-inp,.g-reg .st-inp,.g-sum .st-inp{margin-top:8px}
+.g-sh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--s2)}
+.g-sh h2{font-size:15px;line-height:22px;font-weight:800;color:var(--s9)}
+.g-n{min-width:36px;height:24px;padding:0 8px;border-radius:8px;border:1px solid #d6cffb;background:#efecfd;color:#6d4bff;font-size:12px;font-weight:800;display:grid;place-items:center}
+.g-games{max-height:298px;overflow-y:auto;margin-top:14px;padding:6px 8px 0 10px;display:grid;gap:10px;overscroll-behavior:contain;outline:none}
+.g-game{display:grid;grid-template-columns:113px 1fr;column-gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--s2);border-radius:16px;background:#fff;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.g-game:hover{border-color:#cfd6e0}
+.g-game[aria-selected="true"]{border-color:#c9c2f7;background:#f6f4ff}
+.g-cov{height:46px;border-radius:9px;border:1px solid var(--s2);display:grid;place-items:center;color:#fff;font-size:15px;font-weight:800;letter-spacing:.08em;overflow:hidden}
+.g-game b{display:block;font-size:15px;line-height:20px;font-weight:800;color:var(--s9)}
+.g-game small{display:block;margin-top:5px;font-size:13px;line-height:18px;font-weight:600;color:var(--s4)}
+.g-empty{padding:30px 6px 18px;font-size:12px;line-height:18px;color:var(--s5)}
+.g-games .g-empty{padding:20px 4px}
+.g-eds,.g-regs{display:grid;gap:8px;margin-top:12px}
+.g-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 14px;border:1px solid var(--s2);border-radius:14px;background:#fff;text-align:left;font-size:14px;line-height:20px;font-weight:700;color:var(--s9)}
+.g-opt span{min-width:0}
+.g-opt small{display:block;font-size:12px;font-weight:600;color:var(--s4)}
+.g-opt b{font-size:14px;font-weight:800;color:#6d4bff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-opt:hover{border-color:#cfd6e0}
+.g-opt[aria-checked="true"]{border-color:#c9c2f7;background:#efecfd}
+.g-regs{max-height:300px;overflow-y:auto;overscroll-behavior:contain}
+.g-reg{padding:13px 12px 18px}
+.g-reg .g-sh{margin-bottom:28px}
+.g-reg .g-empty{padding:30px 6px 10px}
+.g-sum{padding:14px 12px 16px}
+.g-sum h2{font-size:18px;line-height:26px;font-weight:800;color:var(--s9);margin-bottom:12px}
+.g-tbl{margin:28px 0 0;border:1px solid var(--s2);border-radius:14px;overflow:hidden}
+.g-tbl div{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:47px;padding:8px 13px;border-top:1px solid var(--s2)}
+.g-tbl div:first-child{border-top:0}
+.g-tbl dt{font-size:15px;font-weight:600;color:#5f6c84}
+.g-tbl dd{margin:0;font-size:14px;font-weight:800;color:var(--s9);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.g-tbl .g-price{background:#e8e5fd;border-top-color:#c9c2f7;border-bottom:1px solid #c9c2f7;min-height:49px}
+.g-tbl .g-price dt{color:var(--s9);font-weight:800}
+.g-tbl .g-price dd{font-size:16px;color:#6d4bff}
+.g-tbl .g-inv{font-weight:600;color:var(--s4);max-width:62%}
+.g-go-w{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:5;margin-top:42px}
+.g-go{margin-top:0}
+
 </style>
 
 <!-- Icons: Lucide (ISC License) -->
@@ -1377,6 +1424,49 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appGiftPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Steam Гифты (игры)</h1>
+      <p class="a-sub">Каталог Steam Gift (игры).</p>
+    </section>
+    <section class="a-card g-wrap">
+      <div class="g-box">
+        <label class="g-l" for="gSearch">Поиск игры по названию или ID</label>
+        <input class="st-inp" id="gSearch" type="search" autocomplete="off" placeholder="Введите название или AppID…">
+      </div>
+      <div class="g-box g-step">
+        <div class="g-sh"><span class="g-n">1</span><h2>Игры</h2></div>
+        <div class="g-games" id="gGames" role="listbox" aria-label="Игры" tabindex="0"></div>
+      </div>
+      <div class="g-box g-step">
+        <div class="g-sh"><span class="g-n">2</span><h2>Издание</h2></div>
+        <div class="g-eds" id="gEds" role="radiogroup" aria-label="Издание"><p class="g-empty">Выберите игру, чтобы загрузить издания</p></div>
+      </div>
+    </section>
+    <section class="a-card g-reg">
+      <div class="g-sh"><span class="g-n">3</span><h2>Регион и цена</h2></div>
+      <label class="g-l" for="gRegQ">Поиск региона</label>
+      <input class="st-inp" id="gRegQ" type="search" autocomplete="off" placeholder="Страна или код ISO (KZ, UZ)…">
+      <div class="g-regs" id="gRegs" role="radiogroup" aria-label="Регион"><p class="g-empty">Выберите издание, чтобы увидеть регионы</p></div>
+    </section>
+    <section class="a-card g-sum">
+      <h2>Сводка</h2>
+      <label class="g-l" for="gInvite">Steam Invite ссылка</label>
+      <input class="st-inp" id="gInvite" type="url" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Вставьте короткую ссылку s.team/p/…" aria-describedby="gInvite-e">
+      <small class="err" id="gInvite-e" hidden></small>
+      <dl class="g-tbl">
+        <div><dt>App ID</dt><dd id="gsApp">-</dd></div>
+        <div><dt>ID пакета</dt><dd id="gsPkg">-</dd></div>
+        <div><dt>Издание</dt><dd id="gsEd">-</dd></div>
+        <div><dt>Регион</dt><dd id="gsReg">-</dd></div>
+        <div class="g-price"><dt>Цена</dt><dd id="gsPrice">$0.000</dd></div>
+        <div><dt>Ссылка invite</dt><dd id="gsInv" class="g-inv">-</dd></div>
+      </dl>
+      <div class="g-go-w"><button class="st-go g-go" id="gGo" type="button">Продолжить</button></div>
+      <p class="form-msg" id="gMsg" role="status" hidden></p>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1527,7 +1617,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1631,7 +1721,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
       ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
@@ -1842,6 +1932,70 @@ body.in-app > .header,body.in-app > #footer{display:none}
     document.addEventListener('click',function(e){if(!e.target.closest('.st-tip,.st-pop')){toggle(tb,tip,false);toggle(rb,rp,false)}});
     document.addEventListener('keydown',function(e){if(e.key==='Escape'){toggle(tb,tip,false);toggle(rb,rp,false)}});
     setCur('RUB',false);
+  })();
+
+  // ---------- cabinet: Steam gifts (example catalogue, own covers) ----------
+  (function(){
+    var REG=[['KZ','Казахстан'],['UZ','Узбекистан'],['KG','Кыргызстан'],['TJ','Таджикистан'],['AM','Армения'],['GE','Грузия'],['AZ','Азербайджан'],['TR','Турция'],['AR','Аргентина'],['IN','Индия'],['UA','Украина'],['US','США']];
+    var K={KZ:.82,UZ:.78,KG:.79,TJ:.77,AM:.84,GE:.86,AZ:.83,TR:.7,AR:.62,IN:.66,UA:.74,US:1};
+    var GAMES=[ // example: names as text only, covers are plain tiles
+      ['Counter-Strike 2',730,['#c2410c','#f59e0b'],[['Prime Status Upgrade',54029,14.99]]],
+      ['Dota 2',570,['#111827','#7f1d1d'],[['Dota Plus (1 месяц)',91001,3.99]]],
+      ['ELDEN RING',1245620,['#0b0b0b','#57534e'],[['Standard Edition',438721,59.99],['Deluxe Edition',438722,69.99],['Shadow of the Erdtree Edition',879432,79.99]]],
+      ['Cyberpunk 2077',1091500,['#facc15','#0f172a'],[['Standard Edition',354261,59.99],['Ultimate Edition',992144,79.99]]],
+      ['Baldur\'s Gate 3',1086940,['#3f1d0b','#b45309'],[['Standard Edition',441208,59.99],['Digital Deluxe Edition',441209,74.99]]],
+      ['Red Dead Redemption 2',1174180,['#7f1d1d','#dc2626'],[['Standard Edition',372158,59.99],['Ultimate Edition',372159,99.99]]],
+      ['Hogwarts Legacy',990080,['#1e3a8a','#a16207'],[['Standard Edition',521366,59.99],['Deluxe Edition',521367,69.99]]],
+      ['Terraria',105600,['#14532d','#22c55e'],[['Standard Edition',30128,9.99]]]
+    ];
+    var g=null,ed=null,reg=null;
+    var $=function(id){return document.getElementById(id)};
+    function cov(x){var ini=x[0].replace(/[^A-Za-z0-9 ]/g,'').split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0]}).join('').toUpperCase();return '<span class="g-cov" style="background:linear-gradient(120deg,'+x[2][0]+','+x[2][1]+')" aria-hidden="true">'+ini+'</span>'}
+    function price(base,code){return base*K[code]}
+    function renderGames(q){
+      q=(q||'').toLowerCase().trim();
+      var list=GAMES.filter(function(x){return !q||x[0].toLowerCase().indexOf(q)>-1||String(x[1]).indexOf(q)>-1});
+      $('gGames').innerHTML=list.length?list.map(function(x){var i=GAMES.indexOf(x);return '<div class="g-game" role="option" id="gg'+i+'" data-i="'+i+'" aria-selected="'+(g===x)+'">'+cov(x)+'<span><b>'+x[0]+'</b><small>AppID · '+x[1]+'</small></span></div>'}).join(''):'<p class="g-empty">Игра не найдена. Проверьте название или AppID.</p>';
+    }
+    function renderEds(){
+      if(!g){$('gEds').innerHTML='<p class="g-empty">Выберите игру, чтобы загрузить издания</p>';return}
+      $('gEds').innerHTML=g[3].map(function(e,i){return '<button type="button" class="g-opt" role="radio" data-i="'+i+'" aria-checked="'+(ed===e)+'"><span>'+e[0]+'<small>ID пакета · '+e[1]+'</small></span><b>от $'+(e[2]*.62).toFixed(2)+'</b></button>'}).join('');
+    }
+    function renderRegs(){
+      if(!ed){$('gRegs').innerHTML='<p class="g-empty">Выберите издание, чтобы увидеть регионы</p>';return}
+      var q=$('gRegQ').value.toLowerCase().trim();
+      var list=REG.filter(function(r){return !q||r[0].toLowerCase().indexOf(q)>-1||r[1].toLowerCase().indexOf(q)>-1});
+      $('gRegs').innerHTML=list.length?list.map(function(r){return '<button type="button" class="g-opt" role="radio" data-c="'+r[0]+'" aria-checked="'+(reg===r[0])+'"><span>'+r[1]+'<small>'+r[0]+'</small></span><b>$'+price(ed[2],r[0]).toFixed(3)+'</b></button>'}).join(''):'<p class="g-empty">Регион не найден. Введите страну или код ISO.</p>';
+    }
+    function sum(){
+      $('gsApp').textContent=g?g[1]:'-';$('gsPkg').textContent=ed?ed[1]:'-';$('gsEd').textContent=ed?ed[0]:'-';
+      $('gsReg').textContent=reg?REG.filter(function(r){return r[0]===reg})[0][1]+' ('+reg+')':'-';
+      $('gsPrice').textContent='$'+(ed&&reg?price(ed[2],reg):0).toFixed(3);
+      var v=$('gInvite').value.trim();$('gsInv').textContent=v||'-';
+    }
+    $('gGames').addEventListener('click',function(e){var c=e.target.closest('.g-game');if(!c)return;g=GAMES[+c.dataset.i];ed=g[3].length===1?g[3][0]:null;reg=null;renderGames($('gSearch').value);renderEds();renderRegs();sum();$('gMsg').hidden=true});
+    $('gGames').addEventListener('keydown',function(e){
+      var items=[].slice.call(this.querySelectorAll('.g-game'));if(!items.length)return;
+      var i=items.findIndex(function(x){return x.getAttribute('aria-selected')==='true'});
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();var n=items[(i+(e.key==='ArrowDown'?1:items.length-1)+(i<0&&e.key==='ArrowDown'?0:0))%items.length]||items[0];n.click();this.querySelector('[aria-selected="true"]').scrollIntoView({block:'nearest'});this.setAttribute('aria-activedescendant',this.querySelector('[aria-selected="true"]').id)}
+    });
+    $('gEds').addEventListener('click',function(e){var b=e.target.closest('.g-opt');if(!b)return;ed=g[3][+b.dataset.i];reg=null;renderEds();renderRegs();sum()});
+    $('gRegs').addEventListener('click',function(e){var b=e.target.closest('.g-opt');if(!b)return;reg=b.dataset.c;renderRegs();sum()});
+    var t1,t2;
+    $('gSearch').addEventListener('input',function(e){clearTimeout(t1);t1=setTimeout(function(){renderGames(e.target.value)},120)});
+    $('gRegQ').addEventListener('input',function(){clearTimeout(t2);t2=setTimeout(renderRegs,120)});
+    var inv=$('gInvite');
+    function chkInv(){var v=inv.value.trim(),ok=/^(https?:\/\/)?s\.team\/p\/[A-Za-z0-9-]+(\/[A-Za-z0-9]+)?\/?$/.test(v),e=$('gInvite-e');
+      var msg=!v?'Вставьте invite-ссылку Steam (s.team/p/…)':!ok?'Нужна короткая ссылка вида s.team/p/abcd-efgh':'';
+      if(msg){inv.setAttribute('aria-invalid','true');e.textContent=msg;e.hidden=false}else{inv.removeAttribute('aria-invalid');e.hidden=true}return !msg}
+    inv.addEventListener('input',function(){sum();if(inv.getAttribute('aria-invalid'))chkInv()});
+    $('gGo').addEventListener('click',function(){
+      var m=$('gMsg');
+      if(!g||!ed||!reg){m.textContent=!g?'Выберите игру в шаге 1.':!ed?'Выберите издание в шаге 2.':'Выберите регион в шаге 3.';m.hidden=false;return}
+      if(!chkInv()){m.hidden=true;inv.focus();return}
+      m.textContent='Это демо: заказ не создаётся. На сервере здесь спишется $'+price(ed[2],reg).toFixed(3)+' с баланса.';m.hidden=false;
+    });
+    renderGames('');
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
