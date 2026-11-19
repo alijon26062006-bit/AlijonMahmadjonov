@@ -982,6 +982,86 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .p-hist span{grid-column:1;font-size:12px;color:var(--s5)}
 .p-hist em{grid-row:1 / 3;grid-column:2;align-self:center;font-style:normal;font-size:11px;font-weight:700;color:#16a34a;background:#e4f8eb;border-radius:8px;padding:3px 8px}
 
+
+/* ================= Part 14: settings, support ================= */
+.st-set{padding:17px 15px 15px;background:#fff;border:1px solid var(--s2);border-radius:20px;box-shadow:0 4px 14px -10px rgba(15,23,42,.12)}
+.st-set-h{display:grid;grid-template-columns:51px 1fr;column-gap:15px;align-items:start}
+.st-set-i{width:51px;height:51px;border-radius:16px;background:#f2f0fd;color:#6d4bff;display:grid;place-items:center}
+.st-set-i .ico{width:20px;height:20px}
+.st-set h2{margin-top:2px;font-size:19px;line-height:26px;font-weight:800;color:var(--s9)}
+.st-set p{margin-top:4px;font-size:13.5px;line-height:19px;color:#5f6c84}
+.st-set-b{display:flex;align-items:center;justify-content:center;width:100%;height:47px;margin-top:17px;border-radius:16px;background:linear-gradient(90deg,#6e54f5,#7f66f5);color:#fff;font-size:13.5px;font-weight:600;box-shadow:0 12px 24px -10px rgba(110,84,245,.55)}
+.st-set-b:hover{filter:brightness(1.05)}
+.sheet .field{margin-top:12px}
+.sheet .field:first-child{margin-top:0}
+.sheet .inp{height:48px;font-size:16px}
+.sh-save{margin-top:18px}
+.sheet .p-auto{margin-top:12px}
+.sh-sw{margin-top:8px !important}
+.sh-gap{display:block;margin-top:18px}
+.sheet > .o-l{display:block}
+.tz-list{display:grid;gap:8px}
+.tz-list button{display:flex;justify-content:space-between;align-items:center;min-height:46px;padding:0 14px;border:1px solid var(--s2);border-radius:14px;font-size:14px;font-weight:700;color:var(--s9);text-align:left}
+.tz-list button small{font-size:12px;font-weight:600;color:var(--s5);font-variant-numeric:tabular-nums}
+.tz-list button[aria-checked="true"]{background:#efecfd;border-color:#c9c2f7}
+/* support */
+.sup-head{display:none}
+body.in-sup .app-head{display:none}
+body.in-sup .sup-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;align-items:center;gap:10px;height:62px;background:#fff;border-bottom:1px solid var(--s2);
+  padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+.sup-back{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500;color:#475569;white-space:nowrap}
+.sup-back .ico{width:18px;height:18px}
+.sup-head .a-lang{margin-left:auto;height:34px;border-radius:999px}
+.sup-head .a-lang button{width:36px;font-size:13px}
+.sup-head .a-lang button[aria-pressed="true"]{background:#eef1f5;border-radius:999px}
+.sup-user{height:38px;padding:0 14px;border:1px solid var(--s2);border-radius:999px;display:flex;align-items:center;font-size:14px;font-weight:600;color:var(--s9);box-shadow:0 2px 6px rgba(15,23,42,.06);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-main.sup{padding-top:0}
+.sup-hero{margin:0 -10px;padding:30px 20px 4px;text-align:center;background:radial-gradient(70% 60% at 15% 10%,#ecebfb,transparent 70%),radial-gradient(60% 50% at 80% 60%,#fbf7ec,transparent 70%)}
+.sup-hero h1{font-size:24px;line-height:32px;font-weight:800;letter-spacing:-.02em;color:var(--s9)}
+.sup-hero p{margin-top:12px;font-size:14px;line-height:21px;color:#5f6c84}
+.sup-search{display:flex;align-items:center;gap:12px;margin-top:22px;height:52px;padding:0 14px;background:#fff;border:1px solid var(--s2);border-radius:16px;box-shadow:0 8px 20px -14px rgba(15,23,42,.25)}
+.sup-search .ico{width:20px;height:20px;color:#475569;flex:none}
+.sup-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:15px;color:var(--s9)}
+.sup-search input::placeholder{color:#94a3b8}
+.sup-search:focus-within{border-color:#a99bf7;box-shadow:0 0 0 3px rgba(126,91,255,.12)}
+.sup-h{margin-top:14px;font-size:19px;line-height:26px;font-weight:800;color:var(--s9)}
+.sup-kb{display:grid;gap:13px}
+.sup-card{display:block;width:100%;padding:16px 17px 18px;background:#fff;border:1px solid var(--s2);border-radius:18px;text-align:left;box-shadow:0 4px 12px -8px rgba(15,23,42,.12)}
+.sup-card:hover{border-color:#d4dae3}
+.sup-card i{width:39px;height:39px;border-radius:12px;display:grid;place-items:center}
+.sup-card i .ico{width:18px;height:18px}
+.sup-card b{display:block;margin-top:13px;font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.sup-card span{display:block;margin-top:6px;font-size:14px;line-height:20px;color:#5f6c84}
+.sup-card .ans{display:block;margin-top:10px;padding-top:10px;border-top:1px dashed var(--s2);font-size:13.5px;line-height:20px;color:#334155}
+.sup-none{padding:22px 10px;text-align:center;font-size:14px;color:var(--s5);background:#fff;border:1px solid var(--s2);border-radius:18px}
+.sup-new{display:flex;align-items:center;justify-content:center;gap:10px;height:45px;border-radius:12px;background:#6157ff;color:#fff;font-size:16px;font-weight:600;box-shadow:0 10px 20px -10px rgba(97,87,255,.6)}
+.sup-new .ico{width:20px;height:20px;stroke-width:2.4}
+.sup-empty{padding:28px 18px 30px;text-align:center;background:#fff;border:1px solid var(--s2);border-radius:18px;box-shadow:0 4px 12px -8px rgba(15,23,42,.12)}
+.sup-empty-i{width:60px;height:60px;margin:14px auto 0;border-radius:18px;background:linear-gradient(135deg,#eceafd,#e9f3fd);display:grid;place-items:center;color:#5b4bdc}
+.sup-empty-i .ico{width:22px;height:22px}
+.sup-empty h3{margin-top:22px;font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.sup-empty p{margin-top:10px;font-size:14px;line-height:23px;color:#5f6c84}
+.sup-empty button{margin-top:22px;height:45px;padding:0 19px;border-radius:12px;background:#6157ff;color:#fff;font-size:16px;font-weight:600;box-shadow:0 10px 20px -10px rgba(97,87,255,.6)}
+#supList{display:grid;gap:10px}
+.tk{padding:14px 15px;background:#fff;border:1px solid var(--s2);border-radius:16px}
+.tk-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tk-top b{font-size:14px;font-weight:800;color:var(--s9)}
+.tk-top em{font-style:normal;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:8px;background:#e5eeff;color:#2563eb}
+.tk p{margin-top:6px;font-size:13px;line-height:19px;color:#5f6c84;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tk small{display:block;margin-top:8px;font-size:12px;color:var(--s4)}
+.tk-topics{display:grid;gap:8px}
+.tk-t{display:grid;grid-template-columns:36px 1fr 16px;column-gap:13px;align-items:center;width:100%;padding:13px 12px 13px 10px;border:1px solid var(--s2);border-radius:16px;text-align:left}
+.tk-t:hover{border-color:#cfd6e0;background:#fbfcfe}
+.tk-t i{width:36px;height:36px;border-radius:10px;background:#f3f5f9;display:grid;place-items:center;color:#6157ff}
+.tk-t i .ico{width:16px;height:16px}
+.tk-t b{display:block;font-size:14.5px;line-height:19px;font-weight:800;color:var(--s9)}
+.tk-t span span{display:block;margin-top:2px;font-size:12.5px;line-height:17px;color:#5f6c84}
+.tk-t > .ico{width:16px;height:16px;color:#94a3b8}
+.tk-cancel{display:flex;align-items:center;justify-content:center;width:100%;height:42px;margin-top:14px;border:1px solid #dfe3ea;border-radius:12px;font-size:15px;font-weight:600;color:var(--s9);box-shadow:0 2px 6px rgba(15,23,42,.06)}
+.tk-back{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:14px;font-weight:700;color:#6157ff}
+.tk-back .ico{width:16px;height:16px}
+.tk-msg{height:auto;min-height:110px;padding:12px 16px;resize:vertical;line-height:22px}
+
 </style>
 
 {{SPRITE}}
@@ -1492,6 +1572,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
 
 <div id="v-app" class="app" hidden>
+  <header class="sup-head"><a class="sup-back" href="#app"><svg class="ico"><use href="#i-chevl"/></svg>Вернуться в панель</a><div class="a-lang" role="group" aria-label="Язык"><button type="button" aria-pressed="true">RU</button><button type="button" aria-pressed="false" data-soon="Английская версия появится на следующем шаге">EN</button></div><span class="sup-user">demo_reseller</span></header>
   <header class="app-head">
     <button class="a-btn a-burger" id="appBurger" type="button" aria-label="Открыть меню кабинета" aria-expanded="false" aria-controls="appMenu"><svg class="ico"><use href="#i-menu"/></svg></button>
     <div class="a-right">
@@ -1803,7 +1884,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <p class="a-osub">Профиль, движения и поддержка</p>
       <a class="a-qi" href="#profile"><span><b>Профиль</b><small>Данные и безопасность</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
       <a class="a-qi" href="#tx"><span><b>Транзакции</b><small>Все движения баланса</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
-      <a class="a-qi" href="#" data-soon="Поддержку сделаем на одном из следующих шагов"><span><b>Поддержка</b><small>Связаться с поддержкой</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
+      <a class="a-qi" href="#support"><span><b>Поддержка</b><small>Связаться с поддержкой</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
     </section>
   </main>
 
@@ -1818,7 +1899,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <button type="button" role="tab" data-p="30d" aria-selected="false">30 дней</button>
       <button type="button" role="tab" data-p="all" aria-selected="true">Всё время</button>
     </div>
-    <p class="s-tz">Часовой пояс: Asia/Dushanbe · данные примерные</p>
+    <p class="s-tz" id="sTz">Часовой пояс: Asia/Dushanbe · данные примерные</p>
     <div class="s-grid" id="sTiles"></div>
     <section class="a-card s-chart">
       <div class="s-ch-h"><h2>Динамика заказов</h2><span>Создано · выполнено · возвраты</span></div>
@@ -1843,7 +1924,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <h2 class="a-name">demo_reseller</h2>
       <a class="a-mail" href="#" data-soon="Это пример: здесь будет почта клиента">demo@example.com</a>
       <div class="p-links">
-        <a href="#orders">Заказы</a><a href="#balance">Баланс</a><a href="#tx">Транзакции</a><a href="#" data-soon="Поддержку сделаем на одном из следующих шагов">Поддержка</a>
+        <a href="#orders">Заказы</a><a href="#balance">Баланс</a><a href="#tx">Транзакции</a><a href="#support">Поддержка</a>
       </div>
     </section>
     <section class="p-box"><span>Баланс</span><b>$58.4100</b><i class="p-sp"></i></section>
@@ -1886,9 +1967,39 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appSettingsPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Настройки</h1>
+      <p class="a-sub">Аккаунт и безопасность.</p>
+    </section>
+    <section class="st-set"><div class="st-set-h"><span class="st-set-i"><svg class="ico"><use href="#i-lock"/></svg></span><div><h2>Безопасность</h2><p>Пароль и защита входа.</p></div></div><button class="st-set-b" type="button" data-sheet="shSec">Настроить</button></section>
+    <section class="st-set"><div class="st-set-h"><span class="st-set-i"><svg class="ico"><use href="#i-bell"/></svg></span><div><h2>Уведомления</h2><p>Где и о чём сообщать.</p></div></div><button class="st-set-b" type="button" data-sheet="shNotif">Настроить</button></section>
+    <section class="st-set"><div class="st-set-h"><span class="st-set-i"><svg class="ico"><use href="#i-clock"/></svg></span><div><h2>Часовой пояс</h2><p>Время заказов и истории в панели.</p></div></div><button class="st-set-b" type="button" data-sheet="shTz">Изменить</button></section>
+    <section class="st-set"><div class="st-set-h"><span class="st-set-i"><svg class="ico"><use href="#i-zap"/></svg></span><div><h2>Webhook</h2><p>POST-уведомления о заказах на ваш URL.</p></div></div><button class="st-set-b" type="button" data-sheet="shHook">Настроить</button></section>
+  </main>
+
+  <main class="app-main sup" id="appSupportPage" hidden>
+    <section class="sup-hero">
+      <h1>Чем мы можем помочь?</h1>
+      <p>Найдите ответ в базе знаний или создайте заявку — мы на связи 24/7</p>
+      <label class="sup-search"><svg class="ico"><use href="#i-search"/></svg><input id="supQ" type="search" autocomplete="off" placeholder="Поиск по базе знаний: «пополнение не пришло»" aria-label="Поиск по базе знаний"></label>
+    </section>
+    <h2 class="sup-h">База знаний</h2>
+    <div class="sup-kb" id="supKb"></div>
+    <h2 class="sup-h">Ваши заявки</h2>
+    <button class="sup-new" type="button" data-sheet="shTicket"><svg class="ico"><use href="#i-plus"/></svg>Новая заявка</button>
+    <div id="supList"></div>
+    <section class="sup-empty" id="supEmpty">
+      <span class="sup-empty-i"><svg class="ico"><use href="#i-msg"/></svg></span>
+      <h3>У вас пока нет заявок</h3>
+      <p>Если возник вопрос — создайте заявку, мы разберёмся и ответим прямо здесь.</p>
+      <button type="button" data-sheet="shTicket">Создать первую заявку</button>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
-    <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
+    <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#support">Поддержка</a></nav>
   </footer>
 
   <div class="sheet-scrim" id="sheetScrim" hidden></div>
@@ -1912,6 +2023,57 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <li><b>15.11.2026, 09:41</b><span>iPhone · Safari · Худжанд</span></li>
     </ul>
     <p class="p-sheet-note">Пример данных. Настоящие входы будет записывать сервер.</p>
+  </div>
+  <div class="sheet" id="shSec" role="dialog" aria-modal="true" aria-labelledby="shSecT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="shSecT">Безопасность</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <form id="secForm" novalidate>
+      <label class="field"><span>Текущий пароль</span><input class="inp" id="secOld" type="password" autocomplete="current-password" aria-describedby="secOld-e"><small class="err" id="secOld-e" hidden></small></label>
+      <label class="field"><span>Новый пароль</span><input class="inp" id="secNew" type="password" autocomplete="new-password" placeholder="Мин. 8 символов" aria-describedby="secNew-e"><small class="err" id="secNew-e" hidden></small></label>
+      <label class="field"><span>Повторите новый пароль</span><input class="inp" id="secNew2" type="password" autocomplete="new-password" aria-describedby="secNew2-e"><small class="err" id="secNew2-e" hidden></small></label>
+      <label class="p-auto"><span>Подтверждать вход кодом из Telegram</span><input type="checkbox" id="sec2fa" role="switch"><i aria-hidden="true"></i></label>
+      <button class="st-go sh-save" type="submit">Сохранить</button>
+      <p class="p-sheet-note" id="secNote" role="status"></p>
+    </form>
+  </div>
+  <div class="sheet" id="shNotif" role="dialog" aria-modal="true" aria-labelledby="shNotifT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="shNotifT">Уведомления</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <span class="o-l">Куда</span>
+    <label class="p-auto sh-sw"><span>Telegram-бот</span><input type="checkbox" checked role="switch" data-n="tg"><i aria-hidden="true"></i></label>
+    <label class="p-auto sh-sw"><span>Email</span><input type="checkbox" role="switch" data-n="mail"><i aria-hidden="true"></i></label>
+    <span class="o-l sh-gap">О чём</span>
+    <label class="p-auto sh-sw"><span>Заказ выполнен</span><input type="checkbox" checked role="switch" data-n="done"><i aria-hidden="true"></i></label>
+    <label class="p-auto sh-sw"><span>Возврат на баланс</span><input type="checkbox" checked role="switch" data-n="ref"><i aria-hidden="true"></i></label>
+    <label class="p-auto sh-sw"><span>Баланс зачислен</span><input type="checkbox" checked role="switch" data-n="top"><i aria-hidden="true"></i></label>
+    <label class="p-auto sh-sw"><span>Баланс меньше $10</span><input type="checkbox" role="switch" data-n="low"><i aria-hidden="true"></i></label>
+    <p class="p-sheet-note" id="notifNote" role="status">Изменения сохраняются сразу.</p>
+  </div>
+  <div class="sheet" id="shTz" role="dialog" aria-modal="true" aria-labelledby="shTzT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="shTzT">Часовой пояс</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <div class="tz-list" id="tzList" role="radiogroup" aria-label="Часовой пояс"></div>
+  </div>
+  <div class="sheet" id="shHook" role="dialog" aria-modal="true" aria-labelledby="shHookT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="shHookT">Webhook</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <form id="hookForm" novalidate>
+      <label class="field"><span>URL для уведомлений</span><input class="inp" id="hookUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://your-shop.com/webhook" aria-describedby="hookUrl-e"><small class="err" id="hookUrl-e" hidden></small></label>
+      <p class="st-help">Мы отправим POST-запрос при смене статуса заказа: создан, выполнен, возврат.</p>
+      <button class="st-go sh-save" type="submit">Сохранить</button>
+      <p class="p-sheet-note" id="hookNote" role="status"></p>
+    </form>
+  </div>
+  <div class="sheet" id="shTicket" role="dialog" aria-modal="true" aria-labelledby="shTicketT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="shTicketT">С чем нужна помощь?</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <div id="tkStep1"><div class="tk-topics" id="tkTopics"></div><button class="tk-cancel" type="button" data-close>Отмена</button></div>
+    <form id="tkStep2" novalidate hidden>
+      <button class="tk-back" type="button" id="tkBack"><svg class="ico"><use href="#i-chevl"/></svg><span id="tkTopicName"></span></button>
+      <label class="field"><span>Номер заказа (если есть)</span><input class="inp" id="tkOrder" type="text" autocomplete="off" placeholder="ord-1000245"></label>
+      <label class="field"><span>Опишите проблему</span><textarea class="inp tk-msg" id="tkMsg" rows="4" placeholder="Что случилось и когда. Для платежа укажите сумму и TxID." aria-describedby="tkMsg-e"></textarea><small class="err" id="tkMsg-e" hidden></small></label>
+      <button class="st-go sh-save" type="submit">Отправить заявку</button>
+    </form>
   </div>
   <div class="app-menu" id="appMenu" role="dialog" aria-modal="true" aria-label="Меню кабинета" hidden>
     <div class="am-top"><button class="a-btn" id="appMenuClose" type="button" aria-label="Закрыть меню"><svg class="ico"><use href="#i-close"/></svg></button></div>
@@ -2058,7 +2220,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app',settings:'v-app',support:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage',settings:'appSettingsPage',support:'appSupportPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -2067,7 +2229,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
         ['v-login','v-signup','v-app'].forEach(function(id){document.getElementById(id).hidden=V[v]!==id});
         Object.keys(PAGES).forEach(function(k){document.getElementById(PAGES[k]).hidden=k!==v});
         current=v;
-        document.body.classList.toggle('in-app',V[v]==='v-app');
+        document.body.classList.toggle('in-app',V[v]==='v-app');document.body.classList.toggle('in-sup',v==='support');
         if(v!=='home'){
           window.scrollTo({top:0,behavior:'instant'});
           var box=document.getElementById(PAGES[v]||V[v]),t=box&&box.querySelector('h1');
@@ -2165,7 +2327,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги','#manual'],['card','Подарочные карты','#cards'],['zap','Пополнение сервисов','#topups']]],
       ['Финансы',[['wallet','Баланс','#balance']]],
       ['Дополнительно',[['zap','Дополнительно']]],
-      ['Аккаунт',[['chartl','Статистика','#stats'],['user','Профиль','#profile'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
+      ['Аккаунт',[['chartl','Статистика','#stats'],['user','Профиль','#profile'],['gear','Настройки','#settings'],['head','Поддержка','#support'],['logout','Выйти','#top']]]
     ];
     document.getElementById('appMenuNav').innerHTML=MENU.map(function(s){
       return '<section class="am-sec"><h2>'+s[0]+'</h2><ul>'+s[1].map(function(it){
@@ -2751,6 +2913,93 @@ body.in-app > .header,body.in-app > #footer{display:none}
     list.addEventListener('keydown',function(e){if(e.key==='ArrowDown'){e.preventDefault();mark(hi+1)}else if(e.key==='ArrowUp'){e.preventDefault();mark(hi-1)}else if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(hi);closeSel(true)}else if(e.key==='Escape'){e.stopPropagation();closeSel(true)}});
     li.forEach(function(x,k){x.addEventListener('mousemove',function(){if(hi!==k)mark(k)});x.addEventListener('click',function(){pick(k);closeSel(true)})});
     $('pAuto').addEventListener('change',function(){$('pSheetNote').textContent=this.checked?'Автопродление включено: тариф продлится сам, если хватит баланса.':'Автопродление выключено: после окончания тариф не продлится.'});
+  })();
+
+  // ---------- generic bottom sheets (settings, support) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    var scrim=$('sheetScrim'),cur=null,back=null;
+    function open(id,from){cur=$(id);back=from;scrim.hidden=false;cur.hidden=false;document.documentElement.style.overflow='hidden';
+      var f=cur.querySelector('input:not([type=checkbox]),textarea,[data-close]');if(f)f.focus({preventScroll:true});if(cur.onopen)cur.onopen()}
+    function close(){if(!cur)return;cur.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';var b=back;cur=null;if(b)b.focus({preventScroll:true})}
+    window.GemSheet={open:open,close:close};
+    document.addEventListener('click',function(e){var b=e.target.closest('[data-sheet]');if(b){e.preventDefault();open(b.dataset.sheet,b)}});
+    ['shSec','shNotif','shTz','shHook','shTicket'].forEach(function(id){$(id).querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',close)})});
+    scrim.addEventListener('click',close);
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&cur)close()});
+    window.addEventListener('hashchange',function(){if(cur){cur.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';cur=null}});
+  })();
+
+  // ---------- cabinet: settings ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    function err(id,msg){var i=$(id),e=$(id+'-e');if(msg){i.setAttribute('aria-invalid','true');e.textContent=msg;e.hidden=false}else{i.removeAttribute('aria-invalid');e.hidden=true}return !msg}
+    $('secForm').addEventListener('submit',function(e){
+      e.preventDefault();var o=$('secOld').value,n=$('secNew').value,n2=$('secNew2').value;
+      var ok=err('secOld',!o?'Введите текущий пароль':'');
+      ok=err('secNew',!n?'Придумайте новый пароль':n.length<8?'Не короче 8 символов':n===o?'Новый пароль совпадает со старым':'')&&ok;
+      ok=err('secNew2',n2!==n?'Пароли не совпадают':'')&&ok;
+      if(!ok){var x=this.querySelector('[aria-invalid="true"]');if(x)x.focus();$('secNote').textContent='';return}
+      $('secNote').textContent='Это демо: пароль не изменён. Заработает, когда подключим сервер.';
+    });
+    $('sec2fa').addEventListener('change',function(){$('secNote').textContent=this.checked?'Вход будет подтверждаться кодом из Telegram (демо).':'Подтверждение входа кодом выключено.'});
+    var N={};try{N=JSON.parse(localStorage.getItem('gem-notif')||'{}')}catch(x){}
+    document.querySelectorAll('#shNotif [data-n]').forEach(function(c){if(c.dataset.n in N)c.checked=!!N[c.dataset.n];
+      c.addEventListener('change',function(){N[c.dataset.n]=c.checked;try{localStorage.setItem('gem-notif',JSON.stringify(N))}catch(x){}$('notifNote').textContent='Сохранено: «'+c.parentNode.querySelector('span').textContent+'» '+(c.checked?'включено':'выключено')+'.'})});
+    var TZ=[['Asia/Dushanbe','UTC+5'],['Asia/Tashkent','UTC+5'],['Asia/Almaty','UTC+5'],['Asia/Bishkek','UTC+6'],['Europe/Moscow','UTC+3'],['Europe/Istanbul','UTC+3'],['Asia/Dubai','UTC+4'],['UTC','UTC+0']];
+    var tz='Asia/Dushanbe';try{tz=localStorage.getItem('gem-tz')||tz}catch(x){}
+    function renderTz(){$('tzList').innerHTML=TZ.map(function(t){return '<button type="button" role="radio" aria-checked="'+(t[0]===tz)+'" data-tz="'+t[0]+'">'+t[0]+'<small>'+t[1]+'</small></button>'}).join('');
+      var s=$('sTz');if(s)s.textContent='Часовой пояс: '+tz+' · данные примерные'}
+    $('tzList').addEventListener('click',function(e){var b=e.target.closest('[data-tz]');if(!b)return;tz=b.dataset.tz;try{localStorage.setItem('gem-tz',tz)}catch(x){}renderTz();window.GemSheet.close()});
+    renderTz();
+    $('hookForm').addEventListener('submit',function(e){
+      e.preventDefault();var v=$('hookUrl').value.trim();
+      if(!err('hookUrl',!v?'Вставьте адрес, куда отправлять уведомления':!/^https:\/\/[^\s/$.?#][^\s]*\.[^\s]+$/i.test(v)?'Нужен адрес, который начинается с https://':'')){$('hookNote').textContent='';$('hookUrl').focus();return}
+      $('hookNote').textContent='Это демо: адрес принят, но запросы начнёт отправлять сервер.';
+    });
+  })();
+
+  // ---------- support: knowledge base + tickets (demo, stored in this browser) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    var KB=[
+      ['card','#e8efff','#2563eb','Платежи и баланс','Пополнение, зачисления, TxID, сроки и лимиты','Баланс зачисляется сам, обычно за 1–5 минут после подтверждения в сети. Для USDT TRC20 переводите ровно ту сумму, которую показала касса, вместе с «хвостиком»: по нему мы находим ваш платёж. Если прошло больше 30 минут — создайте заявку и укажите TxID.'],
+      ['box','#fdf3e1','#b45309','Заказы и доставка','Статусы заказов, задержки, возвраты на баланс','Большинство заказов выполняются за секунды. Статус «В обработке» до 15 минут — это нормально. Если заказ не выполнен, деньги автоматически возвращаются на баланс.'],
+      ['key','#e3f7ec','#15803d','Коды и активация','Активация кодов, ошибки, redeem-страницы','Проверьте регион аккаунта: код должен совпадать с регионом. Если пишет «уже использован» — пришлите скриншот ошибки в заявке.'],
+      ['code','#efecfd','#6d4bff','API и интеграция','Ключи, документация, вебхуки, лимиты','Ключ API находится в профиле. Вебхук настраивается в «Настройках». Ограничение — 60 запросов в минуту.'],
+      ['star','#fde8ef','#db2777','Подписка и тарифы','Bronze, Silver, Gold, пробный период и продление','Тариф меняется в профиле кнопкой «План и продление». Автопродление списывает оплату с баланса.'],
+      ['user','#f1f3f6','#475569','Аккаунт и поддержка','Скорость ответов, перенос аккаунта, документы','Отвечаем в заявках круглосуточно, обычно в течение 15 минут.'],
+      ['clip','#f2edfd','#7c3aed','Ручные услуги','Услуги, выполняемые живыми специалистами','Ручные услуги выполняет оператор, срок указан в описании услуги — обычно от 10 минут до нескольких часов.']
+    ];
+    function renderKb(q){
+      q=(q||'').toLowerCase().trim();var list=KB.filter(function(k){return !q||(k[3]+' '+k[4]+' '+k[5]).toLowerCase().indexOf(q)>-1});
+      $('supKb').innerHTML=list.length?list.map(function(k){var i=KB.indexOf(k);return '<button type="button" class="sup-card" data-kb="'+i+'" aria-expanded="false"><i style="background:'+k[1]+';color:'+k[2]+'"><svg class="ico"><use href="#i-'+k[0]+'"/></svg></i><b>'+k[3]+'</b><span>'+k[4]+'</span><span class="ans" hidden>'+k[5]+'</span></button>'}).join('')
+        :'<p class="sup-none">Ничего не нашли. Создайте заявку ниже — ответим лично.</p>';
+    }
+    $('supKb').addEventListener('click',function(e){var c=e.target.closest('.sup-card');if(!c)return;var a=c.querySelector('.ans'),o=a.hidden;a.hidden=!o;c.setAttribute('aria-expanded',String(o))});
+    var tq;$('supQ').addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value;tq=setTimeout(function(){renderKb(v)},150)});
+    renderKb('');
+    var TOP=[['card','Пополнение / оплата не зачислилась','Перевёл крипту, а баланс не пополнился'],['clock','Заказ завис или долго выполняется','Оплачен, но статус не меняется'],['box','Товар или код не получен / пришёл частично','Заказ выполнен, а товара нет'],['key','Код, ключ или карта не работает','Ошибка при активации или «уже использован»'],['star','Подписка и тарифы','Оплата подписки, смена плана, скидки'],['code','API и интеграция','Ключи, вебхуки, ошибки запросов'],['listp','Наличие товара, добавить товар','Нет нужной позиции или номинала'],['help','Другое','Вопрос, который не подошёл к остальным темам']];
+    $('tkTopics').innerHTML=TOP.map(function(t,i){return '<button type="button" class="tk-t" data-t="'+i+'"><i><svg class="ico"><use href="#i-'+t[0]+'"/></svg></i><span><b>'+t[1]+'</b><span>'+t[2]+'</span></span><svg class="ico"><use href="#i-chev"/></svg></button>'}).join('');
+    var topic=0,T=[];try{T=JSON.parse(localStorage.getItem('gem-tickets')||'[]')}catch(x){}
+    function step(n){$('tkStep1').hidden=n!==1;$('tkStep2').hidden=n!==2;$('shTicketT').textContent=n===1?'С чем нужна помощь?':'Новая заявка'}
+    $('shTicket').onopen=function(){step(1);$('tkMsg').value='';$('tkOrder').value='';$('tkMsg-e').hidden=true;$('tkMsg').removeAttribute('aria-invalid')};
+    $('tkTopics').addEventListener('click',function(e){var b=e.target.closest('.tk-t');if(!b)return;topic=+b.dataset.t;$('tkTopicName').textContent=TOP[topic][1];step(2);$('tkMsg').focus()});
+    $('tkBack').addEventListener('click',function(){step(1)});
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+    function renderT(){
+      $('supEmpty').hidden=T.length>0;
+      $('supList').innerHTML=T.map(function(t){return '<article class="tk"><div class="tk-top"><b>#'+t.id+' · '+esc(t.topic)+'</b><em>Открыта</em></div><p>'+(t.order?esc(t.order)+' — ':'')+esc(t.msg)+'</p><small>'+t.time+' · демо: ответ придёт, когда подключим сервер</small></article>'}).join('');
+    }
+    $('tkStep2').addEventListener('submit',function(e){
+      e.preventDefault();var m=$('tkMsg').value.trim(),er=$('tkMsg-e');
+      if(m.length<10){$('tkMsg').setAttribute('aria-invalid','true');er.textContent='Опишите проблему подробнее (от 10 символов)';er.hidden=false;$('tkMsg').focus();return}
+      var d=new Date(),p=function(n){return ('0'+n).slice(-2)};
+      T.unshift({id:1001+T.length,topic:TOP[topic][1],order:$('tkOrder').value.trim(),msg:m,time:p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())});
+      try{localStorage.setItem('gem-tickets',JSON.stringify(T.slice(0,20)))}catch(x){}
+      renderT();window.GemSheet.close();var el=$('toast');if(el){el.textContent='Заявка создана';el.hidden=false;setTimeout(function(){el.hidden=true},2400)}
+    });
+    renderT();
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
