@@ -457,6 +457,111 @@ h1,h2,h3{color:var(--ink)}
 .sel-list li.act{background:#f3f0ff}
 .sel-list li[aria-selected="true"]{background:var(--acc);color:#fff}
 
+
+/* ================= Part 4: reseller cabinet (dashboard + menu) ================= */
+body.in-app{background:#f6f8fc}
+body.in-app > .header,body.in-app > #footer{display:none}
+.app{--s9:#0f172a;--s5:#64748b;--s4:#94a3b8;--s2:#e2e8f0;--s1:#f1f5f9;--chipb:#dfe3e8;color:var(--s9);min-height:100vh}
+.app .ico{width:20px;height:20px}
+.app-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;height:64px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--s2);
+  padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.a-btn{position:relative;width:38px;height:38px;border:1px solid var(--s2);border-radius:12px;background:#fff;display:grid;place-items:center;color:var(--s9);flex:none}
+.a-burger{width:40px;height:40px}
+.a-right{display:flex;align-items:center;gap:8px}
+.a-lang{display:flex;height:38px;border:1px solid var(--chipb);border-radius:12px;overflow:hidden}
+.a-lang button{width:40px;font-size:13px;font-weight:700;color:var(--s5);background:#f2f5f9}
+.a-lang button[aria-pressed="true"]{background:#fff;color:var(--s9)}
+.a-bell .ico{color:#f08a24}
+.a-bell b{position:absolute;top:-8px;right:-4px;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:#eb4d3d;color:#fff;font-size:12px;line-height:20px;font-weight:700;text-align:center;border:2px solid #fff;box-sizing:content-box;transform:translateY(-1px)}
+.a-moon .ico{color:var(--s5)}
+
+.app-main{display:grid;gap:15px;padding:10px max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px));max-width:760px;margin:0 auto}
+.a-card{background:#fff;border:1px solid var(--s2);border-radius:20px}
+.a-hero{border:1px solid #ebeaf8;border-radius:20px;padding:22px 20px 18px;background:linear-gradient(115deg,#efeefb 0%,#f7f7fd 55%,#fdfdff 100%)}
+.a-eyebrow{font-size:12px;line-height:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#684bf6}
+.a-hero h1{margin-top:6px;font-size:24px;line-height:32px;font-weight:800;color:var(--s9)}
+.a-sub{margin-top:4px;font-size:16px;line-height:24px;color:var(--s5)}
+.a-hero-btns{display:flex;gap:11px;margin-top:14px}
+.a-pbtn,.a-gbtn{height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:17px;font-weight:600}
+.a-pbtn{flex:216 1 0;color:#fff;background:linear-gradient(90deg,#6e54f5,#7f66f5);box-shadow:0 10px 20px -8px rgba(110,84,245,.55)}
+.a-pbtn:hover{filter:brightness(1.05)}
+.a-gbtn{flex:140 1 0;border:1px solid var(--s2);background:rgba(255,255,255,.7);color:var(--s5)}
+.a-gbtn:hover{color:var(--s9)}
+
+.a-prof{padding:11px 13px 10px}
+.a-name{font-size:22px;line-height:30px;font-weight:800;color:var(--s9)}
+.a-mail{display:inline-block;margin-top:1px;font-size:16px;line-height:24px;color:var(--s5);text-decoration:underline;text-decoration-color:#94a3b8;text-underline-offset:3px}
+.a-cap{margin-top:16px;font-size:13px;line-height:20px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--s4)}
+.a-stats{display:grid;gap:10px;margin-top:11px}
+.a-stat{border:1px solid var(--s2);border-radius:16px;padding:11px 13px 7px}
+.a-stat span{display:block;font-size:11px;line-height:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--s4)}
+.a-stat b{display:block;margin-top:2px;font-size:20px;line-height:28px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.a-stat small{display:block;margin-top:2px;font-size:14px;line-height:20px;color:var(--s5)}
+.a-subcard{margin-top:16px;border:1.5px solid #b8e9c5;border-radius:16px;padding:18px 16px 14px;background:linear-gradient(120deg,#f1fdf5,#f8fffb)}
+.a-sub-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.a-sub-top span{display:block;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--s4)}
+.a-sub-top b{display:block;margin-top:2px;font-size:20px;line-height:28px;font-weight:800;color:var(--s9)}
+.a-sub-top strong{font-size:20px;line-height:28px;font-weight:800;color:var(--s9);margin-top:-4px}
+.a-sub-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px}
+.a-active{display:inline-flex;align-items:center;gap:10px;height:36px;padding:0 14px 0 8px;border:1px solid var(--chipb);border-radius:12px;background:#f1f5f9;font-size:16px;font-weight:700;color:var(--s9)}
+.a-active i{width:26px;height:26px;border-radius:50%;background:#e4f8eb;border:1px solid #bfe8cd;display:grid;place-items:center;color:#16a34a}
+.a-active i .ico{width:15px;height:15px}
+.a-change{height:36px;display:inline-flex;align-items:center;padding:0 19px;border-radius:12px;border:1px solid #c9c2f7;background:#e9e7fd;font-size:16px;font-weight:600;color:var(--s9)}
+.a-change:hover{background:#e0ddfc}
+
+.a-quick{padding:12px 14px 15px}
+.a-quick h2,.a-orders h2{font-size:18px;line-height:26px;font-weight:800;color:var(--s9)}
+.a-qi{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding:10px 15px 10px 16px;border:1px solid var(--s2);border-radius:16px;transition:border-color .2s,background .2s}
+.a-qi + .a-qi{margin-top:9px}
+.a-qi:hover{border-color:#cfd6e0;background:#fbfcfe}
+.a-qi span{min-width:0}
+.a-qi b{display:block;font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.a-qi small{display:block;font-size:14px;line-height:20px;color:var(--s5)}
+.a-qi i{width:34px;height:30px;border-radius:10px;border:1px solid var(--chipb);background:#f1f5f9;display:grid;place-items:center;color:var(--s5);flex:none}
+.a-qi i .ico{width:15px;height:15px}
+
+.a-orders{padding:14px 19px 16px}
+.a-osub{margin-top:3px;font-size:14px;line-height:20px;color:var(--s5)}
+.a-all{display:flex;align-items:center;justify-content:center;height:43px;margin-top:10px;border:1px solid var(--s2);border-radius:14px;font-size:16px;font-weight:600;color:var(--s5)}
+.a-all:hover{color:var(--s9);background:#fbfcfe}
+#appOrders{display:grid;gap:11px;margin-top:15px}
+.a-order{display:grid;grid-template-columns:57px 1fr;column-gap:13px;padding:12px 13px 13px;border:1px solid var(--s2);border-radius:18px}
+.a-thumb{width:57px;height:57px;border-radius:14px;border:1.5px solid #d6ccff;display:grid;place-items:center;color:#fff;overflow:hidden}
+.a-thumb .ico{width:28px;height:28px}
+.a-ob{min-width:0}
+.a-ot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.a-ot b{font-size:16px;line-height:24px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.a-ot strong{font-size:18px;line-height:24px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.a-od{margin-top:3px;font-size:14px;line-height:20px;color:var(--s5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a-os{display:flex;align-items:center;gap:8px;margin-top:10px}
+.a-os i{width:28px;height:28px;border-radius:50%;background:#e4f8eb;border:1px solid #bfe8cd;display:grid;place-items:center;color:#16a34a;flex:none}
+.a-os i .ico{width:16px;height:16px}
+.a-os time{height:30px;display:inline-flex;align-items:center;padding:0 10px;border-radius:10px;background:#f1f5f9;border:1px solid var(--chipb);font-size:14px;font-weight:600;color:#475569;font-variant-numeric:tabular-nums}
+
+.a-foot{margin:34px max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px));padding:14px 14px 28px;background:#fff;border:1px solid var(--s2);border-bottom:0;border-radius:20px 20px 0 0;max-width:760px}
+@media (min-width:780px){.a-foot{margin-left:auto;margin-right:auto}}
+.a-foot p{font-size:13px;line-height:20px;color:var(--s4)}
+.a-foot nav{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
+.a-foot nav a{font-size:14px;line-height:20px;font-weight:600;color:var(--s5)}
+.a-foot nav a:hover{color:var(--s9)}
+
+/* cabinet menu (full screen) */
+.app-menu{position:fixed;inset:0;z-index:60;background:#fff;overflow-y:auto;overscroll-behavior:contain;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.am-top{height:70px;display:flex;align-items:flex-start;padding-top:17px;padding-left:2px;border-bottom:1px solid var(--s2)}
+.am-top .a-btn{width:40px;height:40px}
+.am-sec{margin-top:17px}
+.am-sec + .am-sec{margin-top:28px}
+.am-sec h2{padding-left:6px;font-size:13px;line-height:20px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--s4)}
+.am-sec ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.am-sec a{display:flex;align-items:center;gap:9px;height:40px;padding:0 14px;border:1px solid var(--s2);border-radius:14px;font-size:16px;font-weight:600;color:var(--s9);transition:background .15s,border-color .15s}
+.am-sec a:hover{background:#f8fafc}
+.am-sec a[aria-current="page"]{background:#f0ecff;border-color:#d0c5ff}
+.am-sec a > .ico{width:18px;height:18px;color:var(--s4)}
+.am-sec a span{flex:1;min-width:0}
+.am-sec a .chev{width:16px;height:16px;color:var(--s4)}
+@media (min-width:640px){.a-stats{grid-template-columns:repeat(3,1fr)}}
+
 </style>
 
 {{SPRITE}}
@@ -966,6 +1071,75 @@ h1,h2,h3{color:var(--ink)}
 </main>
 
 
+<div id="v-app" class="app" hidden>
+  <header class="app-head">
+    <button class="a-btn a-burger" id="appBurger" type="button" aria-label="Открыть меню кабинета" aria-expanded="false" aria-controls="appMenu"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <div class="a-right">
+      <div class="a-lang" role="group" aria-label="Язык">
+        <button type="button" aria-pressed="true">RU</button>
+        <button type="button" aria-pressed="false" data-soon="Английская версия появится на следующем шаге">EN</button>
+      </div>
+      <button class="a-btn a-bell" type="button" aria-label="Уведомления: 3 новых" data-soon="Уведомления появятся на шаге с сервером"><svg class="ico"><use href="#i-bell"/></svg><b>3</b></button>
+      <button class="a-btn a-moon" type="button" aria-label="Тёмная тема" data-soon="Тёмная тема появится позже"><svg class="ico"><use href="#i-moon"/></svg></button>
+    </div>
+  </header>
+
+  <main class="app-main" id="appMain">
+    <section class="a-hero">
+      <p class="a-eyebrow">Панель реселлера</p>
+      <h1>Обзор</h1>
+      <p class="a-sub">Ключевые показатели и недавняя активность.</p>
+      <div class="a-hero-btns">
+        <a class="a-pbtn" href="#" data-soon="Пополнение баланса сделаем на следующем шаге">Пополнить баланс</a>
+        <a class="a-gbtn" href="#" data-soon="Профиль сделаем на одном из следующих шагов">Профиль</a>
+      </div>
+    </section>
+
+    <section class="a-card a-prof">
+      <h2 class="a-name">demo_reseller</h2>
+      <a class="a-mail" href="#" data-soon="Это пример: здесь будет почта клиента">demo@example.com</a>
+      <h3 class="a-cap">Краткая сводка</h3>
+      <div class="a-stats">
+        <div class="a-stat"><span>Всего потрачено</span><b>$1,248.5320</b><small>За всё время</small></div>
+        <div class="a-stat"><span>Всего заказов</span><b>214</b><small>Создано</small></div>
+        <div class="a-stat"><span>Баланс</span><b>$58.4100</b><small>Доступно сейчас</small></div>
+      </div>
+      <div class="a-subcard">
+        <div class="a-sub-top"><div><span>Подписка</span><b>Bronze</b></div><strong>$3.99</strong></div>
+        <div class="a-sub-row">
+          <span class="a-active"><i><svg class="ico"><use href="#i-check"/></svg></i>Активна</span>
+          <a class="a-change" href="#pricing" data-soon="Смена тарифа появится на шаге с сервером">Поменять</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="a-card a-quick">
+      <h2>Быстрые действия</h2>
+      <a class="a-qi" href="#" data-soon="Раздел «Заказы» сделаем на следующих шагах"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+    </section>
+
+    <section class="a-card a-orders">
+      <h2>Последние заказы</h2>
+      <p class="a-osub">Статусы и суммы последних операций</p>
+      <a class="a-all" href="#" data-soon="Раздел «Заказы» сделаем на следующих шагах">Все заказы</a>
+      <div id="appOrders"></div>
+    </section>
+  </main>
+
+  <footer class="a-foot">
+    <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
+    <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
+  </footer>
+
+  <div class="app-menu" id="appMenu" role="dialog" aria-modal="true" aria-label="Меню кабинета" hidden>
+    <div class="am-top"><button class="a-btn" id="appMenuClose" type="button" aria-label="Закрыть меню"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <nav class="am-nav" id="appMenuNav"></nav>
+  </div>
+</div>
+
 <footer class="footer" id="footer">
   <div class="wrap">
     <a class="f-brand" href="#top">Gemora</a>
@@ -1105,7 +1279,7 @@ h1,h2,h3{color:var(--ink)}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var views={login:document.getElementById('v-login'),signup:document.getElementById('v-signup')},home=document.getElementById('main');
+    var views={login:document.getElementById('v-login'),signup:document.getElementById('v-signup'),app:document.getElementById('v-app')},home=document.getElementById('main');
     var current=null;
     function show(h){
       var v=views[h]?h:'home',changed=v!==current;
@@ -1113,6 +1287,7 @@ h1,h2,h3{color:var(--ink)}
         home.hidden=v!=='home';
         Object.keys(views).forEach(function(k){views[k].hidden=k!==v});
         current=v;
+        document.body.classList.toggle('in-app',v==='app');
         if(v!=='home'){window.scrollTo({top:0,behavior:'instant'});var t=views[v].querySelector('h1');if(t){t.setAttribute('tabindex','-1');t.focus({preventScroll:true})}}
       }
       if(v==='home'){
@@ -1150,7 +1325,7 @@ h1,h2,h3{color:var(--ink)}
     var ok=setErr('li-email',!em?'Введите почту':!EMAIL.test(em)?'Почта указана неверно, например: name@mail.com':'');
     ok=setErr('li-pass',!pw?'Введите пароль':'')&&ok;
     if(!ok){m.hidden=true;first(this);return}
-    m.textContent='Это демо: вход заработает, когда подключим сервер.';m.hidden=false;
+    m.hidden=true;location.hash='app';
   });
 
   var INCL={
@@ -1195,8 +1370,52 @@ h1,h2,h3{color:var(--ink)}
     ok=setErr('su-pass',!p1?'Придумайте пароль':p1.length<8?'Пароль должен быть не короче 8 символов':'')&&ok;
     ok=setErr('su-pass2',!p2?'Повторите пароль':p2!==p1?'Пароли не совпадают':'')&&ok;
     if(!ok){m.hidden=true;first(this);return}
-    m.textContent='Это демо: регистрация заработает, когда подключим сервер.';m.hidden=false;
+    m.hidden=true;location.hash='app';
   });
+
+  // ---------- cabinet: example orders + menu ----------
+  (function(){
+    var IC={pad:'#i-pad',star:'#i-star',gem:'#i-gem',wallet:'#i-wallet'};
+    var ORD=[ // example data, not real orders
+      ['ord-1000231','$1.5509','Пополнение • Free Fire (CIS) • Weekly Membership','19.11.2026 15:51','gem','#7e5bff','#a78bfa'],
+      ['ord-1000230','$2.3781','Пополнение • Free Fire (CIS) • 341 Diamonds','19.11.2026 15:51','gem','#7e5bff','#a78bfa'],
+      ['ord-1000227','$0.8900','Пополнение • PUBG Mobile (Global) • 60 UC','19.11.2026 15:42','pad','#0f766e','#2dd4bf'],
+      ['ord-1000221','$0.7600','Пополнение • Telegram Stars • 50 Stars','19.11.2026 15:38','star','#0284c7','#38bdf8'],
+      ['ord-1000214','$5.5834','Пополнение • Mobile Legends • Weekly Diamond Pass','19.11.2026 15:31','gem','#6d28d9','#c084fc'],
+      ['ord-1000209','$10.2400','Steam • Пополнение по логину • $10','19.11.2026 15:14','wallet','#334155','#64748b']
+    ];
+    document.getElementById('appOrders').innerHTML=ORD.map(function(o){
+      return '<article class="a-order"><span class="a-thumb" style="background:linear-gradient(135deg,'+o[5]+','+o[6]+')" aria-hidden="true"><svg class="ico"><use href="'+IC[o[4]]+'"/></svg></span>'
+        +'<div class="a-ob"><div class="a-ot"><b>'+o[0]+'</b><strong>'+o[1]+'</strong></div><p class="a-od" title="'+o[2]+'">'+o[2]+'</p>'
+        +'<div class="a-os"><i aria-label="Выполнен"><svg class="ico"><use href="#i-check"/></svg></i><time>'+o[3]+'</time></div></div></article>';
+    }).join('');
+    var SOON='Этот раздел сделаем на следующих шагах';
+    var MENU=[
+      ['Обзор',[['house','Главная','#app'],['bag','Заказы'],['swap','Транзакции']]],
+      ['Каталог',[['wallet','Пополнить Steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Финансы',[['wallet','Баланс']]],
+      ['Дополнительно',[['zap','Дополнительно']]],
+      ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
+    ];
+    document.getElementById('appMenuNav').innerHTML=MENU.map(function(s){
+      return '<section class="am-sec"><h2>'+s[0]+'</h2><ul>'+s[1].map(function(it){
+        var attr=it[2]?'href="'+it[2]+'"'+(it[2]==='#app'?' aria-current="page"':''):'href="#" data-soon="'+SOON+'"';
+        return '<li><a '+attr+'><svg class="ico"><use href="#i-'+it[0]+'"/></svg><span>'+it[1]+'</span><svg class="ico chev"><use href="#i-chev"/></svg></a></li>';
+      }).join('')+'</ul></section>';
+    }).join('');
+    var menu=document.getElementById('appMenu'),burger=document.getElementById('appBurger');
+    function setMenu(open){
+      menu.hidden=!open;burger.setAttribute('aria-expanded',String(open));
+      document.documentElement.style.overflow=open?'hidden':'';
+      if(open)document.getElementById('appMenuClose').focus();else burger.focus({preventScroll:true});
+    }
+    burger.addEventListener('click',function(){setMenu(true)});
+    document.getElementById('appMenuClose').addEventListener('click',function(){setMenu(false)});
+    menu.addEventListener('click',function(e){var a=e.target.closest('a');if(a&&!a.hasAttribute('data-soon'))setMenu(false)});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!menu.hidden)setMenu(false)});
+    window.addEventListener('hashchange',function(){if(!menu.hidden&&location.hash!=='#app'){menu.hidden=true;burger.setAttribute('aria-expanded','false');document.documentElement.style.overflow=''}});
+    document.getElementById('appYear').textContent=new Date().getFullYear();
+  })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
 })();
