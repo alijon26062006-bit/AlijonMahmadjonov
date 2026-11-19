@@ -761,6 +761,41 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .tg-tbl .tg-total dd{font-size:16px}
 .tg-sum .g-go-w{margin-top:30px}
 
+
+/* ================= Part 10: cabinet → game keys ================= */
+.k-filter{padding:11px 13px 12px;margin-top:-3px}
+.k-search{margin-top:6px}
+.k-sels{display:grid;grid-template-columns:1fr 1fr 47px;gap:9px;margin-top:6px;align-items:end}
+.k-sels .o-sel{margin-top:4px}
+.k-sels .o-sel > button{height:43px}
+.k-fav{height:43px;border:1px solid var(--s2);border-radius:14px;background:#fff;display:grid;place-items:center;color:var(--s9);box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.k-fav .ico{width:18px;height:18px;stroke-width:2.2}
+.k-fav[aria-pressed="true"]{background:#fff7e0;border-color:#f6d47a;color:#d97706}
+.k-fav[aria-pressed="true"] .ico{fill:currentColor}
+.k-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.k-card{position:relative;display:flex;flex-direction:column;min-width:0;border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 10px 24px -14px rgba(15,23,42,.25),0 1px 2px rgba(15,23,42,.05);cursor:pointer;text-align:left}
+.k-art{position:relative;aspect-ratio:197/298;overflow:hidden}
+.k-art svg{position:absolute;inset:0;width:100%;height:100%}
+.k-art::after{content:"";position:absolute;inset:auto 0 0;height:46%;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.88) 70%,#fff)}
+.k-name{position:relative;z-index:1;margin-top:-40px;padding:0 12px;font-size:16px;line-height:22px;font-weight:800;color:var(--s9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-chips{display:flex;justify-content:space-between;gap:6px;padding:9px 11px 16px}
+.k-chip{display:inline-flex;align-items:center;gap:6px;min-width:0;height:35px;padding:0 8px 0 6px;border:1px solid var(--s2);border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--s9);box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.k-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k-chip i{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none}
+.k-chip i .ico{width:15px;height:15px}
+.k-pf i{background:#111827;color:#fff}
+.k-rg i{background:#eef1f5;border:1px solid var(--chipb);color:#475569}
+.k-pf{flex:0 1 auto}.k-rg{flex:0 1 auto}
+.k-star{position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);display:grid;place-items:center;color:#475569;box-shadow:0 2px 6px rgba(15,23,42,.15)}
+.k-star .ico{width:17px;height:17px}
+.k-star[aria-pressed="true"]{color:#f59e0b}
+.k-star[aria-pressed="true"] .ico{fill:currentColor}
+.k-more{display:flex;align-items:center;justify-content:center;gap:14px;padding:30px 0 24px;font-size:16px;font-weight:600;color:var(--s5)}
+.k-more .ico{width:20px;height:20px;color:#8b7bf5;animation:kspin 1s linear infinite}
+@keyframes kspin{to{transform:rotate(360deg)}}
+.k-empty{grid-column:1 / -1;padding:36px 12px;text-align:center;font-size:15px;line-height:22px;color:var(--s5);background:#fff;border:1px solid var(--s2);border-radius:20px}
+@media (min-width:640px){.k-grid{grid-template-columns:repeat(3,1fr)}}
+
 </style>
 
 {{SPRITE}}
@@ -1499,6 +1534,24 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appKeysPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Ключи игр</h1>
+      <p class="a-sub">Каталог ключей игр.</p>
+    </section>
+    <section class="a-card k-filter">
+      <label class="o-l" for="kSearch">Поиск по каталогу</label>
+      <input class="o-search k-search" id="kSearch" type="search" autocomplete="off" placeholder="Поиск игр (название)">
+      <div class="k-sels">
+        <div class="o-f"><span class="o-l" id="kPlL">Платформа</span><div class="o-sel" id="kPl"></div></div>
+        <div class="o-f"><span class="o-l" id="kRgL">Регион</span><div class="o-sel" id="kRg"></div></div>
+        <button class="k-fav" id="kFav" type="button" aria-pressed="false" aria-label="Только избранное"><svg class="ico"><use href="#i-star"/></svg></button>
+      </div>
+    </section>
+    <div class="k-grid" id="kGrid" aria-live="polite"></div>
+    <div class="k-more" id="kMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загрузка…</div>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1649,7 +1702,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1753,7 +1806,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
       ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
@@ -2080,6 +2133,71 @@ body.in-app > .header,body.in-app > #footer{display:none}
       m.textContent='Это демо: заказ не создаётся. На сервере здесь спишется '+$('tgsPay').textContent+' с баланса.';m.hidden=false;
     });
     renderPacks();renderPlans();setTab('stars');
+  })();
+
+  // ---------- cabinet: game keys catalogue (example data, own covers) ----------
+  (function(){
+    var UI=window.GemUI;if(!UI)return;
+    var $=function(id){return document.getElementById(id)};
+    var G=[['7 Days to Die','Steam','GLOBAL'],['Abyssus','Steam','GLOBAL'],['Ace Attorney Investigations Collection','Steam','СНГ'],['Against the Storm','Steam','СНГ'],['Age of Empires II: Definitive Edition','Steam','GLOBAL'],['Age of Empires III: Definitive Edition','Steam','GLOBAL'],['Assetto Corsa Rally','Steam','СНГ'],['Atomic Heart','Steam','ROW'],['Batman: Arkham Knight','Steam','GLOBAL'],['Battlefield 4','EA','GLOBAL'],['Battlefield 2042','EA','GLOBAL'],['Borderlands 3','Epic','GLOBAL'],['Cities: Skylines','Steam','GLOBAL'],['Dead Island 2','Epic','EU'],['Dying Light 2','Steam','СНГ'],['Euro Truck Simulator 2','Steam','GLOBAL'],['Far Cry 6','Ubisoft','EU'],['FINAL FANTASY VII','Steam','GLOBAL'],['FINAL FANTASY VIII','Steam','GLOBAL'],['FINAL FANTASY IX','Steam','GLOBAL'],['FINAL FANTASY TACTICS','Steam','GLOBAL'],['Forza Horizon 5','Xbox','GLOBAL'],['Grand Theft Auto V','Rockstar','GLOBAL'],['Hades II','Steam','СНГ'],['It Takes Two','EA','GLOBAL'],['Kingdom Come: Deliverance II','Steam','ROW'],['Mafia: Definitive Edition','Steam','GLOBAL'],['Metro Exodus','Steam','СНГ'],['Need for Speed Unbound','EA','GLOBAL'],['Palworld','Steam','GLOBAL'],['Red Dead Redemption 2','Rockstar','GLOBAL'],['Sea of Thieves','Xbox','GLOBAL'],['Stardew Valley','GOG','GLOBAL'],['The Witcher 3: Wild Hunt','GOG','GLOBAL'],['Tom Clancy\'s Rainbow Six Siege','Ubisoft','GLOBAL'],['Total War: WARHAMMER III','Steam','EU'],['Valheim','Steam','GLOBAL'],['Watch Dogs: Legion','Ubisoft','EU']];
+    var PAL=[['#7c2d12','#f97316','#fde68a'],['#0c4a6e','#38bdf8','#e0f2fe'],['#4c1d95','#a78bfa','#f5d0fe'],['#14532d','#4ade80','#dcfce7'],['#1f2937','#9ca3af','#f3f4f6'],['#7f1d1d','#f87171','#fee2e2'],['#713f12','#facc15','#fef9c3'],['#134e4a','#2dd4bf','#ccfbf1'],['#1e3a8a','#818cf8','#e0e7ff'],['#831843','#f472b6','#fce7f3']];
+    function hash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
+    function art(name){ // abstract poster: no game artwork
+      var h=hash(name),p=PAL[h%PAL.length],r=function(n){h=(h*1103515245+12345)&0x7fffffff;return h%n};
+      var s='<svg viewBox="0 0 197 270" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="kg'+h+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+p[0]+'"/><stop offset="1" stop-color="'+p[1]+'"/></linearGradient></defs><rect width="197" height="270" fill="url(#kg'+h+')"/>';
+      for(var i=0;i<5;i++)s+='<circle cx="'+r(197)+'" cy="'+r(200)+'" r="'+(18+r(60))+'" fill="'+p[2]+'" opacity="'+(0.08+r(18)/100)+'"/>';
+      s+='<path d="M0 '+(150+r(40))+' L'+(40+r(40))+' '+(110+r(40))+' L'+(110+r(30))+' '+(160+r(30))+' L197 '+(120+r(40))+' V270 H0Z" fill="'+p[0]+'" opacity=".55"/>';
+      var ini=name.replace(/[^A-Za-z0-9 ]/g,' ').split(' ').filter(Boolean).slice(0,3).map(function(w){return /^[0-9]+$/.test(w)?w:w[0]}).join('').toUpperCase();
+      s+='<text x="98.5" y="112" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="800" font-size="'+(ini.length>3?34:46)+'" fill="#fff" opacity=".92" letter-spacing="2">'+ini+'</text></svg>';
+      return s;
+    }
+    var FAV={};try{FAV=JSON.parse(localStorage.getItem('gem-key-fav')||'{}')}catch(e){}
+    function saveFav(){try{localStorage.setItem('gem-key-fav',JSON.stringify(FAV))}catch(e){}}
+    var f={q:'',pl:'all',rg:'all',fav:false},shown=0,STEP=8,rows=[];
+    function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+    function card(x){
+      var id=esc(x[0]);
+      return '<article class="k-card" tabindex="0" data-name="'+id+'" aria-label="'+id+', '+x[1]+', '+x[2]+'">'
+        +'<div class="k-art">'+art(x[0])+'</div>'
+        +'<button type="button" class="k-star" aria-pressed="'+(!!FAV[x[0]])+'" aria-label="'+(FAV[x[0]]?'Убрать из избранного':'В избранное')+'"><svg class="ico"><use href="#i-star"/></svg></button>'
+        +'<h3 class="k-name" title="'+id+'">'+esc(x[0])+'</h3>'
+        +'<div class="k-chips"><span class="k-chip k-pf"><i><svg class="ico"><use href="#i-pad"/></svg></i><span>'+x[1]+'</span></span><span class="k-chip k-rg"><i><svg class="ico"><use href="#i-globe"/></svg></i><span>'+x[2]+'</span></span></div></article>';
+    }
+    var grid=$('kGrid'),more=$('kMore'),loading=false;
+    function filter(){
+      var q=f.q.toLowerCase();
+      rows=G.filter(function(x){return (f.pl==='all'||x[1]===f.pl)&&(f.rg==='all'||x[2]===f.rg)&&(!f.fav||FAV[x[0]])&&(!q||x[0].toLowerCase().indexOf(q)>-1)})
+        .sort(function(a,b){return a[0].localeCompare(b[0],'en',{numeric:true})});
+      shown=0;grid.innerHTML='';
+      if(!rows.length){grid.innerHTML='<p class="k-empty">'+(f.fav?'В избранном пока пусто. Нажмите ★ на карточке игры, чтобы добавить.':'Ничего не найдено. Измените поиск или фильтры.')+'</p>';more.hidden=true;return}
+      add();
+    }
+    function add(){
+      grid.insertAdjacentHTML('beforeend',rows.slice(shown,shown+STEP).map(card).join(''));
+      shown=Math.min(rows.length,shown+STEP);more.hidden=shown>=rows.length;
+    }
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es){
+        if(!es[0].isIntersecting||loading||shown>=rows.length||$('appKeysPage').hidden)return;
+        loading=true;setTimeout(function(){add();loading=false},450);
+      },{rootMargin:'200px'}).observe(more);
+    }else{more.addEventListener('click',add)}
+    grid.addEventListener('click',function(e){
+      var st=e.target.closest('.k-star');
+      if(st){var n=st.closest('.k-card').dataset.name.replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+        if(FAV[n])delete FAV[n];else FAV[n]=1;saveFav();
+        st.setAttribute('aria-pressed',String(!!FAV[n]));st.setAttribute('aria-label',FAV[n]?'Убрать из избранного':'В избранное');
+        if(f.fav&&!FAV[n])filter();return}
+      var c=e.target.closest('.k-card');if(c)toastSoon('Страницу ключа с ценами сделаем на следующем шаге');
+    });
+    grid.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('k-card')){e.preventDefault();toastSoon('Страницу ключа с ценами сделаем на следующем шаге')}});
+    function toastSoon(t){var el=$('toast');if(!el)return;el.textContent=t;el.hidden=false;clearTimeout(toastSoon.t);toastSoon.t=setTimeout(function(){el.hidden=true},2600)}
+    var tq;$('kSearch').addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value.trim();tq=setTimeout(function(){f.q=v;filter()},150)});
+    var PLs=['Steam','EA','Epic','GOG','Rockstar','Ubisoft','Xbox'],RGs=['GLOBAL','СНГ','ROW','EU'];
+    UI.makeSel($('kPl'),'kPlL',[['all','Все']].concat(PLs.map(function(p){return [p,p]})),function(v){f.pl=v;filter()});
+    UI.makeSel($('kRg'),'kRgL',[['all','Все']].concat(RGs.map(function(p){return [p,p]})),function(v){f.rg=v;filter()});
+    $('kFav').addEventListener('click',function(){f.fav=!f.fav;this.setAttribute('aria-pressed',String(f.fav));this.setAttribute('aria-label',f.fav?'Показать все игры':'Только избранное');filter()});
+    filter();
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
