@@ -1170,6 +1170,58 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
 .pay-done .st-go{margin-top:24px}
 .pay-done.fail .pay-ok{background:#fde8e8;color:#dc2626}
 
+
+/* ================= Part 16: product page ================= */
+#appProductPage .a-hero h1{font-size:22px;line-height:30px}
+#appProductPage .a-sub{font-size:14px;line-height:20px}
+#appProductPage .a-hero-sm{padding:13px 16px 15px}
+.pr-head{display:grid;grid-template-columns:100px 1fr;gap:13px;padding:11px}
+.pr-cov{width:100px;height:100px;border-radius:14px;overflow:hidden;border:1px solid var(--s2)}
+.pr-cov svg{width:100%;height:100%;display:block}
+.pr-hr{min-width:0}
+.pr-hr h2{font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.pr-btn{display:flex;align-items:center;gap:11px;width:100%;height:31px;margin-top:7px;padding:0 10px;border:1px solid var(--s2);border-radius:11px;background:#fff;font-size:12px;font-weight:700;color:var(--s9);box-shadow:0 1px 2px rgba(15,23,42,.05)}
+.pr-btn .ico{width:15px;height:15px}
+.pr-btn[aria-pressed="true"]{color:#b45309;border-color:#f6d47a;background:#fff9e8}
+.pr-btn[aria-pressed="true"] .ico{fill:currentColor}
+.pr-prods{padding:13px 11px 12px}
+.pr-ph{display:flex;align-items:center;justify-content:space-between;padding:0 0 0 0}
+.pr-ph h2{font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.pr-pin{width:32px;height:32px;border:1px solid var(--s2);border-radius:10px;display:grid;place-items:center;color:#475569}
+.pr-pin .ico{width:15px;height:15px}
+.pr-pin[aria-pressed="true"]{background:#efecfd;border-color:#c9c2f7;color:#6d4bff}
+.pr-list{margin-top:20px;padding:4px;max-height:322px;overflow-y:auto;display:grid;gap:9px;border:1px solid #eef1f5;border-radius:14px;overscroll-behavior:contain}
+.pr-list.full{max-height:none}
+.pr-p{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:59px;padding:10px 12px;border:1.5px solid #e3e7ee;border-radius:14px;background:#f8f9fb;text-align:left}
+.pr-p b{font-size:14.5px;line-height:19px;font-weight:800;color:var(--s9)}
+.pr-p span{font-size:14.5px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pr-p:hover{border-color:#cfc6fb}
+.pr-p[aria-checked="true"]{border-color:#a395f5;background:#efecfd}
+.pr-p[aria-checked="true"] span{color:#5b21b6;align-self:flex-start}
+.pr-more{margin-top:8px;text-align:center;font-size:11.5px;font-weight:700;color:var(--s9)}
+.pr-note{padding:13px 12px 14px;border:1.5px solid #ecd59c;border-radius:20px;background:#fbf4e1}
+.pr-note h3{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#b45309}
+.pr-note h3 .ico{width:16px;height:16px}
+.pr-note p{margin-top:10px;font-size:13.5px;line-height:20px;color:var(--s9);white-space:pre-line}
+.pr-sum{padding:0 0 18px;overflow:hidden}
+.pr-sum h2{padding:14px 12px 11px;border-bottom:1px solid var(--s2);font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.pr-rows{display:grid;gap:9px;padding:9px 11px 14px;border-bottom:1px solid var(--s2)}
+.pr-r{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:38px;padding:6px 11px;border:1px solid var(--s2);border-radius:13px;background:#fff}
+.pr-r span{font-size:12.5px;font-weight:600;color:#5f6c84}
+.pr-r b{font-size:13px;font-weight:800;color:var(--s9);text-align:right;min-width:0;font-variant-numeric:tabular-nums}
+.pr-id{min-height:50px;padding:6px 6px 6px 12px;border:1.5px solid #a395f5;background:#efecfd}
+.pr-id label{font-size:13px;font-weight:800;color:#5b21b6;white-space:nowrap}
+.pr-id input{width:52%;height:38px;padding:0 12px;border:1px solid #c9c2f7;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:var(--s9);outline:none}
+.pr-id input::placeholder{color:#94a3b8}
+.pr-id input:focus{border-color:#7e5bff;box-shadow:0 0 0 3px rgba(126,91,255,.15)}
+.pr-id input[aria-invalid="true"]{border-color:#dc2626}
+.pr-rows .err{margin-top:-4px;padding:0 4px}
+.pr-pay{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 0}
+.pr-pay span{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5f6c84}
+.pr-pay b{font-size:18px;font-weight:800;color:#5b21b6;font-variant-numeric:tabular-nums}
+.pr-go{width:calc(100% - 24px);margin:12px 12px 0;height:46px}
+.pr-sum .form-msg{margin:12px 12px 0}
+
 </style>
 
 {{SPRITE}}
@@ -2105,6 +2157,41 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appProductPage" hidden>
+    <section class="a-hero a-hero-sm" id="prHero">
+      <h1>Пополнение игр и сервисов</h1>
+      <p class="a-sub">Каталог пополнений для игр и сервисов.</p>
+    </section>
+    <section class="a-card pr-head">
+      <div class="pr-cov" id="prCov" aria-hidden="true"></div>
+      <div class="pr-hr">
+        <h2 id="prName">PUBG Mobile (Auto)</h2>
+        <button class="pr-btn" type="button" id="prFav" aria-pressed="false"><svg class="ico"><use href="#i-star"/></svg><span>В избранное</span></button>
+        <a class="pr-btn" href="#topups" id="prBack"><svg class="ico"><use href="#i-chevl"/></svg>Назад к каталогу</a>
+      </div>
+    </section>
+    <section class="a-card pr-prods">
+      <div class="pr-ph"><h2>Продукты</h2><button class="pr-pin" type="button" id="prPin" aria-pressed="false" aria-label="Показать весь список без прокрутки"><svg class="ico"><use href="#i-pin"/></svg></button></div>
+      <div class="pr-list" id="prList" role="radiogroup" aria-label="Продукты"></div>
+      <p class="pr-more" id="prMore">Листайте вниз, чтобы увидеть все варианты.</p>
+    </section>
+    <section class="pr-note"><h3><svg class="ico"><use href="#i-info"/></svg>Примечание</h3><p id="prNote"></p></section>
+    <section class="a-card pr-sum">
+      <h2>Итого заказа</h2>
+      <div class="pr-rows">
+        <div class="pr-r"><span>Игра/Сервис</span><b id="prsGame"></b></div>
+        <div class="pr-r"><span>Продукт</span><b id="prsProd"></b></div>
+        <div class="pr-r pr-id"><label for="prId" id="prIdL">Player ID *</label><input id="prId" type="text" inputmode="numeric" autocomplete="off" placeholder="Player ID" aria-describedby="prId-e"></div>
+        <div class="pr-r pr-id" id="prZoneRow" hidden><label for="prZone">Zone ID *</label><input id="prZone" type="text" inputmode="numeric" autocomplete="off" placeholder="Zone ID" aria-describedby="prId-e"></div>
+        <small class="err" id="prId-e" hidden></small>
+        <div class="pr-r"><span>Цена</span><b id="prsPrice"></b></div>
+      </div>
+      <div class="pr-pay"><span>К оплате</span><b id="prsPay"></b></div>
+      <button class="st-go pr-go" type="button" id="prGo">Продолжить</button>
+      <p class="form-msg" id="prMsg" role="status" hidden></p>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#support">Поддержка</a></nav>
@@ -2400,7 +2487,7 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={pay:'v-pay',login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app',settings:'v-app',support:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage',settings:'appSettingsPage',support:'appSupportPage'};
+    var V={pay:'v-pay',login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app',settings:'v-app',support:'v-app',product:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage',settings:'appSettingsPage',support:'appSupportPage',product:'appProductPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -2915,6 +3002,7 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
       return s;
     }
     function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+    window.GemArt=art;
     function catalog(o){
       var FAV={};try{FAV=JSON.parse(localStorage.getItem(o.key)||'{}')}catch(e){}
       var f={q:'',fav:false},rows=[],shown=0,loading=false,grid=$(o.grid),more=$(o.more);
@@ -2937,7 +3025,7 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
       if('IntersectionObserver' in window){new IntersectionObserver(function(es){if(!es[0].isIntersecting||loading||shown>=rows.length||$(o.page).hidden)return;loading=true;setTimeout(function(){add();loading=false},450)},{rootMargin:'200px'}).observe(more)}
       else more.addEventListener('click',add);
       function toast(t){var el=$('toast');if(!el)return;el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true},2600)}
-      function open(c){toast(c.classList.contains('off')?'Эта позиция временно недоступна':o.soon)}
+      function open(c){if(c.classList.contains('off'))return toast('Эта позиция временно недоступна');if(o.onOpen&&window.GemProduct)return window.GemProduct(c.getAttribute('data-name').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<'),'#'+o.back);toast(o.soon)}
       grid.addEventListener('click',function(e){
         var st=e.target.closest('.k-star');
         if(st){var n=st.closest('.c-card').getAttribute('data-name').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<');
@@ -2953,7 +3041,7 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
     catalog({page:'appManualPage',grid:'mGrid',more:'mMore',search:'mSearch',fav:'mFav',key:'gem-man-fav',manual:true,w:410,h:152,step:6,
       soon:'Страницу услуги с ценами сделаем на следующем шаге',
       items:[['9+ iTunes Loaded Accounts (US)'],['Xbox Loaded Accounts (US)'],['Razer Gold Loaded Accounts (Global)'],['Razer Gold Loaded Accounts (China)',1],['PlayStation Loaded Accounts (US)'],['Steam Loaded Accounts (KZ)'],['Nintendo eShop Loaded Accounts (US)'],['Google Play Loaded Accounts (TR)'],['Battle.net Balance Top-up (EU)',1],['EA Play Activation (Global)']]});
-    catalog({page:'appTopupsPage',grid:'tpGrid',more:'tpMore',search:'tpSearch',fav:'tpFav',key:'gem-top-fav',w:198,h:192,step:8,
+    catalog({onOpen:true,back:'topups',page:'appTopupsPage',grid:'tpGrid',more:'tpMore',search:'tpSearch',fav:'tpFav',key:'gem-top-fav',w:198,h:192,step:8,
       soon:'Страницу пополнения с пакетами и полем ID игрока сделаем на следующем шаге',
       items:[['PUBG Mobile (Auto)'],['PUBG Mobile (Manual)'],['Free Fire (CIS)'],['Free Fire (MENA)'],['Free Fire (LATAM)'],['Wuthering Waves'],['Zenless Zone Zero (Global)'],['Honkai: Star Rail (Global)'],['Mobile Legends (RU)'],['Mobile Legends (Philippines)'],['Mobile Legends (Indonesia)'],['Genshin Impact (Global)'],['Badlanders'],['Ballistic Hero VNG'],['Be The King'],['Bigo Live'],['Black Clover M (Asia)'],['Call of Duty Mobile (Global)'],['Clash of Clans'],['Brawl Stars'],['Honor of Kings (Global)',1],['Delta Force (Global)']]});
     catalog({page:'appCardsPage',grid:'cGrid',more:'cMore',search:'cSearch',fav:'cFav',key:'gem-card-fav',w:198,h:170,step:8,
@@ -3258,6 +3346,60 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
     $('paySim').addEventListener('click',function(){done(true,'Получено '+sendAmt.toFixed(4)+' USDT в сети '+net.name+'. На баланс зачислено $'+sendAmt.toFixed(4)+'. Это демо: настоящий баланс не изменился.')});
     function route(){if(location.hash==='#pay')start();else stop()}
     window.addEventListener('hashchange',route);route();
+  })();
+
+  // ---------- product page (packages, player ID, summary; example prices) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    function pk(names,base,step){return names.map(function(n,i){return [n,+(base*(i===0?1:Math.pow(step,i))).toFixed(4)]})}
+    var P={
+      pubg:{id:'Player ID',re:/^\d{5,12}$/,hint:'Player ID — только цифры, от 5 до 12',
+        note:'Регион: Global\nАвтоматическое пополнение PUBG Mobile.\nUC зачисляются прямо на аккаунт сразу после оформления заказа.',
+        items:[['First Purchase Pack',.8866],['Prime (1 Month)',.8866],['Weekly Deal Pack 1',.8866],['60 WOW Coins',.8977],['60 UC',.9077],['325 UC',4.4102],['660 UC',8.8204],['1800 UC',22.051],['3850 UC',44.102],['8100 UC',88.204],['Prime Plus (1 Month)',8.82]]},
+      ff:{id:'Player ID',re:/^\d{6,12}$/,hint:'Player ID — только цифры, от 6 до 12',
+        note:'Регион: указан в названии каталога.\nАлмазы зачисляются по Player ID автоматически.',
+        items:[['Weekly Membership',1.5509],['Monthly Membership',7.7546],['110 Diamonds',.7754],['341 Diamonds',2.3781],['572 Diamonds',3.8773],['1166 Diamonds',7.7546],['2398 Diamonds',15.509],['Level Up Package 10',.5169]]},
+      ml:{id:'User ID',zone:true,re:/^\d{5,12}$/,hint:'User ID — от 5 до 12 цифр, Zone ID — от 1 до 6 цифр',
+        note:'Нужны User ID и Zone ID: профиль в игре → под ником, например 123456789 (1234).\nАлмазы зачисляются автоматически.',
+        items:[['Weekly Diamond Pass',1.38],['86 Diamonds',1.38],['172 Diamonds',2.76],['257 Diamonds',4.14],['706 Diamonds',11.04],['2195 Diamonds',33.12]]},
+      uid:{id:'UID',re:/^\d{8,10}$/,hint:'UID — 8–10 цифр, есть в профиле игры',
+        note:'Пополнение по UID и серверу аккаунта.\nКристаллы зачисляются автоматически.',
+        items:[['Blessing / Monthly Card',4.2],['60 Crystals',.84],['300+30 Crystals',4.2],['980+110 Crystals',12.6],['1980+260 Crystals',25.2],['3280+600 Crystals',42],['6480+1600 Crystals',84]]},
+      gen:{id:'Player ID',re:/^[A-Za-z0-9_-]{4,32}$/,hint:'ID игрока — от 4 символов',
+        note:'Пополнение по ID игрока.\nВалюта зачисляется автоматически после оформления заказа.',
+        items:[['Пакет 1',.99],['Пакет 2',4.95],['Пакет 3',9.9],['Пакет 4',19.8],['Пакет 5',49.5]]}
+    };
+    function kind(n){n=n.toLowerCase();return n.indexOf('pubg')>-1?'pubg':n.indexOf('free fire')>-1?'ff':n.indexOf('mobile legends')>-1?'ml':/genshin|honkai|zenless|wuthering/.test(n)?'uid':'gen'}
+    var cur={name:'PUBG Mobile (Auto)',k:'pubg',sel:0},FAV={};
+    function fav(){try{FAV=JSON.parse(localStorage.getItem('gem-top-fav')||'{}')}catch(x){FAV={}}}
+    function render(){
+      var d=P[cur.k];fav();
+      $('prName').textContent=cur.name;$('prCov').innerHTML=window.GemArt?window.GemArt(cur.name,200,200).replace(/(id="|url\(#)c([gd])/g,'$1pr$2'):'';
+      var on=!!FAV[cur.name];$('prFav').setAttribute('aria-pressed',String(on));$('prFav').querySelector('span').textContent=on?'В избранном':'В избранное';
+      $('prList').innerHTML=d.items.map(function(x,i){return '<button type="button" class="pr-p" role="radio" data-i="'+i+'" aria-checked="'+(i===cur.sel)+'"><b>'+x[0]+'</b><span>$'+x[1].toFixed(2)+'</span></button>'}).join('');
+      $('prMore').hidden=d.items.length<6||$('prList').classList.contains('full');
+      $('prNote').textContent=d.note;$('prIdL').textContent=d.id+' *';$('prId').placeholder=d.id;$('prZoneRow').hidden=!d.zone;
+      sum();
+    }
+    function sum(){var d=P[cur.k],it=d.items[cur.sel];$('prsGame').textContent=cur.name;$('prsProd').textContent=it[0];$('prsPrice').textContent='$'+it[1].toFixed(4);$('prsPay').textContent='$'+it[1].toFixed(4)}
+    $('prList').addEventListener('click',function(e){var b=e.target.closest('.pr-p');if(!b)return;cur.sel=+b.dataset.i;
+      [].forEach.call(this.children,function(x){x.setAttribute('aria-checked',String(x===b))});sum();$('prMsg').hidden=true});
+    $('prPin').addEventListener('click',function(){var on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',String(on));$('prList').classList.toggle('full',on);$('prMore').hidden=on||P[cur.k].items.length<6});
+    $('prFav').addEventListener('click',function(){fav();if(FAV[cur.name])delete FAV[cur.name];else FAV[cur.name]=1;try{localStorage.setItem('gem-top-fav',JSON.stringify(FAV))}catch(x){}render()});
+    function err(m){var e=$('prId-e');[$('prId'),$('prZone')].forEach(function(i){if(m)i.setAttribute('aria-invalid','true');else i.removeAttribute('aria-invalid')});e.textContent=m;e.hidden=!m;return !m}
+    function chk(){var d=P[cur.k],v=$('prId').value.trim(),z=$('prZone').value.trim();
+      return err(!v?'Введите '+d.id:!d.re.test(v)?d.hint:d.zone&&!/^\d{1,6}$/.test(z)?'Введите Zone ID: от 1 до 6 цифр':'')}
+    ['prId','prZone'].forEach(function(id){$(id).addEventListener('input',function(){if(this.getAttribute('aria-invalid'))chk();$('prMsg').hidden=true})});
+    $('prGo').addEventListener('click',function(){
+      var m=$('prMsg');if(!chk()){m.hidden=true;$('prId').focus();return}
+      var d=P[cur.k],it=d.items[cur.sel],id=$('prId').value.trim()+(d.zone?' ('+$('prZone').value.trim()+')':'');
+      m.textContent='Это демо: заказ не создаётся. На сервере здесь спишется $'+it[1].toFixed(4)+' за «'+it[0]+'» на '+d.id+' '+id+'.';m.hidden=false;
+    });
+    window.GemProduct=function(name,back){
+      var k=kind(name);cur={name:name,k:k,sel:0};$('prId').value='';$('prZone').value='';err('');$('prMsg').hidden=true;
+      $('prBack').setAttribute('href',back||'#topups');render();if(location.hash!=='#product')location.hash='product';else window.scrollTo(0,0);
+    };
+    render();
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
