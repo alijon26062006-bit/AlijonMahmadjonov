@@ -796,6 +796,37 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .k-empty{grid-column:1 / -1;padding:36px 12px;text-align:center;font-size:15px;line-height:22px;color:var(--s5);background:#fff;border:1px solid var(--s2);border-radius:20px}
 @media (min-width:640px){.k-grid{grid-template-columns:repeat(3,1fr)}}
 
+
+/* ================= Part 11: cabinet → manual services, gift cards ================= */
+.c-filter{padding:10px 13px 10px;margin-top:-3px}
+.c-filter + .c-grid{margin-top:-4px}
+.c-top{display:flex;justify-content:space-between;gap:12px}
+.c-row{display:grid;grid-template-columns:1fr 67px;gap:11px;margin-top:6px}
+.c-row .o-search{height:43px}
+.c-fav{height:43px}
+.c-grid{display:grid;gap:14px}
+.c-grid.two{grid-template-columns:1fr 1fr}
+.c-card{position:relative;display:flex;flex-direction:column;min-width:0;background:#fff;border:1px solid var(--s2);border-radius:20px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:border-color .15s,box-shadow .15s}
+.c-card:hover{border-color:#d4dae3;box-shadow:0 10px 24px -16px rgba(15,23,42,.3)}
+.c-card:focus-visible{outline:2px solid #7e5bff;outline-offset:2px}
+.c-art{position:relative;overflow:hidden}
+.c-art svg{display:block;width:100%;height:100%}
+.one .c-art{aspect-ratio:410/152}
+.two .c-art{aspect-ratio:198/170}
+.one .c-art::after{content:"";position:absolute;inset:auto 0 0;height:22%;background:linear-gradient(180deg,rgba(255,255,255,0),#fff)}
+.c-name{padding:10px 12px 18px;font-size:15px;line-height:20px;font-weight:800;color:var(--s9);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.two .c-name{padding:4px 11px 16px;min-height:62px;font-size:14px;line-height:19px;letter-spacing:-.01em;word-break:break-word}
+.one .c-name{padding:6px 12px 14px;white-space:nowrap;text-overflow:ellipsis;display:block}
+.c-badges{position:absolute;top:8px;left:8px;z-index:2;display:flex;gap:4px}
+.c-badges span{height:33px;min-width:36px;padding:0 6px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.88);border:1px solid rgba(15,23,42,.08);color:#1f2937;box-shadow:0 2px 6px rgba(15,23,42,.1)}
+.c-badges span .ico{width:16px;height:16px}
+.c-badges .man{height:26px;min-width:30px;background:#e2f6ee;border-color:#bfe8d6;color:#0f766e}
+.c-badges .man .ico{width:14px;height:14px}
+.c-off{position:absolute;inset:auto 0 0;z-index:2;height:23px;display:grid;place-items:center;background:#a0521f;color:#fff;font-size:12px;font-weight:700}
+.c-card.off .c-art svg{filter:grayscale(.35)}
+.c-card .k-star{top:8px;right:8px}
+@media (min-width:640px){.c-grid.two{grid-template-columns:repeat(3,1fr)}.c-grid.one{grid-template-columns:1fr 1fr}}
+
 </style>
 
 <!-- Icons: Lucide (ISC License) -->
@@ -821,6 +852,8 @@ body.in-app > .header,body.in-app > #footer{display:none}
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /> <path d="M14 2v4a2 2 0 0 0 2 2h4" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></symbol>
+  <symbol id="i-boxs" viewBox="0 0 24 24"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14" /> <path d="m7.5 4.27 9 5.15" /> <polyline points="3.29 7 12 12 20.71 7" /> <line x1="12" x2="12" y1="22" y2="12" /> <circle cx="18.5" cy="15.5" r="2.5" /> <path d="M20.27 17.27 22 19" /></symbol>
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></symbol>
   <symbol id="i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
@@ -1406,7 +1439,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <h2>Быстрые действия</h2>
       <a class="a-qi" href="#orders"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
-      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#cards"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#steam"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
     </section>
 
@@ -1607,6 +1640,38 @@ body.in-app > .header,body.in-app > #footer{display:none}
     <div class="k-more" id="kMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загрузка…</div>
   </main>
 
+  <main class="app-main" id="appManualPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Ручные услуги</h1>
+      <p class="a-sub">Каталог ручных услуг и заказов.</p>
+    </section>
+    <section class="a-card c-filter">
+      <div class="c-top"><label class="o-l" for="mSearch">Поиск по каталогу</label><span class="o-l" aria-hidden="true">Избранное</span></div>
+      <div class="c-row">
+        <input class="o-search" id="mSearch" type="search" autocomplete="off" placeholder="Поиск по названию…">
+        <button class="k-fav c-fav" id="mFav" type="button" aria-pressed="false" aria-label="Только избранное"><svg class="ico"><use href="#i-star"/></svg></button>
+      </div>
+    </section>
+    <div class="c-grid one" id="mGrid" aria-live="polite"></div>
+    <div class="k-more" id="mMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загружаем ещё…</div>
+  </main>
+
+  <main class="app-main" id="appCardsPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Подарочные карты и коды</h1>
+      <p class="a-sub">Каталог подарочных карт и кодов.</p>
+    </section>
+    <section class="a-card c-filter">
+      <div class="c-top"><label class="o-l" for="cSearch">Поиск по каталогу</label><span class="o-l" aria-hidden="true">Избранное</span></div>
+      <div class="c-row">
+        <input class="o-search" id="cSearch" type="search" autocomplete="off" placeholder="Поиск по названию категории…">
+        <button class="k-fav c-fav" id="cFav" type="button" aria-pressed="false" aria-label="Только избранное"><svg class="ico"><use href="#i-star"/></svg></button>
+      </div>
+    </section>
+    <div class="c-grid two" id="cGrid" aria-live="polite"></div>
+    <div class="k-more" id="cMore" hidden><svg class="ico"><use href="#i-loader"/></svg>Загружаем ещё…</div>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1757,7 +1822,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1861,7 +1926,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги','#manual'],['card','Подарочные карты','#cards'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
       ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
@@ -2253,6 +2318,66 @@ body.in-app > .header,body.in-app > #footer{display:none}
     UI.makeSel($('kRg'),'kRgL',[['all','Все']].concat(RGs.map(function(p){return [p,p]})),function(v){f.rg=v;filter()});
     $('kFav').addEventListener('click',function(){f.fav=!f.fav;this.setAttribute('aria-pressed',String(f.fav));this.setAttribute('aria-label',f.fav?'Показать все игры':'Только избранное');filter()});
     filter();
+  })();
+
+  // ---------- cabinet: manual services + gift cards (shared catalogue, own covers) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    var PAL=[['#0ea5e9','#2563eb'],['#16a34a','#166534'],['#111827','#14532d'],['#7c3aed','#4c1d95'],['#f97316','#c2410c'],['#db2777','#9d174d'],['#0f766e','#115e59'],['#ca8a04','#854d0e'],['#475569','#1e293b'],['#dc2626','#7f1d1d']];
+    function hash(s){var h=7;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
+    function art(name,w,h){
+      var x=hash(name),p=PAL[x%PAL.length],r=function(n){x=(x*1103515245+12345)&0x7fffffff;return x%n};
+      var base=name.split(/[·(]/)[0].replace(/[^A-Za-z0-9+ ]/g,' ').split(' ').filter(Boolean);
+      var ini=base.slice(0,2).map(function(w){return /^[0-9+]+$/.test(w)?w:w[0]}).join('').toUpperCase();
+      var s='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="cg'+x+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+p[0]+'"/><stop offset="1" stop-color="'+p[1]+'"/></linearGradient><pattern id="cd'+x+'" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#fff" opacity=".12"/></pattern></defs>';
+      s+='<rect width="'+w+'" height="'+h+'" fill="url(#cg'+x+')"/><rect width="'+w+'" height="'+h+'" fill="url(#cd'+x+')"/>';
+      var cx=w/2,cy=h/2,R=Math.min(w,h)*.3;
+      s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="#fff" opacity=".16"/><circle cx="'+(cx+R*.9)+'" cy="'+(cy-R*.7)+'" r="'+(R*.45)+'" fill="#fff" opacity=".1"/>';
+      s+='<text x="'+cx+'" y="'+(cy+R*.32)+'" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="800" font-size="'+(R*.9)+'" fill="#fff" letter-spacing="1">'+ini+'</text></svg>';
+      return s;
+    }
+    function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+    function catalog(o){
+      var FAV={};try{FAV=JSON.parse(localStorage.getItem(o.key)||'{}')}catch(e){}
+      var f={q:'',fav:false},rows=[],shown=0,loading=false,grid=$(o.grid),more=$(o.more);
+      function card(x){
+        var n=x[0],off=!!x[1],man=!!o.manual;
+        return '<article class="c-card'+(off?' off':'')+'" tabindex="0" data-name="'+esc(n)+'" aria-label="'+esc(n)+(off?', временно недоступно':'')+'">'
+          +'<div class="c-art">'+art(n,o.w,o.h)+(off?'<span class="c-off">Временно недоступно</span>':'')+'</div>'
+          +'<div class="c-badges" aria-hidden="true"><span><svg class="ico"><use href="#i-doc"/></svg></span>'+(man?'<span class="man" title="Выполняется вручную"><svg class="ico"><use href="#i-boxs"/></svg></span>':'')+'</div>'
+          +'<button type="button" class="k-star" aria-pressed="'+(!!FAV[n])+'" aria-label="'+(FAV[n]?'Убрать из избранного':'В избранное')+'"><svg class="ico"><use href="#i-star"/></svg></button>'
+          +'<h3 class="c-name" title="'+esc(n)+'">'+esc(n)+'</h3></article>';
+      }
+      function filter(){
+        var q=f.q.toLowerCase();
+        rows=o.items.filter(function(x){return (!f.fav||FAV[x[0]])&&(!q||x[0].toLowerCase().indexOf(q)>-1)});
+        shown=0;grid.innerHTML='';
+        if(!rows.length){grid.innerHTML='<p class="k-empty">'+(f.fav?'В избранном пока пусто. Нажмите ★ на карточке, чтобы добавить.':'Ничего не найдено. Измените поиск.')+'</p>';more.hidden=true;return}
+        add();
+      }
+      function add(){grid.insertAdjacentHTML('beforeend',rows.slice(shown,shown+o.step).map(card).join(''));shown=Math.min(rows.length,shown+o.step);more.hidden=shown>=rows.length}
+      if('IntersectionObserver' in window){new IntersectionObserver(function(es){if(!es[0].isIntersecting||loading||shown>=rows.length||$(o.page).hidden)return;loading=true;setTimeout(function(){add();loading=false},450)},{rootMargin:'200px'}).observe(more)}
+      else more.addEventListener('click',add);
+      function toast(t){var el=$('toast');if(!el)return;el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true},2600)}
+      function open(c){toast(c.classList.contains('off')?'Эта позиция временно недоступна':o.soon)}
+      grid.addEventListener('click',function(e){
+        var st=e.target.closest('.k-star');
+        if(st){var n=st.closest('.c-card').getAttribute('data-name').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<');
+          if(FAV[n])delete FAV[n];else FAV[n]=1;try{localStorage.setItem(o.key,JSON.stringify(FAV))}catch(x){}
+          st.setAttribute('aria-pressed',String(!!FAV[n]));st.setAttribute('aria-label',FAV[n]?'Убрать из избранного':'В избранное');if(f.fav&&!FAV[n])filter();return}
+        var c=e.target.closest('.c-card');if(c)open(c);
+      });
+      grid.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('c-card')){e.preventDefault();open(e.target)}});
+      var tq;$(o.search).addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value.trim();tq=setTimeout(function(){f.q=v;filter()},150)});
+      $(o.fav).addEventListener('click',function(){f.fav=!f.fav;this.setAttribute('aria-pressed',String(f.fav));this.setAttribute('aria-label',f.fav?'Показать все':'Только избранное');filter()});
+      filter();
+    }
+    catalog({page:'appManualPage',grid:'mGrid',more:'mMore',search:'mSearch',fav:'mFav',key:'gem-man-fav',manual:true,w:410,h:152,step:6,
+      soon:'Страницу услуги с ценами сделаем на следующем шаге',
+      items:[['9+ iTunes Loaded Accounts (US)'],['Xbox Loaded Accounts (US)'],['Razer Gold Loaded Accounts (Global)'],['Razer Gold Loaded Accounts (China)',1],['PlayStation Loaded Accounts (US)'],['Steam Loaded Accounts (KZ)'],['Nintendo eShop Loaded Accounts (US)'],['Google Play Loaded Accounts (TR)'],['Battle.net Balance Top-up (EU)',1],['EA Play Activation (Global)']]});
+    catalog({page:'appCardsPage',grid:'cGrid',more:'cMore',search:'cSearch',fav:'cFav',key:'gem-card-fav',w:198,h:170,step:8,
+      soon:'Страницу карты с номиналами сделаем на следующем шаге',
+      items:[['App Store & iTunes (TR) · Instant use'],['PUBG: BATTLEGROUNDS (Global) · Instant use'],['Jawaker Gift Card · Instant use'],['IMO · Instant use'],['Black Clover M Redeem Card'],['Blacknut Gift Card'],['Candy Crush Gift Card (US)'],['Carrom Gold'],['Cherry Credits Gift Card'],['Delta Force Coins (Steam)'],['Google Play (US) · Instant use'],['Steam Wallet Code (Global)'],['PlayStation Store (US)'],['Xbox Gift Card (US)'],['Netflix (TR)'],['Spotify Premium (US)'],['Roblox Gift Card (Global)'],['Razer Gold (Global)'],['Nintendo eShop (US)'],['Amazon Gift Card (US)',1],['Discord Nitro (Global)'],['Valorant Points (TR)'],['Free Fire Diamonds Voucher'],['Mobile Legends Diamonds Voucher']]});
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
