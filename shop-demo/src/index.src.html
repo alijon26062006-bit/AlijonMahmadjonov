@@ -894,6 +894,94 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .s-row strong{display:block;margin-top:10px;padding-top:10px;border-top:1px dashed #cdd4de;font-size:17px;line-height:22px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
 @media (max-width:370px){.s-tabs button{padding:0 9px}.s-th,.s-row-top{grid-template-columns:1fr 44px 44px 44px}}
 
+
+/* ================= Part 13: cabinet → profile ================= */
+#appProfilePage .a-hero h1{font-size:22px;line-height:30px}
+#appProfilePage .a-sub{font-size:14px;line-height:20px}
+#appProfilePage .a-hero-sm{padding:13px 16px 15px}
+.p-head{padding:13px 13px 13px}
+.p-head .a-name{font-size:21px;line-height:28px}
+.p-head .a-mail{font-size:14px;line-height:20px}
+.p-links{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.p-links a{height:44px;display:flex;align-items:center;justify-content:center;border:1px solid var(--s2);border-radius:14px;background:#fff;font-size:14px;font-weight:700;color:var(--s9)}
+.p-links a:hover{background:#fafbfd}
+.p-box{padding:12px 15px 14px;background:#fff;border:1px solid var(--s2);border-radius:20px}
+.p-box > span{display:block;font-size:13px;line-height:18px;color:#5f6c84}
+.p-box > b{display:block;margin-top:4px;font-size:18px;line-height:24px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.p-box > small{display:block;margin-top:6px;font-size:13px;line-height:18px;color:var(--s5)}
+.p-sp{display:block;height:24px}
+.p-more{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:12px;font-weight:700;color:#5f6c84}
+.p-more .ico{width:13px;height:13px;stroke-width:2.6}
+.p-more:hover{color:var(--s9)}
+.p-mail{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1.5px;overflow-wrap:anywhere}
+.p-sub{padding:13px 15px 13px;border:1.5px solid #b8e9c5;border-radius:20px;background:linear-gradient(160deg,#effdf4,#f6fef9)}
+.p-cap{display:block;font-size:12px;line-height:16px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8}
+.p-plan{display:block;margin-top:4px;font-size:18px;line-height:24px;font-weight:800;color:var(--s9)}
+.p-price{display:block;margin-top:9px;font-size:18px;line-height:24px;font-weight:800;color:var(--s9)}
+.p-active{display:inline-flex;align-items:center;gap:9px;margin-top:10px;padding:6px 11px 6px 10px;border:1px solid var(--chipb);border-radius:12px;background:#f1f5f9}
+.p-active i{width:25px;height:25px;border-radius:50%;background:#e4f8eb;border:1px solid #bfe8cd;display:grid;place-items:center;color:#16a34a;flex:none}
+.p-active i .ico{width:14px;height:14px}
+.p-active b{display:block;font-size:14px;line-height:18px;font-weight:800;color:var(--s9)}
+.p-active span{display:block;font-size:12.5px;line-height:17px;color:#5f6c84;font-variant-numeric:tabular-nums}
+.p-lav{display:flex;align-items:center;justify-content:center;width:100%;height:44px;margin-top:12px;border:1.5px solid #b8adf6;border-radius:14px;background:#e9e7fb;font-size:14px;font-weight:600;color:var(--s9)}
+.p-lav:hover{background:#e2dffa}
+.p-lav.big{margin-top:0;font-size:16px;font-weight:600}
+.p-pad{padding:12px 15px}
+.p-sec{margin:6px 0 -4px;font-size:13px;line-height:18px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#5f6c84}
+.p-api{padding:16px 17px 18px}
+.p-api h2{font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.p-note{margin-top:2px;font-size:12.5px;line-height:16px;color:#5f6c84}
+.p-ibtn{height:44px;border:1px solid var(--s2);border-radius:14px;background:#fff;display:grid;place-items:center;color:#5f6c84;margin-top:12px}
+.p-ibtn.wide{width:100%}
+.p-ibtn .ico{width:20px;height:20px}
+.p-ibtn:hover{color:var(--s9);background:#fafbfd}
+.p-ibtn[aria-pressed="true"]{color:#6d4bff;border-color:#c9c2f7}
+.p-ibtn:disabled{opacity:.45;cursor:default}
+.p-3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.p-secret{margin-top:12px;min-height:40px;padding:9px 14px;border:1.5px dashed #e3e7ee;border-radius:14px;font-family:var(--mono);font-size:13px;line-height:20px;letter-spacing:.06em;color:var(--s9);overflow-wrap:anywhere}
+.p-ai .p-secret{margin-top:0}
+.p-chips{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-top:22px}
+.p-chips span{padding:11px 19px;border:1.5px solid #c4b9f8;border-radius:12px;background:#efecfd;font-size:13px;line-height:18px;font-weight:700;color:var(--s9)}
+.p-doc{margin-top:18px;padding:16px 19px 19px;border:1.5px solid #ddd6fb;border-radius:18px;background:linear-gradient(160deg,#f2f0fd,#f8f7fe)}
+.p-doc h3{font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.p-doc p{margin-top:4px;font-size:12px;line-height:16px;color:#5f6c84}
+.p-docbtn{display:inline-flex;align-items:center;height:44px;margin-top:16px;padding:0 15px;border:1px solid var(--s2);border-radius:14px;background:#fff;font-size:16px;font-weight:600;color:var(--s9)}
+.p-last{margin-top:12px}
+/* bottom sheet */
+.sheet-scrim{position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.45)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:71;max-height:88vh;overflow-y:auto;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 30px rgba(15,23,42,.18);
+  padding:10px max(17px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(17px,env(safe-area-inset-left,0px));animation:sheetIn .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet-handle{display:block;width:40px;height:4px;margin:0 auto 12px;border-radius:2px;background:#e2e8f0}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.sheet-h h2{font-size:18px;line-height:24px;font-weight:800;color:var(--s9)}
+.sheet-x{width:40px;height:40px;border:1px solid var(--s2);border-radius:14px;display:grid;place-items:center;color:var(--s9);flex:none}
+.sheet-x .ico{width:18px;height:18px}
+.p-sel{position:relative;margin-top:6px}
+.p-sel > button{display:flex;align-items:center;gap:8px;width:100%;height:42px;padding:0 13px;border:1px solid var(--s2);border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);text-align:left}
+.p-sel > button span{flex:1;font-size:14px;color:var(--s9)}
+.p-sel > button b{font-size:15px;font-weight:800;color:var(--s9)}
+.p-sel > button .ico{width:16px;height:16px;color:#334155;transition:transform .2s}
+.p-sel > button[aria-expanded="true"] .ico{transform:rotate(180deg)}
+.p-sel ul{list-style:none;margin:7px 0 0;padding:6px;display:grid;gap:4px;border:1px solid var(--s2);border-radius:16px;background:#fff;box-shadow:0 10px 20px -10px rgba(15,23,42,.2)}
+.p-sel li{display:flex;justify-content:space-between;align-items:center;height:32px;padding:0 10px;border-radius:12px;font-size:12px;font-weight:700;color:var(--s9);cursor:pointer}
+.p-sel li.act{background:#f6f5fe}
+.p-sel li[aria-selected="true"]{background:#ece8fd;color:#6d4bff}
+.p-auto{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;height:44px;padding:0 13px;border:1px solid var(--s2);border-radius:14px;cursor:pointer}
+.p-auto span{font-size:13px;color:#5f6c84}
+.p-auto input{position:absolute;opacity:0;width:1px;height:1px}
+.p-auto i{position:relative;width:41px;height:24px;border-radius:999px;background:#cbd5e1;transition:background .2s;flex:none}
+.p-auto i::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:transform .2s}
+.p-auto input:checked + i{background:#16a34a}
+.p-auto input:checked + i::after{transform:translateX(17px)}
+.p-auto input:focus-visible + i{outline:2px solid #7e5bff;outline-offset:2px}
+.p-sheet-note{margin-top:12px;min-height:18px;font-size:12px;line-height:18px;color:var(--s5)}
+.p-hist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.p-hist li{display:grid;grid-template-columns:1fr auto;padding:10px 13px;border:1px solid var(--s2);border-radius:14px}
+.p-hist b{font-size:14px;color:var(--s9)}
+.p-hist span{grid-column:1;font-size:12px;color:var(--s5)}
+.p-hist em{grid-row:1 / 3;grid-column:2;align-self:center;font-style:normal;font-size:11px;font-weight:700;color:#16a34a;background:#e4f8eb;border-radius:8px;padding:3px 8px}
+
 </style>
 
 {{SPRITE}}
@@ -1423,7 +1511,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <p class="a-sub">Ключевые показатели и недавняя активность.</p>
       <div class="a-hero-btns">
         <a class="a-pbtn" href="#" data-soon="Пополнение баланса сделаем на следующем шаге">Пополнить баланс</a>
-        <a class="a-gbtn" href="#" data-soon="Профиль сделаем на одном из следующих шагов">Профиль</a>
+        <a class="a-gbtn" href="#profile">Профиль</a>
       </div>
     </section>
 
@@ -1713,7 +1801,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     <section class="a-card a-quick b-quick">
       <h2>Быстрые действия</h2>
       <p class="a-osub">Профиль, движения и поддержка</p>
-      <a class="a-qi" href="#" data-soon="Профиль сделаем на одном из следующих шагов"><span><b>Профиль</b><small>Данные и безопасность</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
+      <a class="a-qi" href="#profile"><span><b>Профиль</b><small>Данные и безопасность</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
       <a class="a-qi" href="#tx"><span><b>Транзакции</b><small>Все движения баланса</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Поддержку сделаем на одном из следующих шагов"><span><b>Поддержка</b><small>Связаться с поддержкой</small></span><i><svg class="ico"><use href="#i-chev"/></svg></i></a>
     </section>
@@ -1746,11 +1834,85 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appProfilePage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Профиль</h1>
+      <p class="a-sub">Подписка, баланс и Partner API в одном месте.</p>
+    </section>
+    <section class="a-card p-head">
+      <h2 class="a-name">demo_reseller</h2>
+      <a class="a-mail" href="#" data-soon="Это пример: здесь будет почта клиента">demo@example.com</a>
+      <div class="p-links">
+        <a href="#orders">Заказы</a><a href="#balance">Баланс</a><a href="#tx">Транзакции</a><a href="#" data-soon="Поддержку сделаем на одном из следующих шагов">Поддержка</a>
+      </div>
+    </section>
+    <section class="p-box"><span>Баланс</span><b>$58.4100</b><i class="p-sp"></i></section>
+    <section class="p-box"><span>Всего заказов</span><b>214</b><a class="p-more" href="#orders">К списку заказов <svg class="ico"><use href="#i-arrow"/></svg></a></section>
+    <section class="p-box"><span>Всего потрачено</span><b>$1,248.5320</b><small>За всё время</small></section>
+    <section class="p-sub">
+      <span class="p-cap">Подписка</span>
+      <b class="p-plan" id="pPlan">Bronze</b>
+      <b class="p-price" id="pPrice">$3.99</b>
+      <div class="p-active"><i><svg class="ico"><use href="#i-check"/></svg></i><div><b>Активна</b><span id="pUntil">Действует до 12.12.2026 18:52</span></div></div>
+      <button class="p-lav" id="pPlanBtn" type="button" aria-haspopup="dialog">План и продление</button>
+    </section>
+    <h2 class="p-sec">Аккаунт</h2>
+    <section class="p-box"><span>Email</span><b class="p-mail">demo@example.com</b></section>
+    <section class="p-box"><span>Валюта счёта</span><b>USD</b></section>
+    <section class="p-box"><span>Регистрация</span><b>09.08.2026 18:46</b></section>
+    <section class="p-box p-pad"><button class="p-lav big" id="pHistBtn" type="button" aria-haspopup="dialog">История входов</button></section>
+    <section class="a-card p-api">
+      <h2>API ключ</h2>
+      <p class="p-note">API ключ для интеграций. Чтобы сменить, напишите в поддержку.</p>
+      <button class="p-ibtn wide" type="button" data-reveal="pKey" aria-pressed="false" aria-label="Показать ключ"><svg class="ico"><use href="#i-eye"/></svg></button>
+      <div class="p-secret" id="pKey" data-v="demo_live_9f3a7c21e4b84d6a" aria-live="polite">•••••••••••</div>
+      <div class="p-chips"><span>Белый список IP: выкл</span><span>Пополнение баланса по API: нет доступа</span></div>
+      <div class="p-doc">
+        <h3>Документация OpenAPI</h3>
+        <p>Интерактивная спецификация: схемы запросов, примеры и Swagger UI.</p>
+        <a class="p-docbtn" href="#api" data-soon="Документацию API напишем, когда будет готов сервер">Открыть документацию</a>
+      </div>
+    </section>
+    <section class="a-card p-api p-ai">
+      <h2>Подключение к ИИ</h2>
+      <p class="p-note">Личная ссылка для Claude, ChatGPT или Cursor. Владеющий ею может тратить ваш баланс.</p>
+      <div class="p-3">
+        <button class="p-ibtn" type="button" data-reveal="pAi" aria-pressed="false" aria-label="Показать ссылку"><svg class="ico"><use href="#i-eye"/></svg></button>
+        <button class="p-ibtn" type="button" id="pAiNew" aria-label="Выпустить новую ссылку"><svg class="ico"><use href="#i-swap"/></svg></button>
+        <button class="p-ibtn" type="button" id="pAiDel" aria-label="Отключить ссылку"><svg class="ico"><use href="#i-trash"/></svg></button>
+      </div>
+      <div class="p-secret" id="pAi" data-v="https://mcp.gemora.demo/u/7c2e91ab" aria-live="polite">•••••••••••</div>
+      <p class="p-note p-last" id="pAiLast">Последнее использование: ещё не использовалась</p>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
   </footer>
 
+  <div class="sheet-scrim" id="sheetScrim" hidden></div>
+  <div class="sheet" id="planSheet" role="dialog" aria-modal="true" aria-labelledby="planSheetT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="planSheetT">План и автопродление</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <span class="o-l" id="pSelL">План</span>
+    <div class="p-sel">
+      <button type="button" id="pSelBtn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="pSelL pSelV"><span id="pSelV">Bronze</span><b id="pSelP">$3.99</b><svg class="ico"><use href="#i-down"/></svg></button>
+      <ul role="listbox" id="pSelList" aria-labelledby="pSelL" tabindex="-1" hidden></ul>
+    </div>
+    <label class="p-auto"><span>Автопродление</span><input type="checkbox" id="pAuto" checked role="switch"><i aria-hidden="true"></i></label>
+    <p class="p-sheet-note" id="pSheetNote" role="status"></p>
+  </div>
+  <div class="sheet" id="histSheet" role="dialog" aria-modal="true" aria-labelledby="histSheetT" hidden>
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <div class="sheet-h"><h2 id="histSheetT">История входов</h2><button class="sheet-x" type="button" data-close aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div>
+    <ul class="p-hist">
+      <li><b>Сегодня, 19:29</b><span>iPhone · Safari · Душанбе</span><em>Текущий вход</em></li>
+      <li><b>18.11.2026, 22:04</b><span>Windows · Chrome · Душанбе</span></li>
+      <li><b>15.11.2026, 09:41</b><span>iPhone · Safari · Худжанд</span></li>
+    </ul>
+    <p class="p-sheet-note">Пример данных. Настоящие входы будет записывать сервер.</p>
+  </div>
   <div class="app-menu" id="appMenu" role="dialog" aria-modal="true" aria-label="Меню кабинета" hidden>
     <div class="am-top"><button class="a-btn" id="appMenuClose" type="button" aria-label="Закрыть меню"><svg class="ico"><use href="#i-close"/></svg></button></div>
     <nav class="am-nav" id="appMenuNav"></nav>
@@ -1896,7 +2058,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app',keys:'v-app',manual:'v-app',cards:'v-app',topups:'v-app',balance:'v-app',stats:'v-app',profile:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage',keys:'appKeysPage',manual:'appManualPage',cards:'appCardsPage',topups:'appTopupsPage',balance:'appBalancePage',stats:'appStatsPage',profile:'appProfilePage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -2003,7 +2165,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр','#keys'],['clip','Ручные услуги','#manual'],['card','Подарочные карты','#cards'],['zap','Пополнение сервисов','#topups']]],
       ['Финансы',[['wallet','Баланс','#balance']]],
       ['Дополнительно',[['zap','Дополнительно']]],
-      ['Аккаунт',[['chartl','Статистика','#stats'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
+      ['Аккаунт',[['chartl','Статистика','#stats'],['user','Профиль','#profile'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
     ];
     document.getElementById('appMenuNav').innerHTML=MENU.map(function(s){
       return '<section class="am-sec"><h2>'+s[0]+'</h2><ul>'+s[1].map(function(it){
@@ -2541,6 +2703,54 @@ body.in-app > .header,body.in-app > #footer{display:none}
       if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length;show(bs[j].dataset.p);bs[j].focus()}
     });
     show('all');
+  })();
+
+  // ---------- cabinet: profile (demo data; secrets are fake examples) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    function toast(t){var el=$('toast');if(!el)return;el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true},2600)}
+    // reveal secrets
+    document.querySelectorAll('[data-reveal]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var box=$(b.dataset.reveal);if(!box.dataset.v)return;var on=b.getAttribute('aria-pressed')!=='true';
+        b.setAttribute('aria-pressed',String(on));b.querySelector('use').setAttribute('href',on?'#i-eyeoff':'#i-eye');
+        b.setAttribute('aria-label',on?'Скрыть':'Показать');box.textContent=on?box.dataset.v:'•••••••••••';
+      });
+    });
+    function rnd(n){var s='',c='0123456789abcdef';for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*16)];return s}
+    var ai=$('pAi'),eyeAi=document.querySelector('[data-reveal="pAi"]'),delArm=0;
+    function hideAi(){eyeAi.setAttribute('aria-pressed','false');eyeAi.querySelector('use').setAttribute('href','#i-eye')}
+    $('pAiNew').addEventListener('click',function(){ai.dataset.v='https://mcp.gemora.demo/u/'+rnd(8);ai.textContent='•••••••••••';hideAi();eyeAi.disabled=false;$('pAiDel').disabled=false;
+      $('pAiLast').textContent='Последнее использование: ещё не использовалась';toast('Выпущена новая ссылка. Старая больше не работает.')});
+    $('pAiDel').addEventListener('click',function(){
+      if(Date.now()-delArm>3000){delArm=Date.now();toast('Нажмите корзину ещё раз, чтобы отключить ссылку');return}
+      delArm=0;ai.dataset.v='';ai.textContent='Ссылка отключена';hideAi();eyeAi.disabled=true;this.disabled=true;
+      $('pAiLast').textContent='Чтобы подключить снова, выпустите новую ссылку кнопкой со стрелками.';toast('Ссылка отключена');
+    });
+    // bottom sheets
+    var scrim=$('sheetScrim'),openSheet=null,back=null;
+    function show(id,from){openSheet=$(id);back=from;scrim.hidden=false;openSheet.hidden=false;document.documentElement.style.overflow='hidden';openSheet.querySelector('[data-close]').focus()}
+    function hide(){if(!openSheet)return;openSheet.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';closeSel(false);openSheet=null;if(back)back.focus({preventScroll:true})}
+    scrim.addEventListener('click',hide);
+    document.querySelectorAll('.sheet [data-close]').forEach(function(b){b.addEventListener('click',hide)});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&openSheet&&$('pSelList').hidden)hide()});
+    window.addEventListener('hashchange',function(){if(openSheet){openSheet.hidden=true;scrim.hidden=true;document.documentElement.style.overflow='';openSheet=null}});
+    $('pPlanBtn').addEventListener('click',function(){$('pSheetNote').textContent='';show('planSheet',this)});
+    $('pHistBtn').addEventListener('click',function(){show('histSheet',this)});
+    // plan select
+    var PL=[['Bronze',3.99],['Silver',6.99],['Gold',9.99]],cur=0,hi=0,list=$('pSelList'),btn=$('pSelBtn');
+    list.innerHTML=PL.map(function(p,i){return '<li role="option" id="pl'+i+'" aria-selected="'+(i===0)+'"><span>'+p[0]+'</span><span>$'+p[1].toFixed(2)+'</span></li>'}).join('');
+    var li=[].slice.call(list.children);
+    function mark(i){hi=(i+li.length)%li.length;li.forEach(function(x,k){x.classList.toggle('act',k===hi)});list.setAttribute('aria-activedescendant',li[hi].id)}
+    function openSel(){list.hidden=false;btn.setAttribute('aria-expanded','true');mark(cur);list.focus()}
+    function closeSel(f){list.hidden=true;btn.setAttribute('aria-expanded','false');if(f)btn.focus()}
+    function pick(i){cur=i;li.forEach(function(x,k){x.setAttribute('aria-selected',String(k===i))});$('pSelV').textContent=PL[i][0];$('pSelP').textContent='$'+PL[i][1].toFixed(2);
+      $('pPlan').textContent=PL[i][0];$('pPrice').textContent='$'+PL[i][1].toFixed(2);
+      $('pSheetNote').textContent='Это демо: тариф '+PL[i][0]+' показан на странице, но ничего не списано.'}
+    btn.addEventListener('click',function(){list.hidden?openSel():closeSel(true)});
+    list.addEventListener('keydown',function(e){if(e.key==='ArrowDown'){e.preventDefault();mark(hi+1)}else if(e.key==='ArrowUp'){e.preventDefault();mark(hi-1)}else if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(hi);closeSel(true)}else if(e.key==='Escape'){e.stopPropagation();closeSel(true)}});
+    li.forEach(function(x,k){x.addEventListener('mousemove',function(){if(hi!==k)mark(k)});x.addEventListener('click',function(){pick(k);closeSel(true)})});
+    $('pAuto').addEventListener('change',function(){$('pSheetNote').textContent=this.checked?'Автопродление включено: тариф продлится сам, если хватит баланса.':'Автопродление выключено: после окончания тариф не продлится.'});
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
