@@ -1,40 +1,127 @@
-{# Баннер розыгрыша: сайт, кабинет. Общую сумму призов не показываем — только места. #}
-{% from "_icons.html" import icon, place %}
-<a class="rfb" href="/raffle" aria-label="Розыгрыш призов — участвовать">
-  <span class="rfb-gift" aria-hidden="true">{{ icon('gift', 54) }}</span>
-  <span class="rfb-chip">{{ icon('gift', 14) }} Қуръакашӣ · Розыгрыш</span>
-  <b class="rfb-h">{{ raffle_banner.winners_n }} ғолиб <span>· {{ raffle_banner.winners_n }} победителей</span></b>
-  <span class="rfb-prizes">{% for p in raffle_banner.top %}<i>{{ place(loop.index, 18) }}{{ p }} с.</i>{% endfor %}</span>
-  <span class="rfb-s">Аз ${{ raffle_banner.min_usd }} харед ва «Иштирок мекунам»-ро пахш кунед.<br>
-    <em>Купите от ${{ raffle_banner.min_usd }} и нажмите «Участвую».</em></span>
-  <span class="rfb-foot">
-    <span class="rfb-days"><b>{{ raffle_banner.days }}</b> рӯз · дн.</span>
-    <span class="rfb-days"><b>{{ raffle_banner.draw }}</b> натиҷа · итоги</span>
-    <span class="rfb-cta">Иштирок · Участвовать {{ icon('chevron', 16) }}</span>
-  </span>
-</a>
+{# Розыгрыш: плавающая кнопка-подарок в углу + окно снизу. Ничего не сдвигает на странице.
+   Общую сумму призов не показываем — только места. raffle_banner — raffle.status(...) для этого посетителя. #}
+{% set rf = raffle_banner %}
+<button class="rff" type="button" id="rff" aria-haspopup="dialog" aria-controls="rfs" aria-label="Розыгрыш призов">
+  <span class="rff-gi" aria-hidden="true">🎁</span>
+  <span class="rff-tx">Қуръакашӣ<small>{{ rf.winners_n }} ғолиб · {{ rf.draw }}</small></span>
+  <span class="rff-dot" id="rff-dot" hidden></span>
+</button>
+<div class="rfs" id="rfs" role="dialog" aria-modal="true" aria-labelledby="rfs-h" hidden>
+  <div class="rfs-shade" data-rfs-close></div>
+  <div class="rfs-sheet" id="rfs-sheet">
+    <div class="rfs-grab" aria-hidden="true"></div>
+    <button class="rfs-x" type="button" data-rfs-close aria-label="Закрыть">✕</button>
+    <div class="rfs-head">
+      <span class="rfs-gift" aria-hidden="true">🎁</span>
+      <div><b id="rfs-h">Қуръакашӣ — {{ rf.winners_n }} ғолиб</b>
+        <small>Розыгрыш · итоги {{ rf.draw }} в прямом эфире Instagram{% if rf.days %} · осталось {{ rf.days }} дн.{% endif %}</small></div>
+    </div>
+    <ul class="rfs-pz">
+      {% for r in rf.prizes %}
+      <li><span>{% if r.from == r.to and r.from <= 3 %}<i class="rfs-md m{{ r.from }}">{{ r.from }}</i>Ҷои {{ r.from }} · {{ r.from }} место
+        {% else %}<i class="rfs-md">{{ '🎁' if loop.index == 4 else '🎉' }}</i>{{ r.from }}–{{ r.to }} · {{ r.n }} нафар{% endif %}</span><b>{{ r.tjs }} с.</b></li>
+      {% endfor %}
+    </ul>
+    {% if rf.won %}
+      <div class="rfs-ok">🏆 Шумо ғолиб шудед! Вы выиграли — {{ rf.won.place }} место, {{ rf.won.prize_tjs }} с.</div>
+    {% elif rf.joined %}
+      <div class="rfs-ok">✓ Шумо иштирок мекунед! <span>Вы участвуете · билет {% for n in rf.tickets %}№ {{ '%04d' % n }}{% endfor %}</span></div>
+      <a class="rfs-btn ghost" href="/raffle">Муфассал · Подробнее</a>
+    {% elif rf.can_join %}
+      <div class="rfs-prog"><i style="width:100%"></i></div>
+      <p class="rfs-note"><b>Харид кофист!</b> Покупок на ${{ rf.min_usd }} достаточно — нажмите «Участвую» и напишите ник Instagram.</p>
+      <a class="rfs-btn" href="/raffle#join">Иштирок мекунам · Участвую →</a>
+    {% else %}
+      {% if user and user.role != 'admin' %}
+      <div class="rfs-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rf.percent }}"><i style="width:{{ rf.percent }}%"></i></div>
+      <div class="rfs-pp"><span>${{ rf.spent }} аз ${{ rf.min_usd }}</span><b>Боз ${{ rf.need }} харед</b></div>
+      {% endif %}
+      <ol class="rfs-st">
+        <li><b>Аз ${{ rf.min_usd }} барои худ харед</b> · купите для себя от ${{ rf.min_usd }}</li>
+        <li><b>Ба Telegram ва Instagram обуна шавед</b> · подпишитесь</li>
+        <li><b>«Иштирок мекунам»</b> · нажмите «Участвую»</li>
+      </ol>
+      <a class="rfs-btn" href="{{ '/raffle' if user else '/' }}">{{ 'Иштирок · Участвовать →' if user else 'Харидан · Купить →' }}</a>
+      {% if not user %}<a class="rfs-link" href="/raffle">Шартҳо ва ҷоизаҳо · условия и призы</a>{% endif %}
+    {% endif %}
+  </div>
+</div>
 <style>
-.rfb { position: relative; display: grid; gap: 6px; margin: 14px 0; padding: 18px; border-radius: 20px; overflow: hidden;
-  color: #fff; text-decoration: none; background: radial-gradient(120% 140% at 100% 0%, #a855f7 0%, #6d28d9 42%, #3b1fa8 100%);
-  box-shadow: 0 10px 28px rgba(79, 70, 229, .28); transition: transform .18s ease; }
-.rfb:hover { color: #fff; transform: translateY(-1px); } .rfb:active { transform: scale(.99); }
-.rfb::before { content: ""; position: absolute; right: -40px; top: -40px; width: 190px; height: 190px; border-radius: 50%;
-  background: radial-gradient(circle, #ffd54a 0%, rgba(255, 213, 74, 0) 70%); opacity: .5; pointer-events: none; }
-.rfb-gift { position: absolute; right: 18px; top: 22px; color: #ffd54a; opacity: .95; }
-.rfb-chip { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 4px 10px; border-radius: 99px;
-  font-size: .72rem; font-weight: 700; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .3); }
-.rfb-h { font-size: 1.45rem; font-weight: 900; line-height: 1.1; letter-spacing: -.01em; margin-top: 4px; padding-right: 70px; }
-.rfb-h span { font-weight: 700; opacity: .85; font-size: 1rem; }
-.rfb-prizes { display: flex; flex-wrap: wrap; gap: 6px; }
-.rfb-prizes i { display: inline-flex; align-items: center; gap: 5px; font-style: normal; font-weight: 800; font-size: .85rem;
-  padding: 4px 10px 4px 5px; border-radius: 99px; background: rgba(255, 255, 255, .16); }
-.rfb-s { font-size: .84rem; line-height: 1.4; } .rfb-s em { font-style: normal; opacity: .82; }
-.rfb-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
-.rfb-days { font-size: .72rem; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, .16); }
-.rfb-days b { font-size: .95rem; margin-right: 2px; }
-.rfb-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px;
-  border-radius: 14px; background: #ffd54a; color: #2a1a00; font-weight: 900; font-size: .9rem; }
-.rfb, .rfb * { -webkit-tap-highlight-color: transparent; }
-@media (max-width: 420px) { .rfb-cta { width: 100%; justify-content: center; margin-left: 0; } }
-@media (prefers-reduced-motion: reduce) { .rfb { transition: none; } }
+.rff { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 45; display: flex; align-items: center; gap: 9px;
+  min-height: 56px; padding: 7px 16px 7px 7px; border: 0; border-radius: 999px; cursor: pointer; color: #fff; font: inherit; text-align: left;
+  background: linear-gradient(135deg, #6d28d9, #a855f7); box-shadow: 0 12px 28px rgba(109, 40, 217, .45); transition: transform .18s ease; }
+.rff:hover { transform: translateY(-2px); } .rff:active { transform: scale(.96); }
+.rff:focus-visible { outline: 3px solid #ffd54a; outline-offset: 3px; }
+.rff-gi { width: 42px; height: 42px; border-radius: 50%; background: #ffd54a; display: grid; place-items: center; font-size: 22px; flex: none;
+  animation: rff-wiggle 4s ease-in-out infinite; }
+.rff-tx { font-weight: 900; font-size: .9rem; line-height: 1.15; } .rff-tx small { display: block; font-weight: 600; font-size: .72rem; opacity: .9; }
+.rff-dot { position: absolute; top: 4px; left: 38px; width: 13px; height: 13px; border-radius: 50%; background: #ef4444; border: 2px solid #fff; }
+@keyframes rff-wiggle { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(-14deg); } 92% { transform: rotate(12deg); } 95% { transform: rotate(-8deg); } }
+body:has(.buy-bar) .rff { bottom: calc(96px + env(safe-area-inset-bottom)); }
+.app-ui body:has(.tabbar) .rff { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+.rfs { position: fixed; inset: 0; z-index: 95; }
+.rfs[hidden] { display: none; }
+.rfs-shade { position: absolute; inset: 0; background: rgba(10, 10, 30, .5); animation: rfs-fade .2s ease; }
+.rfs-sheet { position: absolute; left: 50%; bottom: 0; width: min(520px, 100%); transform: translateX(-50%); max-height: 88vh; overflow-y: auto;
+  background: var(--surface); color: var(--text); border-radius: 24px 24px 0 0; padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .25); animation: rfs-up .28s cubic-bezier(.2, .8, .2, 1); }
+@media (min-width: 700px) { .rfs-sheet { bottom: 50%; transform: translate(-50%, 50%); border-radius: 24px; animation: rfs-fade .2s ease; } }
+.rfs-grab { width: 44px; height: 5px; border-radius: 9px; background: var(--line-strong); margin: 0 auto 12px; }
+.rfs-x { position: absolute; right: 12px; top: 10px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-2);
+  color: var(--muted); font-size: 15px; cursor: pointer; }
+.rfs-head { display: flex; gap: 12px; align-items: center; padding-right: 40px; }
+.rfs-gift { width: 54px; height: 54px; border-radius: 16px; flex: none; display: grid; place-items: center; font-size: 28px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 6px 14px rgba(124, 58, 237, .35); }
+.rfs-head b { display: block; font-size: 1.2rem; font-weight: 900; line-height: 1.15; }
+.rfs-head small { display: block; font-size: .8rem; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+.rfs-pz { list-style: none; margin: 14px 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 14px; }
+.rfs-pz li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px dashed var(--line);
+  font-size: .9rem; font-weight: 700; }
+.rfs-pz li:last-child { border: 0; } .rfs-pz b { font-weight: 900; font-variant-numeric: tabular-nums; }
+.rfs-pz span { display: flex; align-items: center; gap: 8px; }
+.rfs-md { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-style: normal; font-size: .75rem;
+  font-weight: 900; flex: none; }
+.rfs-md.m1 { background: radial-gradient(circle at 35% 30%, #fff3b0, #f5b301 60%, #c88a00); color: #3b2a00; }
+.rfs-md.m2 { background: radial-gradient(circle at 35% 30%, #fff, #c9cfdb 60%, #8e97a8); color: #2b3240; }
+.rfs-md.m3 { background: radial-gradient(circle at 35% 30%, #ffd7b0, #d9853b 60%, #a3561c); color: #3a1d05; }
+.rfs-st { margin: 0 0 14px; padding: 0 0 0 20px; display: grid; gap: 6px; font-size: .84rem; color: var(--muted); }
+.rfs-st b { color: var(--text); }
+.rfs-prog { height: 12px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 2px 0 6px; }
+.rfs-prog i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #7c3aed, #4f46e5); }
+.rfs-pp { display: flex; justify-content: space-between; font-size: .82rem; color: var(--muted); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.rfs-pp b { color: var(--accent); }
+.rfs-note { font-size: .86rem; color: var(--muted); margin: 0 0 12px; } .rfs-note b { color: var(--ok); }
+.rfs-ok { font-weight: 900; font-size: 1.05rem; color: var(--ok); margin-bottom: 12px; }
+.rfs-ok span { display: block; font-weight: 600; font-size: .84rem; color: var(--muted); margin-top: 2px; }
+.rfs-btn { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 14px; background: var(--accent);
+  color: #fff; font-weight: 900; font-size: 1rem; text-decoration: none; }
+.rfs-btn:hover { color: #fff; background: var(--accent-hover); }
+.rfs-btn.ghost { background: var(--surface-2); color: var(--text); }
+.rfs-link { display: block; text-align: center; margin-top: 10px; font-size: .84rem; font-weight: 700; }
+@keyframes rfs-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+@keyframes rfs-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rff-gi, .rfs-sheet, .rfs-shade { animation: none; } .rff { transition: none; } }
 </style>
+<script>
+(function () {
+  var fab = document.getElementById("rff"), box = document.getElementById("rfs"), dot = document.getElementById("rff-dot");
+  if (!fab || !box) return;
+  var KEY = "dx_rf_seen_{{ rf.draw_iso }}";
+  try { if (!localStorage.getItem(KEY)) dot.hidden = false; } catch (e) { dot.hidden = false; }
+  function open() {
+    box.hidden = false; document.documentElement.style.overflow = "hidden"; dot.hidden = true;
+    try { localStorage.setItem(KEY, "1"); } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate(10); } catch (e) {}
+    var b = box.querySelector(".rfs-btn"); b && b.focus({preventScroll: true});
+  }
+  function close() { box.hidden = true; document.documentElement.style.overflow = ""; fab.focus({preventScroll: true}); }
+  fab.addEventListener("click", open);
+  box.addEventListener("click", function (e) { if (e.target.closest("[data-rfs-close]")) close(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !box.hidden) close(); });
+  // свайп вниз — закрыть
+  var sheet = document.getElementById("rfs-sheet"), y0 = null;
+  sheet.addEventListener("touchstart", function (e) { y0 = sheet.scrollTop <= 0 ? e.touches[0].clientY : null; }, {passive: true});
+  sheet.addEventListener("touchend", function (e) { if (y0 !== null && e.changedTouches[0].clientY - y0 > 80) close(); y0 = null; }, {passive: true});
+})();
+</script>

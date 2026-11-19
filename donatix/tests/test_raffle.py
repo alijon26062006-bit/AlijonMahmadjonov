@@ -131,11 +131,11 @@ def test_site_banner_page_join_and_profile(app, conn, config, monkeypatch):
     from fastapi.testclient import TestClient
     from conftest import csrf_of, web_login
     c = TestClient(app)
-    assert "rfb" not in c.get("/").text and "не идёт" in c.get("/raffle").text          # не запущен — ничего не видно
+    assert 'id="rff"' not in c.get("/").text and "не идёт" in c.get("/raffle").text          # не запущен — ничего не видно
     raffle.save_settings(conn, {"instagram": "donatix.tj"})
     raffle.start(conn)
     home = c.get("/").text
-    assert 'class="rfb"' in home and "250 с." in home and "2500" not in home            # общую сумму не показываем
+    assert 'id="rff"' in home and "250 с." in home and "2500" not in home            # общую сумму не показываем
     page = c.get("/raffle").text
     assert "Войти и участвовать" in page and "2500" not in page and "40 с." in page
     uid = make_client(conn, login="rfweb")[0]

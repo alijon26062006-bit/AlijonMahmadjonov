@@ -391,8 +391,9 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             ctx["banners"] = banners.active(_bc)
             if "raffle_banner" not in ctx and request.url.path != "/raffle":   # баннер розыгрыша — на всех страницах
                 from . import raffle
-                try:
-                    ctx["raffle_banner"] = raffle.status(_bc, config, None)
+                me = ctx.get("user")
+                try:   # для вошедшего клиента — его прогресс («осталось купить $…»)
+                    ctx["raffle_banner"] = raffle.status(_bc, config, me["id"] if me and me["role"] != "admin" else None)
                 except sqlite3.Error:
                     ctx["raffle_banner"] = None
         finally:

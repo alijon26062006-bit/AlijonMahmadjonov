@@ -137,7 +137,7 @@
 </header>
 {% endblock %}
 {% if friday_break %}<div class="friday-break" role="status">{{ friday_break }}</div>{% endif %}
-{% block banners %}{% if raffle_banner %}<div class="wrap">{% include "_raffle_banner.html" %}</div>{% endif %}{% if banners %}<div class="wrap">{% include "_banners.html" %}</div>{% endif %}{% endblock %}
+{% block banners %}{% if banners %}<div class="wrap">{% include "_banners.html" %}</div>{% endif %}{% endblock %}
 {% block body %}
 <main class="wrap">
   {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
@@ -256,5 +256,6 @@
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); });
   }
 </script>
+{% if raffle_banner %}{% include "_raffle_banner.html" %}{% endif %}
 </body>
 </html>
