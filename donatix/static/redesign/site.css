@@ -1266,3 +1266,35 @@ body.in-pay > .header,body.in-pay > #footer{display:none}
 .dx-vn{display:flex;align-items:center;gap:14px;padding:16px;text-decoration:none;color:var(--ink);flex-wrap:wrap}
 .dx-vn>span:nth-child(2){flex:1;min-width:200px;display:grid;gap:4px}.dx-vn small{color:var(--text);font-size:14px;line-height:20px}
 .friday-break{padding:10px 16px;text-align:center;font-weight:600;font-size:14px;color:#052e16;background:linear-gradient(90deg,#86efac,#34d399)}
+
+/* ── Donatix: вход и регистрация (Telegram, Google, коды) ── */
+.auth-flash{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border-radius:14px;background:var(--tile);color:var(--ink);font-size:14px;line-height:20px}
+.auth-flash.error{background:#fdeeee;color:#b42318}
+.auth-flash.ok{background:#def6e7;color:#166534}
+.auth-flash.warn{background:#fff6dd;color:#8a5a00}
+.soc-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;margin-top:10px;border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:16px;font-weight:600;transition:border-color .15s,background .15s}
+.soc-btn:hover{border-color:var(--acc)}
+.soc-btn.tg{background:#229ED9;border-color:#229ED9;color:#fff}
+.soc-btn.tg:hover{background:#1c8ec4}
+.soc-btn:first-child{margin-top:0}
+.or-line{display:flex;align-items:center;gap:12px;margin:18px 0 2px;color:#9ca3af;font-size:13px}
+.or-line::before,.or-line::after{content:"";flex:1;height:1px;background:var(--line)}
+.is-webview .soc-btn.google,.is-webview .or-line.g{display:none!important}
+.is-app .hide-in-app{display:none!important}
+.tg-note{display:flex;flex-direction:column;gap:4px;margin:0 0 12px;padding:12px 14px;border-radius:14px;background:#e8f4fb;font-size:14px;line-height:20px;color:var(--ink)}
+.tg-note span{color:var(--text)}
+.email-reg{margin-top:16px;border-top:1px solid var(--line);padding-top:6px}
+.email-reg summary{cursor:pointer;padding:10px 0;text-align:center;font-size:14px;font-weight:600;color:var(--acc)}
+.field .hint,.auth-body .hint{display:block;margin-top:6px;font-size:13px;line-height:18px;color:var(--text)}
+.field .opt{font-weight:400;color:#9ca3af}
+.auth-note{margin-top:14px;text-align:center;font-size:12px;line-height:18px;color:var(--text)}
+.auth-note a{color:var(--acc)}
+.auth-sub{margin:0 0 14px;font-size:14px;line-height:20px;color:var(--text)}
+.inp.code{font-size:28px;font-weight:700;letter-spacing:.45em;text-align:center}
+.tg-steps{margin:4px 0 16px;padding-left:22px;font-size:14px;line-height:22px;color:var(--ink)}
+.tg-steps li{margin:4px 0}
+.tg-wait{display:flex;align-items:center;justify-content:center;gap:10px;margin:16px 0 4px;font-size:14px;color:var(--text)}
+.tg-dot{width:10px;height:10px;border-radius:50%;background:#229ED9;animation:tgp 1.2s ease-in-out infinite}
+@keyframes tgp{50%{opacity:.3;transform:scale(.8)}}
+@media (prefers-reduced-motion:reduce){.tg-dot{animation:none}}
+.tile.tg-tile{background:#229ED9}

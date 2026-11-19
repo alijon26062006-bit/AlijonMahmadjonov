@@ -50,6 +50,6 @@ def test_fonts_local_and_preloaded(client):
     assert 'rel="preload" href="/static/fonts/inter-cyrillic.woff2"' in html
     css = client.get("/static/redesign/site.css").text
     assert "font-display:swap" in css and "/static/fonts/inter-cyrillic-ext.woff2" in css   # таджикские буквы
-    assert "Onest Fallback" in client.get("/login").text
+    assert "Onest Fallback" in client.get("/reviews").text
     r = client.get("/static/fonts/onest-cyrillic.woff2?v=11")
     assert r.status_code == 200 and "immutable" in r.headers["cache-control"]

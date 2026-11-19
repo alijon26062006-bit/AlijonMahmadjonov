@@ -60,6 +60,7 @@
   // ---------- hero window: rows appear one by one, window grows for buttons, loop ----------
   (function(){
     var rows=[].slice.call(document.querySelectorAll('#mockRows .mrow')),fold=document.getElementById('mockFold');
+    if(!fold||!rows.length) return;   // окна-баннера нет (не главная)
     function showAll(){rows.forEach(function(r){r.classList.add('on','done')});fold.classList.add('on')}
     if(still){showAll();return}
     var STEP=900,HOLD=9000,timers=[],running=false,visible=true;

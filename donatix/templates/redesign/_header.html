@@ -14,7 +14,7 @@
       <button class="lang-btn" type="button" data-soon="Английская версия появится на следующем шаге" aria-label="Switch to English">EN</button>
       {% if user and user.role != 'guest' %}<a class="btn-login" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Панель</a>{% else %}<a class="btn-login" href="/login">Вход в панель</a>{% endif %}
       <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
-        <svg class="ico"><use href="/#i-menu"/></svg>
+        <svg class="ico"><use href="#i-menu"/></svg>
       </button>
     </div>
   </div>
