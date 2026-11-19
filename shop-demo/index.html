@@ -721,6 +721,46 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .g-go-w{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:5;margin-top:42px}
 .g-go{margin-top:0}
 
+
+/* ================= Part 9: cabinet → Telegram stars & premium ================= */
+#appTgPage .a-hero h1{font-size:22px;line-height:30px}
+#appTgPage .a-sub{font-size:15px;line-height:22px}
+.g-wrap.tg-wrap{gap:13px;margin-top:0;border-top:1px solid var(--s2);border-radius:20px}
+#appTgPage .a-hero-sm{padding:16px 20px 18px}
+.tg-tabs-box{padding:12px}
+.tg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border:1px solid var(--s2);border-radius:14px;background:#f2f2f3}
+.tg-tabs button{display:flex;align-items:center;justify-content:center;gap:10px;height:40px;border-radius:11px;font-size:15px;font-weight:600;color:#5f6c84}
+.tg-tabs button .ico{width:17px;height:17px}
+.tg-tabs button[aria-selected="true"]{background:#6247f5;color:#fff;box-shadow:0 4px 10px -4px rgba(98,71,245,.6)}
+.tg-sh{justify-content:flex-start;gap:10px}
+.tg-l{margin-top:13px}
+.tg-l + .st-inp{margin-top:6px}
+#tgQtyBox .tg-l{margin-top:13px}
+.tg-packs{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}
+.tg-pk,.tg-plan{display:block;padding:12px 13px 10px;border:1.5px solid var(--s2);border-radius:13px;background:#fff;text-align:left;transition:border-color .15s,background .15s}
+.tg-pk b,.tg-plan b{display:flex;align-items:center;gap:6px;font-size:16px;line-height:22px;font-weight:800;color:var(--s9)}
+.tg-pk b .ico{width:15px;height:15px;stroke-width:2.2}
+.tg-pk span{display:block;margin-top:21px;font-size:13px;line-height:18px;font-weight:700;color:#5f6c84;font-variant-numeric:tabular-nums}
+.tg-pk:hover,.tg-plan:hover{border-color:#cfc6fb}
+.tg-pk[aria-checked="true"],.tg-plan[aria-checked="true"]{border-color:#a395f5;background:#f2f0fd}
+.tg-more-w{display:flex;justify-content:center;margin-top:14px}
+.tg-more{height:40px;padding:0 15px;border:1px solid var(--s2);border-radius:12px;background:#fff;font-size:12px;font-weight:700;color:#5f6c84}
+.tg-more:hover{color:var(--s9)}
+.tg-plans{display:grid;gap:13px;margin-top:13px}
+.tg-plan{padding:13px 17px 12px}
+.tg-plan b{font-size:15px}
+.tg-plan small{display:block;margin-top:6px;font-size:13px;line-height:18px;font-weight:600;color:#5f6c84}
+.tg-plan span{display:block;margin-top:13px;font-size:15px;line-height:20px;font-weight:800;color:var(--s9);font-variant-numeric:tabular-nums}
+.tg-sum h2{margin-bottom:0}
+.tg-sum .a-osub{margin-top:10px;max-width:310px}
+.tg-tbl{margin-top:26px}
+.tg-tbl div{min-height:42px;padding:8px 15px}
+.tg-tbl dt{font-size:14px}
+.tg-tbl .tg-total{min-height:44px;border-top:1.5px solid var(--s2)}
+.tg-tbl .tg-total dt{font-weight:800;color:var(--s9)}
+.tg-tbl .tg-total dd{font-size:16px}
+.tg-sum .g-go-w{margin-top:30px}
+
 </style>
 
 <!-- Icons: Lucide (ISC License) -->
@@ -1467,6 +1507,53 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appTgPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Telegram звёзды и премиум</h1>
+      <p class="a-sub">Каталог Telegram звёзд и премиум подписок.</p>
+    </section>
+    <section class="a-card g-wrap tg-wrap">
+      <div class="g-box tg-tabs-box">
+        <div class="tg-tabs" role="tablist" aria-label="Что покупаем">
+          <button type="button" role="tab" id="tgTabS" aria-selected="true" aria-controls="tgS"><svg class="ico"><use href="#i-star"/></svg>Звёзды</button>
+          <button type="button" role="tab" id="tgTabP" aria-selected="false" aria-controls="tgP"><svg class="ico"><use href="#i-gift"/></svg>Premium</button>
+        </div>
+      </div>
+      <div class="g-box g-step">
+        <div class="g-sh tg-sh"><span class="g-n">1</span><h2>Получатель</h2></div>
+        <label class="g-l tg-l" for="tgUser">Имя пользователя</label>
+        <input class="st-inp" id="tgUser" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@username" aria-describedby="tgUser-e">
+        <small class="err" id="tgUser-e" hidden></small>
+        <div id="tgQtyBox">
+          <label class="g-l tg-l" for="tgQty">Количество звёзд</label>
+          <input class="st-inp" id="tgQty" type="text" inputmode="numeric" autocomplete="off" value="50" aria-describedby="tgQtyHelp tgQty-e">
+          <p class="st-help" id="tgQtyHelp">Мин. 50 · Макс. 100000</p>
+          <small class="err" id="tgQty-e" hidden></small>
+        </div>
+      </div>
+      <div class="g-box g-step" id="tgS" role="tabpanel" aria-labelledby="tgTabS">
+        <div class="g-sh tg-sh"><span class="g-n">2</span><h2>Выберите пакет</h2></div>
+        <div class="tg-packs" id="tgPacks" role="radiogroup" aria-label="Пакет звёзд"></div>
+        <div class="tg-more-w"><button type="button" class="tg-more" id="tgMore" aria-expanded="false" aria-controls="tgPacks"></button></div>
+      </div>
+      <div class="g-box g-step" id="tgP" role="tabpanel" aria-labelledby="tgTabP" hidden>
+        <div class="g-sh tg-sh"><span class="g-n">2</span><h2>Выберите план</h2></div>
+        <div class="tg-plans" id="tgPlans" role="radiogroup" aria-label="План Premium"></div>
+      </div>
+    </section>
+    <section class="a-card g-sum tg-sum">
+      <h2>Сводка</h2>
+      <p class="a-osub" id="tgSumSub">Сводка меняется при вводе получателя и выборе звёзд.</p>
+      <dl class="g-tbl tg-tbl">
+        <div><dt>Аккаунт</dt><dd id="tgsAcc">—</dd></div>
+        <div><dt id="tgsWhatL">Звёзды</dt><dd id="tgsWhat">50 зв.</dd></div>
+        <div class="tg-total"><dt>К оплате</dt><dd id="tgsPay">$0.7688</dd></div>
+      </dl>
+      <div class="g-go-w"><button class="st-go g-go" id="tgGo" type="button">Продолжить</button></div>
+      <p class="form-msg" id="tgMsg" role="status" hidden></p>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1617,7 +1704,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app',gifts:'v-app',telegram:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage',gifts:'appGiftPage',telegram:'appTgPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1721,7 +1808,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)','#gifts'],['send','Telegram звёзды','#telegram'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
       ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
@@ -1996,6 +2083,58 @@ body.in-app > .header,body.in-app > #footer{display:none}
       m.textContent='Это демо: заказ не создаётся. На сервере здесь спишется $'+price(ed[2],reg).toFixed(3)+' с баланса.';m.hidden=false;
     });
     renderGames('');
+  })();
+
+  // ---------- cabinet: Telegram stars & premium (example prices) ----------
+  (function(){
+    var $=function(id){return document.getElementById(id)};
+    var RATE=0.015375,MIN=50,MAX=100000,SHOW=6;
+    var PACKS=[50,100,200,250,500,750,1000,1500,2000,3000,5000,10000,25000,50000,100000];
+    var PLANS=[['3 месяца','3 months',12.2898],['6 месяцев','6 months',16.3898],['12 месяцев','12 months',29.7148]];
+    var tab='stars',open=false,plan=0;
+    function usd(v){return '$'+v.toFixed(4)}
+    function qty(){var v=parseInt($('tgQty').value.replace(/\D/g,''),10);return isFinite(v)?v:0}
+    function renderPacks(){
+      var q=qty(),list=open?PACKS:PACKS.slice(0,SHOW);
+      $('tgPacks').innerHTML=list.map(function(n){return '<button type="button" class="tg-pk" role="radio" data-n="'+n+'" aria-checked="'+(n===q)+'"><b>'+n+'<svg class="ico" aria-label="звёзд"><use href="#i-star"/></svg></b><span>'+usd(n*RATE)+'</span></button>'}).join('');
+      var m=$('tgMore');m.textContent=open?'Скрыть':'Показать полностью ('+PACKS.length+')';m.setAttribute('aria-expanded',String(open));
+    }
+    function renderPlans(){
+      $('tgPlans').innerHTML=PLANS.map(function(p,i){return '<button type="button" class="tg-plan" role="radio" data-i="'+i+'" aria-checked="'+(i===plan)+'"><b>'+p[0]+'</b><small>Premium</small><span>'+usd(p[2])+'</span></button>'}).join('');
+    }
+    function sum(){
+      var u=$('tgUser').value.trim().replace(/^@?/,'@');$('tgsAcc').textContent=u.length>1?u:'—';
+      if(tab==='stars'){var q=qty();$('tgsWhatL').textContent='Звёзды';$('tgsWhat').textContent=q?q+' зв.':'—';$('tgsPay').textContent=q?usd(q*RATE):'—';
+        $('tgSumSub').textContent='Сводка меняется при вводе получателя и выборе звёзд.'}
+      else{$('tgsWhatL').textContent='План';$('tgsWhat').textContent=PLANS[plan][1];$('tgsPay').textContent=usd(PLANS[plan][2]);
+        $('tgSumSub').textContent='Сводка меняется при вводе получателя и выборе плана.'}
+    }
+    function setTab(t,focus){
+      tab=t;var s=t==='stars';
+      $('tgTabS').setAttribute('aria-selected',String(s));$('tgTabP').setAttribute('aria-selected',String(!s));
+      $('tgTabS').tabIndex=s?0:-1;$('tgTabP').tabIndex=s?-1:0;
+      $('tgS').hidden=!s;$('tgP').hidden=s;$('tgQtyBox').hidden=!s;$('tgMsg').hidden=true;
+      if(focus)(s?$('tgTabS'):$('tgTabP')).focus();sum();
+    }
+    $('tgTabS').addEventListener('click',function(){setTab('stars')});
+    $('tgTabP').addEventListener('click',function(){setTab('premium')});
+    document.querySelector('.tg-tabs').addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();setTab(tab==='stars'?'premium':'stars',true)}});
+    $('tgPacks').addEventListener('click',function(e){var b=e.target.closest('.tg-pk');if(!b)return;$('tgQty').value=b.dataset.n;chk('tgQty',true);renderPacks();sum()});
+    $('tgPlans').addEventListener('click',function(e){var b=e.target.closest('.tg-plan');if(!b)return;plan=+b.dataset.i;renderPlans();sum()});
+    $('tgMore').addEventListener('click',function(){open=!open;renderPacks();if(!open)$('tgS').scrollIntoView({block:'nearest',behavior:'smooth'})});
+    function err(id,msg){var i=$(id),e=$(id+'-e');if(msg){i.setAttribute('aria-invalid','true');e.textContent=msg;e.hidden=false}else{i.removeAttribute('aria-invalid');e.hidden=true}return !msg}
+    function chk(id,quiet){
+      if(id==='tgUser'){var u=$('tgUser').value.trim().replace(/^@/,'');return err(id,!u?'Введите username получателя':!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(u)?'Username: от 5 символов, латиница, цифры и _, начинается с буквы':'')}
+      var q=qty();return err(id,quiet&&q>=MIN&&q<=MAX?'':!q?'Введите количество звёзд':q<MIN?'Минимум '+MIN+' звёзд':q>MAX?'Максимум '+MAX+' звёзд':'');
+    }
+    $('tgQty').addEventListener('input',function(){this.value=this.value.replace(/\D/g,'').slice(0,6);if(this.getAttribute('aria-invalid'))chk('tgQty');renderPacks();sum()});
+    $('tgUser').addEventListener('input',function(){if(this.getAttribute('aria-invalid'))chk('tgUser');sum()});
+    $('tgGo').addEventListener('click',function(){
+      var m=$('tgMsg'),ok=chk('tgUser');if(tab==='stars')ok=chk('tgQty')&&ok;
+      if(!ok){m.hidden=true;var x=document.querySelector('#appTgPage [aria-invalid="true"]');if(x)x.focus();return}
+      m.textContent='Это демо: заказ не создаётся. На сервере здесь спишется '+$('tgsPay').textContent+' с баланса.';m.hidden=false;
+    });
+    renderPacks();renderPlans();setTab('stars');
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
