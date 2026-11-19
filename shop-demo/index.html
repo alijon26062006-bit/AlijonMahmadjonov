@@ -574,7 +574,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .o-search::-webkit-search-cancel-button{-webkit-appearance:none}
 .o-sels{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:9px;padding-bottom:13px;border-bottom:1px solid var(--s2)}
 .o-f{min-width:0}
-.o-l{display:block;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--s4)}
+.o-l{display:block;font-size:11px;line-height:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--s4)}
 .o-sel{position:relative;margin-top:4px}
 .o-sel > button{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;height:41px;padding:0 11px 0 13px;border:1px solid var(--s2);border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);font-size:14px;color:var(--s9);text-align:left}
 .o-sel > button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -610,6 +610,16 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .a-os i.proc{background:#e5eeff;border-color:#b9cdf7;color:#2563eb}
 .a-os i.err{background:#fde8e8;border-color:#f6c1c1;color:#dc2626}
 .a-os i.ref{background:#fef3e2;border-color:#f6d7a6;color:#d97706}
+
+
+/* ================= Part 6: cabinet → transactions ================= */
+.tx-thumb{color:#1e293b !important}
+.tx-thumb.debit{background:linear-gradient(135deg,#fde8e8,#fff4f4);border-color:#f3cfcf !important}
+.tx-thumb.credit{background:linear-gradient(135deg,#dcf6e6,#f2fcf6);border-color:#bfe8cd !important}
+.a-ot strong.neg{color:#dc2626}
+.a-ot strong.pos{color:#16a34a}
+.a-os .chip{height:29px;display:inline-flex;align-items:center;padding:0 10px;border-radius:10px;background:#f1f5f9;border:1px solid var(--chipb);font-size:12px;font-weight:700;color:#475569;white-space:nowrap}
+.a-os{flex-wrap:wrap}
 
 </style>
 
@@ -1250,6 +1260,24 @@ body.in-app > .header,body.in-app > #footer{display:none}
     </section>
   </main>
 
+  <main class="app-main" id="appTxPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Транзакции</h1>
+      <p class="a-sub">Движение баланса и операции.</p>
+    </section>
+    <section class="a-card o-wrap">
+      <div class="o-filter">
+        <input class="o-search" id="tSearch" type="search" autocomplete="off" placeholder="Комментарий или id (tx…)" aria-label="Поиск транзакций по комментарию или номеру">
+        <div class="o-sels">
+          <div class="o-f"><span class="o-l" id="tKiL">Тип движения</span><div class="o-sel" id="tKi"></div></div>
+          <div class="o-f"><span class="o-l" id="tStL">Статус</span><div class="o-sel" id="tSt"></div></div>
+        </div>
+        <nav class="o-pager" id="tPager" aria-label="Страницы транзакций"></nav>
+      </div>
+      <div class="o-list" id="tList" aria-live="polite"></div>
+    </section>
+  </main>
+
   <footer class="a-foot">
     <p>© <span id="appYear">2026</span> Gemora · демо, данные примерные</p>
     <nav aria-label="Документы"><a href="#" data-soon>Условия</a><a href="#" data-soon>Конфиденциальность</a><a href="#" data-soon>Поддержка</a></nav>
@@ -1400,7 +1428,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1503,7 +1531,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
   (function(){
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
-      ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции']]],
+      ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
       ['Каталог',[['wallet','Пополнить Steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
@@ -1548,7 +1576,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     for(var n=0;n<45;n++){
       var ty=W[Math.floor(rnd()*W.length)],it=T[ty][3][Math.floor(rnd()*T[ty][3].length)];
       var st=n===31||n===33?'proc':n===12?'err':n===24?'ref':'done';
-      var d=new Date(t);DATA.push({id:'ord-'+(id-n*3-Math.floor(rnd()*3)),ty:ty,st:st,desc:it[0],price:'$'+it[1].toFixed(4),
+      var d=new Date(t);DATA.push({t:t,id:'ord-'+(id-n*3-Math.floor(rnd()*3)),ty:ty,st:st,desc:it[0],price:'$'+it[1].toFixed(4),
         time:('0'+d.getUTCDate()).slice(-2)+'.'+('0'+(d.getUTCMonth()+1)).slice(-2)+'.'+d.getUTCFullYear()+' '+('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)});
       t-=Math.floor(1+rnd()*14)*60000;
     }
@@ -1596,15 +1624,20 @@ body.in-app > .header,body.in-app > #footer{display:none}
       if(cur===1)to=2;if(cur===total)from=total-1;
       if(from>2)out.push('…');for(var k=from;k<=to;k++)out.push(k);if(to<total-1)out.push('…');out.push(total);return out;
     }
+    function pagerHTML(cur,total){
+      return '<button type="button" class="arr" data-p="'+(cur-1)+'" aria-label="Предыдущая страница"'+(cur===1?' disabled':'')+'>‹</button>'
+        +pages(cur,total).map(function(p){return p==='…'?'<span class="dots" aria-hidden="true">…</span>':'<button type="button" data-p="'+p+'"'+(p===cur?' aria-current="page"':'')+' aria-label="Страница '+p+'">'+p+'</button>'}).join('')
+        +'<button type="button" class="arr" data-p="'+(cur+1)+'" aria-label="Следующая страница"'+(cur===total?' disabled':'')+'>›</button>';
+    }
+    function fmt(ms){var d=new Date(ms);return ('0'+d.getUTCDate()).slice(-2)+'.'+('0'+(d.getUTCMonth()+1)).slice(-2)+'.'+d.getUTCFullYear()+' '+('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}
+    window.GemUI={makeSel:makeSel,pagerHTML:pagerHTML,fmt:fmt,orders:DATA};
     function render(scroll){
       var rows=filtered(),total=Math.max(1,Math.ceil(rows.length/PER));
       if(f.page>total)f.page=total;
       var slice=rows.slice((f.page-1)*PER,f.page*PER);
       listEl.innerHTML=slice.length?slice.map(function(o){return card(o,true)}).join(''):'<p class="o-empty">Ничего не найдено. Измените поиск или фильтры.</p>';
-      pager.innerHTML='<button type="button" class="arr" data-p="'+(f.page-1)+'" aria-label="Предыдущая страница"'+(f.page===1?' disabled':'')+'>‹</button>'
-        +pages(f.page,total).map(function(p){return p==='…'?'<span class="dots" aria-hidden="true">…</span>':'<button type="button" data-p="'+p+'"'+(p===f.page?' aria-current="page"':'')+' aria-label="Страница '+p+'">'+p+'</button>'}).join('')
-        +'<button type="button" class="arr" data-p="'+(f.page+1)+'" aria-label="Следующая страница"'+(f.page===total?' disabled':'')+'>›</button>';
-      if(scroll)document.querySelector('.o-wrap').scrollIntoView({block:'start',behavior:'smooth'});
+      pager.innerHTML=pagerHTML(f.page,total);
+      if(scroll)document.querySelector('#appOrdersPage .o-wrap').scrollIntoView({block:'start',behavior:'smooth'});
     }
     pager.addEventListener('click',function(e){var b=e.target.closest('button[data-p]');if(!b||b.disabled)return;f.page=+b.dataset.p;render(true)});
     var tq;document.getElementById('oSearch').addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value.trim();tq=setTimeout(function(){f.q=v;f.page=1;render(false)},150)});
@@ -1616,6 +1649,46 @@ body.in-app > .header,body.in-app > #footer{display:none}
     function markMenu(){document.querySelectorAll('#appMenuNav a').forEach(function(a){if(a.getAttribute('href')===location.hash&&location.hash)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})}
     window.addEventListener('hashchange',markMenu);markMenu();
     document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll(null)});
+  })();
+
+  // ---------- cabinet: transactions (example data built from the example orders) ----------
+  (function(){
+    var UI=window.GemUI; if(!UI) return;
+    var TX=[],n=0;
+    function money(v){return (v<0?'-':'+')+'$'+Math.abs(v).toFixed(4)}
+    UI.orders.forEach(function(o){
+      var amt=parseFloat(o.price.slice(1));
+      TX.push({t:o.t,ki:'debit',st:o.st==='proc'?'proc':o.st==='err'?'cancel':'done',amt:-amt,desc:'Списание за заказ '+o.id});
+      if(o.st==='ref')TX.push({t:o.t+60000,ki:'credit',st:'done',amt:amt,desc:'Возврат за заказ '+o.id});
+    });
+    // example top-ups: crypto amount with a unique "tail" to recognise the payer
+    [[50.0037,'USDT TRC20'],[100.0412,'Bybit UID'],[25.0019,'TON']].forEach(function(x,i){
+      TX.push({t:UI.orders[[2,18,40][i]].t+7*60000,ki:'credit',st:'done',amt:x[0],desc:'Пополнение баланса • '+x[1]});
+    });
+    TX.sort(function(a,b){return b.t-a.t});
+    TX.forEach(function(x,i){x.id='tx'+(2001900-i*7-(i%3));x.time=UI.fmt(x.t)});
+    var KI={debit:'Списание',credit:'Начисление'},ST={done:['Завершён','check'],proc:['В обработке','swap'],cancel:['Отменено','close']};
+    function card(x){
+      var s=ST[x.st];
+      return '<article class="a-order sm"><span class="a-thumb tx-thumb '+x.ki+'" aria-hidden="true"><svg class="ico"><use href="#i-swap"/></svg></span>'
+        +'<div class="a-ob"><div class="a-ot"><b>'+x.id+'</b><strong class="'+(x.amt<0?'neg':'pos')+'">'+money(x.amt)+'</strong></div><p class="a-od">'+x.desc+'</p>'
+        +'<div class="a-os"><i class="'+(x.st==='cancel'?'err':x.st)+'" role="img" aria-label="'+s[0]+'" title="'+s[0]+'"><svg class="ico"><use href="#i-'+s[1]+'"/></svg></i><span class="chip">'+KI[x.ki]+'</span><time>'+x.time+'</time></div></div></article>';
+    }
+    var f={q:'',ki:'all',st:'all',page:1},PER=10,list=document.getElementById('tList'),pager=document.getElementById('tPager');
+    function render(scroll){
+      var q=f.q.toLowerCase();
+      var rows=TX.filter(function(x){return (f.ki==='all'||x.ki===f.ki)&&(f.st==='all'||x.st===f.st)&&(!q||x.id.toLowerCase().indexOf(q)>-1||x.desc.toLowerCase().indexOf(q)>-1)});
+      var total=Math.max(1,Math.ceil(rows.length/PER));if(f.page>total)f.page=total;
+      var slice=rows.slice((f.page-1)*PER,f.page*PER);
+      list.innerHTML=slice.length?slice.map(card).join(''):'<p class="o-empty">Ничего не найдено. Измените поиск или фильтры.</p>';
+      pager.innerHTML=UI.pagerHTML(f.page,total);
+      if(scroll)document.querySelector('#appTxPage .o-wrap').scrollIntoView({block:'start',behavior:'smooth'});
+    }
+    pager.addEventListener('click',function(e){var b=e.target.closest('button[data-p]');if(!b||b.disabled)return;f.page=+b.dataset.p;render(true)});
+    var tq;document.getElementById('tSearch').addEventListener('input',function(e){clearTimeout(tq);var v=e.target.value.trim();tq=setTimeout(function(){f.q=v;f.page=1;render(false)},150)});
+    UI.makeSel(document.getElementById('tKi'),'tKiL',[['all','Все движения'],['credit','Начисление'],['debit','Списание']],function(v){f.ki=v;f.page=1;render(false)});
+    UI.makeSel(document.getElementById('tSt'),'tStL',[['all','Все'],['done','Завершён'],['proc','В обработке'],['cancel','Отменено']],function(v){f.st=v;f.page=1;render(false)});
+    render(false);
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
