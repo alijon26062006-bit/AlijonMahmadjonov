@@ -247,7 +247,7 @@ h1,h2,h3{color:var(--ink)}
 .why-item{padding-block:64px;border-bottom:1px solid var(--line)}
 .why-item:last-child{border-bottom:0;padding-bottom:64px}
 .why-ill{width:100%;max-width:398px;aspect-ratio:1;margin:0 auto 55px}
-.why-ill svg{width:100%;height:100%;display:block}
+.why-ill img{width:100%;height:100%;object-fit:contain;display:block}
 .why-item h3{font-size:24px;line-height:32px;font-weight:700}
 .why-item p{margin-top:15px;font-size:18px;line-height:29.25px}
 
@@ -349,7 +349,7 @@ h1,h2,h3{color:var(--ink)}
 .cta-card{max-width:896px;margin:0 auto;padding:64px 31px;text-align:center;border:1px solid #e6e2f8;border-radius:24px;box-shadow:var(--sh-lg);
   background:radial-gradient(120% 80% at 0% 100%,#dad6fb 0%,rgba(218,214,251,0) 55%),linear-gradient(160deg,#f1eefd,#f5f3fe)}
 .cta-card .hs{height:128px;margin-bottom:36px;display:grid;place-items:center}
-.cta-card .hs svg{width:124px;height:124px;stroke:#3f3a00;fill:#d9cffd}
+.cta-card .hs img{height:94px;width:auto;display:block}
 .cta-card h2{font-size:30px;line-height:36px;font-weight:700;text-wrap:balance}
 .cta-card p{margin-top:15px;font-size:18px;line-height:28px}
 .cta-card .btn{margin-top:32px}
@@ -619,27 +619,27 @@ h1,h2,h3{color:var(--ink)}
       <div class="sec-head"><h2>Почему Gemora</h2></div>
       <div class="why-list">
         <article class="why-item">
-          <div class="why-ill" data-ill="hub" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-1.webp" alt="" width="1200" height="763" loading="lazy" decoding="async"></div>
           <div><h3>Gemora берёт всё на себя</h3><p>Одна платформа. Все поставщики. Автоматическая доставка. Мы создали Gemora, чтобы вы могли сосредоточиться на росте — а не тушить пожары.</p></div>
         </article>
         <article class="why-item">
-          <div class="why-ill" data-ill="board" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-2.webp" alt="" width="1200" height="789" loading="lazy" decoding="async"></div>
           <div><h3>Всё необходимое в одном месте</h3><p>Мы объединяем поставщиков, продукты и автоматизацию в единую платформу. Вам остаётся только продавать.</p></div>
         </article>
         <article class="why-item">
-          <div class="why-ill" data-ill="growth" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-3.webp" alt="" width="1200" height="847" loading="lazy" decoding="async"></div>
           <div><h3>Все поставщики — без головной боли</h3><p>Больше не нужно проверять наличие на разных сервисах. Gemora объединяет десятки поставщиков и автоматически управляет остатками. Меньше сбоев, стабильные поставки, проще управление.</p></div>
         </article>
         <article class="why-item">
-          <div class="why-ill" data-ill="api" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-4.webp" alt="" width="1200" height="800" loading="lazy" decoding="async"></div>
           <div><h3>Автоматизируйте магазин с нашим API</h3><p>Создавайте заказы, отслеживайте выполнение, доставляйте коды — всё автоматически через REST API. Интеграция занимает часы, а не дни. Ваш магазин работает 24/7 без ручной работы.</p></div>
         </article>
         <article class="why-item">
-          <div class="why-ill" data-ill="price" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-5.webp" alt="" width="1200" height="806" loading="lazy" decoding="async"></div>
           <div><h3>Цены, которые позволяют конкурировать</h3><p>Благодаря крупным закупкам и собственной инфраструктуре мы предлагаем одни из самых выгодных оптовых цен. Выше маржа, сильнее позиция, масштабируемые продажи.</p></div>
         </article>
         <article class="why-item">
-          <div class="why-ill" data-ill="globe" aria-hidden="true"></div>
+          <div class="why-ill"><img src="img/why-6.webp" alt="" width="1200" height="758" loading="lazy" decoding="async"></div>
           <div><h3>Глобальный охват, локальный эффект</h3><p>Мобильные игры, игровые платформы, подарочные карты, цифровые сервисы — если это есть на рынке, скорее всего у нас это есть. Все основные регионы и платформы поддерживаются.</p></div>
         </article>
       </div>
@@ -810,7 +810,7 @@ h1,h2,h3{color:var(--ink)}
   <section class="cta-sec">
     <div class="wrap">
       <div class="cta-card">
-        <div class="hs" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shake"/></svg></div>
+        <div class="hs"><img src="img/cta-hands.webp" alt="" width="480" height="264" loading="lazy" decoding="async"></div>
         <h2>Готовы начать продавать?</h2>
         <p>Присоединяйтесь к тысячам реселлеров, развивающих бизнес с Gemora.</p>
         <a class="btn btn-primary lg" href="#pricing">Начать бесплатно</a>
@@ -848,58 +848,7 @@ h1,h2,h3{color:var(--ink)}
 (function(){
   // ---------- service illustrations (own drawings, no third-party logos) ----------
   var V='#7e5bff',VD='#5b3fd9',VL='#b9a9ff',VT='#efebff',TL='#2dd4bf',TD='#14a89a',INK='#1a1d24',G='#6b7280',W='#fff';
-  var OBJ={
-    cards:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="26" y="150" width="150" height="56" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="26" y="186" width="150" height="20" rx="10" fill="#e9e6f7"/>'
-      +'<g transform="rotate(-8 100 110)"><rect x="52" y="52" width="104" height="112" rx="12" fill="'+VL+'"/></g>'
-      +'<rect x="44" y="60" width="104" height="112" rx="12" fill="'+TL+'"/><rect x="36" y="68" width="104" height="112" rx="12" fill="'+VD+'"/><rect x="36" y="64" width="104" height="110" rx="12" fill="'+V+'"/>'
-      +'<rect x="50" y="80" width="26" height="20" rx="5" fill="'+VL+'"/><rect x="50" y="132" width="60" height="8" rx="4" fill="#fff" opacity=".9"/><rect x="50" y="146" width="38" height="6" rx="3" fill="#fff" opacity=".6"/>'
-      +'<circle cx="118" cy="92" r="12" fill="#fff" opacity=".2"/><path d="M112 92h12M118 86v12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'
-      +'<rect x="176" y="128" width="58" height="62" rx="8" fill="'+VD+'"/><rect x="170" y="116" width="70" height="20" rx="6" fill="'+V+'"/><rect x="199" y="116" width="12" height="74" fill="'+VL+'"/><path d="M205 116c-8-18-26-17-26-7 0 7 13 7 26 7Zm0 0c8-18 26-17 26-7 0 7-13 7-26 7Z" fill="'+VL+'"/>'
-      +'<ellipse cx="216" cy="212" rx="20" ry="7" fill="'+TD+'"/><rect x="196" y="204" width="40" height="8" fill="'+TD+'"/><ellipse cx="216" cy="204" rx="20" ry="7" fill="'+TL+'"/>'
-      +'<rect x="170" y="36" width="64" height="58" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="178" y="46" width="14" height="14" rx="4" fill="'+V+'"/><rect x="196" y="46" width="14" height="14" rx="4" fill="'+INK+'"/><rect x="214" y="46" width="14" height="14" rx="4" fill="'+TL+'"/><rect x="178" y="64" width="14" height="14" rx="4" fill="'+VL+'"/><rect x="196" y="64" width="14" height="14" rx="4" fill="'+V+'"/><rect x="214" y="64" width="14" height="14" rx="4" fill="'+VT+'"/>',
-    wallet:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="40" y="56" width="120" height="40" rx="10" fill="'+TL+'" transform="rotate(-7 100 76)"/>'
-      +'<rect x="28" y="80" width="160" height="112" rx="18" fill="'+VD+'"/><rect x="28" y="74" width="160" height="112" rx="18" fill="'+V+'"/><rect x="28" y="74" width="160" height="26" rx="13" fill="'+VL+'" opacity=".55"/>'
-      +'<rect x="136" y="116" width="66" height="38" rx="12" fill="'+VD+'"/><circle cx="156" cy="135" r="7" fill="'+TL+'"/><rect x="46" y="158" width="64" height="8" rx="4" fill="#fff" opacity=".75"/>'
-      +'<g><ellipse cx="206" cy="206" rx="26" ry="9" fill="'+TD+'"/><rect x="180" y="192" width="52" height="14" fill="'+TD+'"/><ellipse cx="206" cy="192" rx="26" ry="9" fill="'+TL+'"/></g>'
-      +'<g><ellipse cx="206" cy="184" rx="26" ry="9" fill="'+VD+'"/><rect x="180" y="172" width="52" height="12" fill="'+VD+'"/><ellipse cx="206" cy="172" rx="26" ry="9" fill="'+VL+'"/></g>'
-      +'<circle cx="210" cy="62" r="24" fill="#fff" stroke="#e5e7eb"/><path d="M200 62h20M210 52v20" stroke="'+V+'" stroke-width="5" stroke-linecap="round"/>'
-      +'<rect x="34" y="28" width="92" height="26" rx="13" fill="#fff" stroke="#e5e7eb"/><circle cx="48" cy="41" r="6" fill="'+TL+'"/><rect x="60" y="37" width="52" height="8" rx="4" fill="'+VT+'"/>',
-    gift:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="22" y="156" width="150" height="50" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="22" y="188" width="150" height="18" rx="9" fill="#e9e6f7"/>'
-      +'<rect x="58" y="62" width="96" height="112" rx="12" fill="'+VL+'"/><rect x="48" y="70" width="96" height="112" rx="12" fill="'+TL+'"/><rect x="38" y="78" width="96" height="112" rx="12" fill="'+VD+'"/><rect x="38" y="74" width="96" height="110" rx="12" fill="'+V+'"/>'
-      +'<circle cx="72" cy="112" r="14" fill="none" stroke="#fff" stroke-width="5"/><circle cx="72" cy="112" r="4" fill="#fff"/><rect x="52" y="146" width="52" height="8" rx="4" fill="#fff" opacity=".9"/><rect x="52" y="160" width="34" height="6" rx="3" fill="#fff" opacity=".6"/>'
-      +'<circle cx="124" cy="160" r="11" fill="'+TL+'"/><path d="M119 160h10M124 155v10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'
-      +'<rect x="170" y="124" width="64" height="70" rx="9" fill="'+VD+'"/><rect x="164" y="110" width="76" height="22" rx="7" fill="'+V+'"/><rect x="195" y="110" width="14" height="84" fill="'+VL+'"/><path d="M202 110c-9-20-30-19-30-8 0 8 15 8 30 8Zm0 0c9-20 30-19 30-8 0 8-15 8-30 8Z" fill="'+VL+'"/>'
-      +'<rect x="160" y="34" width="74" height="52" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="168" y="42" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="190" y="42" width="18" height="16" rx="4" fill="'+V+'"/><rect x="212" y="42" width="14" height="16" rx="4" fill="'+TL+'"/><rect x="168" y="66" width="58" height="12" rx="6" fill="'+V+'"/>',
-    key:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="22" y="156" width="150" height="50" rx="14" fill="'+W+'" stroke="#e5e7eb"/><rect x="22" y="188" width="150" height="18" rx="9" fill="#e9e6f7"/>'
-      +'<rect x="58" y="62" width="100" height="112" rx="12" fill="'+VL+'"/><rect x="48" y="70" width="100" height="112" rx="12" fill="'+TL+'"/><rect x="38" y="78" width="100" height="112" rx="12" fill="'+VD+'"/><rect x="38" y="74" width="100" height="110" rx="12" fill="'+V+'"/>'
-      +'<circle cx="66" cy="136" r="15" fill="none" stroke="#fff" stroke-width="8"/><path d="M82 136h40M108 136v13M120 136v10" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><rect x="52" y="90" width="50" height="7" rx="3.5" fill="#fff" opacity=".8"/>'
-      +'<rect x="160" y="34" width="74" height="70" rx="10" fill="#fff" stroke="#e5e7eb"/><rect x="168" y="42" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="190" y="42" width="18" height="16" rx="4" fill="'+V+'"/><rect x="212" y="42" width="14" height="16" rx="4" fill="'+TL+'"/><rect x="168" y="62" width="18" height="16" rx="4" fill="'+VL+'"/><rect x="190" y="62" width="18" height="16" rx="4" fill="'+INK+'"/><rect x="212" y="62" width="14" height="16" rx="4" fill="'+VT+'"/><rect x="168" y="84" width="58" height="12" rx="6" fill="'+V+'"/>'
-      +'<rect x="168" y="132" width="42" height="42" rx="9" fill="'+V+'" transform="rotate(-10 189 153)"/><text x="189" y="162" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="24" fill="#fff">%</text>'
-      +'<g><ellipse cx="214" cy="204" rx="22" ry="8" fill="'+TD+'"/><rect x="192" y="190" width="44" height="14" fill="'+TD+'"/><ellipse cx="214" cy="190" rx="22" ry="8" fill="'+TL+'"/></g>',
-    subs:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="30" y="150" width="150" height="40" rx="11" fill="#d7d3e6"/><rect x="30" y="144" width="150" height="38" rx="11" fill="#eceaf5"/>'
-      +'<rect x="36" y="112" width="150" height="40" rx="11" fill="'+TD+'"/><rect x="36" y="106" width="150" height="38" rx="11" fill="'+TL+'"/>'
-      +'<rect x="42" y="74" width="150" height="40" rx="11" fill="'+VD+'"/><rect x="42" y="68" width="150" height="38" rx="11" fill="'+V+'"/>'
-      +'<path d="M58 96l4-16 9 9 8-13 8 13 9-9 4 16Z" fill="#fff"/><rect x="112" y="80" width="62" height="7" rx="3.5" fill="#fff" opacity=".9"/><rect x="112" y="92" width="40" height="6" rx="3" fill="#fff" opacity=".6"/>'
-      +'<rect x="52" y="120" width="34" height="10" rx="5" fill="#fff" opacity=".9"/><rect x="128" y="120" width="46" height="10" rx="5" fill="#fff" opacity=".6"/><rect x="46" y="158" width="40" height="10" rx="5" fill="'+G+'" opacity=".45"/><rect x="126" y="158" width="40" height="10" rx="5" fill="'+G+'" opacity=".3"/>'
-      +'<rect x="184" y="28" width="50" height="48" rx="9" fill="#fff" stroke="#e5e7eb"/><rect x="184" y="28" width="50" height="14" rx="7" fill="'+V+'"/><rect x="192" y="50" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="205" y="50" width="8" height="8" rx="2" fill="'+VL+'"/><rect x="218" y="50" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="192" y="62" width="8" height="8" rx="2" fill="'+VT+'"/><rect x="205" y="62" width="8" height="8" rx="2" fill="'+VT+'"/>'
-      +'<circle cx="216" cy="110" r="16" fill="'+VT+'"/><circle cx="216" cy="105" r="6" fill="'+V+'"/><path d="M205 121c2-7 6-10 11-10s9 3 11 10" fill="'+V+'"/>'
-      +'<circle cx="212" cy="156" r="16" fill="#d5f7f1"/><circle cx="212" cy="151" r="6" fill="'+TD+'"/><path d="M201 167c2-7 6-10 11-10s9 3 11 10" fill="'+TD+'"/>'
-      +'<g><ellipse cx="214" cy="204" rx="22" ry="8" fill="'+VD+'"/><rect x="192" y="192" width="44" height="12" fill="'+VD+'"/><ellipse cx="214" cy="192" rx="22" ry="8" fill="'+VL+'"/></g>',
-    phone:'<ellipse cx="125" cy="222" rx="112" ry="20" fill="'+VT+'"/>'
-      +'<rect x="14" y="138" width="86" height="62" rx="10" fill="#e3def8"/><rect x="14" y="130" width="86" height="62" rx="10" fill="'+VL+'"/><rect x="26" y="112" width="24" height="24" rx="5" fill="'+V+'"/><rect x="54" y="118" width="20" height="18" rx="5" fill="'+TL+'"/><rect x="40" y="152" width="34" height="14" rx="4" fill="'+V+'"/>'
-      +'<g transform="rotate(8 150 120)"><rect x="100" y="24" width="96" height="184" rx="20" fill="'+VD+'"/><rect x="100" y="20" width="96" height="182" rx="20" fill="'+V+'"/><rect x="107" y="28" width="82" height="166" rx="14" fill="#fff"/>'
-      +'<rect x="116" y="38" width="40" height="7" rx="3.5" fill="'+INK+'"/><rect x="116" y="54" width="30" height="30" rx="8" fill="#3b4a6b"/><rect x="150" y="54" width="30" height="30" rx="8" fill="'+V+'"/><rect x="116" y="88" width="30" height="30" rx="8" fill="'+TL+'"/><rect x="150" y="88" width="30" height="30" rx="8" fill="#f5b83d"/>'
-      +'<rect x="116" y="126" width="64" height="8" rx="4" fill="#e5e7eb"/><rect x="116" y="140" width="64" height="8" rx="4" fill="#e5e7eb"/><rect x="116" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="133" y="156" width="14" height="12" rx="4" fill="'+V+'"/><rect x="150" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="167" y="156" width="14" height="12" rx="4" fill="'+VT+'"/><rect x="116" y="174" width="64" height="14" rx="7" fill="'+V+'"/></g>'
-      +'<path d="M70 44 80 32h16l10 12-18 22Z" fill="'+VL+'"/><path d="M70 44h36L88 66Z" fill="'+V+'"/>'
-      +'<path d="M30 76l7-8h10l7 8-12 14Z" fill="'+TL+'"/><path d="M196 30l6-7h9l6 7-10 12Z" fill="'+TL+'"/>'
-      +'<circle cx="216" cy="150" r="24" fill="'+VL+'"/><path d="M196 144c8 4 12-4 20 0s8 10 18 6M200 162c8-4 14 4 30-2" fill="none" stroke="'+V+'" stroke-width="5" stroke-linecap="round"/><ellipse cx="216" cy="152" rx="34" ry="9" fill="none" stroke="'+V+'" stroke-width="2.5" transform="rotate(-18 216 152)"/>'
-      +'<path d="M222 192 222 176c0-10 20-10 20 0v8c0 12-8 18-10 20-2-2-10-6-10-12Z" fill="'+V+'"/><path d="m226 186 5 5 8-9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
-  };
+  var IMG={cards:'svc-1',wallet:'svc-2',gift:'svc-3',key:'svc-4',subs:'svc-5',phone:'svc-6'};
   var TXT={
     cards:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Оптовые','подарочные карты','Сотни брендов и регионов по оптовым ценам.'],
     wallet:['РЕШЕНИЕ ДЛЯ РЕСЕЛЛЕРОВ','Пополнение','кошелька Steam','По логину, для СНГ и других регионов.'],
@@ -913,7 +862,7 @@ h1,h2,h3{color:var(--ink)}
   var FOOT=['Конкурентные цены','Глобальное покрытие','Поддержка 24/7'];
   function esc(s){return s.replace(/&/g,'&amp;')}
   function art(k){
-    var t=TXT[k],s='<svg viewBox="0 0 540 360" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif"><rect width="540" height="360" rx="10" fill="#fff"/>';
+    var t=TXT[k],s='<svg viewBox="0 0 540 360" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif"><rect width="540" height="360" rx="10" fill="#fff"/><image href="img/'+IMG[k]+'.webp" x="270" y="36" width="262" height="262"/>';
     s+='<rect x="18" y="14" width="'+(t[0].length*5.6+22)+'" height="18" rx="5" fill="'+VT+'"/><text x="29" y="26.5" font-size="8" font-weight="700" fill="'+V+'">'+esc(t[0])+'</text>';
     s+='<text x="18" y="62" font-size="24" font-weight="700" fill="'+INK+'" letter-spacing="-.5">'+esc(t[1])+'</text><text x="18" y="90" font-size="24" font-weight="700" fill="'+V+'" letter-spacing="-.5">'+esc(t[2])+'</text>';
     s+='<text x="18" y="108" font-size="8.5" fill="'+G+'">'+esc(t[3])+'</text>';
@@ -926,7 +875,7 @@ h1,h2,h3{color:var(--ink)}
       if(i<3)s+='<path d="M'+(x+20)+' 284h10m-3-3 3 3-3 3" fill="none" stroke="'+VL+'" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>';});
     FOOT.forEach(function(f,i){var x=24+i*176;
       s+='<circle cx="'+(x+6)+'" cy="336" r="7" fill="'+VT+'"/><circle cx="'+(x+6)+'" cy="336" r="3" fill="'+V+'"/><text x="'+(x+18)+'" y="339" font-size="8" font-weight="700" fill="'+INK+'">'+f+'</text>';});
-    s+='<g transform="translate(272,22)">'+OBJ[k]+'</g></svg>';
+    s+='</svg>';
     return s;
   }
   document.querySelectorAll('[data-art]').forEach(function(el){el.innerHTML=art(el.getAttribute('data-art'))});
@@ -998,110 +947,6 @@ h1,h2,h3{color:var(--ink)}
     })},{threshold:.6});
     document.querySelectorAll('.stat b[data-to]').forEach(function(el){io.observe(el)});
   }
-  // ---------- "why" illustrations (own drawings) ----------
-  (function(){
-    var P={v:'#7e5bff',vd:'#5b3fd9',v2:'#9b82ff',vl:'#c9bdff',vt:'#e9e3ff',or:'#ff8c38',ol:'#3f3a00',og:'#6b6a3f',pk:'#ec4899',sk:'#ffc9a8',bg:'#c9c9b6'};
-    function gear(cx,cy,ro,ri,n,fill,hole){
-      var d='',s=Math.PI*2/n,k=[[-.28,ri],[-.16,ro],[.16,ro],[.28,ri]],i,j,a;
-      for(i=0;i<n;i++)for(j=0;j<4;j++){a=(i+k[j][0])*s;d+=(i||j?'L':'M')+(cx+Math.cos(a)*k[j][1]).toFixed(1)+' '+(cy+Math.sin(a)*k[j][1]).toFixed(1)}
-      d+='Z';
-      if(hole)d+='M'+(cx-hole)+' '+cy+'a'+hole+' '+hole+' 0 1 0 '+(2*hole)+' 0a'+hole+' '+hole+' 0 1 0 '+(-2*hole)+' 0Z';
-      return '<path fill-rule="evenodd" fill="'+fill+'" d="'+d+'"/>';
-    }
-    function win(x,y,w,h,bar,body){
-      return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="7" fill="'+body+'"/>'
-        +'<path d="M'+x+' '+(y+7)+'a7 7 0 0 1 7-7h'+(w-14)+'a7 7 0 0 1 7 7v9H'+x+'Z" fill="'+bar+'"/>'
-        +[10,19,28].map(function(o){return '<circle cx="'+(x+w-o)+'" cy="'+(y+8)+'" r="2.4" fill="#fff" opacity=".85"/>'}).join('');
-    }
-    function rows(x,y,w,n,gap,c1,c2){var o='',i;for(i=0;i<n;i++)o+='<rect x="'+x+'" y="'+(y+i*gap)+'" width="'+(w*(i%2?.7:1))+'" height="4" rx="2" fill="'+(i%2?c2:c1)+'"/>';return o}
-    function coin(cx,cy,r){return '<circle cx="'+cx+'" cy="'+(cy+4)+'" r="'+r+'" fill="'+P.vd+'"/><circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+P.v2+'"/><text x="'+cx+'" y="'+(cy+r*.4)+'" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="'+(r*1.15)+'" fill="'+P.vd+'">$</text>'}
-    function plane(x,y,k,rot,fill){return '<path transform="translate('+x+' '+y+') rotate('+rot+') scale('+k+')" d="M0 0 32 12 0 24 7 12Z" fill="'+fill+'"/>'}
-    function head(cx,cy,r,hair){return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+P.sk+'"/><path d="M'+(cx-r)+' '+(cy-2)+'a'+r+' '+r+' 0 0 1 '+(2*r)+' 0c-'+(r*.6)+'-'+(r*.5)+'-'+(r*1.4)+'-'+(r*.5)+'-'+(2*r)+' 0Z" fill="'+(hair||P.ol)+'"/>'}
-    function use(id,x,y,sz,col,sw){return '<use href="#i-'+id+'" x="'+x+'" y="'+y+'" width="'+sz+'" height="'+sz+'" fill="none" stroke="'+col+'" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round"/>'}
-    var nodes=[[72,104],[328,104],[46,210],[354,210],[72,316],[328,316]];
-    var ILL={
-      hub:'<ellipse cx="200" cy="210" rx="176" ry="150" fill="'+P.vt+'"/>'
-        +nodes.map(function(n){return '<path d="M200 210L'+n[0]+' '+n[1]+'" stroke="'+P.v2+'" stroke-width="2.5" stroke-dasharray="6 6"/>'}).join('')
-        +nodes.map(function(n,i){return '<rect x="'+(n[0]-34)+'" y="'+(n[1]-24)+'" width="68" height="48" rx="10" fill="#fff" stroke="'+P.vl+'" stroke-width="2"/><rect x="'+(n[0]-24)+'" y="'+(n[1]-14)+'" width="16" height="16" rx="4" fill="'+[P.v,P.or,P.v2,P.pk,P.v,P.or][i]+'"/>'+rows(n[0]-2,n[1]-12,26,3,9,P.vl,P.vt)}).join('')
-        +'<rect x="146" y="162" width="108" height="108" rx="26" fill="'+P.vd+'"/><rect x="146" y="154" width="108" height="108" rx="26" fill="'+P.v+'"/>'+use('box',170,178,60,'#fff',1.8)
-        +gear(300,52,20,14,8,P.or,7)+gear(96,366,15,10,8,P.v2,5),
-      board:'<path d="M40 250c-20-70 30-130 100-130s90-40 150-10 80 90 60 150-80 70-170 70S60 320 40 250Z" fill="'+P.vt+'"/>'
-        +'<rect x="112" y="62" width="172" height="128" rx="6" fill="#fff" stroke="'+P.vl+'" stroke-width="6"/>'
-        +[0,1,2,3,4].map(function(i){return '<rect x="'+(134+i*11)+'" y="'+(160-[14,22,26,18,10][i])+'" width="6" height="'+[14,22,26,18,10][i]+'" rx="2" fill="'+P.v2+'"/>'}).join('')
-        +'<circle cx="208" cy="102" r="16" fill="#ffe3c2" stroke="'+P.or+'" stroke-width="2"/><rect x="201" y="118" width="14" height="9" rx="2" fill="'+P.v+'"/>'
-        +'<rect x="150" y="76" width="15" height="17" fill="#ffd7b0" transform="rotate(8 157 84)"/><rect x="242" y="76" width="22" height="13" rx="2" fill="#f9a8d4"/>'
-        +gear(318,92,27,19,8,P.vl,9)+'<circle cx="340" cy="190" r="14" fill="'+P.vl+'"/><path d="M340 190v-14a14 14 0 0 1 14 14Z" fill="'+P.pk+'"/>'
-        +win(52,108,52,32,P.v2,'#fff')+rows(58,124,38,2,7,P.vl,P.vl)
-        +'<ellipse cx="200" cy="346" rx="172" ry="10" fill="'+P.vl+'"/>'
-        +'<path d="M96 288v54M96 306h34v36M176 288v54M176 306h30v36M306 288v54M306 306h-32v36" fill="none" stroke="'+P.vd+'" stroke-width="4" stroke-linecap="round"/>'
-        +'<rect x="92" y="226" width="42" height="62" rx="18" fill="'+P.vl+'"/>'+head(113,208,14)
-        +'<rect x="170" y="230" width="40" height="58" rx="18" fill="'+P.v2+'"/>'+head(190,212,14)
-        +'<rect x="286" y="226" width="42" height="62" rx="18" fill="#ffb98a"/>'+head(307,208,14,P.og)
-        +'<rect x="238" y="150" width="34" height="140" rx="16" fill="'+P.vl+'"/>'+head(255,134,15,P.og)
-        +'<rect x="72" y="284" width="258" height="8" rx="4" fill="'+P.vd+'"/><path d="M136 284l10-30h42l-10 30ZM234 284l-8-28h40l8 28Z" fill="'+P.v+'"/>'
-        +'<rect x="342" y="318" width="22" height="20" rx="4" fill="'+P.v+'"/><ellipse cx="344" cy="304" rx="13" ry="7" fill="'+P.vl+'" transform="rotate(-30 344 304)"/><ellipse cx="364" cy="300" rx="13" ry="7" fill="'+P.v2+'" transform="rotate(25 364 300)"/>',
-      growth:'<path d="M214 380c-90 10-170-30-170-130 0-60 40-90 80-110 30-80 120-110 190-70s70 130 60 210-80 92-160 100Z" fill="'+P.vt+'"/>'
-        +'<rect x="74" y="74" width="196" height="118" rx="9" fill="#fff" stroke="'+P.vl+'" stroke-width="2"/><path d="M74 83a9 9 0 0 1 9-9h178a9 9 0 0 1 9 9v5H74Z" fill="'+P.v2+'"/>'
-        +'<circle cx="92" cy="82" r="2" fill="'+P.ol+'"/><circle cx="102" cy="82" r="2" fill="'+P.ol+'"/><circle cx="112" cy="82" r="2" fill="'+P.ol+'"/>'
-        +[0,1,2,3,4].map(function(i){return '<rect x="'+(94+i*10)+'" y="'+(124-[6,13,10,20,20][i])+'" width="6" height="'+[6,13,10,20,20][i]+'" fill="'+P.v+'"/>'}).join('')
-        +'<rect x="86" y="134" width="170" height="46" rx="5" fill="none" stroke="'+P.vt+'" stroke-width="2"/>'
-        +'<path d="M88 176l28-36 20 14 72-98" fill="none" stroke="'+P.ol+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><path d="M214 46l-2 20-15-11Z" fill="'+P.ol+'"/>'
-        +coin(232,100,16)+coin(298,112,17)+coin(266,170,29)
-        +'<ellipse cx="238" cy="352" rx="150" ry="26" fill="'+P.vl+'"/>'
-        +'<path d="M96 318c-8-70 34-128 96-128s112 44 116 104-36 68-106 68-100-6-106-44Z" fill="'+P.vl+'"/><path d="M118 322c20 22 96 26 150 8 10 14-4 26-66 26s-86-8-84-34Z" fill="'+P.v2+'" opacity=".5"/>'
-        +'<rect x="140" y="208" width="72" height="84" rx="30" fill="'+P.v+'"/>'+head(178,186,19)
-        +'<path d="M168 296c44-10 98 2 136 46l-18 18c-30-30-74-40-112-36Z" fill="'+P.ol+'"/><path d="M290 348l34 14-8 16-34-12Z" fill="'+P.v2+'"/>'
-        +'<path d="M214 232l58-12 6 58-60 10Z" fill="#fff" stroke="'+P.vl+'" stroke-width="2"/><ellipse cx="246" cy="258" rx="4" ry="6" fill="'+P.ol+'"/>'
-        +'<rect x="328" y="292" width="30" height="24" rx="3" fill="'+P.ol+'"/><path d="M343 292c0-40 4-60 16-84" fill="none" stroke="'+P.v2+'" stroke-width="2.5"/>'
-        +[[352,230,-40],[362,214,-50],[340,252,30],[350,268,-35],[334,274,40]].map(function(l){return '<ellipse cx="'+l[0]+'" cy="'+l[1]+'" rx="12" ry="5" fill="'+P.v2+'" transform="rotate('+l[2]+' '+l[0]+' '+l[1]+')"/>'}).join(''),
-      api:'<path d="M20 330h360" stroke="#e5e7eb" stroke-width="1.5"/><ellipse cx="214" cy="356" rx="162" ry="6" fill="'+P.og+'"/>'
-        +'<rect x="92" y="126" width="252" height="176" rx="8" fill="'+P.bg+'"/><rect x="100" y="134" width="236" height="160" fill="'+P.vt+'"/><rect x="100" y="134" width="236" height="14" fill="'+P.vd+'"/>'
-        +[306,316,326].map(function(x){return '<circle cx="'+x+'" cy="141" r="2.4" fill="#fff" opacity=".8"/>'}).join('')
-        +'<path d="M188 302h54l8 30h-70Z" fill="'+P.bg+'"/><rect x="164" y="330" width="104" height="6" fill="'+P.bg+'"/>'
-        +'<path d="M124 222h34M292 250h30v-18" fill="none" stroke="'+P.vd+'" stroke-width="1.5"/>'
-        +gear(216,222,54,41,8,P.vd,26)+'<circle cx="216" cy="222" r="26" fill="#fff"/><text x="216" y="228" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="16" fill="'+P.vd+'">API</text>'
-        +gear(152,252,14,10,8,P.v2,5)+gear(276,196,12,8,8,P.v2,4)+gear(268,166,9,6,8,P.vl,3)+gear(164,282,9,6,8,P.vl,3)
-        +gear(278,112,30,22,8,P.v2,13)+'<rect x="244" y="112" width="70" height="14" fill="#fafbfc"/><rect x="100" y="126" width="236" height="8" fill="'+P.bg+'"/>'
-        +gear(366,150,16,11,8,P.og,7)+gear(58,232,17,12,8,P.og,7)
-        +win(60,112,88,72,P.vd,'#a996f5')+'<path d="M82 164a11 11 0 0 1 2-21 15 15 0 0 1 28-3 12 12 0 0 1 6 24Z" fill="#fff"/><path d="M100 164v-14m-6 6 6-6 6 6" fill="none" stroke="#a996f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
-        +win(292,156,88,72,P.vd,'#a996f5')+rows(300,182,70,5,9,P.vd,'#fff')
-        +'<rect x="158" y="58" width="74" height="56" rx="5" fill="#e7e7e7"/><rect x="158" y="58" width="74" height="10" rx="5" fill="'+P.og+'"/>'+rows(166,78,56,4,8,P.v2,P.og)
-        +'<text x="320" y="110" font-family="ui-monospace,Menlo,monospace" font-weight="700" font-size="22" fill="'+P.og+'">&lt;/&gt;</text>'
-        +'<rect x="42" y="262" width="38" height="24" rx="6" fill="'+P.vd+'"/><text x="61" y="279" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-weight="700" font-size="12" fill="#fff">&lt;/&gt;</text>'
-        +'<rect x="298" y="270" width="84" height="60" fill="'+P.v2+'"/><rect x="298" y="270" width="26" height="60" fill="#6d4fd6"/>'
-        +[0,1,2,3,4,5].map(function(i){return '<rect x="328" y="'+(274+i*9.4)+'" width="50" height="6.4" fill="'+P.vd+'"/><circle cx="334" cy="'+(277.2+i*9.4)+'" r="1.2" fill="#fff"/><circle cx="341" cy="'+(277.2+i*9.4)+'" r="1.2" fill="#fff"/>'}).join('')
-        +'<ellipse cx="116" cy="340" rx="48" ry="14" fill="'+P.ol+'"/><rect x="88" y="270" width="46" height="62" rx="18" fill="'+P.v+'"/><path d="M111 284l5 34-5 8-5-8Z" fill="'+P.vd+'"/>'+head(110,254,15)
-        +'<path d="M132 322l14-26h34l-14 26Z" fill="'+P.bg+'"/><circle cx="158" cy="309" r="2.5" fill="#fff"/>',
-      price:'<path d="M46 332C18 280 108 250 138 176S222 44 286 70s40 96 76 150 30 82 6 112Z" fill="'+P.v2+'"/>'
-        +'<rect x="76" y="196" width="56" height="54" rx="8" fill="'+P.or+'"/><text x="104" y="238" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="36" fill="#fff">%</text>'
-        +'<path d="M150 334c-4-84 4-150 38-178 26-12 62 2 72 34 12 40 4 100 0 144Z" fill="'+P.or+'"/><path d="M176 172c20 40 50 50 84 30" fill="none" stroke="#fff" stroke-width="2"/>'
-        +'<rect x="152" y="320" width="100" height="16" fill="'+P.ol+'"/>'
-        +'<path d="M236 196l62-44" stroke="'+P.or+'" stroke-width="26" stroke-linecap="round"/><circle cx="304" cy="148" r="15" fill="#ffc2d6"/>'
-        +head(210,128,22)
-        +'<g transform="rotate(28 322 126)"><rect x="296" y="78" width="54" height="94" rx="10" fill="#fff" stroke="'+P.ol+'" stroke-width="3"/>'+use('cart',309,88,28,P.ol,2.4)+'<circle cx="340" cy="92" r="4" fill="'+P.or+'"/>'+rows(306,126,34,4,9,P.ol,P.ol)+'</g>'
-        +'<rect x="286" y="246" width="88" height="76" rx="11" fill="#fff" stroke="'+P.ol+'" stroke-width="3"/><path d="M332 262h40" stroke="'+P.ol+'" stroke-width="3"/>'
-        +[346,355,364].map(function(x){return '<circle cx="'+x+'" cy="254" r="2.2" fill="'+P.or+'"/>'}).join('')
-        +'<path d="M310 314l5-34h30l5 34Z" fill="'+P.or+'"/><path d="M322 282c0-16 16-16 16 0" fill="none" stroke="'+P.or+'" stroke-width="2.5"/>',
-      globe:'<path d="M30 220c-10-60 40-110 90-90 20 60 0 130-30 150s-54-20-60-60Z" fill="'+P.vt+'"/><path d="M310 130c40-30 80 10 70 70s-40 90-60 80-40-110-10-150Z" fill="'+P.vt+'"/>'
-        +'<path d="M96 250c-30-60-10-130 26-150 20 50 14 110-26 150Z" fill="'+P.vl+'"/><path d="M356 250c10-40 6-70-12-90-14 30-10 60 12 90Z" fill="'+P.vl+'"/>'
-        +'<circle cx="204" cy="172" r="108" fill="'+P.v+'"/><circle cx="204" cy="172" r="90" fill="'+P.v2+'" opacity=".45"/>'
-        +'<ellipse cx="204" cy="172" rx="36" ry="106" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M112 118h184M98 172h212M112 226h184M204 66v212" stroke="#fff" stroke-width="1.6"/>'
-        +'<circle cx="152" cy="108" r="27" fill="none" stroke="'+P.or+'" stroke-width="1.2" stroke-dasharray="4 4"/><circle cx="214" cy="158" r="42" fill="none" stroke="'+P.or+'" stroke-width="1.2" stroke-dasharray="4 4"/>'
-        +gear(152,108,19,14,8,P.or,7)+gear(214,158,32,24,8,P.or,11)
-        +'<path d="M70 262c-20 40 10 78 60 82s120-10 150-40" fill="none" stroke="'+P.vl+'" stroke-width="2" stroke-dasharray="5 5"/><path d="M318 146c30 10 44 40 30 70" fill="none" stroke="'+P.vl+'" stroke-width="2" stroke-dasharray="5 5"/>'
-        +plane(54,232,.95,-28,P.v2)+plane(330,118,.95,205,P.v2)
-        +'<path d="M62 256h112l42 86H104Z" fill="#b9a0ff" stroke="'+P.ol+'" stroke-width="6" stroke-linejoin="round"/><path d="M346 256H236l-42 86h112Z" fill="'+P.pk+'" stroke="'+P.ol+'" stroke-width="6" stroke-linejoin="round"/>'
-        +'<path d="M106 342c0-62 14-100 44-108 22 0 38 20 44 50l-10 58Z" fill="'+P.or+'"/>'+head(152,214,18)
-        +'<path d="M300 342c2-60-8-98-36-110-22-2-40 16-48 46l14 64Z" fill="'+P.vl+'"/>'+head(262,210,18)+'<path d="M248 214c2 16 22 18 28 4" fill="none" stroke="'+P.ol+'" stroke-width="7" stroke-linecap="round"/>'
-        +'<path d="M176 268l36 20" stroke="#ffb3d1" stroke-width="15" stroke-linecap="round"/><path d="M244 266l-34 22" stroke="'+P.vl+'" stroke-width="15" stroke-linecap="round"/><circle cx="210" cy="288" r="10" fill="#ff9ec4"/>'
-        +'<rect x="286" y="296" width="40" height="34" rx="4" fill="'+P.ol+'" transform="rotate(-12 306 313)"/>'
-        +'<rect x="102" y="339" width="112" height="8" rx="4" fill="'+P.ol+'"/><rect x="226" y="339" width="112" height="8" rx="4" fill="'+P.ol+'"/>'
-    };
-    document.querySelectorAll('[data-ill]').forEach(function(el){
-      el.innerHTML='<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">'+ILL[el.getAttribute('data-ill')]+'</svg>';
-    });
-  })();
-
   // ---------- FAQ accordion ----------
   document.querySelectorAll('.faq-q').forEach(function(b){
     b.addEventListener('click',function(){
