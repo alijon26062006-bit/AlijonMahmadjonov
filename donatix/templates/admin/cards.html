@@ -25,6 +25,8 @@
   <b>Добавить карту</b>
   <label>Банк<select name="method" required>{% for m in banks %}<option value="{{ m.code }}">{{ m.title }}</option>{% endfor %}</select></label>
   <label>Реквизиты (как увидит клиент)<textarea name="details" rows="2" required placeholder="Карта 4444 5555 6666 7777&#10;Получатель: Али В."></textarea></label>
+  <label>Имя получателя в банке — как пишет банк в чеке <span class="muted small">(клиенту не показывается)</span>
+    <input name="names" placeholder="Исомиддин Х., Isomiddin Kh" maxlength="200" autocomplete="off"></label>
   <label>Чья карта — кому приходят чеки<select name="owner_tg"><option value="0">Вы (владелец) — в админ-чат</option>
     {% for c in cashiers %}<option value="{{ c.tg_id }}">Кассир {{ c.name }} ({{ c.tg_id }}){{ '' if c.active else ' — выключен' }}</option>{% endfor %}</select></label>
   <button class="btn primary" type="submit">Добавить</button>
@@ -38,7 +40,14 @@
         <div class="muted small" style="white-space:pre-line;overflow-wrap:anywhere">{{ r.details }}</div></div>
       <div class="right"><div class="amount">{{ '%.2f' % (r.today_micro / 10000 * rate) }} с.</div><div class="muted small">сегодня · {{ r.today_n }} заявок</div></div>
     </div>
-    <form method="post" action="/admin/cards" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <form method="post" action="/admin/cards" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="card_id" value="{{ r.id }}">
+      <input name="names" value="{{ r.names or '' }}" placeholder="Имя в чеке: Исомиддин Х., Isomiddin Kh" maxlength="200"
+             aria-label="Имя получателя в банке, как в чеке" style="flex:1;min-width:220px" autocomplete="off">
+      <button class="btn" name="action" value="names">Сохранить имя</button>
+    </form>
+    {% if not r.names %}<div class="muted small" style="color:#b45309;margin-top:4px">⚠️ Имя не указано — чеки Алифа «на счёт кошелька» (без номера) эта карта не узнает.</div>{% endif %}
+    <form method="post" action="/admin/cards" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="card_id" value="{{ r.id }}">
       {% if r.active %}<button class="btn" name="action" value="off">Выключить</button>{% else %}<button class="btn" name="action" value="on">Включить</button>{% endif %}
       <button class="btn danger" name="action" value="delete" onclick="return confirm('Удалить карту ****{{ r.tail }}?')">Удалить</button>

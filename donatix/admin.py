@@ -838,12 +838,16 @@ def cards_page(request: Request, admin=Depends(admin_user), conn=Depends(get_con
 
 @router.post("/cards", dependencies=[Depends(check_csrf)])
 def cards_save(request: Request, action: str = Form(""), card_id: int = Form(0), method: str = Form(""),
-               details: str = Form(""), owner_tg: int = Form(0), admin=Depends(admin_user), conn=Depends(get_conn)):
+               details: str = Form(""), owner_tg: int = Form(0), names: str = Form(""), admin=Depends(admin_user),
+               conn=Depends(get_conn)):
     from . import paycards
     try:
         if action == "add":
-            paycards.add(conn, method, details, owner_tg)
+            paycards.add(conn, method, details, owner_tg, names)
             flash(request, "Карта добавлена — клиенты начнут её получать сразу.")
+        elif action == "names":
+            paycards.set_names(conn, card_id, names)
+            flash(request, "Имя получателя сохранено — чеки без номера (только с именем) теперь узнаются.")
         elif action in ("on", "off"):
             paycards.set_active(conn, card_id, action == "on")
         elif action == "delete":

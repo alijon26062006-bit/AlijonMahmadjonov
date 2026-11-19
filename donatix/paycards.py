@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS pay_cards (
     method     TEXT NOT NULL,
     details    TEXT NOT NULL,
     owner_tg   INTEGER NOT NULL DEFAULT 0,
+    names      TEXT NOT NULL DEFAULT '',          -- имя получателя, как пишет банк в чеке: «Исомиддин Х., Isomiddin Kh»
     active     INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
@@ -52,6 +53,8 @@ def ensure(conn: sqlite3.Connection) -> None:
         conn.executescript(SCHEMA)
     if "card_id" not in {r[1] for r in conn.execute("PRAGMA table_info(payments)")}:
         conn.execute("ALTER TABLE payments ADD COLUMN card_id INTEGER")
+    if "names" not in {r[1] for r in conn.execute("PRAGMA table_info(pay_cards)")}:
+        conn.execute("ALTER TABLE pay_cards ADD COLUMN names TEXT NOT NULL DEFAULT ''")
 
 
 # ── список карт (админка) ──
@@ -75,15 +78,26 @@ def numbers(details: str) -> list[str]:
     return [d for d in (re.sub(r"\D", "", m) for m in re.findall(r"\+?\d[\d \-]{7,}\d", details or "")) if len(d) >= 9]
 
 
-def add(conn: sqlite3.Connection, method: str, details: str, owner_tg: int = 0) -> int:
+def add(conn: sqlite3.Connection, method: str, details: str, owner_tg: int = 0, names: str = "") -> int:
     ensure(conn)
     details = (details or "").strip()[:500]
     if not method:
         raise CardError("Выберите банк.")
     if not numbers(details):
         raise CardError("В реквизитах нет номера карты или телефона.")
-    return int(conn.execute("INSERT INTO pay_cards (method, details, owner_tg, active, created_at) VALUES (?, ?, ?, 1, ?)",
-                            (method, details, int(owner_tg or 0), db.now())).lastrowid)
+    return int(conn.execute("INSERT INTO pay_cards (method, details, owner_tg, names, active, created_at) "
+                            "VALUES (?, ?, ?, ?, 1, ?)",
+                            (method, details, int(owner_tg or 0), clean_names(names), db.now())).lastrowid)
+
+
+def clean_names(raw: str) -> str:
+    return re.sub(r"\s+", " ", (raw or "").replace("\n", ", ")).strip(" ,")[:200]
+
+
+def set_names(conn: sqlite3.Connection, card_id: int, names: str) -> None:
+    """Имя получателя, как пишет банк в чеке (не показывается клиентам) — для чеков без номера."""
+    ensure(conn)
+    conn.execute("UPDATE pay_cards SET names = ? WHERE id = ?", (clean_names(names), card_id))
 
 
 def set_active(conn: sqlite3.Connection, card_id: int, on: bool) -> None:
@@ -179,11 +193,58 @@ def all_details(conn: sqlite3.Connection, method: str, default: str = "") -> str
     (our_card), и чек уходит хозяину этой карты. Сначала карты выбранного банка, потом наши карты других банков —
     клиент мог по привычке перевести на нашу карту другого банка."""
     ensure(conn)
-    rows = conn.execute("SELECT id, method, details FROM pay_cards ORDER BY method != ?, method, id", (method,)).fetchall()
+    rows = conn.execute("SELECT id, method, details, names FROM pay_cards ORDER BY method != ?, method, id",
+                        (method,)).fetchall()
     lines = [default] if default else []
     lines += [f"[карта #{r['id']}] " + ("" if r["method"] == method else f"(банк {r['method']}) ")
-              + re.sub(r"\s+", " ", r["details"]) for r in rows]
+              + re.sub(r"\s+", " ", r["details"]) + (f" · имя получателя в чеке: {r['names']}" if r["names"] else "")
+              for r in rows]
     return "\n".join(lines).strip()
+
+
+_LAT = {"а": "a", "б": "b", "в": "v", "г": "g", "ғ": "g", "д": "d", "е": "e", "ё": "e", "ж": "j", "з": "z", "и": "i",
+        "ӣ": "i", "й": "i", "к": "k", "қ": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s",
+        "т": "t", "у": "u", "ӯ": "u", "ф": "f", "х": "h", "ҳ": "h", "ц": "s", "ч": "ch", "ҷ": "j", "ш": "sh", "щ": "sh",
+        "ъ": "", "ы": "i", "ь": "", "э": "e", "ю": "yu", "я": "ya"}
+
+
+def _skel(word: str) -> str:
+    """Имя «скелетом»: кириллица → латиница, kh/x → h, y → i, двойные буквы — одна. «Исомиддин» = «Isomiddin»."""
+    w = "".join(_LAT.get(ch, ch) for ch in word.lower())
+    w = w.replace("kh", "h").replace("x", "h").replace("dzh", "j").replace("zh", "j").replace("y", "i").replace("w", "v")
+    return re.sub(r"(.)\1+", r"\1", re.sub(r"[^a-z]", "", w))
+
+
+def _person(text: str) -> list[tuple[str, str]]:
+    """Люди в тексте: (имя-скелет, первая буква фамилии или ''). «Исомиддин Х., Isomiddin Kh» → [("isomidin", "h"), …]."""
+    out = []
+    for part in re.split(r"[,;/\n]|\bили\b", text or ""):
+        words = re.findall(r"[A-Za-zА-Яа-яЁёҒғӢӣҚқӮӯҲҳҶҷ]+", part)
+        words = [w for w in words if w.lower() not in _SKIP]
+        if not words or len(words[0]) < 3:
+            continue
+        initial = _skel(words[1])[:1] if len(words) > 1 else ""
+        out.append((_skel(words[0]), initial))
+    return out
+
+
+def name_hits(recipient: str, cards: list) -> list:
+    """Карты, чьё «имя получателя» совпадает с получателем из чека. Если в чеке есть буква фамилии — она тоже должна
+    совпасть (два «Исомиддина» различаются по ней)."""
+    seen = _person(recipient)
+    if not seen:
+        return []
+    found = []
+    for c in cards:
+        mine = _person(c["names"] if "names" in c.keys() else "")
+        if any(a == b and (not ia or not ib or ia == ib) for a, ia in seen for b, ib in mine):
+            found.append(c)
+    return found
+
+
+_SKIP = {"карта", "карты", "получатель", "тел", "телефон", "счёт", "счет", "номер", "банк", "алиф", "сити", "душанбе",
+         "card", "visa", "mastercard", "korti", "милли", "корти", "кому", "перевод", "на", "кошелек", "кошелёк", "гиранда",
+         "қабулкунанда"}
 
 
 def _names(details: str) -> set[str]:
@@ -278,6 +339,11 @@ def which_card(conn: sqlite3.Connection, method: str, seen: dict | None) -> tupl
         return None, "номер подходит к нескольким нашим картам"
     if ai_card is not None:
         return ai_card, "ИИ узнал карту в чеке"
+    by_name = name_hits(text, cards)
+    if len(by_name) == 1:
+        return by_name[0], "имя получателя"
+    if len(by_name) > 1:
+        return None, "имя подходит к нескольким нашим картам — укажите в админке и первую букву фамилии"
     named = match(conn, text, method)
     if named is not None:
         return named, "имя получателя"
@@ -285,6 +351,10 @@ def which_card(conn: sqlite3.Connection, method: str, seen: dict | None) -> tupl
     other = [c for c in every if any(_fits(ch, n) for ch in chunks for n in numbers(c["details"]))]
     if len(other) == 1:
         return other[0], "номер получателя — наша карта другого банка"
+    if not other and not chunks:
+        other_names = name_hits(text, every)
+        if len(other_names) == 1:
+            return other_names[0], "имя получателя — наша карта другого банка"
     if not other and seen_ai is not None:
         return seen_ai, "ИИ узнал нашу карту другого банка"
     return None, "в чеке нет номера/имени нашей карты" if text else "ИИ не нашёл получателя в чеке"

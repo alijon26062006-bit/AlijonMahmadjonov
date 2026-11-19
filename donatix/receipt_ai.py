@@ -379,8 +379,16 @@ def amount_matches(d: dict[str, Any], pay_amount: Any, pay_currency: str) -> boo
 def recipient_matches(d: dict[str, Any], our_details: str) -> bool | None:
     """Совпадает ли получатель в чеке с нашими реквизитами: номер карты/телефона, с масками и без.
     None — сравнить нечем (в чеке нет номера)."""
-    from .paycards import _chunks, _fits
+    from .paycards import _chunks, _fits, _person
     chunks = _chunks(d.get("recipient") or "")
+    if not chunks:   # в чеке только имя (Алиф «на счёт кошелька»): сверяем с «именем получателя» наших карт
+        names = re.findall(r"имя получателя в чеке: ([^\n]+)", our_details or "")
+        seen = _person(d.get("recipient") or "")
+        if names and seen:
+            mine = [p for n in names for p in _person(n)]
+            # совпало — «✅ наши»; не совпало — не тревога (у части карт имя могут ещё не заполнить)
+            return True if any(a == b and (not ia or not ib or ia == ib) for a, ia in seen for b, ib in mine) else None
+        return None
     ours = [re.sub(r"\D", "", x) for x in re.findall(r"[\d][\d\s-]{5,}\d", our_details or "")]
     ours = [x for x in ours if len(x) >= 6]
     if not chunks or not ours:

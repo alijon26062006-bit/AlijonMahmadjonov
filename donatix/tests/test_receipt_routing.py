@@ -326,3 +326,32 @@ def test_real_dc_receipt_phone_992_found_whatever_way_we_saved_it(conn, app, sav
 def test_prompt_has_real_dc_receipt_example():
     from donatix import receipt_ai
     assert "Қабулкунанда: 992102208383" in receipt_ai.PROMPT and "Таъминкунанда" in receipt_ai.FIND_PROMPT
+
+
+# Настоящий чек Алифа «на счёт кошелька»: номера нет, только «Получатель: Исомиддин Х.»
+def test_alif_wallet_receipt_with_name_only_goes_to_that_cashier(app, conn, monkeypatch, ai_on):
+    from donatix import receipt_ai
+    db.set_setting(conn, "cards.rest", "0")
+    config = app.state.config
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    config.alert_telegram_chat_id = ADMIN_CHAT
+    config.alert_telegram_token = config.alert_telegram_token or "1:x"
+    cashiers.add(conn, 777301, "Исомиддин")
+    cashiers.add(conn, 777302, "Второй")
+    isom = paycards.add(conn, "alif", "Телефон +992 10 220 83 83", 777301, "Исомиддин Х., Isomiddin Kh")
+    other = paycards.add(conn, "alif", "Телефон +992 93 111 22 33", 777302, "Исомиддин Р.")   # тёзка, другая фамилия
+    cards = conn.execute("SELECT * FROM pay_cards").fetchall()
+    assert [c["id"] for c in paycards.name_hits("Исомиддин Х.", cards)] == [isom]       # «Х.» отличает тёзку
+    assert [c["id"] for c in paycards.name_hits("ISOMIDDIN KH.", cards)] == [isom]       # латиницей — тоже
+    assert len(paycards.name_hits("Исомиддин", cards)) == 2                              # без буквы фамилии — не гадаем
+    assert paycards.which_card(conn, "alif", {"recipient": "Исомиддин"})[0] is None
+    assert "имя получателя в чеке: Исомиддин Х." in paycards.all_details(conn, "alif")  # ИИ тоже видит имена
+    assert receipt_ai.recipient_matches({"recipient": "Исомиддин Х."}, paycards.all_details(conn, "alif")) is True
+    monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
+    pid, sent = _site_topup(app, conn, monkeypatch, {}, "alif",
+                            receipt_ai.clean({"bank": "alif", "amount": 8, "currency": "TJS", "recipient": "Исомиддин Х.",
+                                              "datetime": "2026-11-19 13:27", "txn_id": "464948862",
+                                              "recipient_ok": "unknown", "our_card": 0}), "alifname")
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert p["card_id"] == isom and '"card_ok": true' in p["receipt_ai"]
+    assert sent == ["admin", 777301]                                                     # чек — именно Исомиддину Х.
