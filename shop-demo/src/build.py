@@ -3,7 +3,7 @@ S=os.path.dirname(os.path.abspath(__file__))
 ICONS={'box':'package','code':'code-xml','dash':'layout-dashboard','zap':'zap','gift':'gift','head':'headphones','globe':'globe','shield':'shield','pad':'gamepad-2','key':'key-round','music':'music','tablet':'tablet','send':'send','plus':'plus','redo':'refresh-cw','menu':'menu','close':'x','up':'arrow-up','arrow':'arrow-right','chev':'chevron-right','check':'check'}
 sym=[]
 for k,f in ICONS.items():
-    s=open(f'{S}/lucide/package/icons/{f}.svg').read()
+    s=open(os.path.join(os.environ.get('LUCIDE_DIR',f'{S}/lucide'),'package/icons',f+'.svg')).read()
     inner=re.search(r'<svg[^>]*>(.*)</svg>',s,re.S).group(1)
     inner=re.sub(r'\s+',' ',inner).strip()
     sym.append(f'  <symbol id="i-{k}" viewBox="0 0 24 24">{inner}</symbol>')

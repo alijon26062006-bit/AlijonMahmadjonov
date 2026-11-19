@@ -66,20 +66,19 @@ h1,h2,h3{color:var(--ink)}
 .hero{padding-block:40px 24px}
 .hero .wrap{display:flex;flex-direction:column}
 .mock-wrap{position:relative}
-.tilt{position:relative;transform-origin:50% 50%;transform:perspective(1060px) rotateX(9deg) rotateY(-9.8deg) rotateZ(.3deg);animation:sway 9s ease-in-out infinite}
+.tilt{position:relative;transform-origin:50% 50%;transform:perspective(1060px) rotateX(9deg) rotateY(-9.8deg) rotateZ(.3deg);animation:sway 16s ease-in-out infinite}
 @keyframes sway{
   0%,100%{transform:perspective(1060px) rotateX(9deg) rotateY(-9.8deg) rotateZ(.3deg)}
-  50%{transform:perspective(1060px) rotateX(7deg) rotateY(-7.4deg) rotateZ(-.6deg) translateY(-4px)}
+  50%{transform:perspective(1060px) rotateX(8.3deg) rotateY(-8.6deg) rotateZ(0deg) translateY(-2px)}
 }
 .mock{position:relative;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:#fafbfb;
   box-shadow:0 0 0 1px #8fb4f0,0 25px 50px -12px rgba(0,0,0,.25)}
 .mock::before{content:"";position:absolute;left:0;top:0;width:95%;aspect-ratio:1;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(126,91,255,.22) 0%,rgba(126,91,255,.12) 38%,transparent 68%);animation:glowMove 10s ease-in-out infinite}
+  background:radial-gradient(circle,rgba(126,91,255,.18) 0%,rgba(126,91,255,.09) 40%,transparent 70%);animation:glowMove 24s ease-in-out infinite}
 @keyframes glowMove{
-  0%,100%{transform:translate(52%,42%)}
-  25%{transform:translate(-38%,38%)}
-  50%{transform:translate(8%,-48%)}
-  75%{transform:translate(30%,-8%)}
+  0%,100%{transform:translate(45%,38%)}
+  33%{transform:translate(-20%,30%)}
+  66%{transform:translate(15%,-25%)}
 }
 .mock-bar,.mock-body{position:relative;z-index:1}
 .mock-bar{display:flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-bottom:1px solid var(--line)}
@@ -90,30 +89,30 @@ h1,h2,h3{color:var(--ink)}
 .rows{display:grid;gap:16px;min-height:244px;align-content:start}
 .mrow{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-sm);
   font-family:var(--mono);font-weight:600;font-size:14px;line-height:20px;color:var(--ink);
-  opacity:0;transform:translateY(14px) scale(.98);transition:opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1)}
+  opacity:0;transform:translateY(6px);transition:opacity .7s ease,transform .8s cubic-bezier(.22,.61,.36,1)}
 .mrow.on{opacity:1;transform:none}
 .mrow span.t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mrow > .ico{color:var(--acc);width:18px;height:18px}
 .mrow .ok{width:24px;height:24px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;
-  opacity:0;transform:scale(.3);transition:opacity .2s ease,transform .45s cubic-bezier(.3,1.7,.5,1)}
+  opacity:0;transform:scale(.7);transition:opacity .4s ease,transform .5s cubic-bezier(.25,1.15,.5,1)}
 .mrow.done .ok{opacity:1;transform:none}
 .mrow .ok .ico{width:14px;height:14px;stroke-width:2.6}
 /* buttons: the window grows to reveal them */
-.mfold{display:grid;grid-template-rows:0fr;margin-top:0;transition:grid-template-rows .6s cubic-bezier(.3,.8,.2,1),margin-top .6s}
+.mfold{display:grid;grid-template-rows:0fr;margin-top:0;transition:grid-template-rows .8s cubic-bezier(.22,.61,.36,1),margin-top .8s cubic-bezier(.22,.61,.36,1)}
 .mfold.on{grid-template-rows:1fr;margin-top:16px}
 .mfold > div{min-height:0;overflow:hidden;display:grid;gap:12px}
 .mbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:47px;background:#fff;border:1px solid var(--line);border-radius:16px;color:var(--acc);font-weight:600;font-size:14px;
-  opacity:0;transform:translateY(10px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.8,.2,1)}
-.mfold.on .mbtn{opacity:1;transform:none;transition-delay:.25s}
-.mfold.on .mbtns .mbtn{transition-delay:.4s}
+  opacity:0;transform:translateY(4px);transition:opacity .6s ease,transform .7s cubic-bezier(.22,.61,.36,1)}
+.mfold.on .mbtn{opacity:1;transform:none;transition-delay:.3s}
+.mfold.on .mbtns .mbtn{transition-delay:.45s}
 .mbtn .ico{width:16px;height:16px}
 .mbtns{display:flex;gap:10px}
 .mbtns .mbtn{flex:1 1 auto;height:38px;font-size:13px;padding:0 12px;gap:6px}
 .mbtns .mbtn .ico{width:14px;height:14px}
 .tag{position:absolute;z-index:2;border-radius:999px;font-size:12px;line-height:16px}
-.tag-l{left:-12px;top:24.5%;background:#fff;color:var(--acc);font-weight:500;padding:4px 12px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);animation:floatA 5s ease-in-out infinite}
-.tag-r{right:-4px;bottom:-10px;background:var(--acc);color:#fff;font-weight:600;padding:5px 10px;box-shadow:var(--sh-lg);animation:floatA 6s ease-in-out -2s infinite}
-@keyframes floatA{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.tag-l{left:-12px;top:24.5%;background:#fff;color:var(--acc);font-weight:500;padding:4px 12px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);animation:floatA 8s ease-in-out infinite}
+.tag-r{right:-4px;bottom:-10px;background:var(--acc);color:#fff;font-weight:600;padding:5px 10px;box-shadow:var(--sh-lg);animation:floatA 9s ease-in-out -3s infinite}
+@keyframes floatA{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 
 .hero-text{display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:52px}
 .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.5);color:var(--acc);font-weight:500;font-size:14px;line-height:20px;box-shadow:var(--sh-sm)}
@@ -592,22 +591,32 @@ h1,h2,h3{color:var(--ink)}
     var rows=[].slice.call(document.querySelectorAll('#mockRows .mrow')),fold=document.getElementById('mockFold');
     function showAll(){rows.forEach(function(r){r.classList.add('on','done')});fold.classList.add('on')}
     if(still){showAll();return}
-    var STEP=750,timers=[];
+    var STEP=900,HOLD=9000,timers=[],running=false,visible=true;
     function at(ms,fn){timers.push(setTimeout(fn,ms))}
-    function cycle(){
-      timers.forEach(clearTimeout);timers=[];
+    function stop(){timers.forEach(clearTimeout);timers=[];running=false}
+    function play(){
+      stop();running=true;
       rows.forEach(function(r){r.classList.remove('on','done')});fold.classList.remove('on');
       rows.forEach(function(r,i){
-        at(500+i*STEP,function(){r.classList.add('on')});
-        if(i>0) at(500+i*STEP+420,function(){r.classList.add('done')});
+        at(400+i*STEP,function(){r.classList.add('on')});
+        if(i>0) at(400+i*STEP+500,function(){r.classList.add('done')});
       });
-      var full=500+rows.length*STEP+250;
+      var full=400+rows.length*STEP+300;
       at(full,function(){fold.classList.add('on')});
-      at(full+4500,function(){fold.classList.remove('on');rows.slice().reverse().forEach(function(r,i){setTimeout(function(){r.classList.remove('on','done')},i*90)})});
-      at(full+5700,cycle);
+      at(full+HOLD,fadeOut);
     }
-    cycle();
-    document.addEventListener('visibilitychange',function(){if(document.hidden){timers.forEach(clearTimeout);timers=[];showAll()}else{cycle()}});
+    function fadeOut(){            // everything fades together, then a calm pause before replay
+      fold.classList.remove('on');
+      rows.forEach(function(r){r.classList.remove('on','done')});
+      at(1400,function(){if(visible&&!document.hidden)play();else{running=false;showAll()}});
+    }
+    function resume(){if(!running&&visible&&!document.hidden){stop();running=true;at(HOLD/2,fadeOut)}}
+    play();
+    // pause when the window is off-screen or the tab is hidden (keeps the full state on screen)
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es){visible=es[0].isIntersecting;if(!visible){stop();showAll()}else resume()},{threshold:.25}).observe(fold.closest('.mock'));
+    }
+    document.addEventListener('visibilitychange',function(){if(document.hidden){stop();showAll()}else resume()});
   })();
 
   // ---------- count-up (final values are already in the markup) ----------
