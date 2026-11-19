@@ -3,7 +3,7 @@
 {% block header %}
 <header class="top">
   <div class="bar">
-    <button class="icon-btn only-sm" type="button" aria-label="Открыть меню" onclick="dxMenu(true)">{{ icon('menu') }}</button>
+    <button class="icon-btn only-sm burger-btn" type="button" aria-label="Открыть меню" onclick="dxMenu(true)">{{ icon('menu') }}</button>
     <a class="brand" href="/">{{ logo() }}<span class="hide-sm">{{ site_name }}</span></a>
     <nav class="nav">
       {% if user.guest %}
@@ -15,6 +15,7 @@
       <a class="btn sm primary" href="/register?next={{ here | urlencode }}">Регистрация</a>
       {% else %}
       <span class="hide-sm hide-app muted small" style="margin-right:6px">{{ 'Гость' if is_guest_account(user) else user.login }}</span>
+      {% block lang %}{% endblock %}
       <a class="icon-btn bell" id="dx-bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
       <span class="cur-switch" role="group" aria-label="Валюта">
         {% for c in cur_choices | reverse %}<a href="/currency/{{ c }}" class="{{ 'on' if cur_code == c }}">{{ c }}</a>{% endfor %}

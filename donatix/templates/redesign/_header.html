@@ -7,7 +7,7 @@
       <a href="/#why">Для кого</a>
       <a href="/#about">О платформе</a>
       <a href="/#services">Услуги</a>
-      <a href="/#pricing">Тарифы</a>
+      {% if show_plans %}<a href="/#pricing">Тарифы</a>{% endif %}
       <a href="/#faq">FAQ</a>
     </nav>
     <div class="h-right">
@@ -28,7 +28,7 @@
         <a class="m-link" href="/#why">Для кого</a>
         <a class="m-link" href="/#about">О платформе</a>
         <a class="m-link" href="/#services">Услуги</a>
-        <a class="m-link" href="/#pricing">Тарифы</a>
+        {% if show_plans %}<a class="m-link" href="/#pricing">Тарифы</a>{% endif %}
         <a class="m-link" href="/#faq">FAQ</a>
         {% if tg_channel %}<a class="m-link" href="{{ tg_channel }}" target="_blank" rel="noopener">Telegram-канал</a>{% endif %}
       </nav>

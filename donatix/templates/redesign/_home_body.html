@@ -32,7 +32,7 @@
         <h1>Продавайте цифровые продукты&nbsp;с&nbsp;<span class="brand-word">Donatix</span></h1>
         <p class="lead">10 000+ продуктов в одном API — подарочные карты, ключи игр, Steam, пополнения игр и подписки по 700+ играм и 1 000+ категориям. Постройте свой магазин или бота. Мгновенная доставка, оптовые цены.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="/register">Начать бесплатно — 5 дней Gold <svg class="ico"><use href="#i-arrow"/></svg></a>
+          <a class="btn btn-primary" href="/register">Стать партнёром — бесплатно <svg class="ico"><use href="#i-arrow"/></svg></a>
           <a class="btn btn-ghost" href="#catalog">Каталог</a>
         </div>
         <p class="note">Карта не нужна · полный доступ · 5 дней</p>
@@ -45,8 +45,8 @@
   <section class="sec" id="features">
     <div class="wrap">
       <div class="sec-head">
-        <h2>В каждом тарифе</h2>
-        <p>Полный доступ с первого дня. Без скрытых платежей и минимумов. Каждая подписка Donatix включает полный каталог, API, веб-панель и автоматическую доставку.</p>
+        <h2>Для каждого партнёра</h2>
+        <p>Полный доступ с первого дня. Без скрытых платежей и минимумов. Каждый партнёр Donatix получает полный каталог, API, веб-панель и автоматическую доставку.</p>
       </div>
       <div class="features">
         <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-box"/></svg></span><div><h3>10000+ продуктов</h3><p>10 000+ товаров в 1 000+ категориях и 700+ играх — подарочные карты, ключи игр, пополнения игр, Steam-кошелёк, гифты и подписки. Один каталог для всех цифровых товаров.</p></div></article>
@@ -58,7 +58,7 @@
         <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-globe"/></svg></span><div><h3>Глобальное покрытие</h3><p>Множество регионов и валют. Продавайте клиентам по всему миру с учётом локальной доступности товаров.</p></div></article>
         <article class="card feature"><span class="tile"><svg class="ico"><use href="#i-shield"/></svg></span><div><h3>Безопасно и надёжно</h3><p>99.9% uptime, шифрование, безопасная обработка платежей. Инфраструктура корпоративного уровня.</p></div></article>
       </div>
-      <p class="after-link"><a class="link" href="#pricing">Выбрать тариф <svg class="ico"><use href="#i-arrow"/></svg></a></p>
+      <p class="after-link"><a class="link" href="/register">Стать партнёром <svg class="ico"><use href="#i-arrow"/></svg></a></p>
     </div>
   </section>
 
@@ -206,7 +206,7 @@
     <div class="wrap">
       <div class="sec-head"><h2>Как это работает</h2><p>Начните за минуты с нашей платформой самообслуживания</p></div>
       <div class="steps">
-        <div class="step"><span class="step-ico"><svg class="ico"><use href="#i-userplus"/></svg><b>1</b></span><h3>Регистрация</h3><p>Создайте аккаунт и выберите тариф</p></div>
+        <div class="step"><span class="step-ico"><svg class="ico"><use href="#i-userplus"/></svg><b>1</b></span><h3>Регистрация</h3><p>Создайте аккаунт — это бесплатно</p></div>
         <div class="step"><span class="step-ico"><svg class="ico"><use href="#i-plug"/></svg><b>2</b></span><h3>Подключение</h3><p>Используйте панель или интегрируйтесь через API</p></div>
         <div class="step"><span class="step-ico"><svg class="ico"><use href="#i-grid"/></svg><b>3</b></span><h3>Каталог</h3><p>Доступ к 10000+ продуктам мгновенно</p></div>
         <div class="step"><span class="step-ico"><svg class="ico"><use href="#i-trend"/></svg><b>4</b></span><h3>Заработок</h3><p>Продавайте клиентам с вашей наценкой</p></div>
@@ -250,6 +250,8 @@
     </div>
   </section>
 
+  {#- Тарифы (подписки) временно скрыты по решению владельца; вернуть — show_plans=True в контексте главной -#}
+  {% if show_plans %}
   <!-- PRICING -->
   <section class="sec pricing" id="pricing">
     <div class="wrap">
@@ -285,6 +287,8 @@
       </div>
     </div>
   </section>
+
+  {% endif %}
 
   <!-- REVIEWS -->
   <section class="sec reviews" id="reviews">
@@ -331,13 +335,13 @@
         <div class="faq-item"><button class="faq-q" type="button" id="fq2" aria-expanded="false" aria-controls="fa2"><span>Нужны ли технические навыки для интеграции Donatix?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa2" role="region" aria-labelledby="fq2" hidden>Нет. Покупать товары и следить за заказами можно в веб-панели без кода. API нужен только для автоматизации.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq3" aria-expanded="false" aria-controls="fa3"><span>Можно ли использовать панель без интеграции API?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa3" role="region" aria-labelledby="fq3" hidden>Да. В веб-панели можно покупать товары, отслеживать заказы и управлять балансом без кода.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq4" aria-expanded="false" aria-controls="fa4"><span>Какие способы оплаты поддерживает Donatix?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa4" role="region" aria-labelledby="fq4" hidden>Binance Pay и USDT (TRC20, BEP20, TON, Aptos).</div></div>
-        <div class="faq-item"><button class="faq-q" type="button" id="fq5" aria-expanded="false" aria-controls="fa5"><span>Есть ли бесплатный пробный период?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa5" role="region" aria-labelledby="fq5" hidden>Да. Бесплатная 5-дневная подписка Gold: полный доступ, карта не нужна.</div></div>
+        {% if show_plans %}<div class="faq-item"><button class="faq-q" type="button" id="fq5" aria-expanded="false" aria-controls="fa5"><span>Есть ли бесплатный пробный период?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa5" role="region" aria-labelledby="fq5" hidden>Да. Бесплатная 5-дневная подписка Gold: полный доступ, карта не нужна.</div></div>{% endif %}
         <div class="faq-item"><button class="faq-q" type="button" id="fq6" aria-expanded="false" aria-controls="fa6"><span>Чем Donatix отличается от работы с несколькими поставщиками?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa6" role="region" aria-labelledby="fq6" hidden>Один каталог, один API и одна панель вместо десятков поставщиков. Остатки и доставка управляются автоматически.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq7" aria-expanded="false" aria-controls="fa7"><span>Какие регионы и валюты поддерживает Donatix?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa7" role="region" aria-labelledby="fq7" hidden>Ответ на этот вопрос пока не добавлен.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq8" aria-expanded="false" aria-controls="fa8"><span>Donatix только для B2B / реселлеров?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa8" role="region" aria-labelledby="fq8" hidden>Ответ на этот вопрос пока не добавлен.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq9" aria-expanded="false" aria-controls="fa9"><span>Можно ли интегрировать Donatix с Telegram-ботом?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa9" role="region" aria-labelledby="fq9" hidden>Ответ на этот вопрос пока не добавлен.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq10" aria-expanded="false" aria-controls="fa10"><span>Donatix поддерживает вебхуки для статуса заказов?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa10" role="region" aria-labelledby="fq10" hidden>Да. REST API отправляет webhooks о статусе заказа.</div></div>
-        <div class="faq-item"><button class="faq-q" type="button" id="fq11" aria-expanded="false" aria-controls="fa11"><span>Как оплатить подписку реселлера через Binance Pay или USDT?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa11" role="region" aria-labelledby="fq11" hidden>Ответ на этот вопрос пока не добавлен.</div></div>
+        {% if show_plans %}<div class="faq-item"><button class="faq-q" type="button" id="fq11" aria-expanded="false" aria-controls="fa11"><span>Как оплатить подписку реселлера через Binance Pay или USDT?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa11" role="region" aria-labelledby="fq11" hidden>Ответ на этот вопрос пока не добавлен.</div></div>{% endif %}
         <div class="faq-item"><button class="faq-q" type="button" id="fq12" aria-expanded="false" aria-controls="fa12"><span>Чем оптовый API подарочных карт отличается от розничных сайтов?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa12" role="region" aria-labelledby="fq12" hidden>Ответ на этот вопрос пока не добавлен.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq13" aria-expanded="false" aria-controls="fa13"><span>Можно ли продавать пополнения мобильных игр (PUBG Mobile, Free Fire) через Donatix?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa13" role="region" aria-labelledby="fq13" hidden>Да. PUBG Mobile, Free Fire, Genshin Impact, MLBB и другие пополнения доступны через одно API.</div></div>
         <div class="faq-item"><button class="faq-q" type="button" id="fq14" aria-expanded="false" aria-controls="fa14"><span>Какой базовый URL у API Donatix и как авторизоваться?</span><svg class="ico"><use href="#i-down"/></svg></button><div class="faq-a" id="fa14" role="region" aria-labelledby="fq14" hidden>Ответ на этот вопрос пока не добавлен.</div></div>

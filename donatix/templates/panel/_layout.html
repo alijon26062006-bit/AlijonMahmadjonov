@@ -1,5 +1,18 @@
 {% extends "_app.html" %}
 {% from "_icons.html" import icon, nav_link, media, kind_icon, tg_logo, ig_logo %}
+{% block head_extra %}
+<link rel="preload" href="/static/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/redesign/cabinet.css?v={{ asset_v }}">
+<script>
+  // Короткое сообщение внизу экрана («появится позже» и т.п.)
+  window.dxSoon = function (text) {
+    var t = document.getElementById("dx-toast");
+    if (!t) { t = document.createElement("div"); t.id = "dx-toast"; t.className = "dx-toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = text; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600);
+  };
+</script>
+{% endblock %}
+{% block lang %}<span class="a-lang" role="group" aria-label="Язык"><button type="button" aria-pressed="true">RU</button><button type="button" aria-pressed="false" onclick="dxSoon('Английская версия кабинета появится позже')">EN</button></span>{% endblock %}
 {% block side_top %}
 {% if user.guest %}
 <div class="balance-card guest-card">
@@ -30,7 +43,7 @@
 {% endfor %}
 {% endif %}
 <h4>Обзор</h4>
-{{ nav_link('/panel', 'Профиль', 'home', current) }}
+{{ nav_link('/panel', 'Главная', 'home', current) }}
 {{ nav_link('/panel/orders', 'Заказы', 'bag', current) }}
 {{ nav_link('/panel/transactions', 'Транзакции', 'swap', current) }}
 {{ nav_link('/panel/stats', 'Аналитика', 'chart', current) }}

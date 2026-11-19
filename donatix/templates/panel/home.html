@@ -1,13 +1,17 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon, media, place %}
-{% block title %}Профиль — {{ site_name }}{% endblock %}
+{% block title %}Обзор — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="profile-hero hide-app">
-  <h1>Профиль</h1>
-  <p>Баланс, заказы и API в одном месте.</p>
+<section class="a-hero">
+  <p class="a-eyebrow">Панель реселлера</p>
+  <h1>Обзор</h1>
+  <p class="a-sub">Ключевые показатели и недавняя активность.</p>
+  <div class="a-hero-btns">
+    <a class="a-pbtn" href="/panel/balance">Пополнить баланс</a>
+    <a class="a-gbtn" href="#account">Профиль</a>
+  </div>
 </section>
 {% include "panel/_verify_mail.html" %}
-<div class="app-hello only-app">Салом{% if not is_guest_account(user) %}, <b>{{ user.login }}</b>{% endif %} 👋</div>
 {% if is_guest_account(user) %}
 <div class="guest-id">
   <div><small>Ваш код покупателя</small><b class="mono">{{ guest_code or '—' }}</b></div>
@@ -17,20 +21,27 @@
 <a class="save-acc" href="/panel/save"><span style="font-size:1.5rem">🔐</span>
   <span class="grow"><b>Сохраните аккаунт через Google</b><span>Одна кнопка — и заказы будут доступны с любого телефона, даже если браузер очистится.</span></span>{{ icon('chevron', 18) }}</a>
 {% endif %}
+<section class="a-card a-prof">
+  <h2 class="a-name">{{ 'Гость' if is_guest_account(user) else user.login }}</h2>
+  {% if is_guest_account(user) %}<a class="a-mail" href="/panel/save">аккаунт не сохранён</a>{% else %}<span class="a-mail">{{ user.email }}</span>{% endif %}
+  <h3 class="a-cap">Краткая сводка</h3>
+  <div class="a-stats">
+    <div class="a-stat"><span>Всего потрачено</span><b>{{ money(summary.spent) }}</b><small>на выполненные заказы</small></div>
+    <a class="a-stat" href="/panel/orders"><span>Выполнено заказов</span><b>{{ summary.n }}</b><small>из {{ orders_all }} всего</small></a>
+    <a class="a-stat" href="/panel/balance"><span>Баланс</span><b data-live="balance">{{ money(user.balance_micro) }}</b><small>Доступно сейчас</small></a>
+  </div>
+  <div class="a-tier {{ '' if user.status == 'active' else 'wait' }}">
+    <div class="a-tier-top"><span>Уровень</span><b>{{ user.tier | capitalize }}</b></div>
+    <div class="a-tier-row">
+      <span class="a-active"><i>{{ icon('check' if user.status == 'active' else 'clock', 15) }}</i>{{ 'Активен' if user.status == 'active' else status_titles[user.status] }}</span>
+      <small>Наценка к цене поставщика: {{ markup }}%</small>
+    </div>
+  </div>
+</section>
 <div class="install-app install-card" role="region" aria-label="Приложение">
   <span style="font-size:1.6rem">📲</span>
   <span class="grow"><b>Приложение Donatix</b><small>Покупки в одно касание и уведомления о заказах</small></span>
   <button class="btn sm" type="button" data-install>Установить</button>
-</div>
-
-<div class="bal-hero">
-  <div class="bal-amount" data-live="balance">{{ money(user.balance_micro) }}</div>
-  <div class="bal-sub">Доступно</div>
-  <a class="btn primary block bal-btn" href="/panel/balance">Пополнить</a>
-  <div class="bal-tiles">
-    <div class="bal-tile"><div class="t-label">Потрачено</div><div class="t-value">{{ money(summary.spent) }}</div><div class="t-note">на выполненные заказы</div></div>
-    <a class="bal-tile" href="/panel/orders"><div class="t-label">Выполнено заказов</div><div class="t-value">{{ summary.n }}</div><div class="t-note">из {{ orders_all }} всего</div></a>
-  </div>
 </div>
 
 {% if rf %}
@@ -119,36 +130,20 @@
 </a>
 {% endif %}
 
-<div class="card quick">
-  <div class="who-row">
-    <span class="avatar">{{ user.login[:2] | upper }}</span>
-    <div class="who"><b>{{ 'Гость' if is_guest_account(user) else user.login }}</b><span class="muted">{{ 'аккаунт не сохранён' if is_guest_account(user) else user.email }}</span></div>
-  </div>
+<section class="a-card a-quick">
   {% if tg_bot and not tg_linked %}
-  <a class="btn block tg-btn" href="/auth/telegram?link=1" style="margin:12px 0 0">Привязать Telegram — вход одной кнопкой</a>
+  <a class="btn block tg-btn" href="/auth/telegram?link=1" style="margin:0 0 12px">Привязать Telegram — вход одной кнопкой</a>
   {% endif %}
-  <h3 class="quick-title">Быстрые действия</h3>
-  <p class="quick-sub">Заказы, движения и поддержка</p>
-  <a class="qrow" href="/panel/orders"><span><b>Заказы</b><small>История и статусы</small></span>{{ icon('chevron', 16) }}</a>
-  <a class="qrow" href="/panel/transactions"><span><b>Транзакции</b><small>Все движения баланса</small></span>{{ icon('chevron', 16) }}</a>
-  <a class="qrow" href="/panel/stats"><span><b>Аналитика</b><small>Расходы и заказы по дням</small></span>{{ icon('chevron', 16) }}</a>
-  <a class="qrow" href="/panel/support"><span><b>Поддержка</b><small>Открыть обращение — ответим здесь</small></span>{{ icon('chevron', 16) }}</a>
-  <a class="qrow" href="/panel/logins"><span><b>История входов</b><small>Данные и безопасность</small></span>{{ icon('chevron', 16) }}</a>
-</div>
+  <h2>Быстрые действия</h2>
+  <p class="a-osub">Заказы, движения и поддержка</p>
+  <a class="a-qi" href="/panel/orders"><span><b>Заказы</b><small>История заказов и статусы обработки</small></span><i>{{ icon('arrow-right', 15) }}</i></a>
+  <a class="a-qi" href="/panel/transactions"><span><b>Транзакции</b><small>Все движения баланса</small></span><i>{{ icon('arrow-right', 15) }}</i></a>
+  <a class="a-qi" href="/panel/stats"><span><b>Аналитика</b><small>Расходы и заказы по дням</small></span><i>{{ icon('arrow-right', 15) }}</i></a>
+  <a class="a-qi" href="/panel/support"><span><b>Поддержка</b><small>Открыть обращение — ответим здесь</small></span><i>{{ icon('arrow-right', 15) }}</i></a>
+  <a class="a-qi" href="/panel/logins"><span><b>История входов</b><small>Данные и безопасность</small></span><i>{{ icon('arrow-right', 15) }}</i></a>
+</section>
 
-<div class="tier-card {{ 'ok' if user.status == 'active' else 'wait' }}">
-  <div class="label-caps">Уровень</div>
-  <div class="tier-name">{{ user.tier | capitalize }}</div>
-  <div class="tier-row">
-    <span class="tier-status">
-      <span class="status {{ 'completed' if user.status == 'active' else 'processing' }}">{{ icon('check' if user.status == 'active' else 'clock', 14) }}</span>
-      <span><b>{{ 'Активен' if user.status == 'active' else status_titles[user.status] }}</b>
-        <span class="sub">Наценка к цене поставщика: {{ markup }}%</span></span>
-    </span>
-  </div>
-</div>
-
-<div class="label-caps section-label">Аккаунт</div>
+<div class="label-caps section-label" id="account">Аккаунт</div>
 <div class="list">
   <div class="kv"><span class="k">Email</span><span class="v">{% if is_guest_account(user) %}<a href="/panel/save">Указать</a>{% else %}{{ user.email }}{% endif %}</span></div>
   <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
