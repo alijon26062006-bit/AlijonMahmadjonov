@@ -621,6 +621,59 @@ body.in-app > .header,body.in-app > #footer{display:none}
 .a-os .chip{height:29px;display:inline-flex;align-items:center;padding:0 10px;border-radius:10px;background:#f1f5f9;border:1px solid var(--chipb);font-size:12px;font-weight:700;color:#475569;white-space:nowrap}
 .a-os{flex-wrap:wrap}
 
+
+/* ================= Part 7: cabinet → Steam top-up ================= */
+.st-card{padding:17px 17px 16px}
+.st-head{display:grid;grid-template-columns:39px 1fr auto;column-gap:15px;align-items:start;padding-bottom:14px;border-bottom:1px solid var(--s2)}
+.st-ic{width:39px;height:39px;border-radius:10px;background:linear-gradient(160deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;box-shadow:0 2px 6px rgba(15,23,42,.25)}
+.st-ic .ico{width:22px;height:22px}
+.st-ht{min-width:0}
+.st-ht h2{font-size:16px;line-height:24px;font-weight:800;color:var(--s9)}
+.st-ht p{margin-top:4px;font-size:13px;line-height:17px;color:var(--s5)}
+.st-rates-w{position:relative}
+.st-rates{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 11px 0 9px;border:1.5px dashed #d5dbe4;border-radius:12px;font-size:14px;font-weight:700;color:#475569;white-space:nowrap}
+.st-rates .ico{width:18px;height:18px}
+.st-rates:hover{border-color:#b8c1ce;color:var(--s9)}
+.st-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:236px;padding:12px 14px;background:#0f172a;color:#fff;border-radius:14px;font-size:14px;line-height:20px;box-shadow:0 20px 25px -5px rgba(15,23,42,.25)}
+.st-pop b{display:block;margin-bottom:6px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#cbd5e1}
+.st-pop div{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+.st-pop small{display:block;margin-top:8px;font-size:12px;line-height:16px;color:#94a3b8}
+.st-l{display:block;font-size:12px;line-height:18px;font-weight:700;color:#8a97ad}
+#stForm > .st-l:first-child{margin-top:20px}
+.st-gap{margin-top:16px}
+.st-inp-w{position:relative;margin-top:4px}
+.st-inp{display:block;width:100%;height:47px;margin-top:4px;padding:0 15px;border:1px solid var(--chipb);border-radius:16px;background:#eef1f6;font:inherit;font-size:16px;color:var(--s9);outline:none}
+.st-inp-w .st-inp{margin-top:0;padding-right:52px}
+.st-inp::placeholder{color:var(--s4)}
+.st-inp:focus{border-color:#a99bf7;background:#fff;box-shadow:0 0 0 3px rgba(126,91,255,.12)}
+.st-inp[aria-invalid="true"]{border-color:#dc2626}
+.st-tip-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:1px solid var(--chipb);border-radius:12px;background:#fff;display:grid;place-items:center;color:#475569}
+.st-tip-btn .ico{width:20px;height:20px}
+.st-tip-btn[aria-expanded="true"]{color:#6d4bff;box-shadow:0 2px 6px rgba(15,23,42,.08)}
+.st-tip{position:absolute;right:0;top:calc(100% + 10px);z-index:30;width:min(270px,100%);padding:10px 12px;border-radius:12px;background:#0f172a;color:#fff;font-size:12px;line-height:17px;font-weight:600;box-shadow:0 20px 25px -5px rgba(15,23,42,.25)}
+.st-tip::before{content:"";position:absolute;right:12px;top:-6px;width:12px;height:12px;background:#0f172a;transform:rotate(45deg);border-radius:2px}
+.st-help{margin-top:5px;font-size:12px;line-height:18px;color:var(--s5)}
+#stForm .err{margin-top:4px}
+.st-curs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px}
+.st-cur{display:flex;align-items:center;justify-content:center;gap:9px;height:43px;border:1px solid var(--s2);border-radius:16px;background:#fff;font-size:12px;font-weight:700;color:var(--s9);min-width:0}
+.st-cur svg{width:18px;height:12px;border-radius:2px;flex:none;box-shadow:0 0 0 .5px rgba(15,23,42,.15)}
+.st-cur[aria-checked="true"]{background:#efecfd;border-color:#c9c2f7}
+.st-cur:focus-visible{outline:2px solid #7e5bff;outline-offset:2px}
+.st-sum{padding:18px 19px 20px}
+.st-sum h2{font-size:18px;line-height:26px;font-weight:800;color:var(--s9)}
+.st-sum .a-osub{margin-top:4px}
+.st-rows{display:grid;gap:9px;margin-top:16px}
+.st-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:9px 16px;border:1px solid var(--s2);border-radius:14px;background:#f6f6f7}
+.st-row span{font-size:14px;line-height:20px;font-weight:600;color:var(--s5)}
+.st-row b{font-size:14px;line-height:20px;font-weight:800;color:var(--s9);text-align:right;font-variant-numeric:tabular-nums}
+.st-row b.pos{color:#22c55e}
+.st-total{margin-top:5px;min-height:52px;box-shadow:0 8px 20px -10px rgba(110,84,245,.25)}
+.st-total span{color:var(--s9);font-weight:800}
+.st-total b{font-size:16px}
+.st-go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;margin-top:24px;border-radius:16px;background:linear-gradient(90deg,#6e54f5,#7f66f5);color:#fff;font-size:16px;font-weight:800;box-shadow:0 12px 24px -10px rgba(110,84,245,.6)}
+.st-go:hover{filter:brightness(1.05)}
+@media (max-width:370px){.st-head{grid-template-columns:39px 1fr}.st-rates-w{grid-column:1 / -1;margin-top:12px}.st-pop{left:0;right:auto}.st-cur{gap:6px;font-size:14px}}
+
 </style>
 
 {{SPRITE}}
@@ -1177,7 +1230,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
       <a class="a-qi" href="#orders"><span><b>Заказы</b><small>История заказов и статусы обработки.</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнение игр и сервисов</b><small>Каталог и API</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
       <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Подарочные карты и коды</b><small>Коды и ваучеры</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
-      <a class="a-qi" href="#" data-soon="Каталог в кабинете сделаем на следующих шагах"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
+      <a class="a-qi" href="#steam"><span><b>Пополнить Steam</b><small>Пополнение по логину</small></span><i><svg class="ico"><use href="#i-arrow"/></svg></i></a>
     </section>
 
     <section class="a-card a-orders">
@@ -1221,6 +1274,51 @@ body.in-app > .header,body.in-app > #footer{display:none}
         <nav class="o-pager" id="tPager" aria-label="Страницы транзакций"></nav>
       </div>
       <div class="o-list" id="tList" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <main class="app-main" id="appSteamPage" hidden>
+    <section class="a-hero a-hero-sm">
+      <h1>Пополнить Steam</h1>
+      <p class="a-sub">Пополнение Steam по логину. Выберите валюту и сумму.</p>
+    </section>
+    <section class="a-card st-card">
+      <div class="st-head">
+        <span class="st-ic" aria-hidden="true"><svg class="ico"><use href="#i-pad"/></svg></span>
+        <div class="st-ht"><h2>Данные пополнения</h2><p>Логин аккаунта и сумма в выбранной валюте.</p></div>
+        <div class="st-rates-w">
+          <button class="st-rates" id="stRatesBtn" type="button" aria-expanded="false" aria-controls="stRates"><svg class="ico"><use href="#i-warn"/></svg>Курсы</button>
+          <div class="st-pop" id="stRates" role="dialog" aria-label="Курсы валют" hidden></div>
+        </div>
+      </div>
+      <form id="stForm" novalidate>
+        <label class="st-l" for="stLogin">Логин Steam</label>
+        <div class="st-inp-w">
+          <input class="st-inp" id="stLogin" name="login" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Логин Steam" aria-describedby="stLoginHelp stLogin-e">
+          <button class="st-tip-btn" id="stTipBtn" type="button" aria-label="Что такое логин Steam" aria-expanded="false" aria-controls="stTip"><svg class="ico"><use href="#i-warn"/></svg></button>
+          <div class="st-tip" id="stTip" role="tooltip" hidden>Это логин входа в Steam. Неверный логин — пополнение получит другой аккаунт.</div>
+        </div>
+        <p class="st-help" id="stLoginHelp">Введите логин аккаунта Steam для пополнения.</p>
+        <small class="err" id="stLogin-e" hidden></small>
+        <label class="st-l st-gap" for="stAmount">Сумма</label>
+        <input class="st-inp" id="stAmount" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="Введите сумму" aria-describedby="stLimits stAmount-e">
+        <p class="st-help" id="stLimits"></p>
+        <small class="err" id="stAmount-e" hidden></small>
+        <span class="st-l st-gap" id="stCurL">Валюта</span>
+        <div class="st-curs" role="radiogroup" aria-labelledby="stCurL" id="stCurs"></div>
+      </form>
+    </section>
+    <section class="a-card st-sum">
+      <h2>Сводка</h2>
+      <p class="a-osub">Цифры обновляются при вводе суммы.</p>
+      <div class="st-rows" aria-live="polite">
+        <div class="st-row"><span>Скидка</span><b class="pos" id="stDisc">2.5%</b></div>
+        <div class="st-row"><span>Получит на аккаунт</span><b id="stGet">—</b></div>
+        <div class="st-row"><span>Получит в USD</span><b id="stUsd">—</b></div>
+        <div class="st-row st-total"><span>К оплате</span><b id="stPay">—</b></div>
+      </div>
+      <button class="st-go" type="submit" form="stForm">Продолжить</button>
+      <p class="form-msg" id="stMsg" role="status" hidden></p>
     </section>
   </main>
 
@@ -1374,7 +1472,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
 
   // ---------- views: home / login / signup (hash routing) ----------
   (function(){
-    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage'};
+    var V={login:'v-login',signup:'v-signup',app:'v-app',orders:'v-app',tx:'v-app',steam:'v-app'},PAGES={app:'appMain',orders:'appOrdersPage',tx:'appTxPage',steam:'appSteamPage'};
     var home=document.getElementById('main'),current=null;
     function show(h){
       var v=V[h]?h:'home',changed=v!==current;
@@ -1478,7 +1576,7 @@ body.in-app > .header,body.in-app > #footer{display:none}
     var SOON='Этот раздел сделаем на следующих шагах';
     var MENU=[
       ['Обзор',[['house','Главная','#app'],['bag','Заказы','#orders'],['swap','Транзакции','#tx']]],
-      ['Каталог',[['wallet','Пополнить Steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
+      ['Каталог',[['wallet','Пополнить Steam','#steam'],['gift','Steam Гифты (игры)'],['send','Telegram звёзды'],['key','Ключи игр'],['clip','Ручные услуги'],['card','Подарочные карты'],['zap','Пополнение сервисов']]],
       ['Финансы',[['wallet','Баланс']]],
       ['Дополнительно',[['zap','Дополнительно']]],
       ['Аккаунт',[['chartl','Статистика'],['user','Профиль'],['gear','Настройки'],['head','Поддержка'],['logout','Выйти','#top']]]
@@ -1635,6 +1733,60 @@ body.in-app > .header,body.in-app > #footer{display:none}
     UI.makeSel(document.getElementById('tKi'),'tKiL',[['all','Все движения'],['credit','Начисление'],['debit','Списание']],function(v){f.ki=v;f.page=1;render(false)});
     UI.makeSel(document.getElementById('tSt'),'tStL',[['all','Все'],['done','Завершён'],['proc','В обработке'],['cancel','Отменено']],function(v){f.st=v;f.page=1;render(false)});
     render(false);
+  })();
+
+  // ---------- cabinet: Steam top-up (example rates, no real payment yet) ----------
+  (function(){
+    var RATES={USD:1,RUB:80.83,KZT:517.4,UAH:41.62},MIN_USD=0.153,MAX_USD=1020.2,DISC=0.025,BALANCE=58.41;
+    var FLAGS={
+      USD:'<svg viewBox="0 0 18 12" aria-hidden="true"><rect width="18" height="12" fill="#fff"/><g fill="#d22f3c"><rect width="18" height="1.2"/><rect y="2.4" width="18" height="1.2"/><rect y="4.8" width="18" height="1.2"/><rect y="7.2" width="18" height="1.2"/><rect y="9.6" width="18" height="1.2"/></g><rect width="8" height="6" fill="#2e3b8f"/><g fill="#fff"><circle cx="1.6" cy="1.4" r=".45"/><circle cx="4" cy="1.4" r=".45"/><circle cx="6.4" cy="1.4" r=".45"/><circle cx="2.8" cy="3" r=".45"/><circle cx="5.2" cy="3" r=".45"/><circle cx="1.6" cy="4.6" r=".45"/><circle cx="4" cy="4.6" r=".45"/><circle cx="6.4" cy="4.6" r=".45"/></g></svg>',
+      RUB:'<svg viewBox="0 0 18 12" aria-hidden="true"><rect width="18" height="4" fill="#fff"/><rect y="4" width="18" height="4" fill="#1c48c4"/><rect y="8" width="18" height="4" fill="#d52b1e"/></svg>',
+      KZT:'<svg viewBox="0 0 18 12" aria-hidden="true"><rect width="18" height="12" fill="#26b6d1"/><circle cx="9.5" cy="5.4" r="2.2" fill="#f7d417"/><path d="M6.6 8.6c1.6 1 4.2 1 5.8 0" stroke="#f7d417" stroke-width=".8" fill="none"/><rect x="1.4" y="1" width=".9" height="10" fill="#f7d417" opacity=".9"/></svg>',
+      UAH:'<svg viewBox="0 0 18 12" aria-hidden="true"><rect width="18" height="6" fill="#1e5bd7"/><rect y="6" width="18" height="6" fill="#ffd400"/></svg>'
+    };
+    var cur='RUB',curs=document.getElementById('stCurs');
+    curs.innerHTML=Object.keys(RATES).map(function(c){return '<button type="button" class="st-cur" role="radio" aria-checked="'+(c===cur)+'" tabindex="'+(c===cur?0:-1)+'" data-c="'+c+'">'+FLAGS[c]+c+'</button>'}).join('');
+    function fx(v,c){return v.toFixed(2)+' '+c}
+    function lim(){return [MIN_USD*RATES[cur],MAX_USD*RATES[cur]]}
+    function setCur(c,focus){
+      cur=c;[].forEach.call(curs.children,function(b){var on=b.dataset.c===c;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;if(on&&focus)b.focus()});
+      var l=lim();document.getElementById('stLimits').textContent='Минимум: '+fx(l[0],cur)+' • Максимум: '+fx(l[1],cur);calc();
+    }
+    curs.addEventListener('click',function(e){var b=e.target.closest('.st-cur');if(b)setCur(b.dataset.c,false)});
+    curs.addEventListener('keydown',function(e){
+      var k=Object.keys(RATES),i=k.indexOf(cur);
+      if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();setCur(k[(i+1)%k.length],true)}
+      if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();setCur(k[(i+k.length-1)%k.length],true)}
+    });
+    var amt=document.getElementById('stAmount'),login=document.getElementById('stLogin');
+    function val(){var v=parseFloat(amt.value.replace(/\s/g,'').replace(',','.'));return isFinite(v)?v:NaN}
+    function calc(){
+      var v=val(),g=document.getElementById('stGet'),u=document.getElementById('stUsd'),p=document.getElementById('stPay');
+      if(!(v>0)){g.textContent=u.textContent=p.textContent='—';return}
+      var usd=v/RATES[cur];g.textContent=fx(v,cur);u.textContent='$'+usd.toFixed(4);p.textContent='$'+(usd*(1-DISC)).toFixed(4);
+    }
+    amt.addEventListener('input',function(){amt.value=amt.value.replace(/[^\d.,]/g,'');calc();if(amt.getAttribute('aria-invalid'))chkAmt()});
+    login.addEventListener('input',function(){if(login.getAttribute('aria-invalid'))chkLogin()});
+    function err(inp,id,msg){var e=document.getElementById(id);if(msg){inp.setAttribute('aria-invalid','true');e.textContent=msg;e.hidden=false}else{inp.removeAttribute('aria-invalid');e.hidden=true}return !msg}
+    function chkLogin(){var s=login.value.trim();return err(login,'stLogin-e',!s?'Введите логин Steam':!/^[A-Za-z0-9_]{3,64}$/.test(s)?'Логин Steam: латинские буквы, цифры и подчёркивание, от 3 символов':'')}
+    function chkAmt(){var v=val(),l=lim();return err(amt,'stAmount-e',!(v>0)?'Введите сумму':v<l[0]-1e-9?'Меньше минимума: '+fx(l[0],cur):v>l[1]+1e-9?'Больше максимума: '+fx(l[1],cur):'')}
+    document.getElementById('stForm').addEventListener('submit',function(e){
+      e.preventDefault();var m=document.getElementById('stMsg');
+      var ok=chkLogin();ok=chkAmt()&&ok;
+      if(!ok){m.hidden=true;var x=document.querySelector('#stForm [aria-invalid="true"]');if(x)x.focus();return}
+      var pay=val()/RATES[cur]*(1-DISC);
+      m.textContent=pay>BALANCE?'Не хватает средств: к оплате $'+pay.toFixed(4)+', на балансе $'+BALANCE.toFixed(4)+'. Пополните баланс.':'Это демо: заказ не создаётся. На сервере здесь спишется $'+pay.toFixed(4)+' с баланса.';
+      m.hidden=false;
+    });
+    // tooltip and rates popover
+    function toggle(btn,box,open){box.hidden=!open;btn.setAttribute('aria-expanded',String(open))}
+    var tb=document.getElementById('stTipBtn'),tip=document.getElementById('stTip'),rb=document.getElementById('stRatesBtn'),rp=document.getElementById('stRates');
+    rp.innerHTML='<b>Курс к 1 USD</b>'+Object.keys(RATES).filter(function(c){return c!=='USD'}).map(function(c){return '<div><span>'+c+'</span><span>'+RATES[c].toFixed(2)+'</span></div>'}).join('')+'<small>Примерные курсы для демо. Настоящие подставит сервер.</small>';
+    tb.addEventListener('click',function(e){e.stopPropagation();toggle(tb,tip,tip.hidden);toggle(rb,rp,false)});
+    rb.addEventListener('click',function(e){e.stopPropagation();toggle(rb,rp,rp.hidden);toggle(tb,tip,false)});
+    document.addEventListener('click',function(e){if(!e.target.closest('.st-tip,.st-pop')){toggle(tb,tip,false);toggle(rb,rp,false)}});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'){toggle(tb,tip,false);toggle(rb,rp,false)}});
+    setCur('RUB',false);
   })();
 
   document.getElementById('year').textContent=new Date().getFullYear();
