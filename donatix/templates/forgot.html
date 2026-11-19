@@ -1,33 +1,32 @@
-{% extends "redesign/base.html" %}
-{% import "redesign/_auth.html" as A %}
+{% extends "base.html" %}
+{% from "_icons.html" import icon, tg_logo, google_logo %}
 {% block title %}Восстановление пароля — {{ site_name }}{% endblock %}
 {% block body %}
-<main id="main" class="auth">
-  <div class="auth-card">
-    {{ A.head('Забыли пароль?', 'Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.' if (mail or ways.google or ways.telegram) else '', 'lock', '/login', 'Назад') }}
-    <div class="auth-body">
-      {{ A.msgs(flashes, '') }}
-      {% if mail %}
-      <form method="post" action="/forgot/email" class="fg-mail">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <label class="field first"><span>Почта аккаунта</span>
-          <input class="inp" id="fg-email" name="email" type="email" inputmode="email" required autocomplete="email" placeholder="you@gmail.com">
-        </label>
-        <button class="auth-btn" type="submit">Получить код на почту</button>
-      </form>
-      {% if ways.google or ways.telegram %}<div class="or-line"><span>или</span></div>{% endif %}
-      {% endif %}
-      {% if ways.google %}
-      <a class="soc-btn google" href="/auth/google?reset=1">{{ A.google_svg() }}Восстановить через Google</a>
-      <p class="hint">Выберите Google-почту, на которую зарегистрирован аккаунт (или которую вы привязали).</p>
-      {% endif %}
-      {% if ways.telegram %}
-      <a class="soc-btn tg" href="/auth/telegram?reset=1">{{ A.tg_svg() }}Восстановить через Telegram</a>
-      <p class="hint">Если к аккаунту привязан Telegram — подтвердите в боте одной кнопкой.</p>
-      {% endif %}
-      {% if not ways.google and not ways.telegram and not mail %}<p class="auth-sub">Сбросить пароль самостоятельно сейчас нельзя — <a class="link" href="/panel/support">напишите в поддержку</a>{% if support_contact %} или {{ support_contact }}{% endif %}, поможем вернуть доступ. Баланс и заказы останутся.</p>{% endif %}
-      {% if support_contact and (ways.google or ways.telegram or mail) %}<p class="auth-alt">Не получается? Напишите {{ support_contact }}</p>{% endif %}
-    </div>
+<main class="auth">
+  <div class="card tg-auth">
+    <a class="back hide-in-app" href="/login">{{ icon('arrow-left', 18) }}Назад</a>
+    <h2>Забыли пароль?</h2>
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
+    {% if mail or ways.google or ways.telegram %}<p class="muted">Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.</p>{% endif %}
+    {% if mail %}
+    <form method="post" action="/forgot/email" class="fg-mail">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="fg-email">Почта аккаунта</label>
+      <input id="fg-email" name="email" type="email" required autocomplete="email" placeholder="you@gmail.com">
+      <button class="btn primary lg block">{{ icon('mail', 18) }}Получить код на почту</button>
+    </form>
+    {% if ways.google or ways.telegram %}<p class="hint center">или</p>{% endif %}
+    {% endif %}
+    {% if ways.google %}
+    <a class="btn lg block google-btn" href="/auth/google?reset=1">{{ google_logo(20) }}Восстановить через Google</a>
+    <p class="hint">Выберите Google-почту, на которую зарегистрирован аккаунт (или которую вы привязали).</p>
+    {% endif %}
+    {% if ways.telegram %}
+    <a class="btn lg block tg-btn" href="/auth/telegram?reset=1">{{ tg_logo(22) }}Восстановить через Telegram</a>
+    <p class="hint">Если к аккаунту привязан Telegram — подтвердите в боте одной кнопкой.</p>
+    {% endif %}
+    {% if not ways.google and not ways.telegram and not mail %}<p class="muted">Сбросить пароль самостоятельно сейчас нельзя — <a href="/panel/support">напишите в поддержку</a>{% if support_contact %} или {{ support_contact }}{% endif %}, поможем вернуть доступ. Баланс и заказы останутся.</p>{% endif %}
+    {% if support_contact and (ways.google or ways.telegram or mail) %}<p class="hint center">Не получается? Напишите {{ support_contact }}</p>{% endif %}
   </div>
 </main>
 {% endblock %}
