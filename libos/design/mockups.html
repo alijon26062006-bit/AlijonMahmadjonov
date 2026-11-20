@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Libos — бонусная программа</title>
+<style>
+@font-face { font-family: 'Unbounded'; src: url(fonts/Unbounded-600.ttf); font-weight: 600; }
+@font-face { font-family: 'Unbounded'; src: url(fonts/Unbounded-700.ttf); font-weight: 700; }
+@font-face { font-family: 'Manrope'; src: url(fonts/Manrope-500.ttf); font-weight: 500; }
+@font-face { font-family: 'Manrope'; src: url(fonts/Manrope-700.ttf); font-weight: 700; }
+@font-face { font-family: 'Manrope'; src: url(fonts/Manrope-800.ttf); font-weight: 800; }
+
+:root {
+  --ink: #0B0B0B;
+  --paper: #FFFFFF;
+  --mist: #F3F3F2;
+  --line: #E4E4E2;
+  --grey: #8C8C88;
+  --soft: #5C5C58;
+  --display: 'Unbounded', sans-serif;
+  --text: 'Manrope', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--text); background: #DCDCD8; color: var(--ink); -webkit-font-smoothing: antialiased; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.board { width: 1420px; padding: 54px 60px 60px; background: #DCDCD8; }
+.board-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
+.board-head h1 { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: -0.5px; text-transform: uppercase; }
+.board-head p { font-size: 17px; color: var(--soft); margin-top: 8px; max-width: 760px; line-height: 1.4; }
+.board-head .tag { font-family: var(--display); font-size: 13px; letter-spacing: 2px; border: 1.5px solid var(--ink); padding: 8px 14px; border-radius: 99px; }
+.phones { display: flex; gap: 44px; justify-content: center; }
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.label { font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--soft); }
+.phone { width: 390px; height: 844px; border-radius: 50px; overflow: hidden; position: relative; background: var(--paper);
+  box-shadow: 0 0 0 10px #0B0B0B, 0 0 0 11px #3A3A38, 0 40px 80px -24px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+.status { position: absolute; top: 0; left: 0; right: 0; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px 0 34px; font-weight: 700; font-size: 15px; z-index: 5; }
+.status .r { display: flex; gap: 6px; align-items: center; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; padding: 1.5px; }
+.bat i { display: block; height: 100%; width: 72%; background: currentColor; border-radius: 1px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; background: #000; border-radius: 20px; z-index: 6; }
+.home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); z-index: 7; }
+.scroll { flex: 1; overflow: hidden; padding: 58px 20px 0; position: relative; }
+.dark .status { color: #fff; } .dark .home-ind { background: #fff; }
+
+/* top bar */
+.top { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+.word { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 3px; }
+.ibtn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; position: relative; }
+.ibtn .dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; background: var(--ink); border-radius: 50%; }
+.hello { margin-top: 18px; font-size: 15px; color: var(--soft); }
+.hello b { display: block; font-family: var(--display); font-weight: 600; font-size: 24px; color: var(--ink); margin-top: 2px; letter-spacing: -0.3px; }
+
+/* loyalty card */
+.card { margin-top: 18px; background: var(--ink); color: #fff; border-radius: 26px; padding: 20px 20px 18px; position: relative; overflow: hidden; }
+.card::after { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border: 1.5px solid rgba(255,255,255,.12); border-radius: 50%; }
+.card::before { content: ''; position: absolute; right: -10px; top: -10px; width: 120px; height: 120px; border: 1.5px solid rgba(255,255,255,.12); border-radius: 50%; }
+.card .row { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; }
+.card small { font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 700; }
+.lvl { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 1.5px solid rgba(255,255,255,.5); padding: 5px 10px; border-radius: 99px; }
+.bal { font-family: var(--display); font-weight: 700; font-size: 50px; letter-spacing: -1px; margin-top: 12px; line-height: 1; position: relative; z-index: 1; }
+.bal span { font-size: 16px; letter-spacing: 0; font-weight: 600; color: rgba(255,255,255,.7); margin-left: 6px; }
+.card .sub { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 8px; position: relative; z-index: 1; }
+.card .foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.14); }
+.num { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: 3px; }
+.qrbtn { display: flex; align-items: center; gap: 8px; background: #fff; color: var(--ink); font-weight: 800; font-size: 14px; padding: 10px 14px; border-radius: 99px; }
+.qrbtn svg.i { width: 18px; height: 18px; }
+
+/* progress */
+.box { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 22px; padding: 16px; }
+.box h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; }
+.box h5 span { color: var(--grey); font-weight: 700; }
+.bar { height: 8px; background: var(--mist); border-radius: 4px; margin: 12px 0 8px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ink); border-radius: 4px; }
+.steps { display: flex; justify-content: space-between; font-size: 12px; color: var(--grey); font-weight: 700; }
+.steps .on { color: var(--ink); }
+
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 0 6px; }
+.sec h4 { font-family: var(--display); font-weight: 600; font-size: 16px; text-transform: uppercase; letter-spacing: .5px; }
+.sec a { font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+
+/* operations */
+.op { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.op:last-child { border-bottom: none; }
+.op .ic { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--mist); flex: none; }
+.op .ic.neg { background: #fff; border: 1.5px solid var(--ink); }
+.op .t { flex: 1; min-width: 0; }
+.op .t b { font-size: 14.5px; font-weight: 800; display: block; }
+.op .t span { font-size: 12.5px; color: var(--grey); font-weight: 500; }
+.op .a { font-family: var(--display); font-weight: 600; font-size: 16px; white-space: nowrap; }
+.op .a.neg { color: var(--soft); }
+
+/* promo */
+.promo { margin-top: 14px; border-radius: 22px; background: var(--mist); padding: 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.promo b { font-family: var(--display); font-weight: 700; font-size: 40px; letter-spacing: -1px; }
+.promo p { font-size: 13.5px; font-weight: 700; line-height: 1.35; }
+.promo p span { display: block; color: var(--grey); font-weight: 500; margin-top: 2px; }
+
+/* nav */
+.nav { height: 84px; flex: none; display: flex; justify-content: space-around; padding: 10px 6px 0; border-top: 1px solid var(--line); background: #fff; position: relative; z-index: 4; }
+.nav .it { width: 70px; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--grey); }
+.nav .it.on { color: var(--ink); }
+.dark .nav { background: var(--ink); border-top-color: rgba(255,255,255,.1); }
+.dark .nav .it { color: rgba(255,255,255,.45); } .dark .nav .it.on { color: #fff; } .dark .nav .it.on::before { background: #fff; }
+.nav .it.on::before { content: ''; position: absolute; top: 0; width: 34px; height: 2.5px; background: var(--ink); border-radius: 2px; margin-top: -10px; }
+.nav .it { position: relative; }
+
+/* QR screen */
+.qrwrap { text-align: center; margin-top: 30px; }
+.qrwrap h2 { font-family: var(--display); font-weight: 700; font-size: 24px; text-transform: uppercase; }
+.qrwrap p { color: var(--soft); font-size: 15px; margin-top: 8px; }
+.qrframe { margin: 26px auto 0; width: 270px; height: 270px; border-radius: 28px; border: 1.5px solid var(--line); display: grid; place-items: center; position: relative; }
+.qrframe svg { width: 210px; height: 210px; shape-rendering: crispEdges; }
+.qrframe .logo { position: absolute; width: 56px; height: 56px; background: #fff; border-radius: 14px; display: grid; place-items: center; }
+.qrframe .logo b { width: 44px; height: 44px; background: var(--ink); color: #fff; border-radius: 11px; display: grid; place-items: center; font-family: var(--display); font-size: 18px; }
+.code { font-family: var(--display); font-weight: 600; font-size: 22px; letter-spacing: 5px; margin-top: 22px; }
+.mini { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
+.mini div { border: 1.5px solid var(--line); border-radius: 18px; padding: 12px 16px; text-align: left; min-width: 150px; }
+.mini small { display: block; font-size: 12px; color: var(--grey); font-weight: 700; }
+.mini b { font-family: var(--display); font-weight: 600; font-size: 18px; }
+.hint { margin: 22px auto 0; display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 13px; color: var(--grey); font-weight: 700; }
+.close { position: absolute; top: 58px; right: 20px; }
+
+/* history */
+.h1 { font-family: var(--display); font-weight: 700; font-size: 28px; text-transform: uppercase; letter-spacing: -0.3px; margin-top: 6px; }
+.tabs { display: flex; gap: 8px; margin-top: 16px; }
+.tabs span { padding: 9px 16px; border-radius: 99px; border: 1.5px solid var(--line); font-weight: 800; font-size: 13.5px; }
+.tabs span.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.totals div { background: var(--mist); border-radius: 18px; padding: 14px; }
+.totals small { font-size: 12px; color: var(--grey); font-weight: 700; display: block; }
+.totals b { font-family: var(--display); font-weight: 600; font-size: 20px; }
+.day { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 18px 0 2px; }
+.warn { margin-top: 14px; border: 1.5px dashed var(--ink); border-radius: 18px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; font-size: 13.5px; font-weight: 700; }
+
+/* cashier */
+.dark .phone, .phone.dark { background: var(--ink); color: #fff; }
+.ctop { display: flex; justify-content: space-between; align-items: center; height: 44px; }
+.ctop .w { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 2px; }
+.ctop .store { font-size: 13px; font-weight: 700; border: 1.5px solid rgba(255,255,255,.3); padding: 7px 12px; border-radius: 99px; display: flex; gap: 6px; align-items: center; }
+.ctop .store svg.i { width: 16px; height: 16px; }
+.cam { margin-top: 18px; height: 360px; border-radius: 28px; background: radial-gradient(120% 90% at 50% 40%, #2a2a28, #121211); position: relative; display: grid; place-items: center; overflow: hidden; }
+.cam .frame { width: 220px; height: 220px; position: relative; }
+.cam .frame i { position: absolute; width: 44px; height: 44px; border: 4px solid #fff; }
+.cam .frame i:nth-child(1) { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 16px 0 0 0; }
+.cam .frame i:nth-child(2) { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 16px 0 0; }
+.cam .frame i:nth-child(3) { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 16px; }
+.cam .frame i:nth-child(4) { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 16px 0; }
+.cam .scanline { position: absolute; left: 18px; right: 18px; top: 46%; height: 2px; background: #fff; box-shadow: 0 0 16px 2px rgba(255,255,255,.6); }
+.cam .ghost { position: absolute; inset: 70px; opacity: .09; }
+.cam .ghost { color: #fff; }
+.cam .ghost svg { width: 100%; height: 100%; shape-rendering: crispEdges; }
+.cam p { position: absolute; bottom: 18px; font-size: 14px; font-weight: 700; color: rgba(255,255,255,.75); }
+.or { text-align: center; color: rgba(255,255,255,.45); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800; margin: 16px 0 12px; }
+.field { border: 1.5px solid rgba(255,255,255,.22); border-radius: 18px; height: 58px; display: flex; align-items: center; padding: 0 16px; gap: 10px; font-size: 18px; font-weight: 700; }
+.field .pre { color: rgba(255,255,255,.55); }
+.field .ph { color: rgba(255,255,255,.35); }
+.field .go { margin-left: auto; width: 42px; height: 42px; border-radius: 13px; background: #fff; color: var(--ink); display: grid; place-items: center; }
+.recent { margin-top: 18px; }
+.recent small { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: rgba(255,255,255,.45); }
+.rc { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.av { width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--ink); display: grid; place-items: center; font-family: var(--display); font-weight: 600; font-size: 15px; flex: none; }
+.rc .t { flex: 1; } .rc b { font-size: 14.5px; display: block; } .rc span { font-size: 12.5px; color: rgba(255,255,255,.5); }
+.rc .a { font-family: var(--display); font-size: 14px; }
+
+.client { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 22px; padding: 14px; display: flex; gap: 12px; align-items: center; }
+.client .av { background: var(--ink); color: #fff; width: 48px; height: 48px; font-size: 18px; }
+.client .t { flex: 1; } .client b { font-size: 16px; font-weight: 800; display: block; } .client span { font-size: 13px; color: var(--grey); font-weight: 600; }
+.client .bl { text-align: right; } .client .bl b { font-family: var(--display); font-weight: 600; font-size: 18px; } .client .bl span { font-size: 12px; }
+.amount { margin-top: 16px; }
+.amount small { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.amount .v { font-family: var(--display); font-weight: 700; font-size: 46px; letter-spacing: -1.5px; margin-top: 6px; display: flex; align-items: baseline; gap: 8px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+.amount .v span { font-size: 18px; letter-spacing: 0; color: var(--grey); }
+.amount .v i { width: 3px; height: 40px; background: var(--ink); align-self: center; animation: none; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--mist); border-radius: 16px; padding: 4px; margin-top: 16px; }
+.seg span { text-align: center; padding: 11px 0; font-weight: 800; font-size: 14px; border-radius: 12px; color: var(--soft); }
+.seg span.on { background: #fff; color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.spend { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 20px; padding: 14px; }
+.spend .r { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 700; }
+.spend .r b { font-family: var(--display); font-size: 18px; }
+.slider { height: 6px; background: var(--mist); border-radius: 3px; margin: 14px 0 10px; position: relative; }
+.slider i { position: absolute; left: 0; top: 0; bottom: 0; width: 43%; background: var(--ink); border-radius: 3px; }
+.slider b { position: absolute; left: 43%; top: 50%; width: 24px; height: 24px; background: #fff; border: 2.5px solid var(--ink); border-radius: 50%; transform: translate(-50%, -50%); }
+.spend .lim { display: flex; justify-content: space-between; font-size: 12px; color: var(--grey); font-weight: 700; }
+.sum { margin-top: 14px; font-size: 14.5px; }
+.sum .r { display: flex; justify-content: space-between; padding: 5px 0; font-weight: 600; color: var(--soft); }
+.sum .r b { color: var(--ink); font-weight: 800; }
+.sum .tot { border-top: 1.5px solid var(--ink); margin-top: 6px; padding-top: 10px; color: var(--ink); font-size: 18px; font-weight: 800; }
+.sum .tot b { font-family: var(--display); font-size: 22px; }
+.earn { margin-top: 10px; background: var(--mist); border-radius: 16px; padding: 12px 14px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; }
+.earn b { font-family: var(--display); }
+.bb { flex: none; padding: 12px 20px 30px; background: #fff; border-top: 1px solid var(--line); position: relative; z-index: 4; }
+.cta { height: 58px; border-radius: 18px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; font-size: 16.5px; }
+.cta.inv { background: #fff; color: var(--ink); }
+.cta.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
+.back { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 15px; }
+
+.done { text-align: center; margin-top: 46px; }
+.done .ok { width: 96px; height: 96px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; margin: 0 auto; }
+.done .ok svg.i { width: 46px; height: 46px; stroke-width: 2.4; }
+.done h2 { font-family: var(--display); font-weight: 700; font-size: 24px; text-transform: uppercase; margin-top: 22px; }
+.done p { color: var(--soft); margin-top: 6px; font-size: 15px; }
+.receipt { margin: 24px 0 0; border: 1.5px solid var(--line); border-radius: 22px; padding: 18px; text-align: left; position: relative; }
+.receipt .r { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14.5px; font-weight: 600; color: var(--soft); }
+.receipt .r b { color: var(--ink); font-weight: 800; }
+.receipt hr { border: none; border-top: 1.5px dashed var(--line); margin: 8px 0; }
+.receipt .big { color: var(--ink); font-weight: 800; font-size: 16px; }
+.receipt .big b { font-family: var(--display); font-size: 22px; }
+.newbal { margin-top: 12px; background: var(--ink); color: #fff; border-radius: 20px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; }
+.newbal small { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: rgba(255,255,255,.6); }
+.newbal b { font-family: var(--display); font-size: 26px; }
+
+/* admin */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.stats div { border: 1.5px solid var(--line); border-radius: 20px; padding: 14px; }
+.stats div.k { background: var(--ink); color: #fff; border-color: var(--ink); }
+.stats small { font-size: 12px; font-weight: 700; color: var(--grey); display: block; }
+.stats .k small { color: rgba(255,255,255,.6); }
+.stats b { font-family: var(--display); font-weight: 600; font-size: 22px; display: block; margin-top: 6px; letter-spacing: -0.5px; }
+.stats em { font-style: normal; font-size: 12px; font-weight: 800; }
+.chart { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 22px; padding: 16px; }
+.chart h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; }
+.chart h5 span { color: var(--grey); font-weight: 700; }
+.bars { display: flex; align-items: flex-end; gap: 10px; height: 130px; margin-top: 14px; }
+.bars > div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; height: 100%; }
+.bars .p { background: var(--ink); border-radius: 6px 6px 2px 2px; flex: none; }
+.bars .m { background: #BDBDB8; border-radius: 2px 2px 6px 6px; flex: none; }
+.days { display: flex; gap: 10px; margin-top: 8px; } .days span { flex: 1; text-align: center; font-size: 11.5px; font-weight: 800; color: var(--grey); }
+.legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12.5px; font-weight: 700; color: var(--soft); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+.rule { border: 1.5px solid var(--line); border-radius: 20px; padding: 6px 16px; margin-top: 12px; }
+.rule .r { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.rule .r:last-child { border-bottom: none; }
+.rule .r .t { flex: 1; min-width: 0; padding-right: 12px; }
+.rule .r .t b { font-size: 14.5px; font-weight: 800; display: block; } .rule .r .t span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.stepper { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 12px; height: 38px; }
+.stepper i { width: 32px; text-align: center; font-style: normal; font-size: 18px; color: var(--soft); }
+.stepper b { min-width: 52px; text-align: center; font-family: var(--display); font-size: 14px; font-weight: 600; }
+.lvls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.lvls div { border: 1.5px solid var(--line); border-radius: 18px; padding: 12px; }
+.lvls div:nth-child(3) { background: var(--ink); color: #fff; border-color: var(--ink); }
+.lvls small { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.lvls div:nth-child(3) small { color: rgba(255,255,255,.6); }
+.lvls b { display: block; font-family: var(--display); font-weight: 700; font-size: 26px; margin-top: 6px; }
+.lvls span { font-size: 12px; font-weight: 700; color: var(--grey); }
+.lvls div:nth-child(3) span { color: rgba(255,255,255,.6); }
+.toggle { width: 46px; height: 28px; border-radius: 14px; background: var(--ink); position: relative; }
+.toggle::after { content: ''; position: absolute; right: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; }
+.toggle.off { background: var(--line); } .toggle.off::after { right: auto; left: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const QR = `<svg version="1.1" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M0,0H1V1H0zM1,0H2V1H1zM2,0H3V1H2zM3,0H4V1H3zM4,0H5V1H4zM5,0H6V1H5zM6,0H7V1H6zM10,0H11V1H10zM11,0H12V1H11zM14,0H15V1H14zM15,0H16V1H15zM16,0H17V1H16zM17,0H18V1H17zM18,0H19V1H18zM19,0H20V1H19zM20,0H21V1H20zM0,1H1V2H0zM6,1H7V2H6zM10,1H11V2H10zM11,1H12V2H11zM14,1H15V2H14zM20,1H21V2H20zM0,2H1V3H0zM2,2H3V3H2zM3,2H4V3H3zM4,2H5V3H4zM6,2H7V3H6zM8,2H9V3H8zM9,2H10V3H9zM11,2H12V3H11zM12,2H13V3H12zM14,2H15V3H14zM16,2H17V3H16zM17,2H18V3H17zM18,2H19V3H18zM20,2H21V3H20zM0,3H1V4H0zM2,3H3V4H2zM3,3H4V4H3zM4,3H5V4H4zM6,3H7V4H6zM8,3H9V4H8zM9,3H10V4H9zM10,3H11V4H10zM14,3H15V4H14zM16,3H17V4H16zM17,3H18V4H17zM18,3H19V4H18zM20,3H21V4H20zM0,4H1V5H0zM2,4H3V5H2zM3,4H4V5H3zM4,4H5V5H4zM6,4H7V5H6zM8,4H9V5H8zM9,4H10V5H9zM12,4H13V5H12zM14,4H15V5H14zM16,4H17V5H16zM17,4H18V5H17zM18,4H19V5H18zM20,4H21V5H20zM0,5H1V6H0zM6,5H7V6H6zM8,5H9V6H8zM9,5H10V6H9zM10,5H11V6H10zM12,5H13V6H12zM14,5H15V6H14zM20,5H21V6H20zM0,6H1V7H0zM1,6H2V7H1zM2,6H3V7H2zM3,6H4V7H3zM4,6H5V7H4zM5,6H6V7H5zM6,6H7V7H6zM8,6H9V7H8zM10,6H11V7H10zM12,6H13V7H12zM14,6H15V7H14zM15,6H16V7H15zM16,6H17V7H16zM17,6H18V7H17zM18,6H19V7H18zM19,6H20V7H19zM20,6H21V7H20zM8,7H9V8H8zM9,7H10V8H9zM12,7H13V8H12zM0,8H1V9H0zM2,8H3V9H2zM3,8H4V9H3zM4,8H5V9H4zM5,8H6V9H5zM6,8H7V9H6zM9,8H10V9H9zM10,8H11V9H10zM11,8H12V9H11zM14,8H15V9H14zM15,8H16V9H15zM16,8H17V9H16zM17,8H18V9H17zM18,8H19V9H18zM0,9H1V10H0zM1,9H2V10H1zM2,9H3V10H2zM4,9H5V10H4zM5,9H6V10H5zM8,9H9V10H8zM9,9H10V10H9zM11,9H12V10H11zM12,9H13V10H12zM13,9H14V10H13zM15,9H16V10H15zM16,9H17V10H16zM17,9H18V10H17zM18,9H19V10H18zM19,9H20V10H19zM20,9H21V10H20zM3,10H4V11H3zM4,10H5V11H4zM5,10H6V11H5zM6,10H7V11H6zM8,10H9V11H8zM12,10H13V11H12zM13,10H14V11H13zM14,10H15V11H14zM16,10H17V11H16zM18,10H19V11H18zM0,11H1V12H0zM1,11H2V12H1zM4,11H5V12H4zM5,11H6V12H5zM8,11H9V12H8zM9,11H10V12H9zM11,11H12V12H11zM12,11H13V12H12zM15,11H16V12H15zM18,11H19V12H18zM0,12H1V13H0zM3,12H4V13H3zM4,12H5V13H4zM6,12H7V13H6zM7,12H8V13H7zM8,12H9V13H8zM10,12H11V13H10zM12,12H13V13H12zM14,12H15V13H14zM16,12H17V13H16zM18,12H19V13H18zM19,12H20V13H19zM20,12H21V13H20zM8,13H9V14H8zM9,13H10V14H9zM11,13H12V14H11zM12,13H13V14H12zM13,13H14V14H13zM15,13H16V14H15zM17,13H18V14H17zM19,13H20V14H19zM20,13H21V14H20zM0,14H1V15H0zM1,14H2V15H1zM2,14H3V15H2zM3,14H4V15H3zM4,14H5V15H4zM5,14H6V15H5zM6,14H7V15H6zM9,14H10V15H9zM13,14H14V15H13zM16,14H17V15H16zM17,14H18V15H17zM0,15H1V16H0zM6,15H7V16H6zM8,15H9V16H8zM9,15H10V16H9zM12,15H13V16H12zM14,15H15V16H14zM15,15H16V16H15zM17,15H18V16H17zM18,15H19V16H18zM20,15H21V16H20zM0,16H1V17H0zM2,16H3V17H2zM3,16H4V17H3zM4,16H5V17H4zM6,16H7V17H6zM8,16H9V17H8zM9,16H10V17H9zM12,16H13V17H12zM14,16H15V17H14zM18,16H19V17H18zM20,16H21V17H20zM0,17H1V18H0zM2,17H3V18H2zM3,17H4V18H3zM4,17H5V18H4zM6,17H7V18H6zM8,17H9V18H8zM9,17H10V18H9zM12,17H13V18H12zM14,17H15V18H14zM16,17H17V18H16zM17,17H18V18H17zM18,17H19V18H18zM0,18H1V19H0zM2,18H3V19H2zM3,18H4V19H3zM4,18H5V19H4zM6,18H7V19H6zM8,18H9V19H8zM9,18H10V19H9zM12,18H13V19H12zM15,18H16V19H15zM17,18H18V19H17zM18,18H19V19H18zM0,19H1V20H0zM6,19H7V20H6zM9,19H10V20H9zM11,19H12V20H11zM17,19H18V20H17zM18,19H19V20H18zM20,19H21V20H20zM0,20H1V21H0zM1,20H2V21H1zM2,20H3V21H2zM3,20H4V21H3zM4,20H5V21H4zM5,20H6V21H5zM6,20H7V21H6zM8,20H9V21H8zM9,20H10V21H9zM10,20H11V21H10zM14,20H15V21H14zM15,20H16V21H15zM17,20H18V21H17zM18,20H19V21H18z" id="qr-path" fill="#000000" fill-opacity="1" fill-rule="nonzero" stroke="none"/></svg>`;
+const P = {
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h7v-4M17.5 17.5v.01"/>',
+  card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3.5 7.5 8 12 8zM12 8s1.5-5 4-4.5S16.5 8 12 8z"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  back: '<path d="m15 18-6-6 6-6"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  check: '<path d="M5 12.5 10 17 19 7"/>',
+  store: '<path d="M4 9h16l-1-5H5zM5 9v11h14V9M9 20v-6h6v6"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.01"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 4 6"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+};
+const i = (k, extra = '') => `<svg class="i" viewBox="0 0 24 24" ${extra}>${P[k]}</svg>`;
+const status = () => `<div class="island"></div><div class="status"><span>9:41</span><span class="r"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M2 18h3v-3H2zM7 18h3v-6H7zM12 18h3V9h-3zM17 18h3V5h-3z" fill="currentColor"/></svg><span class="bat"><i></i></span></span></div>`;
+const nav = (items, on) => `<div class="nav">${items.map(([k, l], n) => `<div class="it ${n === on ? 'on' : ''}">${i(k)}${l}</div>`).join('')}</div>`;
+const clientNav = on => nav([['card', 'Карта'], ['clock', 'История'], ['tag', 'Акции'], ['user', 'Профиль']], on);
+const op = (sign, title, sub, amt) => `<div class="op"><div class="ic ${sign === '-' ? 'neg' : ''}">${i(sign === '-' ? 'minus' : sign === 'g' ? 'gift' : 'plus')}</div><div class="t"><b>${title}</b><span>${sub}</span></div><div class="a ${sign === '-' ? 'neg' : ''}">${sign === '-' ? '−' : '+'}${amt}</div></div>`;
+
+const clientHome = () => `${status()}<div class="scroll">
+  <div class="top"><div class="word">LIBOS</div><div class="ibtn">${i('bell')}<span class="dot"></span></div></div>
+  <div class="hello">Добрый день,<b>Мадина Каримова</b></div>
+  <div class="card">
+    <div class="row"><small>Бонусный счёт</small><span class="lvl">Серебро · 5%</span></div>
+    <div class="bal">1 240<span>бонусов</span></div>
+    <div class="sub">1 бонус = 1 сомони при оплате</div>
+    <div class="row foot"><span class="num">4821 0937</span><span class="qrbtn">${i('qr')}Показать QR</span></div>
+  </div>
+  <div class="box"><h5>До уровня «Золото» <span>3 240 / 5 000 смн</span></h5><div class="bar"><i style="width:64.8%"></i></div>
+    <div class="steps"><span>Базовый 3%</span><span class="on">Серебро 5%</span><span>Золото 7%</span></div></div>
+  <div class="promo"><p>Двойные бонусы на верхнюю одежду<span>до 30 ноября во всех магазинах</span></p><b>×2</b></div>
+  <div class="sec"><h4>Операции</h4><a>Все</a></div>
+  ${op('+', 'Покупка · ТЦ «Пайкар»', 'Сегодня, 14:32 · чек 1 240 смн', '62')}
+</div>${clientNav(0)}<div class="home-ind"></div>`;
+
+const clientQr = () => `${status()}<div class="scroll">
+  <div class="ibtn close">${i('close')}</div>
+  <div class="qrwrap"><h2>Ваша карта</h2><p>Покажите код кассиру при оплате</p>
+    <div class="qrframe">${QR}<div class="logo"><b>L</b></div></div>
+    <div class="code">4821 0937</div>
+    <div class="mini"><div><small>Баланс</small><b>1 240</b></div><div><small>Уровень</small><b>Серебро</b></div></div>
+    <div class="hint">${i('sun', 'style="width:18px;height:18px"')}Яркость экрана увеличена</div>
+  </div>
+</div>${clientNav(0)}<div class="home-ind"></div>`;
+
+const clientHistory = () => `${status()}<div class="scroll">
+  <div class="h1">История</div>
+  <div class="tabs"><span class="on">Все</span><span>Начисления</span><span>Списания</span></div>
+  <div class="totals"><div><small>Начислено за всё время</small><b>+2 380</b></div><div><small>Потрачено бонусов</small><b>−1 140</b></div></div>
+  <div class="warn">${i('alert')}150 бонусов сгорят 15 декабря</div>
+  <div class="day">Сегодня</div>
+  ${op('+', 'Покупка · ТЦ «Пайкар»', '14:32 · чек 1 240 смн', '62')}
+  <div class="day">15 ноября</div>
+  ${op('-', 'Оплата бонусами', '18:05 · чек 2 100 смн', '600')}
+  ${op('+', 'Покупка · ул. Рудаки, 45', '18:05 · чек 1 500 смн', '75')}
+  <div class="day">2 ноября</div>
+  ${op('g', 'Подарок ко дню рождения', '09:00', '300')}
+</div>${clientNav(1)}<div class="home-ind"></div>`;
+
+const cashierScan = () => `${status()}<div class="scroll">
+  <div class="ctop"><span class="w">LIBOS · КАССА</span><span class="store">${i('store')}ТЦ «Пайкар»</span></div>
+  <div class="cam"><div class="ghost">${QR}</div><div class="frame"><i></i><i></i><i></i><i></i></div><div class="scanline"></div><p>Наведите камеру на QR-код клиента</p></div>
+  <div class="or">или номер телефона</div>
+  <div class="field"><span class="pre">+992</span><span class="ph">90 123 45 67</span><span class="go">${i('arrow')}</span></div>
+  <div class="recent"><small>Недавние клиенты</small>
+    <div class="rc"><div class="av">ФН</div><div class="t"><b>Фирдавс Назаров</b><span>•• •• 12 08 · Золото</span></div><div class="a">3 410</div></div>
+  </div>
+</div>${nav([['scan', 'Касса'], ['clock', 'Операции'], ['user', 'Смена']], 0)}<div class="home-ind"></div>`;
+
+const cashierSale = () => `${status()}<div class="scroll">
+  <div class="top"><div class="back">${i('back')}Новая покупка</div><div class="ibtn">${i('close')}</div></div>
+  <div class="client"><div class="av">МК</div><div class="t"><b>Мадина Каримова</b><span>•• •• 45 67 · Серебро 5%</span></div><div class="bl"><b>1 240</b><span>бонусов</span></div></div>
+  <div class="amount"><small>Сумма покупки</small><div class="v">1 850<span>смн</span><i></i></div></div>
+  <div class="seg"><span>Только начислить</span><span class="on">Списать бонусы</span></div>
+  <div class="spend"><div class="r"><span>Оплатить бонусами</span><b>400</b></div><div class="slider"><i></i><b></b></div>
+    <div class="lim"><span>0</span><span>макс. 925 (50% чека)</span></div></div>
+  <div class="sum">
+    <div class="r"><span>Сумма покупки</span><b>1 850 смн</b></div>
+    <div class="r"><span>Бонусами</span><b>−400 смн</b></div>
+    <div class="r tot"><span>К оплате</span><b>1 450 смн</b></div>
+  </div>
+  <div class="earn"><span>Будет начислено (5% от 1 450)</span><b>+73</b></div>
+</div><div class="bb"><div class="cta">Провести покупку</div></div><div class="home-ind"></div>`;
+
+const cashierDone = () => `${status()}<div class="scroll">
+  <div class="done"><div class="ok">${i('check')}</div><h2>Готово</h2><p>Покупка проведена, клиент получил SMS</p></div>
+  <div class="receipt">
+    <div class="r"><span>Клиент</span><b>Мадина Каримова</b></div>
+    <div class="r"><span>Сумма покупки</span><b>1 850 смн</b></div>
+    <div class="r"><span>Оплачено бонусами</span><b>−400</b></div>
+    <div class="r"><span>Начислено</span><b>+73</b></div>
+    <hr><div class="r big"><span>Клиент заплатил</span><b>1 450 смн</b></div>
+  </div>
+  <div class="newbal"><small>Новый баланс</small><b>913</b></div>
+</div><div class="bb"><div class="cta">${i('scan')}Следующий клиент</div></div><div class="home-ind"></div>`;
+
+const adminNav = on => nav([['chart', 'Обзор'], ['users', 'Клиенты'], ['store', 'Кассы'], ['settings', 'Правила']], on);
+const adminOverview = () => `${status()}<div class="scroll">
+  <div class="top"><div class="word">LIBOS</div><span class="lvl" style="border-color:var(--line);color:var(--ink)">Админ</span></div>
+  <div class="h1" style="margin-top:14px">Ноябрь</div>
+  <div class="stats">
+    <div class="k"><small>Продажи по картам</small><b>184 300</b><em>смн · +12%</em></div>
+    <div><small>Клиентов</small><b>1 268</b><em>+94 за месяц</em></div>
+    <div><small>Начислено</small><b>+8 940</b><em>бонусов</em></div>
+    <div><small>Списано</small><b>−5 120</b><em>бонусов</em></div>
+  </div>
+  <div class="chart"><h5>Бонусы по дням <span>неделя</span></h5>
+    <div class="bars">${[[60,30],[45,20],[80,40],[55,35],[95,30],[120,60],[70,28]].map(([p,m])=>`<div><div class="p" style="height:${p*0.75}px"></div><div class="m" style="height:${m*0.5}px"></div></div>`).join('')}</div>
+    <div class="days">${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=>`<span>${d}</span>`).join('')}</div>
+    <div class="legend"><span><i style="background:var(--ink)"></i>начислено</span><span><i style="background:#BDBDB8"></i>списано</span></div>
+  </div>
+</div>${adminNav(0)}<div class="home-ind"></div>`;
+
+const adminRules = () => `${status()}<div class="scroll">
+  <div class="h1">Правила</div>
+  <div class="sec" style="margin-top:14px"><h4>Уровни и кешбэк</h4><a>Изменить</a></div>
+  <div class="lvls">
+    <div><small>Базовый</small><b>3%</b><span>с 0 смн</span></div>
+    <div><small>Серебро</small><b>5%</b><span>от 2 000 смн</span></div>
+    <div><small>Золото</small><b>7%</b><span>от 5 000 смн</span></div>
+  </div>
+  <div class="rule">
+    <div class="r"><div class="t"><b>Оплата бонусами</b><span>максимум от суммы чека</span></div><div class="stepper"><i>−</i><b>50%</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Срок жизни бонусов</b><span>после начисления</span></div><div class="stepper"><i>−</i><b>180 д</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Приветственный бонус</b><span>за регистрацию</span></div><div class="stepper"><i>−</i><b>100</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Бонус ко дню рождения</b><span>начисляется автоматически</span></div><div class="stepper"><i>−</i><b>300</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Начислять на сумму после списания</b><span>бонусы не начисляются на бонусы</span></div><div class="toggle"></div></div>
+  </div>
+</div>${adminNav(3)}<div class="home-ind"></div>`;
+
+const boards = [
+  { name: 'Клиент', desc: 'Карта лояльности в телефоне: баланс, уровень, QR-код для кассы и история начислений и списаний.', phones: [['Главная', clientHome], ['QR-код на кассе', clientQr], ['История', clientHistory]] },
+  { name: 'Кассир', desc: 'Сканирует QR-код или вводит телефон, вводит сумму чека, начисляет или списывает бонусы.', phones: [['Поиск клиента', cashierScan, 'dark'], ['Покупка', cashierSale], ['Готово', cashierDone]] },
+  { name: 'Админ', desc: 'Итоги программы и правила: проценты по уровням, лимит оплаты бонусами, срок жизни и подарочные бонусы.', phones: [['Обзор', adminOverview], ['Правила бонусов', adminRules]] },
+];
+document.getElementById('root').innerHTML = boards.map((b, n) => `
+  <section class="board" id="b${n}">
+    <div class="board-head"><div><h1>Libos · ${b.name}</h1><p>${b.desc}</p></div><span class="tag">ЧЁРНО-БЕЛЫЙ</span></div>
+    <div class="phones">${b.phones.map(([l, f, cls]) => `<div class="wrap"><div class="phone ${cls || ''}">${f()}</div><div class="label">${l}</div></div>`).join('')}</div>
+  </section>`).join('');
+</script>
+</body>
+</html>
