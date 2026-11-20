@@ -107,7 +107,7 @@ def test_client_on_site_receipt_reaches_owner_of_that_card(app, conn, monkeypatc
 
 
 def test_unknown_recipient_keeps_shown_card(app, conn, monkeypatch, cards):
-    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": "**** 9999"}, "rtunknown")
+    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": "Неизвестный П."}, "rtunknown")
     shown = conn.execute("SELECT card_id FROM payments WHERE id = ?", (pid,)).fetchone()[0]
     assert shown in (cards["A1"], cards["A2"], cards["A3"])
     owner = {cards["A1"]: FARRUKH, cards["A2"]: SHAHZOD}.get(shown)
@@ -240,7 +240,7 @@ def ai_on(monkeypatch):
 def test_ai_on_unrecognised_receipt_goes_to_admin_only(app, conn, monkeypatch, cards, ai_on):
     """Клиент перевёл на старую сохранённую чужую карту / ИИ не нашёл номер — кассиру показанной карты НЕ шлём."""
     monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
-    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": "**** 9999", "amount": 0}, "aion1")
+    pid, sent = _site_topup(app, conn, monkeypatch, cards, "alif", {"recipient": "Неизвестный П.", "amount": 0}, "aion1")
     assert sent == ["admin"]
     p = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
     assert "Кассиру чек не отправлен" in p["receipt_ai"]

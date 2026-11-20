@@ -86,7 +86,7 @@ def test_receipt_amount_never_raises_credit(app, config, conn):
         pid = payments.create(conn, config, user, "alif", "", amount_tjs="10")
     before = conn.execute("SELECT amount_micro FROM payments WHERE id=?", (pid,)).fetchone()[0]
     seen = {"is_receipt": True, "bank": "Alif", "amount": 99999.0, "currency": "TJS", "datetime": "",
-            "txn_id": "", "recipient": "", "status": "success", "recipient_ok": "unknown",
+            "txn_id": "", "recipient": "+992 90 000 00 00", "status": "success", "recipient_ok": "unknown",
             "forgery": "suspicious", "signs": ["x"]}
     payments.attach_receipt(conn, config, uid, pid, PNG2, seen=seen)
     after = conn.execute("SELECT amount_micro, pay_amount FROM payments WHERE id=?", (pid,)).fetchone()

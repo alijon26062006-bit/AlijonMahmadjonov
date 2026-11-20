@@ -781,6 +781,15 @@ def read_receipt(config: Config, data: bytes, our_details: str = "") -> dict | N
     return seen
 
 
+class ReceiptRefused(PaymentError):
+    """Чек не принят сразу, до админа: на фото не чек, в чеке нет реквизитов или они не наши (receipt_ai.refuse).
+    Заявка остаётся без чека — клиент проверит перевод и пришлёт чек заново."""
+
+    def __init__(self, text: str, reason: str):
+        super().__init__(text)
+        self.reason = reason
+
+
 class ReceiptRejected(PaymentError):
     """Чек не принят: чужие реквизиты, подделка, не чек. Клиенту — общая фраза, админу — причины."""
 
@@ -836,6 +845,11 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     details = paycards.all_details(conn, p["method"], settings(conn, config)["details"].get(p["method"], "")) if p else ""
     if seen is _UNREAD:
         seen = read_receipt(config, data, details)
+    bad = receipt_ai.refuse(seen, details) if p else None
+    if bad:   # не чек / нет реквизитов / не наши реквизиты — отказ сразу, админу не отправляем
+        import logging
+        logging.getLogger(__name__).info("чек к заявке #%s не принят: %s", payment_id, bad[1])
+        raise ReceiptRefused(*bad)
     _, warns = receipt_ai.file_marks(data, ext)
     if seen and warns:
         seen = {**seen, "file_marks": warns}
@@ -845,8 +859,8 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         max_age = receipt_ai.MAX_AGE_HOURS
     reasons = (receipt_ai.verdict(seen, data, ext, details, p["created_at"], max_age_hours=max_age)
                if p else [])
-    # Ничего не отклоняем: «не чек», возраст, получатель, признаки правки — админ видит это в заявке крупно
-    # и решает сам. Не пускаем только чек, который уже приняли (см. _attach_locked).
+    # Остальное не отклоняем (не чек и чужие реквизиты отсеяны выше — refuse): возраст, признаки правки —
+    # админ видит это в заявке крупно и решает сам. Не пускаем только чек, который уже приняли (см. _attach_locked).
     if seen and reasons:
         seen = {**seen, "checks": reasons}
     reasons = []

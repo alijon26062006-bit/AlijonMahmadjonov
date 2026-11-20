@@ -1,4 +1,5 @@
 """ИИ читает чек: тот же перевод второй раз не пройдёт, новый — уходит админу с данными чека."""
+import pytest
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -104,18 +105,59 @@ def _png_with_text(key: bytes, value: bytes) -> bytes:
     return RECEIPT_PNG[:33] + chunk + RECEIPT_PNG[33:]
 
 
-def test_foreign_requisites_are_not_accepted_and_admin_gets_reasons(app, config, conn, monkeypatch):
-    alerts = []
-    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+def test_foreign_requisites_are_refused_before_admin(app, config, conn, monkeypatch):
+    """Чужой номер получателя — отказ сразу: клиент проверит перевод и пришлёт чек заново, админу не идёт."""
+    alerts, captions = [], []
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda cfg, caption, *a, **k: captions.append(caption))
     monkeypatch.setattr("donatix.worker.notify_admin", lambda cfg, text, *a, **k: alerts.append(text))
+    monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
     foreign = {**SEEN, "recipient": "9762 **** **** 3253"}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(foreign))
     a, ta = _client(app, config, conn, 1)
     r = _send(a, ta, RECEIPT_PNG)
-    assert "создана" in r.text                                          # не отклонён — решает админ
-    flags = _flags(conn)
-    assert any("не наши реквизиты" in c and "3253" in c for c in flags["checks"])
-    assert "НЕ наши реквизиты" in receipt_ai.summary(flags, "545", "TJS", our_details="Алиф: +992 90 000 00 00")
+    assert "В чеке не найдены наши реквизиты" in r.text and "аз нав фиристед" in r.text
+    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 0
+    assert not captions and not alerts
+
+
+def test_receipt_without_recipient_is_invalid(app, config, conn, monkeypatch):
+    from donatix import payments
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    monkeypatch.setattr("donatix.receipt_ai.find_card", lambda *a, **k: None)
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    uid = accounts.create_user(conn, email="nr@example.com", login="norec", password="password123", status="active")
+    pid = payments.create(conn, config, accounts.get_user(conn, uid), "alif", "5")
+    blank = {**SEEN, "recipient": ""}
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(blank))
+    with pytest.raises(payments.ReceiptRefused) as err:
+        payments.attach_receipt(conn, config, uid, pid, RECEIPT_PNG + b"9")
+    assert "недействительный чек" in str(err.value)
+    row = conn.execute("SELECT status, receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert row["status"] == "pending" and row["receipt_file"] is None        # можно прислать чек заново
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(SEEN))
+    payments.attach_receipt(conn, config, uid, pid, RECEIPT_PNG + b"8")      # правильный чек — принят
+    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0]
+
+
+@pytest.mark.parametrize("seen,details,refused", [
+    ({**SEEN, "recipient": "+992 90 000 00 00"}, "Алиф: +992 90 000 00 00", None),            # наши — к админу
+    ({**SEEN, "recipient": "90 *** 00 00"}, "Алиф: +992 90 000 00 00", None),                 # маска сходится
+    ({**SEEN, "recipient": "+992 93 111 22 33"}, "Алиф: +992 90 000 00 00", "WRONG"),
+    ({**SEEN, "recipient": "+992 93 111 22 33", "our_card": 4}, "[карта #4] 93 111 22 33", None),
+    ({**SEEN, "is_receipt": False}, "Алиф: +992 90 000 00 00", "NOT"),
+    ({**SEEN, "recipient": ""}, "Алиф: +992 90 000 00 00", "NO"),
+    ({**SEEN, "recipient": "Иван П."}, "Алиф: +992 90 000 00 00", None),                     # имя, имён карт нет
+    ({**SEEN, "recipient": "Иван П.", "recipient_ok": "no"},
+     "[карта #1] +992 90 000 00 00 · имя получателя в чеке: Исомиддин Х.", "WRONG"),
+    ({**SEEN, "recipient": "Isomiddin Kh"}, "[карта #1] +992 90 000 00 00 · имя получателя в чеке: Исомиддин Х.", None),
+    ({**SEEN, "recipient": "TXy9a8b7c6d5e4f3", "currency": "USDT"}, "USDT TRC20: TQ1234567890abc", None),  # крипта
+    (None, "Алиф: +992 90 000 00 00", None),                                                   # ИИ не прочитал
+])
+def test_refuse_rules(seen, details, refused):
+    got = receipt_ai.refuse(receipt_ai.clean(seen) if seen else None, details)
+    want = {"WRONG": receipt_ai.WRONG_DETAILS_TEXT, "NOT": receipt_ai.NOT_RECEIPT_TEXT,
+            "NO": receipt_ai.NO_DETAILS_TEXT}.get(refused)
+    assert (got[0] if got else None) == want
 
 
 def test_ai_says_fake_is_rejected_and_suspicious_goes_to_admin(app, config, conn, monkeypatch):
@@ -281,8 +323,8 @@ def test_accepted_receipt_never_passes_again(app, config, conn, monkeypatch):
     assert f"#{first}" in _send(c, token, RECEIPT_PNG).text   # и на сайте клиент видит номер старой заявки
 
 
-def test_any_photo_is_accepted_admin_sees_warnings(app, config, conn, monkeypatch):
-    """Защита снята: и старый чек, и фото «не чек» принимаются — админ видит предупреждения и решает сам."""
+def test_photo_that_is_not_a_receipt_is_refused(app, config, conn, monkeypatch):
+    """Фото — не чек: отказ сразу, заявка ждёт настоящий чек."""
     from donatix import payments, quickbuy
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
     config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
@@ -291,9 +333,10 @@ def test_any_photo_is_accepted_admin_sees_warnings(app, config, conn, monkeypatc
     photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
     pid = payments.create(conn, config, guest, "alif", "5", for_purchase=True)
-    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"3")
-    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0]
-    assert "не чек" in receipt_ai.summary(_flags(conn), "5", "TJS")
+    with pytest.raises(payments.ReceiptRefused) as err:
+        payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"3")
+    assert "не является чеком" in str(err.value) and "чек нест" in str(err.value)
+    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0] is None
 
 
 def test_old_receipt_is_accepted_and_admin_sees_why(app, config, conn, monkeypatch):
@@ -305,11 +348,12 @@ def test_old_receipt_is_accepted_and_admin_sees_why(app, config, conn, monkeypat
     assert "🚨 Чек старый" in receipt_ai.summary(_flags(conn), "545", "TJS")
 
 
-def test_photo_that_is_not_a_receipt_goes_to_admin(app, config, conn, monkeypatch):
-    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+def test_photo_that_is_not_a_receipt_site_message(app, config, conn, monkeypatch):
+    captions = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda cfg, caption, *a, **k: captions.append(caption))
     monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
     photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
     a, ta = _client(app, config, conn, 1)
-    assert "создана" in _send(a, ta, RECEIPT_PNG).text
-    assert "🚨 Это не чек о переводе" in receipt_ai.summary(_flags(conn), "50", "TJS")
+    assert "Ваша фотография не является чеком" in _send(a, ta, RECEIPT_PNG).text
+    assert not captions                                                  # админу не отправлено

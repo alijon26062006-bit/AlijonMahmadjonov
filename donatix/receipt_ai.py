@@ -10,6 +10,9 @@
 подделка, «не чек», старый чек, фоторедактор или нейросеть, повтор ждущего/отклонённого) не отклоняем —
 админ видит предупреждения в заявке и кнопку на старую заявку и решает сам.
 
+Сразу, до админа, отказываем (refuse): на фото не чек; в чеке нет реквизитов получателя; реквизиты не наши —
+клиент видит причину и присылает чек заново.
+
 Нет ключа, PDF или ИИ не ответил — заявка всё равно принимается, админ проверяет как раньше.
 """
 
@@ -394,6 +397,45 @@ def recipient_matches(d: dict[str, Any], our_details: str) -> bool | None:
     if not chunks or not ours:
         return None
     return any(_fits(ch, x) for ch in chunks for x in ours)
+
+
+# ── Отказ СРАЗУ, до админа (решение владельца): не чек; в чеке нет реквизитов; реквизиты не наши ──
+NOT_RECEIPT_TEXT = ("Ваша фотография не является чеком. Пришлите скриншот чека о переводе. / "
+                    "Сурати шумо чек нест. Скриншоти чеки интиқолро фиристед.")
+NO_DETAILS_TEXT = ("Вы отправили недействительный чек: в нём нет реквизитов получателя. / "
+                   "Чеки фиристодаи шумо беэътибор аст: дар он реквизитҳои гиранда нест.")
+WRONG_DETAILS_TEXT = ("В чеке не найдены наши реквизиты. Проверьте свой перевод и пришлите чек заново. / "
+                      "Дар чек реквизитҳои мо ёфт нашуд. Интиқоли худро санҷед ва чекро аз нав фиристед.")
+_CRYPTO = re.compile(r"USDT|USDC|TRC-?20|BEP-?20|ERC-?20|BTC|TRX|\bTON\b|кошел[её]к крипт|адрес кошелька", re.I)
+
+
+def refuse(d: dict[str, Any] | None, our_details: str) -> tuple[str, str] | None:
+    """Чек не пускаем к админу: (текст клиенту, причина для журнала). None — чек идёт админу как обычно.
+    ИИ не прочитал чек (нет ключа, PDF, ошибка) — не отказываем: проверит админ.
+    Реквизиты сверяем только по нашим картам и телефонам (не крипта) и только если ИИ НЕ узнал нашу карту."""
+    if not d:
+        return None
+    if d.get("is_receipt") is False:
+        return NOT_RECEIPT_TEXT, "на фото не чек"
+    from .paycards import _chunks, _person, labelled_hits, numbers
+    if not numbers(our_details) or _CRYPTO.search(our_details or "") or _CRYPTO.search(d.get("currency") or ""):
+        return None
+    recipient = (d.get("recipient") or "").strip()
+    if d.get("our_card") or d.get("recipient_ok") == "yes" or labelled_hits(our_details, recipient):
+        return None
+    if recipient_matches(d, our_details):
+        return None
+    if not recipient:
+        return NO_DETAILS_TEXT, "в чеке нет получателя"
+    if _chunks(recipient):   # в чеке есть номер получателя, и он не наш
+        if recipient_matches(d, our_details) is False:
+            return WRONG_DETAILS_TEXT, f"получатель «{recipient}» — не наши реквизиты"
+        return None
+    # В чеке только имя (Алиф «на счёт кошелька»): отказ, только если имена наших карт заполнены и ИИ сказал «не наши»
+    names = re.findall(r"имя получателя в чеке: ([^\n]+)", our_details or "")
+    if names and _person(recipient) and d.get("recipient_ok") == "no":
+        return WRONG_DETAILS_TEXT, f"получатель «{recipient}» — не наше имя"
+    return None
 
 
 def time_problem(d: dict[str, Any], created_at: str | None, tz_hours: int = 5) -> str:
