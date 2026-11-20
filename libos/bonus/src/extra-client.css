@@ -1,0 +1,12 @@
+.whint { margin-top: 14px; font-size: 13.5px; color: var(--soft); font-weight: 600; line-height: 1.45; }
+.otp.six { gap: 8px; }
+.otp.six span { width: auto; flex: 1; height: 58px; font-size: 22px; border-radius: 14px; }
+.nav.four { grid-template-columns: repeat(4, 1fr); }
+.nav.four .ind { width: 25%; }
+.ibtn.spin svg { animation: spin .7s; }
+.rmain .scroll { padding-top: 4px; }
+.rlist { padding-bottom: 8px; }
+.rnote { color: var(--grey); font-size: 12.5px; font-weight: 600; margin: 10px 0 0; line-height: 1.45; text-align: center; }
+.nf { margin: 22px 0 14px; text-align: center; color: var(--soft); font-weight: 700; font-size: 14px; line-height: 1.45; }
+.op.ref .t b, .op.ref .amt { text-decoration: line-through; color: var(--grey); }
+.payrow > div { min-width: 0; }

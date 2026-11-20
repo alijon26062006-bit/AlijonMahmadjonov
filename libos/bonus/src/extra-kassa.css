@@ -1,0 +1,6 @@
+.pins { gap: 14px; }
+.lockmsg { min-height: 20px; margin-top: 14px; font-size: 13.5px; font-weight: 800; color: var(--soft); text-align: center; }
+.linkbtn { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 800; padding: 10px 0; text-decoration: underline; text-underline-offset: 3px; }
+.linkbtn svg.i { width: 18px; height: 18px; }
+.sheet .field input { font-size: 20px; letter-spacing: 1px; }
+.sheet .field + .cta { margin-top: 12px; }

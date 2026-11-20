@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0B0B0B">
+<title>ISTANBUL</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@500;600;700;800&family=Unbounded:wght@600;700&family=Montserrat:wght@700;800&display=swap">
+<style>
+/* One phone screen: sign-in, card, history, rating, offers, profile. Black and white system. */
+:root {
+  --ink: #0B0B0B; --paper: #FFFFFF; --mist: #F3F3F2; --line: #E4E4E2; --grey: #8C8C88; --soft: #5C5C58; --desk: #DCDCD8;
+  --brand: 'Unbounded', 'Arial Black', sans-serif;
+  --display: var(--brand);
+  --text: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { box-sizing: border-box; height: 100%; }
+body { height: 100%; margin: 0; background: var(--desk); color: var(--ink); font-family: var(--text); display: grid; place-items: center; overflow: hidden; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; padding: 0; text-align: inherit; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+h1, h2, h3, h4, h5, p { margin: 0; }
+.pad { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.app { position: relative; width: min(100%, 420px); height: min(100%, 880px); background: var(--paper); color: var(--ink); overflow: hidden; overflow: clip; transition: background .45s, color .45s; }
+/* Unbounded has no Kazakh letters, so Kazakh headings use Montserrat; the wordmark stays as is */
+.app[data-lang="kk"] { --display: 'Montserrat', 'Arial Black', sans-serif; }
+.app.is-dark { --ink: #FFFFFF; --paper: #0B0B0B; --mist: #1C1C1A; --line: #2B2B29; --soft: #BDBDB8; }
+@media (min-width: 480px) and (min-height: 700px) {
+  body { padding-block: 20px; }
+  .app { border-radius: 38px; box-shadow: 0 0 0 10px #0B0B0B, 0 30px 60px -20px rgba(0,0,0,.45); }
+}
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
+
+/* views */
+.view { position: absolute; inset: 0; display: none; flex-direction: column; background: var(--paper); }
+.view.on { display: flex; }
+.view.from-r { animation: fromR .38s cubic-bezier(.2,.9,.2,1); }
+.view.from-l { animation: fromL .38s cubic-bezier(.2,.9,.2,1); }
+.col { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 14px; padding-bottom: 18px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding-top: 14px; padding-bottom: 18px; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.grow { flex: 1; }
+.a { animation: rise .5s backwards; animation-delay: calc(var(--i, 0) * 55ms); }
+
+/* common */
+.back { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; flex: none; transition: transform .15s; }
+.back:active, .ibtn:active { transform: scale(.9); }
+.topbar { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 16px; min-height: 44px; }
+.big-t { font: 700 27px/1.12 var(--display); text-transform: uppercase; margin-top: 18px; }
+.lead { font-size: 15px; color: var(--soft); margin-top: 10px; line-height: 1.45; }
+.h1 { font: 700 28px/1.1 var(--display); text-transform: uppercase; letter-spacing: -.3px; }
+.cta { width: 100%; height: 56px; border-radius: 18px; background: var(--ink); color: var(--paper); font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform .15s, opacity .2s; flex: none; }
+.cta:active { transform: scale(.97); }
+.cta[disabled] { opacity: .3; }
+.cta.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--grey); }
+.link { display: block; width: 100%; text-align: center; font-size: 14px; font-weight: 800; padding: 14px 0 0; color: var(--soft); text-decoration: underline; text-underline-offset: 3px; }
+.chipsel { display: flex; gap: 8px; flex-wrap: wrap; }
+.chipsel button { padding: 9px 15px; border-radius: 99px; border: 1.5px solid var(--line); font-weight: 800; font-size: 13.5px; white-space: nowrap; transition: background .25s, color .25s, border-color .25s, transform .15s; }
+.chipsel button:active { transform: scale(.94); }
+.chipsel button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.note { margin-top: 12px; background: var(--mist); border-radius: 16px; padding: 12px 14px; font-size: 13.5px; font-weight: 600; color: var(--soft); line-height: 1.45; display: flex; gap: 10px; }
+.note svg.i { width: 20px; height: 20px; color: var(--ink); }
+.toggle { width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; flex: none; margin-left: auto; transition: background .25s; }
+.toggle::after { content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .3s cubic-bezier(.3,1.5,.5,1); }
+.toggle[aria-checked="true"] { background: var(--ink); }
+.app.is-dark .toggle[aria-checked="true"]::after { background: #0B0B0B; }
+.toggle[aria-checked="true"]::after { transform: translateX(18px); }
+
+/* welcome */
+.wl { flex: 1; display: flex; flex-direction: column; padding-top: 54px; padding-bottom: 26px; min-height: 0; }
+.wmbig { font: 700 38px/1 var(--brand); letter-spacing: 5px; display: flex; }
+.wmbig span { animation: letter .6s cubic-bezier(.2,1.4,.4,1) backwards; animation-delay: calc(var(--i) * 60ms); }
+.stage { flex: 1; min-height: 150px; position: relative; display: grid; place-items: center; perspective: 900px; }
+.stage .ring { position: absolute; border: 1.5px solid var(--line); border-radius: 50%; animation: breathe 4s ease-in-out infinite; }
+.stage .ring.r1 { width: 250px; height: 250px; }
+.stage .ring.r2 { width: 160px; height: 160px; animation-delay: -2s; }
+.democard { width: 216px; height: 134px; border-radius: 18px; background: var(--ink); color: var(--paper); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; animation: cardIn .9s .3s cubic-bezier(.2,1.2,.3,1) backwards, floatCard 6s 1.2s ease-in-out infinite; box-shadow: 0 30px 50px -20px rgba(255,255,255,.25); }
+.democard::after, .bcard::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(128,128,128,.35) 50%, transparent 65%); transform: translateX(-120%); animation: shine 4s 1.5s infinite; pointer-events: none; }
+.democard b { font: 700 13px var(--brand); letter-spacing: 3px; }
+.democard span { font: 600 12px var(--brand); letter-spacing: 2px; opacity: .7; }
+.perk { display: flex; gap: 12px; align-items: center; font-size: 15px; font-weight: 700; margin-top: 12px; }
+.perk b { min-width: 76px; height: 30px; padding: 0 8px; border-radius: 99px; border: 1.5px solid var(--grey); display: grid; place-items: center; font: 600 12px var(--display); }
+.wl .cta { margin-top: 24px; }
+
+/* phone and code */
+.inp { margin-top: 22px; border: 1.5px solid var(--ink); border-radius: 18px; height: 62px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 22px; font-weight: 800; letter-spacing: .5px; }
+.inp .pre { color: var(--grey); }
+.caret { width: 2px; height: 28px; background: var(--ink); animation: caret 1s steps(1) infinite; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; flex: none; }
+.key { height: 52px; border-radius: 16px; background: var(--mist); font: 600 21px var(--display); display: grid; place-items: center; transition: transform .1s, background .15s; }
+.key:active { transform: scale(.92); background: var(--line); }
+.key.x { background: none; }
+.otp { display: flex; gap: 12px; margin-top: 26px; }
+.otp span { width: 62px; height: 70px; border: 1.5px solid var(--line); border-radius: 18px; display: grid; place-items: center; font: 700 28px var(--display); transition: background .3s, color .3s, border-color .2s, transform .2s; transition-delay: calc(var(--i) * 70ms); }
+.otp span.f { border-color: var(--ink); animation: keyIn .25s; }
+.otp span.cur { border-color: var(--ink); border-width: 2.5px; }
+.otp.ok span { background: var(--ink); color: var(--paper); transform: translateY(-4px); }
+.otp.bad { animation: shake .4s; }
+.resend { margin-top: 18px; font-size: 14px; color: var(--grey); font-weight: 700; }
+.sms { position: absolute; z-index: 45; top: 10px; left: 12px; right: 12px; background: #1C1C1A; color: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; transform: translateY(-170%); transition: transform .5s cubic-bezier(.2,1.2,.3,1); box-shadow: 0 16px 30px -12px rgba(0,0,0,.5); }
+.sms.on { transform: none; }
+.sms i { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; color: #0B0B0B; display: grid; place-items: center; font: 700 15px var(--brand); font-style: normal; flex: none; }
+.sms b { display: block; font-size: 13px; }
+.sms span { font-size: 14px; opacity: .85; }
+.sms em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 800; border: 1.5px solid #5C5C58; border-radius: 99px; padding: 5px 10px; white-space: nowrap; }
+
+/* registration */
+.field { display: block; margin-top: 14px; }
+.field > span { display: block; font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 0 0 6px 2px; }
+.field input { width: 100%; height: 54px; border: 1.5px solid var(--line); border-radius: 16px; padding: 0 16px; font: 700 16px var(--text); background: var(--paper); color: var(--ink); transition: border-color .2s; }
+.field input:focus { border-color: var(--ink); outline: none; }
+.giftb { margin-top: 18px; background: var(--ink); color: var(--paper); border-radius: 22px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; }
+.giftb img { width: 50px; height: 50px; object-fit: contain; filter: invert(1); animation: wiggle 2.4s ease-in-out infinite; }
+.app.is-dark .giftb img { filter: none; }
+.giftb b { font: 600 20px var(--display); display: block; }
+.giftb span { font-size: 13px; opacity: .65; font-weight: 600; }
+.made { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 70px; padding-bottom: 26px; perspective: 900px; }
+.made .democard { animation: cardMade 1.1s cubic-bezier(.2,1.1,.3,1) backwards, floatCard 6s 1.2s ease-in-out infinite; width: 250px; height: 156px; }
+.made h2 { font: 700 24px/1.15 var(--display); text-transform: uppercase; margin-top: 44px; animation: rise .6s .9s backwards; }
+.made .cnt { font: 700 64px/1 var(--display); letter-spacing: -2px; margin-top: 22px; animation: pop .6s 1.1s cubic-bezier(.2,1.5,.4,1) backwards; }
+.made p { color: var(--soft); margin-top: 8px; font-weight: 700; animation: rise .6s 1.3s backwards; }
+.made .cta { margin-top: auto; animation: rise .6s 1.6s backwards; }
+
+/* main shell */
+.tabs-area { flex: 1; min-height: 0; position: relative; }
+.tab { position: absolute; inset: 0; display: none; flex-direction: column; }
+.tab.on { display: flex; }
+.nav { flex: none; height: 72px; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: var(--paper); position: relative; padding-top: 10px; transition: background .45s; }
+.nav button { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--grey); transition: color .25s; }
+.nav button.on { color: var(--ink); }
+.nav button.on svg { animation: navpop .45s cubic-bezier(.2,1.6,.4,1); }
+.nav .ind { position: absolute; top: -1px; left: 0; width: 20%; height: 2.5px; display: flex; justify-content: center; transition: transform .45s cubic-bezier(.2,1.2,.3,1); pointer-events: none; }
+.nav .ind i { width: 34px; background: var(--ink); border-radius: 2px; }
+.nav .bdg { position: absolute; }
+
+/* home */
+.top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.word { font: 700 20px var(--brand); letter-spacing: 3px; }
+.ibtn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; position: relative; transition: transform .15s; }
+.ibtn .dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; background: var(--ink); border-radius: 50%; animation: pulse 1.6s infinite; }
+.hello { margin-top: 14px; font-size: 15px; color: var(--soft); }
+.hello b { display: block; font: 600 22px var(--display); color: var(--ink); margin-top: 2px; letter-spacing: -.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcard { margin-top: 16px; width: 100%; display: block; position: relative; overflow: hidden; border-radius: 26px; background: #0B0B0B; color: #FFFFFF; padding: 18px 10px 4px; box-shadow: 0 24px 34px -24px rgba(0,0,0,.6); transition: transform .2s; }
+.bcard:active { transform: scale(.98); }
+.bcard::before { content: ''; position: absolute; right: -70px; top: -80px; width: 240px; height: 240px; border: 1.5px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 34px rgba(255,255,255,.035); animation: breathe 5s ease-in-out infinite; }
+.bcard > span { position: relative; z-index: 1; }
+.bc-top, .bc-mid, .bc-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 10px; }
+.bword { font: 700 15px var(--brand); letter-spacing: 3.5px; }
+.lvl { font-size: 11.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 1.5px solid rgba(255,255,255,.5); padding: 5px 10px; border-radius: 99px; white-space: nowrap; }
+.bc-mid { margin-top: 20px; align-items: flex-end; }
+.bcard small { display: block; font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 800; }
+.bal { display: block; font: 700 40px/1 var(--display); letter-spacing: -1px; margin-top: 8px; white-space: nowrap; }
+.bal b { font: inherit; }
+.bal.sm { font-size: 32px; }
+.bc-mid > span:first-child { min-width: 0; }
+.bal span { font: 600 14px var(--text); letter-spacing: 0; color: rgba(255,255,255,.7); margin-left: 7px; }
+.chipset { display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,.75); padding-bottom: 4px; flex: none; }
+.chipset svg.i { width: 24px; height: 24px; }
+.chip { width: 44px; height: 33px; border-radius: 9px; border: 1.5px solid rgba(255,255,255,.8); background: linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 50% 50% / 100% 1.5px no-repeat, linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 32% 0 / 1.5px 100% no-repeat, linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 68% 0 / 1.5px 100% no-repeat, rgba(255,255,255,.08); }
+.bc-row { margin-top: 16px; }
+.holder { font-size: 12.5px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.num { font: 600 12.5px var(--brand); letter-spacing: 2.2px; white-space: nowrap; }
+.bc-code { display: block; margin-top: 14px; background: #FFFFFF; color: #0B0B0B; border-radius: 18px; padding: 13px 20px 8px; text-align: center; }
+.bars { display: block; width: 100%; height: 48px; shape-rendering: crispEdges; }
+.bars rect { fill: #0B0B0B; transform-box: fill-box; transform-origin: 50% 100%; animation: barIn .55s cubic-bezier(.2,1.2,.3,1) backwards; animation-delay: calc(.35s + var(--i) * 14ms); }
+.digits { display: block; font: 600 11.5px var(--brand); letter-spacing: 3px; margin-top: 7px; white-space: nowrap; }
+.digits.big { font-size: 15px; letter-spacing: 4.5px; margin-top: 12px; }
+.bc-hint { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 0 8px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.62); }
+.bc-hint svg.i { width: 15px; height: 15px; }
+.paycode { position: relative; margin-top: 16px; border: 1.5px solid var(--line); border-radius: 22px; padding: 22px 26px; background: #FFFFFF; overflow: hidden; }
+.paycode .bars { height: 108px; }
+.scanline { position: absolute; top: 10px; bottom: 10px; left: 10px; width: 3px; border-radius: 2px; background: #0B0B0B; box-shadow: 0 0 18px 6px rgba(0,0,0,.3); opacity: 0; }
+.paycode.scanning .scanline { animation: scanX .85s ease-in-out 2; }
+.payrow { margin-top: 14px; display: flex; gap: 14px; align-items: center; text-align: left; background: var(--mist); border-radius: 20px; padding: 12px; }
+.qrsm { width: 86px; height: 86px; background: #FFFFFF; border-radius: 12px; padding: 7px; flex: none; }
+.qrsm svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
+.payrow small { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.payrow b { display: block; font: 600 14px var(--brand); letter-spacing: 2px; margin: 3px 0 5px; }
+.payrow span { font-size: 12.5px; color: var(--soft); font-weight: 600; line-height: 1.35; }
+.langbtn { position: absolute; z-index: 2; top: 14px; right: max(20px, env(safe-area-inset-right, 0px)); height: 38px; padding: 0 13px 0 10px; border-radius: 99px; border: 1.5px solid var(--grey); display: flex; align-items: center; gap: 7px; font: 600 11.5px var(--brand); letter-spacing: 1px; animation: fade .6s .9s backwards; transition: transform .15s; }
+.langbtn:active { transform: scale(.94); }
+.langbtn svg.i { width: 18px; height: 18px; }
+.langs { display: grid; gap: 8px; margin-top: 16px; }
+.lopt { width: 100%; display: flex; align-items: center; gap: 14px; padding: 15px 16px; border: 1.5px solid var(--line); border-radius: 18px; font-weight: 800; font-size: 15.5px; transition: transform .15s, border-color .2s; animation: rise .45s backwards; }
+.lopt:nth-child(2) { animation-delay: 60ms; } .lopt:nth-child(3) { animation-delay: 120ms; }
+.lopt:active { transform: scale(.98); }
+.lopt b { font: 600 12px var(--brand); letter-spacing: 1px; min-width: 42px; color: var(--grey); }
+.lopt span { flex: 1; }
+.lopt.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.lopt.on b { color: var(--ink); }
+.app.is-dark .sheet { box-shadow: 0 -1.5px 0 var(--line); }
+.nw { white-space: nowrap; }
+.rwidget .pl.sm { font-size: 22px; letter-spacing: -.5px; }
+.bigplace .up { white-space: nowrap; }
+.bigplace .up svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.demo { margin-top: 12px; width: 100%; height: 50px; border-radius: 16px; border: 1.5px dashed var(--ink); font-weight: 800; font-size: 14.5px; display: flex; align-items: center; justify-content: center; gap: 8px; animation: rise .4s backwards; transition: transform .15s; }
+.demo:active { transform: scale(.97); }
+.rwidget { margin-top: 12px; width: 100%; border: 1.5px solid var(--ink); border-radius: 22px; padding: 13px 16px; display: flex; align-items: center; gap: 14px; transition: transform .15s; }
+.rwidget:active, .promo:active, .pcard:active { transform: scale(.98); }
+.rwidget .pl { font: 700 30px var(--display); letter-spacing: -1px; white-space: nowrap; }
+.rwidget .t { flex: 1; min-width: 0; }
+.rwidget b { font-size: 14.5px; font-weight: 800; display: block; }
+.rwidget span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.box { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 22px; padding: 15px 16px; }
+.box h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; gap: 10px; }
+.box h5 span { color: var(--grey); font-weight: 700; white-space: nowrap; }
+.pbar { height: 8px; background: var(--mist); border-radius: 4px; margin: 12px 0 8px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; background: var(--ink); border-radius: 4px; transition: width 1.1s .3s cubic-bezier(.2,.9,.2,1); }
+.steps { display: flex; justify-content: space-between; font-size: 12px; color: var(--grey); font-weight: 700; }
+.steps .on { color: var(--ink); }
+.promo { margin-top: 12px; width: 100%; border-radius: 22px; background: var(--mist); padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: transform .15s; }
+.promo b { font: 700 36px var(--display); letter-spacing: -1px; animation: wiggle 3s ease-in-out infinite; }
+.promo p { font-size: 13.5px; font-weight: 700; line-height: 1.35; }
+.promo p span { display: block; color: var(--grey); font-weight: 500; margin-top: 2px; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 20px 0 4px; }
+.sec h4 { font: 600 15px var(--display); text-transform: uppercase; letter-spacing: .5px; }
+.sec button { font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+
+/* operations */
+.op { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); transition: transform .15s; }
+.op:active { transform: scale(.98); }
+.op .ic { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--mist); flex: none; }
+.op .ic.neg { background: var(--paper); border: 1.5px solid var(--ink); }
+.op .t { flex: 1; min-width: 0; }
+.op .t b { font-size: 14.5px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op .t span { font-size: 12.5px; color: var(--grey); font-weight: 500; }
+.op .amt { font: 600 16px var(--display); white-space: nowrap; }
+.op .amt.neg { color: var(--soft); }
+.op.fresh { animation: fresh 1.2s; }
+.totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.totals div { background: var(--mist); border-radius: 18px; padding: 14px; }
+.totals small { font-size: 12px; color: var(--grey); font-weight: 700; display: block; }
+.totals b { font: 600 20px var(--display); }
+.day { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 18px 0 2px; }
+.empty { text-align: center; margin-top: 60px; }
+.empty .c { width: 116px; height: 116px; border-radius: 50%; background: var(--mist); margin: 0 auto; display: grid; place-items: center; }
+.empty .c img { width: 66px; animation: wiggle 3s ease-in-out infinite; }
+.empty h3 { font: 700 19px var(--display); text-transform: uppercase; margin-top: 20px; }
+.empty p { color: var(--soft); margin-top: 8px; font-size: 15px; line-height: 1.45; }
+
+/* sheet */
+.dim { position: absolute; inset: 0; background: rgba(11,11,11,.45); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.dim.on { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--paper); border-radius: 30px 30px 0 0; padding-top: 12px; padding-bottom: 26px; max-height: 88%; overflow-y: auto; transform: translateY(105%); visibility: hidden; transition: transform .5s cubic-bezier(.2,1.08,.3,1), visibility 0s .5s; }
+.sheet.on { transform: none; visibility: visible; transition-delay: 0s; }
+.grab { width: 40px; height: 5px; background: var(--line); border-radius: 3px; margin: 0 auto 14px; }
+.sheet h3 { font: 700 20px var(--display); text-transform: uppercase; }
+.sheet .amt { font: 700 44px var(--display); letter-spacing: -1px; margin-top: 12px; }
+.sheet .amt small { font-size: 17px; color: var(--grey); letter-spacing: 0; }
+.when { color: var(--grey); font-weight: 700; font-size: 14px; margin-top: 2px; }
+.kv { margin-top: 14px; border-top: 1.5px solid var(--line); }
+.kv div { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; color: var(--soft); font-weight: 600; }
+.kv div b { color: var(--ink); font-weight: 800; }
+.kv div b.big { font: 600 17px var(--display); }
+.sheet .cta { margin-top: 16px; }
+.okc { width: 72px; height: 72px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; margin: 4px auto 14px; animation: pop .55s .15s cubic-bezier(.2,1.6,.4,1) backwards; }
+.okc svg.i { width: 36px; height: 36px; stroke-width: 2.4; stroke-dasharray: 30; stroke-dashoffset: 30; animation: drawCheck .45s .5s forwards; }
+.sheet.center { text-align: center; }
+.newbal { margin-top: 12px; background: var(--ink); color: var(--paper); border-radius: 20px; padding: 15px 18px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+.newbal small { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; opacity: .6; }
+.newbal b { font: 600 26px var(--display); }
+
+/* rating */
+.rhd { flex: none; padding-top: 14px; padding-bottom: 10px; }
+.trow { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.timer { text-align: right; font-size: 11.5px; font-weight: 800; color: var(--grey); }
+.timer b { display: block; font: 600 14.5px/1.3 var(--brand); color: var(--ink); min-width: 132px; }
+.rhd .chipsel { margin: 10px -20px 0; padding: 0 20px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.rhd .chipsel::-webkit-scrollbar { display: none; }
+.rhd .chipsel button { padding: 9px 13px; }
+.rmain { flex: 1; min-height: 0; position: relative; }
+.scene { position: absolute; inset: 0; display: none; flex-direction: column; }
+.scene.on { display: flex; }
+.scene .scroll { padding-top: 0; }
+.ticker { overflow: hidden; border-block: 1px solid var(--line); padding: 6px 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.track { display: flex; gap: 26px; width: max-content; animation: marq 24s linear infinite; font-size: 12.5px; font-weight: 700; color: var(--soft); white-space: nowrap; }
+.track b { color: var(--ink); font: 600 12px var(--display); }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; margin-top: 10px; }
+.pd { text-align: center; min-width: 0; }
+.pd .who { animation: pop .5s cubic-bezier(.2,1.5,.4,1) backwards; animation-delay: calc(var(--d) + .35s); }
+.pd.swap .who { animation: swap .65s cubic-bezier(.2,1.5,.4,1); }
+.pd .av { width: 46px; height: 46px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center; font: 600 14px var(--display); background: var(--mist); border: 2px solid var(--ink); }
+.pd.r1 .av { width: 56px; height: 56px; background: var(--ink); color: var(--paper); font-size: 17px; }
+.pd.mine .av { background: var(--ink); color: var(--paper); box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
+.pd .nm { font-size: 13px; font-weight: 800; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pd .pts { font: 600 12.5px var(--display); color: var(--soft); margin-top: 1px; }
+.pd .bar { margin-top: 8px; height: var(--h); border-radius: 14px 14px 0 0; background: var(--mist); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; overflow: hidden; position: relative; animation: grow .8s cubic-bezier(.2,1.3,.35,1) backwards; animation-delay: var(--d); }
+.pd .bar b { font: 700 24px/1 var(--display); }
+.pd .bar span { font-size: 11.5px; font-weight: 800; color: var(--soft); }
+.pd.r1 .bar { background: var(--ink); color: var(--paper); }
+.pd.r1 .bar span { color: inherit; opacity: .7; }
+.pd.r1 .bar::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.3) 50%, transparent 65%); transform: translateX(-120%); animation: shine 3.6s 1.6s infinite; }
+.crown { width: 24px; height: 24px; display: block; margin: 0 auto 3px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; animation: drop .7s 1s cubic-bezier(.3,1.6,.5,1) backwards, float 2.4s 1.8s ease-in-out infinite; }
+.mecard { margin-top: 10px; background: #0B0B0B; color: #FFFFFF; border-radius: 22px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; animation: rise .6s .8s backwards; }
+.ring { position: relative; width: 58px; height: 58px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 5; }
+.ring .bg { stroke: rgba(255,255,255,.2); }
+.ring .fg { stroke: #FFFFFF; stroke-linecap: round; stroke-dasharray: 169.65; stroke-dashoffset: 169.65; transition: stroke-dashoffset 1s cubic-bezier(.2,.9,.2,1); }
+.place { position: absolute; inset: 0; display: grid; place-items: center; font: 700 21px var(--display); overflow: hidden; border-radius: 50%; }
+.place.sm { font-size: 13px; }
+.place span { grid-area: 1 / 1; transition: transform .5s cubic-bezier(.2,1.2,.3,1), opacity .4s; }
+.place span.out { transform: translateY(-110%); opacity: 0; }
+.place span.pre { transform: translateY(110%); opacity: 0; }
+.mecard .t { flex: 1; min-width: 0; }
+.mecard small { font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 800; opacity: .6; display: block; }
+.mecard .t b { font-size: 14.5px; font-weight: 800; display: block; margin-top: 2px; }
+.mecard .t .sub { font-size: 12.5px; opacity: .65; font-weight: 600; }
+.mecard .score { text-align: right; }
+.mecard .score b { font: 600 17px var(--display); display: block; }
+.rlist { margin-top: 6px; display: flex; flex-direction: column; padding-bottom: 60px; }
+.rk { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 16px; position: relative; background: var(--paper); animation: rise .5s backwards; animation-delay: calc(1s + var(--i) * 70ms); }
+.rk.hidden { display: none; }
+.rk.enter { animation: rise .5s; }
+.rk .pl { font: 600 15px var(--display); min-width: 24px; color: var(--soft); }
+.rk.far .pl { font-size: 11.5px; }
+.rk .av { width: 38px; height: 38px; border-radius: 50%; background: var(--mist); display: grid; place-items: center; font: 600 13px var(--display); flex: none; }
+.rk .t { flex: 1; min-width: 0; }
+.rk .t b { font-size: 14.5px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lane { height: 5px; border-radius: 3px; background: var(--mist); margin-top: 6px; overflow: hidden; }
+.lane i { display: block; height: 100%; width: 0; background: var(--grey); border-radius: 3px; transition: width 1s cubic-bezier(.2,.9,.2,1); }
+.rk.mine { background: var(--mist); }
+.rk.mine .av { background: var(--ink); color: var(--paper); }
+.rk.mine .lane { background: var(--line); }
+.rk.mine .lane i { background: var(--ink); }
+.rk .s { text-align: right; min-width: 84px; position: relative; white-space: nowrap; }
+.rk .s b { font: 600 14.5px var(--display); display: inline-block; }
+.mv { display: inline-flex; align-items: center; gap: 1px; font-size: 11.5px; font-weight: 800; font-style: normal; color: var(--grey); margin-left: 5px; }
+.mv svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.mv.up { color: var(--ink); }
+.rk.lift { z-index: 3; scale: 1.03; box-shadow: 0 14px 30px -12px rgba(0,0,0,.45); }
+.rk.tick .s b { animation: blink .6s; }
+.plus { position: absolute; right: 0; top: -6px; font: 600 12px var(--display); pointer-events: none; animation: floatUp .9s forwards; }
+.gapdots { text-align: center; color: var(--grey); font-weight: 800; letter-spacing: 4px; padding: 2px 0; }
+.fab { position: absolute; right: 16px; bottom: 14px; z-index: 5; height: 48px; padding: 0 18px; border-radius: 99px; background: var(--ink); color: var(--paper); font-weight: 800; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 14px 28px -10px rgba(0,0,0,.5); animation: pop .5s 1.4s cubic-bezier(.2,1.5,.4,1) backwards; transition: transform .15s, opacity .2s; }
+.fab:active { transform: scale(.94); }
+.fab[disabled] { opacity: .55; }
+.fab small { opacity: .6; font-weight: 700; }
+.chipfly { position: absolute; z-index: 35; background: var(--ink); color: var(--paper); font: 600 14px var(--display); padding: 7px 12px; border-radius: 99px; translate: -50% -50%; transition: transform .6s cubic-bezier(.3,.1,.2,1), opacity .2s .45s; pointer-events: none; }
+.bigplace { text-align: center; margin-top: 6px; position: relative; padding: 26px 0 10px; }
+.orbit { position: absolute; left: 50%; top: 8px; width: 190px; height: 190px; margin-left: -95px; border-radius: 50%; border: 1.5px dashed var(--line); animation: spin 18s linear infinite; }
+.orbit.b { width: 140px; height: 140px; margin-left: -70px; top: 33px; animation-duration: 12s; animation-direction: reverse; }
+.orbit::after { content: ''; position: absolute; top: -5px; left: 50%; width: 9px; height: 9px; margin-left: -5px; border-radius: 50%; background: var(--ink); }
+.bigplace small { position: relative; font-size: 11.5px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.bigplace .bn { position: relative; font: 700 92px/1.05 var(--display); letter-spacing: -4px; margin-top: 18px; }
+.bigplace .bn.sm { font-size: 60px; letter-spacing: -2px; line-height: 1.6; }
+.bigplace .up { position: relative; display: inline-flex; align-items: center; gap: 5px; margin-top: 26px; background: var(--ink); color: var(--paper); font-size: 12.5px; font-weight: 800; padding: 6px 12px; border-radius: 99px; animation: pop .5s 1.5s cubic-bezier(.2,1.5,.4,1) backwards; }
+.chart { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 22px; padding: 14px 14px 8px; animation: rise .6s .2s backwards; }
+.chart h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; }
+.chart h5 span { color: var(--grey); font-weight: 700; }
+.chart svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
+.chart .area { fill: var(--mist); stroke: none; animation: fade .8s 1.2s backwards; }
+.chart .ln { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.4s .3s cubic-bezier(.4,0,.2,1) forwards; }
+.chart .pt { animation: pop .4s backwards; animation-delay: calc(.4s + var(--i) * .22s); transform-box: fill-box; transform-origin: center; }
+.chart circle { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
+.chart circle.last { fill: var(--ink); }
+.chart text { font: 600 10px var(--display); fill: var(--ink); }
+.chart text.dx { font: 800 10px var(--text); fill: var(--grey); }
+.goals { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 22px; padding: 4px 14px; animation: rise .6s .4s backwards; }
+.goal { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.goal:last-child { border-bottom: none; }
+.goal .n { min-width: 46px; height: 46px; padding: 0 6px; border-radius: 14px; border: 1.5px solid var(--ink); display: grid; place-items: center; font: 700 13px var(--display); flex: none; }
+.goal.dk .n { background: var(--ink); color: var(--paper); }
+.goal .t { flex: 1; min-width: 0; }
+.goal b { font-size: 14.5px; font-weight: 800; display: block; }
+.goal span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.gb { height: 5px; border-radius: 3px; background: var(--mist); margin-top: 8px; overflow: hidden; }
+.gb i { display: block; height: 100%; width: 0; background: var(--ink); border-radius: 3px; transition: width 1.2s .5s cubic-bezier(.2,.9,.2,1); }
+.prizes { display: grid; gap: 8px; margin-top: 14px; }
+.pz { display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--line); border-radius: 18px; padding: 12px 14px; }
+.pz .n { font: 700 15px var(--display); min-width: 54px; }
+.pz .t { flex: 1; font-size: 14px; font-weight: 800; }
+.pz .t span { display: block; font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.pz.dk { background: var(--ink); color: var(--paper); border-color: var(--ink); position: relative; overflow: hidden; }
+.pz.dk .t span { color: inherit; opacity: .6; }
+.pz.dk svg { animation: float 2.4s ease-in-out infinite; }
+.res { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 6px; padding-bottom: 18px; scrollbar-width: none; }
+.res > small { font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); animation: fade .6s backwards; }
+.medal { position: relative; width: 168px; height: 168px; margin-top: 14px; flex: none; display: grid; place-items: center; }
+.medal svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.medal circle { fill: none; stroke: var(--ink); }
+.medal .m1 { stroke-width: 2.5; stroke-dasharray: 579; stroke-dashoffset: 579; transform: rotate(-90deg); transform-origin: center; animation: draw 1.5s .2s cubic-bezier(.4,0,.2,1) forwards; }
+.medal .m2 { stroke-width: 1.5; stroke-dasharray: 3 9; opacity: .45; transform-origin: center; animation: spin 16s linear infinite; }
+.medal b { position: relative; font: 700 74px/1 var(--display); letter-spacing: -3px; animation: pop .7s .1s cubic-bezier(.2,1.5,.4,1) backwards; }
+.res h2 { font: 700 22px/1.15 var(--display); text-transform: uppercase; margin-top: 16px; animation: rise .6s 1.5s backwards; }
+.res p { color: var(--soft); margin-top: 8px; font-size: 14.5px; line-height: 1.45; max-width: 320px; animation: rise .6s 1.7s backwards; }
+.won { margin-top: 14px; width: 100%; border: 1.5px solid var(--line); border-radius: 20px; padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; text-align: left; position: relative; overflow: hidden; animation: flipIn .8s 2s cubic-bezier(.2,1.2,.4,1) backwards; }
+.won::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.22) 50%, transparent 65%); transform: translateX(-120%); animation: shine 3s 2.8s infinite; }
+.won b { font: 600 20px var(--display); display: block; margin-top: 2px; }
+.won span { font-size: 13px; color: var(--grey); font-weight: 700; }
+.res .acts { margin-top: auto; padding-top: 14px; width: 100%; animation: rise .6s 2.3s backwards; }
+
+/* promos */
+.pcard { display: block; width: 100%; margin-top: 14px; border-radius: 24px; overflow: hidden; transition: transform .15s; }
+.pcard .pic { height: 160px; background: var(--mist); position: relative; overflow: hidden; }
+.pcard .pic img { position: absolute; right: 12px; bottom: -8px; height: 146px; transition: transform .4s; animation: imgIn .7s cubic-bezier(.2,1.2,.3,1) backwards; animation-delay: calc(.2s + var(--i, 0) * 55ms); }
+.pcard .pic .x { position: absolute; left: 18px; top: 16px; font: 700 44px var(--display); letter-spacing: -1.5px; }
+.pcard.dk .pic { background: #0B0B0B; color: #FFFFFF; }
+.pcard.dk .pic img { filter: invert(1); }
+.pcard .txt { padding: 13px 16px 15px; border: 1.5px solid var(--line); border-top: none; border-radius: 0 0 24px 24px; }
+.pcard .txt b { font-size: 15.5px; font-weight: 800; display: block; }
+.pcard .txt span { font-size: 13px; color: var(--grey); font-weight: 600; }
+.hero { height: 290px; background: #0B0B0B; color: #FFFFFF; position: relative; overflow: hidden; flex: none; }
+.hero img { position: absolute; right: -6px; bottom: -18px; height: 250px; filter: invert(1); animation: imgIn .9s .1s cubic-bezier(.2,1.2,.3,1) backwards; }
+.hero .x { position: absolute; left: 20px; bottom: 24px; font: 700 72px/.9 var(--display); letter-spacing: -3px; animation: pop .7s .3s cubic-bezier(.2,1.5,.4,1) backwards; transform-origin: left bottom; }
+.hero .x small { display: block; font-size: 13px; letter-spacing: 2px; font-weight: 600; opacity: .6; margin-bottom: 8px; }
+.hero .back { position: absolute; top: 14px; left: max(20px, env(safe-area-inset-left, 0px)); border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.1); z-index: 2; }
+.rules div { display: flex; gap: 12px; padding: 9px 0; font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+.rules div b { font: 600 12.5px var(--display); width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; flex: none; }
+.bb { flex: none; padding-top: 12px; padding-bottom: 18px; border-top: 1px solid var(--line); }
+
+/* profile, levels, stores, notifications */
+.prof { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.prof .av { width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font: 600 21px var(--display); flex: none; }
+.prof b { font: 600 19px var(--display); display: block; overflow-wrap: anywhere; }
+.prof span { color: var(--grey); font-weight: 700; font-size: 14px; }
+.list { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 22px; padding: 0 16px; }
+.list > * { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 14.5px; }
+.list > *:last-child { border-bottom: none; }
+.list .v { margin-left: auto; color: var(--grey); font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.list svg.i { width: 20px; height: 20px; }
+.cap { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 20px 0 -4px 4px; }
+.lc { margin-top: 10px; border: 1.5px solid var(--line); border-radius: 22px; padding: 15px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: transform .3s; }
+.lc.cur { border-color: var(--ink); border-width: 2.5px; transform: scale(1.02); }
+.lc.gold { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lc small { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; opacity: .55; }
+.lc .n { font: 700 19px var(--display); text-transform: uppercase; margin-top: 4px; }
+.lc .d { font-size: 13px; opacity: .6; font-weight: 600; margin-top: 4px; }
+.lc .p { font: 700 32px var(--display); }
+.badge { display: inline-block; font: 800 10.5px var(--text); letter-spacing: 1px; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 4px 8px; border-radius: 99px; margin-left: 8px; vertical-align: 3px; }
+.lc.gold .badge { background: var(--paper); color: var(--ink); }
+.map { margin-top: 14px; height: 200px; border-radius: 24px; background: var(--mist); position: relative; overflow: hidden; }
+.map .road { position: absolute; background: var(--paper); }
+.map .pin { position: absolute; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; background: var(--ink); display: grid; place-items: center; rotate: -45deg; animation: pinDrop .6s cubic-bezier(.3,1.6,.5,1) backwards; animation-delay: calc(.3s + var(--i) * .15s); }
+.map .pin i { width: 10px; height: 10px; border-radius: 50%; background: var(--paper); }
+.map .pin.soon { background: var(--grey); }
+.store { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; gap: 12px; }
+.store .ic { width: 44px; height: 44px; border-radius: 14px; background: var(--mist); display: grid; place-items: center; flex: none; }
+.store .t { flex: 1; }
+.store b { font-size: 15px; font-weight: 800; display: block; }
+.store span { font-size: 13px; color: var(--grey); font-weight: 600; }
+.pill { font-size: 12px; font-weight: 800; border: 1.5px solid var(--ink); padding: 4px 9px; border-radius: 99px; align-self: flex-start; white-space: nowrap; }
+.pill.off { border-color: var(--line); color: var(--grey); }
+.nt { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.nt .ic { width: 42px; height: 42px; border-radius: 14px; background: var(--mist); display: grid; place-items: center; flex: none; }
+.nt.new .ic { background: var(--ink); color: var(--paper); }
+.nt b { font-size: 14.5px; font-weight: 800; display: block; }
+.nt p { font-size: 13.5px; color: var(--soft); margin-top: 2px; line-height: 1.4; }
+.nt span { font-size: 12px; color: var(--grey); font-weight: 700; display: block; margin-top: 4px; }
+
+.toast { position: absolute; z-index: 44; top: 12px; left: 16px; right: 16px; background: #0B0B0B; color: #FFFFFF; border: 1.5px solid #3A3A38; border-radius: 16px; padding: 13px 16px; font-weight: 800; font-size: 14px; text-align: center; transform: translateY(-170%); transition: transform .45s cubic-bezier(.2,1.3,.4,1); }
+.toast.on { transform: none; }
+
+@keyframes fromR { from { transform: translateX(34px); opacity: 0; } }
+@keyframes fromL { from { transform: translateX(-34px); opacity: 0; } }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { transform: scale(0); opacity: 0; } }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(.7); } }
+@keyframes letter { from { transform: translateY(40px) rotate(12deg); opacity: 0; } }
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: .5; } }
+@keyframes cardIn { from { transform: translateY(80px) rotateX(60deg) rotateZ(-20deg); opacity: 0; } }
+@keyframes cardMade { from { transform: translateY(160px) rotateY(180deg) scale(.5); opacity: 0; } }
+@keyframes floatCard { 0%, 100% { transform: rotateX(14deg) rotateY(-18deg) rotateZ(4deg) translateY(0); } 50% { transform: rotateX(8deg) rotateY(14deg) rotateZ(-3deg) translateY(-10px); } }
+@keyframes shine { 0% { transform: translateX(-120%); } 40%, 100% { transform: translateX(120%); } }
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes keyIn { from { transform: scale(.8); } }
+@keyframes shake { 20%, 60% { transform: translateX(-9px); } 40%, 80% { transform: translateX(9px); } }
+@keyframes wiggle { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg) scale(1.05); } }
+@keyframes navpop { 40% { transform: translateY(-5px) scale(1.15); } }
+@keyframes scanX { 0%, 100% { left: 10px; opacity: 1; } 50% { left: calc(100% - 13px); opacity: 1; } }
+@keyframes barIn { from { transform: scaleY(0); opacity: 0; } }
+@keyframes fresh { 0%, 60% { background: var(--mist); } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+@keyframes marq { to { transform: translateX(-50%); } }
+@keyframes swap { 0% { transform: scale(.4) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.12) rotate(3deg); opacity: 1; } 100% { transform: none; } }
+@keyframes grow { from { height: 0; } }
+@keyframes drop { from { transform: translateY(-44px) rotate(-25deg); opacity: 0; } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(4deg); } }
+@keyframes blink { 40% { transform: scale(1.25); } }
+@keyframes floatUp { from { transform: translateY(6px); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-22px); opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes flipIn { from { transform: perspective(600px) rotateX(80deg); opacity: 0; } }
+@keyframes imgIn { from { transform: translateY(40px) scale(.8) rotate(8deg); opacity: 0; } }
+@keyframes pinDrop { from { translate: 0 -60px; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0s !important; }
+}
+.whint { margin-top: 14px; font-size: 13.5px; color: var(--soft); font-weight: 600; line-height: 1.45; }
+.otp.six { gap: 8px; }
+.otp.six span { width: auto; flex: 1; height: 58px; font-size: 22px; border-radius: 14px; }
+.nav.four { grid-template-columns: repeat(4, 1fr); }
+.nav.four .ind { width: 25%; }
+.ibtn.spin svg { animation: spin .7s; }
+.rmain .scroll { padding-top: 4px; }
+.rlist { padding-bottom: 8px; }
+.rnote { color: var(--grey); font-size: 12.5px; font-weight: 600; margin: 10px 0 0; line-height: 1.45; text-align: center; }
+.nf { margin: 22px 0 14px; text-align: center; color: var(--soft); font-weight: 700; font-size: 14px; line-height: 1.45; }
+.op.ref .t b, .op.ref .amt { text-decoration: line-through; color: var(--grey); }
+.payrow > div { min-width: 0; }
+.busy { position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(11,11,11,.16); opacity: 0; pointer-events: none; transition: opacity .2s .2s; }
+.busy.on { opacity: 1; pointer-events: auto; }
+.busy i { width: 46px; height: 46px; border-radius: 50%; border: 3.5px solid rgba(255,255,255,.3); border-top-color: #FFFFFF; background: #0B0B0B; box-shadow: 0 0 0 9px #0B0B0B; animation: spin .8s linear infinite; }
+.codebig { margin-top: 14px; background: var(--ink); color: var(--paper); border-radius: 22px; padding: 16px; text-align: center; }
+.codebig small { display: block; font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; opacity: .6; }
+.codebig b { display: flex; justify-content: center; gap: 10px; font: 700 42px/1.15 var(--brand); margin-top: 4px; }
+.codebig b i { font-style: normal; animation: pop .45s cubic-bezier(.2,1.6,.4,1) backwards; animation-delay: calc(var(--i) * 80ms); }
+.codebig span { display: block; font-size: 13px; opacity: .7; font-weight: 700; margin-top: 6px; }
+.sheet.locked .grab { opacity: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- welcome -->
+  <section class="view" id="v-welcome" data-dark>
+    <button class="langbtn" id="langBtn" aria-label="Language"><span data-ic="globe"></span><b>RU</b></button>
+    <div class="wl pad">
+      <div class="wmbig" id="wmbig" aria-label="ISTANBUL"></div>
+      <p class="lead a" style="--i:8">Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.</p>
+      <div class="stage"><div class="ring r1"></div><div class="ring r2"></div>
+        <div class="democard"><b>ISTANBUL</b><span>IST •••• ••••</span></div>
+      </div>
+      <div class="perk a" style="--i:12"><b id="wPct">3%</b>Кешбэк бонусами с первой покупки</div>
+      <div class="perk a" style="--i:14"><b id="wWelcome">+1 000</b>Приветственные бонусы на карту</div>
+      <p class="whint a" style="--i:15">Карту выдаёт кассир в магазине и говорит код для входа.</p>
+      <button class="cta a" style="--i:16" id="wGo">Войти</button>
+    </div>
+  </section>
+
+  <!-- phone -->
+  <section class="view" id="v-phone">
+    <div class="col pad">
+      <button class="back" data-back aria-label="Back"></button>
+      <h2 class="big-t">Ваш номер<br>телефона</h2>
+      <p class="lead">Введите номер, который вы назвали кассиру.</p>
+      <div class="inp"><span class="pre">+7</span><span id="phDigits"></span><span class="caret"></span></div>
+      <div class="grow"></div>
+      <button class="cta" id="phNext" disabled>Далее</button>
+      <div class="keypad" data-pad="phone"></div>
+    </div>
+  </section>
+
+  <!-- code -->
+  <section class="view" id="v-otp">
+    <div class="col pad">
+      <button class="back" data-back aria-label="Back"></button>
+      <h2 class="big-t">Код от кассира</h2>
+      <p class="lead">Кассир назвал вам 6 цифр, когда выдавал карту. Если код потерялся, попросите на кассе новый.</p>
+      <div class="otp six" id="otp"><span style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span><span style="--i:4"></span><span style="--i:5"></span></div>
+      <div class="resend" id="otpPhone"></div>
+      <div class="grow"></div>
+      <div class="keypad" data-pad="otp"></div>
+    </div>
+  </section>
+
+  <!-- main -->
+  <section class="view" id="v-main">
+    <div class="tabs-area">
+      <div class="tab on" id="t-card">
+        <div class="scroll pad" id="cardScroll">
+          <div class="top a"><div class="word">ISTANBUL</div><button class="ibtn" id="reload" aria-label="Refresh"><span data-ic="refresh"></span></button></div>
+          <div class="hello a" style="--i:1"><span id="hiTime">Добрый день</span>,<b id="hiName"></b></div>
+          <button class="bcard a" style="--i:2" id="bcard" aria-label="ISTANBUL card">
+            <span class="bc-top"><span class="bword">ISTANBUL</span><span class="lvl" id="lvlPill"></span></span>
+            <span class="bc-mid"><span><small>Бонусный счёт</small><span class="bal" id="balBox"><b id="bal">0</b><span>бонусов</span></span></span><span class="chipset"><span data-ic="wave"></span><span class="chip"></span></span></span>
+            <span class="bc-row"><span class="holder" id="holder"></span><span class="num cardnum"></span></span>
+            <span class="bc-code"><span id="bcBars"></span><span class="digits" id="bcDigits"></span></span>
+            <span class="bc-hint"><span data-ic="scan"></span>Нажмите, чтобы показать кассиру</span>
+          </button>
+          <button class="rwidget a" style="--i:3" id="rw"><span class="pl" id="rwPl"></span><span class="t"><b id="rwT"></b><span id="rwS"></span></span></button>
+          <div class="box a" style="--i:4"><h5><span id="lvT" style="color:inherit;font-weight:800"></span><span id="lvR"></span></h5><div class="pbar"><i id="lvBar"></i></div>
+            <div class="steps" id="steps"></div></div>
+          <div class="sec a" style="--i:5"><h4>Операции</h4><button id="allOps">Все</button></div>
+          <div id="homeOps"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-history">
+        <div class="scroll pad">
+          <div class="h1 a">История</div>
+          <div class="chipsel a" style="--i:1;margin-top:14px" id="hFilter"><button class="on" data-f="all">Все</button><button data-f="earn">Начисления</button><button data-f="spend">Списания</button></div>
+          <div class="totals a" style="--i:2"><div><small>Начислено всего</small><b id="hEarn">0</b></div><div><small>Потрачено</small><b id="hSpend">0</b></div></div>
+          <div id="opsList"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-rating">
+        <header class="rhd pad">
+          <div class="trow"><div class="h1">Рейтинг</div><div class="timer"><span id="monthName"></span><b id="timer"></b></div></div>
+        </header>
+        <div class="rmain">
+          <div class="scroll pad" id="ratingScroll">
+            <div class="podium" id="podium"></div>
+            <div class="mecard" id="mecard">
+              <div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" id="ring" cx="32" cy="32" r="27"/></svg><div class="place" id="place"></div></div>
+              <div class="t"><small>Ваше место</small><b id="gapLine"></b><span class="sub" id="target"></span></div>
+              <div class="score"><b id="myScore">0</b><small>очков</small></div>
+            </div>
+            <div class="rlist" id="rlist"></div>
+            <p class="rnote">1 тенге покупок = 1 очко. Рейтинг обнуляется 1-го числа каждого месяца.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-profile">
+        <div class="scroll pad">
+          <div class="h1 a">Профиль</div>
+          <div class="prof a" style="--i:1"><div class="av" id="pAv"></div><div><b id="pName"></b><span id="pPhone"></span></div></div>
+          <div class="list a" style="--i:2">
+            <button data-go="v-levels"><span data-ic="star"></span>Уровни и правила<span class="v"><span id="pLvl"></span><span data-ic="next"></span></span></button>
+            <button id="langRow"><span data-ic="globe"></span>Язык<span class="v"><span id="pLang"></span><span data-ic="next"></span></span></button>
+          </div>
+          <div class="cap a" style="--i:3">Настройки</div>
+          <div class="list a" style="--i:3">
+            <div><span data-ic="trophy"></span>Участвовать в рейтинге<button class="toggle" role="switch" id="tRating" aria-label="Rating"></button></div>
+          </div>
+          <div class="list a" style="--i:4"><button id="logout"><span data-ic="out"></span>Выйти</button></div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav four" id="nav" aria-label="Sections">
+      <div class="ind" id="navInd"><i></i></div>
+      <button class="on" data-tab="card"><span data-ic="card"></span>Карта</button>
+      <button data-tab="history"><span data-ic="clock"></span>История</button>
+      <button data-tab="rating"><span data-ic="trophy"></span>Рейтинг</button>
+      <button data-tab="profile"><span data-ic="user"></span>Профиль</button>
+    </nav>
+  </section>
+
+  <section class="view" id="v-levels"><div class="scroll pad" id="levelsBody"></div></section>
+
+  <div class="dim" id="dim"></div>
+  <div class="sheet pad" id="sheet" role="dialog" aria-modal="true"></div>
+  <div class="busy" id="busy"><i></i></div>
+</div>
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const app = $('#app');
+  const API = 'https://qxwivnwzpbiewptaskzq.supabase.co/rest/v1/rpc/', API_KEY = 'sb_publishable_vfe4cA46bAE7RQubAcfzZg_21bBgbeh';
+  const CUR = '₸';
+  const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const two = n => String(n).padStart(2, '0');
+  const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+  const store = {
+    get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* storage is optional */ } },
+  };
+
+  /* ---------- languages: Russian text is the key, [Kazakh, English] ---------- */
+  const TR = {
+    'Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.': ['Киім дүкендерінің бонус картасы. Әр сатып алудан бонус жинап, чектің жартысына дейін бонуспен төлеңіз.', 'A bonus card for our clothing stores. Earn bonuses on every purchase and pay up to half of the bill with them.'],
+    'Кешбэк бонусами с первой покупки': ['Алғашқы сатып алудан бонуспен кешбэк', 'Cashback in bonuses from the first purchase'],
+    'Приветственные бонусы на карту': ['Картаға сәлемдесу бонустары', 'Welcome bonuses on your card'],
+    'Карту выдаёт кассир в магазине и говорит код для входа.': ['Картаны дүкендегі кассир береді және кіру кодын айтады.', 'The cashier in the store issues the card and tells you the login code.'],
+    'Войти': ['Кіру', 'Log in'], 'Ваш номер': ['Телефон', 'Your phone'], 'телефона': ['нөміріңіз', 'number'],
+    'Введите номер, который вы назвали кассиру.': ['Кассирге айтқан нөміріңізді енгізіңіз.', 'Enter the number you gave the cashier.'], 'Далее': ['Әрі қарай', 'Next'],
+    'Код от кассира': ['Кассирдің коды', 'Code from the cashier'],
+    'Кассир назвал вам 6 цифр, когда выдавал карту. Если код потерялся, попросите на кассе новый.': ['Кассир картаны бергенде 6 сан айтты. Код жоғалса, кассадан жаңасын сұраңыз.', 'The cashier told you 6 digits when issuing the card. If you lost the code, ask for a new one at the till.'],
+    'Номер: {0}': ['Нөмір: {0}', 'Number: {0}'],
+    'Неверный код': ['Код қате', 'Wrong code'], 'Слишком много попыток. Попробуйте через 15 минут': ['Әрекет тым көп. 15 минуттан кейін көріңіз', 'Too many attempts. Try again in 15 minutes'],
+    'Нет интернета. Проверьте связь': ['Интернет жоқ. Байланысты тексеріңіз', 'No internet. Check your connection'], 'Ошибка сервера. Попробуйте ещё раз': ['Сервер қатесі. Қайталап көріңіз', 'Server error. Please try again'],
+    'Войдите снова': ['Қайта кіріңіз', 'Please log in again'], 'С возвращением, {0}': ['Қайта келуіңізбен, {0}', 'Welcome back, {0}'],
+    'Доброй ночи': ['Қайырлы түн', 'Good night'], 'Доброе утро': ['Қайырлы таң', 'Good morning'], 'Добрый день': ['Қайырлы күн', 'Good afternoon'], 'Добрый вечер': ['Қайырлы кеш', 'Good evening'],
+    'Бонусный счёт': ['Бонус шоты', 'Bonus balance'], 'бонусов': ['бонус', 'bonuses'], 'Нажмите, чтобы показать кассиру': ['Кассирге көрсету үшін басыңыз', 'Tap to show the cashier'],
+    'Рейтинг · {0}': ['Рейтинг · {0}', 'Rating · {0}'], 'Вы лидер месяца': ['Сіз ай көшбасшысысыз', 'You lead this month'], 'Вы скрыты из рейтинга': ['Сіз рейтингте жасырылғансыз', 'You are hidden from the rating'],
+    'До {0}-го места {1} ₸ покупок': ['{0}-орынға дейін {1} ₸', '{1} ₸ more to reach place {0}'], 'Сделайте покупку, чтобы попасть в рейтинг': ['Рейтингке кіру үшін сатып алу жасаңыз', 'Make a purchase to join the rating'],
+    'До уровня «{0}»': ['«{0}» деңгейіне дейін', 'To {0} level'], 'Максимальный уровень': ['Ең жоғары деңгей', 'Top level'], 'кешбэк {0}%': ['кешбэк {0}%', '{0}% cashback'],
+    'Базовый': ['Базалық', 'Basic'], 'Серебро': ['Күміс', 'Silver'], 'Золото': ['Алтын', 'Gold'],
+    'Операции': ['Операциялар', 'Activity'], 'Все': ['Барлығы', 'All'], 'История': ['Тарих', 'History'], 'Начисления': ['Есептелген', 'Earned'], 'Списания': ['Жұмсалған', 'Spent'],
+    'Начислено всего': ['Барлығы есептелді', 'Total earned'], 'Потрачено': ['Жұмсалды', 'Spent'], 'Пока пусто': ['Әзірге бос', 'Nothing here yet'],
+    'Покажите карту на кассе, и здесь появятся бонусы': ['Кассада картаны көрсетіңіз, бонустар осында пайда болады', 'Show your card at the till and bonuses will appear here'],
+    'Вы ещё не оплачивали покупки бонусами': ['Сіз әлі бонуспен төлеген жоқсыз', 'You have not paid with bonuses yet'],
+    'Покупка': ['Сатып алу', 'Purchase'], 'Оплата бонусами': ['Бонуспен төлеу', 'Paid with bonuses'], 'Возврат покупки': ['Сатып алуды қайтару', 'Purchase refund'], 'Приветственные бонусы': ['Сәлемдесу бонустары', 'Welcome bonuses'],
+    'чек': ['чек', 'bill'], 'возврат': ['қайтарылды', 'refunded'], 'Сегодня': ['Бүгін', 'Today'], 'Вчера': ['Кеше', 'Yesterday'],
+    'Операция': ['Операция', 'Operation'], 'Сумма чека': ['Чек сомасы', 'Bill total'], 'Списано': ['Шегерілді', 'Deducted'], 'Начислено': ['Есептелді', 'Earned'], 'Оплачено деньгами': ['Ақшамен төленді', 'Paid in money'],
+    'Снято начисленных': ['Есептелгені алынды', 'Earned taken back'], 'Возвращено бонусов': ['Қайтарылған бонус', 'Bonuses returned'], '1 бонус': ['1 бонус', '1 bonus'], 'Закрыть': ['Жабу', 'Close'],
+    'Покажите кассиру': ['Кассирге көрсетіңіз', 'Show the cashier'], 'Бонусы начислятся сразу после оплаты': ['Бонустар төлемнен кейін бірден есептеледі', 'Bonuses are credited right after payment'],
+    'Номер карты': ['Карта нөмірі', 'Card number'], 'Списать бонусы': ['Бонус жұмсау', 'Pay with bonuses'],
+    'Чтобы оплатить бонусами, получите код и назовите его кассиру': ['Бонуспен төлеу үшін код алып, оны кассирге айтыңыз', 'To pay with bonuses, get a code and tell it to the cashier'],
+    'Получить код': ['Код алу', 'Get code'], 'Код для кассира': ['Кассирге арналған код', 'Code for the cashier'], 'Назовите этот код кассиру. Действует {0}': ['Осы кодты кассирге айтыңыз. Жарамды: {0}', 'Tell this code to the cashier. Valid for {0}'],
+    'Код устарел. Получите новый': ['Код ескірді. Жаңасын алыңыз', 'The code expired. Get a new one'], 'Новый код': ['Жаңа код', 'New code'],
+    '+{0} бонусов на карту': ['Картаға +{0} бонус', '+{0} bonuses on your card'], 'Новый уровень: {0} · кешбэк {1}%': ['Жаңа деңгей: {0} · кешбэк {1}%', 'New level: {0} · {1}% cashback'],
+    'Рейтинг': ['Рейтинг', 'Rating'], '{0} · до итогов': ['{0} · қорытындыға дейін', '{0} · results in'], '{0} д': ['{0} к', '{0} d'], 'Ваше место': ['Сіздің орныңыз', 'Your place'], 'очков': ['ұпай', 'points'], 'Вы': ['Сіз', 'You'],
+    'Вы лидер': ['Сіз көшбасшысыз', 'You are the leader'], 'держите первое место': ['бірінші орынды сақтаңыз', 'hold the first place'], 'обгоните: {0}': ['басып озыңыз: {0}', 'overtake: {0}'],
+    'Пока никто не покупал в этом месяце': ['Бұл айда әзірге ешкім сатып алмады', 'No purchases this month yet'], 'из {0} покупателей': ['{0} сатып алушыдан', 'out of {0} shoppers'],
+    '1 тенге покупок = 1 очко. Рейтинг обнуляется 1-го числа каждого месяца.': ['1 теңге сатып алу = 1 ұпай. Рейтинг әр айдың 1-інде нөлденеді.', '1 tenge spent = 1 point. The rating resets on the 1st of every month.'],
+    'Включите участие в профиле, чтобы видеть своё место': ['Орныңызды көру үшін профильде қатысуды қосыңыз', 'Turn on participation in your profile to see your place'],
+    'Профиль': ['Профиль', 'Profile'], 'Уровни и правила': ['Деңгейлер мен ережелер', 'Levels and rules'], 'Язык': ['Тіл', 'Language'], 'Настройки': ['Баптаулар', 'Settings'],
+    'Участвовать в рейтинге': ['Рейтингке қатысу', 'Take part in the rating'], 'Выйти': ['Шығу', 'Log out'], 'Вы снова в рейтинге': ['Сіз қайтадан рейтингтесіз', 'You are back in the rating'], 'Ваше имя скрыто из рейтинга': ['Атыңыз рейтингтен жасырылды', 'Your name is hidden from the rating'],
+    'Выйти из аккаунта?': ['Аккаунттан шығасыз ба?', 'Log out?'], 'Карта и бонусы сохранятся. Чтобы войти снова, понадобится код от кассира.': ['Карта мен бонустар сақталады. Қайта кіру үшін кассирдің коды керек болады.', 'Your card and bonuses stay. To log in again you will need a code from the cashier.'], 'Остаться': ['Қалу', 'Stay'],
+    'Язык приложения': ['Қолданба тілі', 'App language'], 'Язык изменён': ['Тіл өзгертілді', 'Language changed'], 'Карта': ['Карта', 'Card'],
+    'Уровни': ['Деңгейлер', 'Levels'], 'Больше покупок, больше бонусов': ['Көбірек сатып алу, көбірек бонус', 'More purchases, more bonuses'],
+    'Уровень зависит от суммы покупок за последние 12 месяцев.': ['Деңгей соңғы 12 айдағы сатып алу сомасына байланысты.', 'Your level depends on purchases over the last 12 months.'],
+    'с первой покупки': ['алғашқы сатып алудан', 'from the first purchase'], 'от {0} ₸': ['{0} ₸-ден', 'from {0} ₸'], 'ваш': ['сіздікі', 'yours'], 'осталось {0} ₸': ['{0} ₸ қалды', '{0} ₸ to go'],
+    '{0}% бонусами с каждой покупки': ['әр сатып алудан {0}% бонус', '{0}% back in bonuses on every purchase'],
+    '1 бонус = 1 тенге при оплате': ['Төлегенде 1 бонус = 1 теңге', '1 bonus = 1 tenge when paying'], 'Бонусами можно оплатить до {0}% чека': ['Бонуспен чектің {0}%-ына дейін төлеуге болады', 'Bonuses cover up to {0}% of a bill'],
+    'Списание подтверждается кодом из приложения': ['Шегеру қолданбадағы кодпен расталады', 'Paying with bonuses is confirmed with a code from the app'],
+    'Кешбэк начисляется на сумму, оплаченную деньгами': ['Кешбэк ақшамен төленген сомаға есептеледі', 'Cashback is earned on the part paid with money'],
+    'Обновлено': ['Жаңартылды', 'Updated'],
+  };
+  const LANGS = [['ru', 'RU', 'Русский'], ['kk', 'ҚАЗ', 'Қазақша'], ['en', 'EN', 'English']];
+  let lang = 'ru';
+  { const l = store.get('istanbul-lang'); if (LANGS.some(x => x[0] === l)) lang = l; }
+  const t = (s, ...a) => { const e = TR[s]; let r = lang === 'ru' || !e ? s : e[lang === 'kk' ? 0 : 1]; a.forEach((v, i) => { r = r.split('{' + i + '}').join(v); }); return r; };
+  const MONTHS = {
+    ru: [['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'], ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']],
+    kk: [['қаңтар', 'ақпан', 'наурыз', 'сәуір', 'мамыр', 'маусым', 'шілде', 'тамыз', 'қыркүйек', 'қазан', 'қараша', 'желтоқсан']],
+    en: [['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']],
+  };
+  const dateText = d => { const m = MONTHS[lang]; return lang === 'en' ? `${d.getDate()} ${m[0][d.getMonth()]}` : `${d.getDate()} ${(m[1] || m[0])[d.getMonth()]}`; };
+  const statics = [];
+  (() => {
+    const w = document.createTreeWalker(app, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) { const s = n.nodeValue.trim(); if (/[А-Яа-яЁё]/.test(s)) statics.push({ n, ru: s, pre: n.nodeValue.match(/^\s*/)[0], post: n.nodeValue.match(/\s*$/)[0] }); }
+  })();
+
+  const P = {
+    card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8M9 18h6"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
+    gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3.5 7.5 8 12 8zM12 8s1.5-5 4-4.5S16.5 8 12 8z"/>',
+    back: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M5 12.5 10 17 19 7"/>',
+    alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.01"/>',
+    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>',
+    del: '<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m16 9-6 6M10 9l6 6"/>',
+    scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+    wave: '<path d="M7 8a6 6 0 0 1 0 8M11 5.5a10 10 0 0 1 0 13M15 3a14 14 0 0 1 0 18"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    crown: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
+  };
+  const ic = k => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[k]}</svg>`;
+  $$('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic); });
+  $$('.back').forEach(b => { b.innerHTML = ic('back'); });
+  $('#wmbig').innerHTML = [...'ISTANBUL'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('');
+
+  function count(el, from, to, ms = 900, f = fmt) {
+    cancelAnimationFrame(el._raf);
+    if (calm || from === to) { el.textContent = f(to); return; }
+    const t0 = performance.now();
+    const step = now => { const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = f(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
+    el._raf = requestAnimationFrame(step);
+  }
+  function setNum(el, v, anim, f = fmt) {
+    if (el._v === undefined || !anim) { cancelAnimationFrame(el._raf); el.textContent = f(v); }
+    else if (el._v !== v) count(el, el._v, v, 900, f);
+    el._v = v;
+  }
+
+  /* ---------- server ---------- */
+  class ApiError extends Error { constructor(code) { super(code); this.code = code; } }
+  async function rpc(fn, args = {}) {
+    let r;
+    try { r = await fetch(API + fn, { method: 'POST', headers: { apikey: API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args) }); }
+    catch (e) { throw new ApiError('net'); }
+    let d = null; try { d = await r.json(); } catch (e) { /* empty body */ }
+    if (!r.ok) throw new ApiError('server');
+    if (d && d.error) throw new ApiError(d.error);
+    return d;
+  }
+  const errText = c => t({ net: 'Нет интернета. Проверьте связь', code: 'Неверный код', locked: 'Слишком много попыток. Попробуйте через 15 минут', auth: 'Войдите снова' }[c] || 'Ошибка сервера. Попробуйте ещё раз');
+  let busyN = 0;
+  const busy = on => { busyN = Math.max(0, busyN + (on ? 1 : -1)); $('#busy').classList.toggle('on', busyN > 0); };
+
+  /* ---------- state ---------- */
+  let token = store.get('istanbul-client-token');
+  let me = null, ops = [], rating = null;
+  let settings = { welcome_bonus: 1000, max_spend_pct: 50, levels: [{ name: 'Базовый', pct: 3, from: 0 }, { name: 'Серебро', pct: 5, from: 100000 }, { name: 'Золото', pct: 7, from: 250000 }] };
+  const fmtPhone = d => `+7 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  const cardNo = () => `IST ${me.phone.slice(2, 6)} ${me.phone.slice(6)}`;
+  const fullName = () => me.first_name + (me.last_name ? ' ' + me.last_name : '');
+  const initials = () => (me.first_name[0] + (me.last_name ? me.last_name[0] : '')).toUpperCase();
+  const hm = iso => { const d = new Date(iso); return two(d.getHours()) + ':' + two(d.getMinutes()); };
+  function dayLabel(iso) {
+    const d = new Date(iso), n = new Date();
+    const diff = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    if (diff === 0) return t('Сегодня'); if (diff === 1) return t('Вчера');
+    return dateText(d);
+  }
+  const monthName = () => { const s = MONTHS[lang][0][new Date().getMonth()]; return s[0].toUpperCase() + s.slice(1); };
+
+  /* ---------- barcode (EAN-13) ---------- */
+  const EL = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+  const EG = ['0100111', '0110011', '0011011', '0100001', '0011101', '0111001', '0000101', '0010001', '0001001', '0010111'];
+  const ER = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100'];
+  const PAR = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+  function ean13(d12) {
+    let s = 0; [...d12].forEach((c, i) => { s += +c * (i % 2 ? 3 : 1); });
+    const d = d12 + ((10 - s % 10) % 10), par = PAR[+d[0]]; let b = '101';
+    for (let i = 1; i <= 6; i++) b += (par[i - 1] === 'L' ? EL : EG)[+d[i]];
+    b += '01010'; for (let i = 7; i <= 12; i++) b += ER[+d[i]];
+    return { digits: d, bits: b + '101' };
+  }
+  const cardCode = () => ean13('29' + me.phone);
+  function barsSvg(bits) {
+    let x = 0, n = 0, out = '';
+    bits.match(/1+|0+/g).forEach(r => { if (r[0] === '1') out += `<rect x="${x}" y="0" width="${r.length}" height="10" style="--i:${n++}"/>`; x += r.length; });
+    return `<svg class="bars" viewBox="0 0 95 10" preserveAspectRatio="none" aria-hidden="true">${out}</svg>`;
+  }
+  const spaced = d => `${d[0]} ${d.slice(1, 7)} ${d.slice(7)}`;
+
+  /* ---------- effects ---------- */
+  const fx = $('#fx'), ctx = fx.getContext('2d');
+  let parts = [], raf = 0, W = 0, H = 0;
+  function size() { const r = app.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2); W = r.width; H = r.height; fx.width = W * d; fx.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
+  size(); addEventListener('resize', size);
+  const palette = () => app.classList.contains('is-dark') ? ['#FFFFFF', '#BDBDB8', '#6A6A66'] : ['#0B0B0B', '#5C5C58', '#BDBDB8'];
+  function particle(x, y, vx, vy) {
+    const c = palette();
+    parts.push({ x, y, vx, vy, r: 3 + Math.random() * 5, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, life: 1, c: c[Math.floor(Math.random() * c.length)], round: Math.random() < .4 });
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+  function burst(x, y, n) { if (calm) return; for (let i = 0; i < n; i++) particle(x, y, (Math.random() - .5) * 11, -Math.random() * 10 - 2); }
+  function rain(n, ms) { if (calm) return; for (let i = 0; i < n; i++) setTimeout(() => particle(Math.random() * W, -10, (Math.random() - .5) * 1.6, 1.5 + Math.random() * 3), Math.random() * ms); }
+  function frame() {
+    ctx.clearRect(0, 0, W, H);
+    parts.forEach(p => {
+      p.vy += .13; p.x += p.vx; p.y += p.vy; p.vx *= .985; p.rot += p.vr; p.life -= .008;
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.r / 2, 0, 7); ctx.fill(); } else ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
+      ctx.restore();
+    });
+    parts = parts.filter(p => p.life > 0 && p.y < H + 20);
+    raf = parts.length ? requestAnimationFrame(frame) : 0;
+    if (!raf) ctx.clearRect(0, 0, W, H);
+  }
+  const center = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
+  let toastT;
+  function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600); }
+
+  /* ---------- sheet ---------- */
+  const sheet = $('#sheet'), dim = $('#dim');
+  let onSheetClose = null;
+  function openSheet(html, cls = '', onClose = null) {
+    const was = sheet.classList.contains('on');
+    sheet.className = 'sheet pad ' + cls + (was ? ' on' : ''); sheet.innerHTML = '<div class="grab"></div>' + html; sheet.scrollTop = 0; onSheetClose = onClose;
+    requestAnimationFrame(() => { sheet.classList.add('on'); dim.classList.add('on'); });
+  }
+  function closeSheet() { sheet.classList.remove('on'); dim.classList.remove('on'); const f = onSheetClose; onSheetClose = null; if (f) f(); }
+  dim.addEventListener('click', closeSheet);
+  sheet.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
+
+  /* ---------- navigation ---------- */
+  let stack = [], curTab = 'card';
+  const curView = () => stack[stack.length - 1];
+  const syncDark = () => app.classList.toggle('is-dark', $('#' + curView()).hasAttribute('data-dark'));
+  function showView(id, dir) {
+    $$('.view').forEach(v => v.classList.toggle('on', v.id === id));
+    const v = $('#' + id); v.classList.remove('from-r', 'from-l'); void v.offsetWidth; if (dir) v.classList.add(dir === 'back' ? 'from-l' : 'from-r');
+    parts = []; syncDark(); app.scrollTop = 0;
+  }
+  function push(id) { stack.push(id); showView(id, 'fwd'); }
+  function pop() { if (stack.length > 1) { stack.pop(); showView(curView(), 'back'); if (curView() === 'v-main') showTab(curTab); } }
+  function reset(id) { stack = [id]; showView(id, 'fwd'); }
+  app.addEventListener('click', e => { if (e.target.closest('[data-back]')) pop(); const g = e.target.closest('[data-go]'); if (g) openSub(g.dataset.go); });
+  /* the Android back button asks the page first */
+  window.__back = () => {
+    if (sheet.classList.contains('on')) { closeSheet(); return true; }
+    if (stack.length > 1) { pop(); return true; }
+    if (curView() === 'v-main' && curTab !== 'card') { showTab('card'); return true; }
+    return false;
+  };
+
+  /* ---------- keypads, phone, code ---------- */
+  $$('.keypad').forEach(k => { k.innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(d => d === '' ? '<span></span>' : `<button class="key ${d === 'del' ? 'x' : ''}" data-k="${d}" aria-label="${d === 'del' ? 'Delete' : d}">${d === 'del' ? ic('del') : d}</button>`).join(''); });
+  app.addEventListener('click', e => { const k = e.target.closest('.key'); if (k) press(k.closest('.keypad').dataset.pad, k.dataset.k); });
+  addEventListener('keydown', e => {
+    const pad = curView() === 'v-phone' ? 'phone' : curView() === 'v-otp' ? 'otp' : null;
+    if (!pad) return;
+    if (/^\d$/.test(e.key)) press(pad, e.key); else if (e.key === 'Backspace') press(pad, 'del'); else if (e.key === 'Enter' && pad === 'phone') $('#phNext').click();
+  });
+  let phone = '', typed = '', checking = false;
+  function press(pad, k) {
+    if (pad === 'phone') {
+      if (k === 'del') phone = phone.slice(0, -1); else if (phone.length < 10) phone += k;
+      $('#phDigits').textContent = [phone.slice(0, 3), phone.slice(3, 6), phone.slice(6, 8), phone.slice(8)].filter(Boolean).join(' ');
+      $('#phNext').disabled = phone.length !== 10;
+    } else {
+      if (checking || $('#otp').classList.contains('ok')) return;
+      if (k === 'del') typed = typed.slice(0, -1); else if (typed.length < 6) typed += k;
+      drawOtp(); if (typed.length === 6) checkCode();
+    }
+  }
+  function drawOtp() { $$('#otp span').forEach((s, i) => { s.textContent = typed[i] || ''; s.className = i < typed.length ? 'f' : i === typed.length ? 'cur' : ''; }); }
+  $('#wGo').addEventListener('click', () => { phone = ''; press('phone', 'del'); push('v-phone'); });
+  $('#phNext').addEventListener('click', () => {
+    if (phone.length !== 10) return;
+    typed = ''; $('#otp').className = 'otp six'; drawOtp(); $('#otpPhone').textContent = t('Номер: {0}', fmtPhone(phone)); push('v-otp');
+  });
+  async function checkCode() {
+    checking = true; busy(true);
+    try {
+      const r = await rpc('customer_login', { p_phone: phone, p_code: typed });
+      token = r.token; store.set('istanbul-client-token', token);
+      $('#otp').classList.add('ok');
+      await load(false);
+      setTimeout(() => { enterMain(); toast(t('С возвращением, {0}', me.first_name)); }, 500);
+    } catch (e) {
+      replay($('#otp'), 'bad'); typed = ''; setTimeout(drawOtp, 350); toast(errText(e.code));
+    } finally { checking = false; busy(false); }
+  }
+
+  /* ---------- data ---------- */
+  let loading = null, lastLoad = 0;
+  function load(quiet) {
+    if (loading) return loading;
+    if (!quiet) busy(true);
+    loading = rpc('customer_me', { p_token: token }).then(d => {
+      const prev = me ? me.balance : +(store.get('istanbul-client-bal') || NaN);
+      const prevLevel = me ? me.level.idx : null;
+      me = d.customer; ops = d.ops; rating = d.rating; settings = d.settings || settings; lastLoad = Date.now();
+      store.set('istanbul-client-bal', String(me.balance));
+      return { prev, prevLevel };
+    }).catch(e => {
+      if (e.code === 'auth') { logoutLocal(); toast(errText('auth')); }
+      else if (!quiet) toast(errText(e.code));
+      throw e;
+    }).finally(() => { loading = null; if (!quiet) busy(false); });
+    return loading;
+  }
+  function refresh(quiet = true) {
+    if (!token) return;
+    load(quiet).then(({ prev, prevLevel }) => {
+      if (curView() === 'v-main') showTab(curTab, true);
+      if (!isNaN(prev) && me.balance > prev) {
+        toast(t('+{0} бонусов на карту', fmt(me.balance - prev)));
+        if (curTab === 'card') setTimeout(() => { const c = center($('#bcard')); burst(c.x, c.y, 90); }, 500);
+      }
+      if (prevLevel !== null && me.level.idx > prevLevel) { setTimeout(() => toast(t('Новый уровень: {0} · кешбэк {1}%', t(me.level.name), me.level.pct)), 2700); rain(120, 2200); }
+    }).catch(() => {});
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && token && Date.now() - lastLoad > 5000) refresh(true); });
+  setInterval(() => { if (!document.hidden && token && curView() === 'v-main') refresh(true); }, 30000);
+  $('#reload').addEventListener('click', () => { replay($('#reload'), 'spin'); refresh(false); });
+
+  /* ---------- home ---------- */
+  function opRows(o) {
+    const day = dayLabel(o.created_at) + ', ' + hm(o.created_at), rows = [];
+    if (o.kind === 'welcome') rows.push({ o, ic: 'gift', title: 'Приветственные бонусы', sub: day, amt: '+' + fmt(o.earn) });
+    if (o.kind === 'sale') {
+      rows.push({ o, ic: 'plus', title: 'Покупка', sub: `${day} · ${t('чек')} ${fmt(o.amount)} ${CUR}` + (o.refunded ? ` · ${t('возврат')}` : ''), amt: '+' + fmt(o.earn), ref: o.refunded });
+      if (o.spend) rows.push({ o, ic: 'minus', neg: true, title: 'Оплата бонусами', sub: `${day} · ${t('чек')} ${fmt(o.amount)} ${CUR}`, amt: '−' + fmt(o.spend), ref: o.refunded });
+    }
+    if (o.kind === 'refund') { const net = o.spend - o.earn; rows.push({ o, ic: 'undo', neg: net < 0, title: 'Возврат покупки', sub: `${day} · ${t('чек')} ${fmt(o.amount)} ${CUR}`, amt: (net < 0 ? '−' : '+') + fmt(Math.abs(net)) }); }
+    return rows;
+  }
+  const rowHtml = (r, i) => `<button class="op a${r.ref ? ' ref' : ''}" style="--i:${i}" data-op="${r.o.id}"><span class="ic ${r.neg ? 'neg' : ''}">${ic(r.ic)}</span><span class="t"><b>${t(r.title)}</b><span>${r.sub}</span></span><span class="amt ${r.neg ? 'neg' : ''}">${r.amt}</span></button>`;
+  const allRows = () => ops.flatMap(opRows);
+  function refreshHome(anim) {
+    const h = new Date().getHours();
+    $('#hiTime').textContent = t(h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер');
+    $('#hiName').textContent = fullName(); $('#holder').textContent = fullName();
+    setNum($('#bal'), me.balance, anim); $('#balBox').classList.toggle('sm', me.balance >= 100000);
+    const L = me.level;
+    $('#lvlPill').textContent = `${t(L.name)} · ${L.pct}%`;
+    $$('.cardnum').forEach(e => { e.textContent = cardNo(); });
+    const c = cardCode(); $('#bcBars').innerHTML = barsSvg(c.bits); $('#bcDigits').textContent = spaced(c.digits);
+    $('#lvT').textContent = L.next_name ? t('До уровня «{0}»', t(L.next_name)) : t('Максимальный уровень');
+    $('#lvR').textContent = L.next_name ? `${fmt(me.year_total)} / ${fmt(L.next_from)} ${CUR}` : t('кешбэк {0}%', L.pct);
+    requestAnimationFrame(() => { $('#lvBar').style.width = (L.next_from ? Math.min(100, me.year_total / L.next_from * 100) : 100) + '%'; });
+    $('#steps').innerHTML = settings.levels.map((l, i) => `<span class="${i === L.idx ? 'on' : ''}">${t(l.name)} ${l.pct}%</span>`).join('');
+    $('#rwT').textContent = t('Рейтинг · {0}', monthName());
+    const pl = me.place;
+    $('#rwPl').textContent = pl ? '#' + fmt(pl) : '—'; $('#rwPl').classList.toggle('sm', pl > 99);
+    $('#rwS').textContent = !me.in_rating ? t('Вы скрыты из рейтинга') : !rating.me ? t('Сделайте покупку, чтобы попасть в рейтинг') : !rating.above ? t('Вы лидер месяца') : t('До {0}-го места {1} ₸ покупок', rating.above.place, fmt(rating.above.score - rating.me.score + 1));
+    $('#homeOps').innerHTML = allRows().slice(0, 3).map((r, i) => rowHtml(r, 6 + i)).join('');
+  }
+
+  /* ---------- show the card, code for paying with bonuses ---------- */
+  let codeTimer = 0;
+  function openPay() {
+    const c = cardCode();
+    openSheet(`<h3>${t('Покажите кассиру')}</h3><div class="when">${t('Бонусы начислятся сразу после оплаты')}</div>
+      <div class="paycode">${barsSvg(c.bits)}</div><div class="digits big">${spaced(c.digits)}</div>
+      <div class="payrow"><div><small>${t('Номер карты')}</small><b>${cardNo()}</b><span>${t('Чтобы оплатить бонусами, получите код и назовите его кассиру')}</span></div></div>
+      <div id="codeBox"><button class="cta" id="getCode">${ic('star')}${t('Списать бонусы')}</button></div><button class="cta ghost" style="margin-top:10px" data-close>${t('Закрыть')}</button>`, 'center', () => clearInterval(codeTimer));
+  }
+  async function getCode() {
+    busy(true);
+    try {
+      const r = await rpc('customer_redeem_code', { p_token: token });
+      let left = r.seconds;
+      const box = $('#codeBox'); if (!box) return;
+      box.innerHTML = `<div class="codebig"><small>${t('Код для кассира')}</small><b>${r.code.split('').map((d, i) => `<i style="--i:${i}">${d}</i>`).join('')}</b><span id="codeLeft"></span></div>`;
+      const draw = () => {
+        const el = $('#codeLeft'); if (!el) { clearInterval(codeTimer); return; }
+        if (left <= 0) { clearInterval(codeTimer); box.innerHTML = `<p class="lead">${t('Код устарел. Получите новый')}</p><button class="cta" id="getCode">${t('Новый код')}</button>`; return; }
+        el.textContent = t('Назовите этот код кассиру. Действует {0}', `${Math.floor(left / 60)}:${two(left % 60)}`); left--;
+      };
+      clearInterval(codeTimer); draw(); codeTimer = setInterval(draw, 1000);
+    } catch (e) { toast(errText(e.code)); if (e.code === 'auth') { closeSheet(); logoutLocal(); } } finally { busy(false); }
+  }
+  $('#bcard').addEventListener('click', openPay);
+  sheet.addEventListener('click', e => { if (e.target.closest('#getCode')) getCode(); });
+
+  /* ---------- history ---------- */
+  let hFilter = 'all';
+  function renderOps() {
+    let earned = 0, spent = 0;
+    ops.forEach(o => {
+      if (o.kind === 'sale' || o.kind === 'welcome') { earned += o.earn; spent += o.spend; }
+      if (o.kind === 'refund') { earned -= o.earn; spent -= o.spend; }
+    });
+    setNum($('#hEarn'), earned, true, n => '+' + fmt(n)); setNum($('#hSpend'), spent, true, n => (Math.round(n) ? '−' : '') + fmt(n));
+    const list = allRows().filter(r => hFilter === 'all' || (hFilter === 'spend' ? r.neg : !r.neg));
+    let day = '', html = '';
+    list.forEach((r, i) => { const d = dayLabel(r.o.created_at); if (d !== day) { day = d; html += `<div class="day a" style="--i:${3 + i}">${d}</div>`; } html += rowHtml(r, 3 + i); });
+    $('#opsList').innerHTML = html || `<div class="empty a" style="--i:3"><div class="c"><img src="data:image/png;base64,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" alt=""></div><h3>${t('Пока пусто')}</h3><p>${t(hFilter === 'spend' ? 'Вы ещё не оплачивали покупки бонусами' : 'Покажите карту на кассе, и здесь появятся бонусы')}</p></div>`;
+  }
+  $('#hFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; hFilter = b.dataset.f; $$('#hFilter button').forEach(x => x.classList.toggle('on', x === b)); renderOps(); });
+  app.addEventListener('click', e => {
+    const b = e.target.closest('[data-op]'); if (!b) return;
+    const o = ops.find(x => x.id === +b.dataset.op); if (!o) return;
+    const title = o.kind === 'welcome' ? 'Приветственные бонусы' : o.kind === 'refund' ? 'Возврат покупки' : 'Покупка';
+    const kv = (k, v) => `<div><span>${t(k)}</span><b>${v}</b></div>`;
+    let rows = '';
+    if (o.kind === 'sale') rows = kv('Сумма чека', `${fmt(o.amount)} ${CUR}`) + (o.spend ? kv('Оплата бонусами', '−' + fmt(o.spend)) : '') + kv('Оплачено деньгами', `${fmt(o.pay)} ${CUR}`) + kv('Начислено', '+' + fmt(o.earn));
+    if (o.kind === 'refund') rows = kv('Сумма чека', `${fmt(o.amount)} ${CUR}`) + kv('Снято начисленных', '−' + fmt(o.earn)) + (o.spend ? kv('Возвращено бонусов', '+' + fmt(o.spend)) : '');
+    if (o.kind === 'welcome') rows = kv('Начислено', '+' + fmt(o.earn));
+    openSheet(`<h3>${t(title)}</h3><div class="when">${dayLabel(o.created_at)}, ${hm(o.created_at)}</div><div class="kv">${rows}${kv('1 бонус', '1 ' + CUR)}</div><button class="cta ghost" data-close>${t('Закрыть')}</button>`);
+  });
+
+  /* ---------- rating ---------- */
+  function renderRating() {
+    const r = rating, top = r.top, H = ['58px', '76px', '46px'], order = [1, 0, 2];
+    $('#podium').innerHTML = order.map(i => {
+      const p = top[i];
+      return `<div class="pd r${i + 1}${p && p.me ? ' mine' : ''}" style="--h:${H[order.indexOf(i)]};--d:${[.25, .4, .1][order.indexOf(i)]}s"><div class="who">${i === 0 ? `<svg class="crown" viewBox="0 0 24 24" aria-hidden="true">${P.crown}</svg>` : ''}<div class="av">${p ? esc(p.initials) : '—'}</div><div class="nm">${p ? (p.me ? t('Вы') : esc(p.name)) : '—'}</div><div class="pts">${p ? fmt(p.score) : ''}</div></div><div class="bar"><b>${i + 1}</b></div></div>`;
+    }).join('');
+    const mine = r.me;
+    $('#mecard').hidden = !me.in_rating;
+    if (me.in_rating) {
+      const place = me.place || 1;
+      $('#place').textContent = fmt(place); $('#place').classList.toggle('sm', place > 99);
+      setNum($('#myScore'), mine ? mine.score : 0, true);
+      if (mine && !r.above) { $('#gapLine').textContent = t('Вы лидер'); $('#target').textContent = t('держите первое место'); }
+      else if (r.above) { const gap = r.above.score - (mine ? mine.score : 0) + 1; $('#gapLine').textContent = t('До {0}-го места {1} ₸ покупок', r.above.place, fmt(gap)); $('#target').textContent = t('обгоните: {0}', r.above.name); }
+      else { $('#gapLine').textContent = t('Сделайте покупку, чтобы попасть в рейтинг'); $('#target').textContent = t('Пока никто не покупал в этом месяце'); }
+      const prog = !mine ? .04 : !r.above ? 1 : Math.max(.04, mine.score / r.above.score);
+      requestAnimationFrame(() => { $('#ring').style.strokeDashoffset = 169.65 * (1 - prog); });
+    }
+    const max = top.length ? top[0].score : 1;
+    let html = top.slice(3).map((p, i) => `<div class="rk${p.me ? ' mine' : ''}" style="--i:${i}"><div class="pl">${p.place}</div><div class="av">${esc(p.initials)}</div><div class="t"><b>${p.me ? t('Вы') + ' · ' : ''}${esc(p.name)}</b><div class="lane"><i style="width:${p.score / max * 100}%"></i></div></div><div class="s"><b>${fmt(p.score)}</b></div></div>`).join('');
+    if (me.in_rating && mine && mine.place > 10) html += `<div class="gapdots">···</div><div class="rk mine" style="--i:8"><div class="pl">${fmt(mine.place)}</div><div class="av">${esc(initials())}</div><div class="t"><b>${t('Вы')}</b><div class="lane"><i style="width:${mine.score / max * 100}%"></i></div></div><div class="s"><b>${fmt(mine.score)}</b></div></div>`;
+    if (!top.length) html = `<p class="nf">${t('Пока никто не покупал в этом месяце')}</p>`;
+    if (!me.in_rating) html = `<p class="nf">${t('Включите участие в профиле, чтобы видеть своё место')}</p>` + html;
+    $('#rlist').innerHTML = html;
+    $('#monthName').textContent = t('{0} · до итогов', monthName());
+  }
+  (function tick() {
+    const n = new Date(), end = new Date(n.getFullYear(), n.getMonth() + 1, 1), left = Math.max(0, Math.floor((end - n) / 1000));
+    const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+    $('#timer').textContent = `${t('{0} д', d)} ${two(h)}:${two(m)}:${two(s)}`;
+    setTimeout(tick, 1000);
+  })();
+
+  /* ---------- profile, language, levels ---------- */
+  function refreshProfile() {
+    $('#pAv').textContent = initials(); $('#pName').textContent = fullName(); $('#pPhone').textContent = fmtPhone(me.phone);
+    $('#pLvl').textContent = t(me.level.name); $('#tRating').setAttribute('aria-checked', String(me.in_rating));
+  }
+  $('#tRating').addEventListener('click', async () => {
+    const v = !me.in_rating; $('#tRating').setAttribute('aria-checked', String(v)); busy(true);
+    try { await rpc('customer_settings', { p_token: token, p_in_rating: v }); me.in_rating = v; toast(t(v ? 'Вы снова в рейтинге' : 'Ваше имя скрыто из рейтинга')); refresh(true); }
+    catch (e) { $('#tRating').setAttribute('aria-checked', String(me.in_rating)); toast(errText(e.code)); } finally { busy(false); }
+  });
+  function logoutLocal() { token = null; me = null; store.set('istanbul-client-token', null); store.set('istanbul-client-bal', null); reset('v-welcome'); }
+  $('#logout').addEventListener('click', () => openSheet(`<h3>${t('Выйти из аккаунта?')}</h3><p class="lead">${t('Карта и бонусы сохранятся. Чтобы войти снова, понадобится код от кассира.')}</p><button class="cta" id="doLogout">${t('Выйти')}</button><button class="cta ghost" style="margin-top:10px" data-close>${t('Остаться')}</button>`));
+  function openLang() { openSheet(`<h3>${t('Язык приложения')}</h3><div class="langs">${LANGS.map(([c, short, name]) => `<button class="lopt ${c === lang ? 'on' : ''}" data-lang="${c}"><b>${short}</b><span>${name}</span>${c === lang ? ic('check') : ''}</button>`).join('')}</div>`); }
+  function applyLang() {
+    statics.forEach(x => { x.n.nodeValue = x.pre + t(x.ru) + x.post; });
+    document.documentElement.lang = lang; app.dataset.lang = lang;
+    const cur = LANGS.find(x => x[0] === lang); $('#langBtn b').textContent = cur[1]; $('#pLang').textContent = cur[2];
+    if (me && curView() === 'v-main') showTab(curTab, true);
+  }
+  $('#langBtn').addEventListener('click', openLang);
+  $('#langRow').addEventListener('click', openLang);
+  sheet.addEventListener('click', e => {
+    const l = e.target.closest('.lopt[data-lang]');
+    if (l) { lang = l.dataset.lang; store.set('istanbul-lang', lang); closeSheet(); applyLang(); toast(t('Язык изменён')); }
+    if (e.target.closest('#doLogout')) { const tk = token; closeSheet(); logoutLocal(); rpc('customer_logout', { p_token: tk }).catch(() => {}); }
+  });
+  function openSub(id) {
+    if (id !== 'v-levels') return;
+    const li = me.level.idx, L = me.level;
+    const rules = ['1 бонус = 1 тенге при оплате', t('Бонусами можно оплатить до {0}% чека', settings.max_spend_pct), 'Списание подтверждается кодом из приложения', 'Кешбэк начисляется на сумму, оплаченную деньгами'];
+    $('#levelsBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Back">${ic('back')}</button>${t('Уровни')}</div><h2 class="big-t a" style="font-size:22px;margin-top:10px">${t('Больше покупок, больше бонусов')}</h2><p class="lead a" style="--i:1">${t('Уровень зависит от суммы покупок за последние 12 месяцев.')}</p>` +
+      settings.levels.map((l, i) => `<div class="lc ${i === li ? 'cur' : ''} ${i === settings.levels.length - 1 ? 'gold' : ''} a" style="--i:${3 + i * 2}"><div><small>${i ? t('от {0} ₸', fmt(l.from)) : t('с первой покупки')}</small><div class="n">${t(l.name)}${i === li ? `<span class="badge">${t('ваш')}</span>` : ''}</div><div class="d">${t('{0}% бонусами с каждой покупки', l.pct)}</div></div><div class="p">${l.pct}%</div></div>`).join('') +
+      (L.next_name ? `<div class="box a" style="--i:9"><h5>${t('До уровня «{0}»', t(L.next_name))}<span>${t('осталось {0} ₸', fmt(L.next_from - me.year_total))}</span></h5><div class="pbar"><i id="lvBar2"></i></div></div>` : '') +
+      `<div class="rules" style="margin-top:12px">${rules.map((r, i) => `<div class="a" style="--i:${10 + i}"><b>${i + 1}</b>${t(r)}</div>`).join('')}</div>`;
+    push(id); setTimeout(() => { const b = $('#lvBar2'); if (b) b.style.width = Math.min(100, me.year_total / L.next_from * 100) + '%'; }, 50);
+  }
+  $('#rw').addEventListener('click', () => showTab('rating'));
+  $('#allOps').addEventListener('click', () => showTab('history'));
+
+  /* ---------- tabs ---------- */
+  const TABS = ['card', 'history', 'rating', 'profile'];
+  function showTab(name, quiet) {
+    if (!me) return;
+    curTab = name;
+    $$('.tab').forEach(x => x.classList.toggle('on', x.id === 't-' + name));
+    $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    $('#navInd').style.transform = `translateX(${TABS.indexOf(name) * 100}%)`;
+    parts = [];
+    if (name === 'card') refreshHome(true);
+    if (name === 'history') renderOps();
+    if (name === 'rating') renderRating();
+    if (name === 'profile') refreshProfile();
+    if (!quiet && Date.now() - lastLoad > 15000) refresh(true);
+  }
+  $('#nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+  function enterMain() { $('#bal')._v = 0; $('#bal').textContent = '0'; hFilter = 'all'; $$('#hFilter button').forEach((b, i) => b.classList.toggle('on', i === 0)); reset('v-main'); showTab('card', true); }
+
+  function drawWelcome() {
+    $('#wPct').textContent = settings.levels[0].pct + '%'; $('#wWelcome').textContent = '+' + fmt(settings.welcome_bonus);
+  }
+  applyLang();
+  if (token) {
+    reset('v-welcome'); $('#wGo').disabled = true;
+    load(false).then(() => enterMain()).catch(() => {}).finally(() => { $('#wGo').disabled = false; });
+  } else reset('v-welcome');
+  rpc('app_settings').then(s => { settings = s; drawWelcome(); }).catch(() => {});
+})();
+</script>
+</body>
+</html>

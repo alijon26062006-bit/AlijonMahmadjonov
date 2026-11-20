@@ -1,0 +1,154 @@
+
+<div class="app" id="app">
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- lock -->
+  <section class="view" id="v-lock" data-dark>
+    <button class="langbtn" id="langBtn" aria-label="Language"><span data-ic="globe"></span><b>RU</b></button>
+    <div class="lock pad">
+      <div class="wm" id="wm" aria-label="ISTANBUL"></div>
+      <div class="tagk">КАССА</div>
+      <div class="st" id="lockStore">ISTANBUL</div>
+      <h2>Введите PIN-код</h2>
+      <div class="pins" id="pins"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i></div>
+      <div class="lockmsg" id="lockMsg"></div>
+      <div class="keypad" data-pad="pin"></div>
+    </div>
+  </section>
+
+  <!-- main -->
+  <section class="view" id="v-main">
+    <div class="tabs-area">
+      <div class="tab on" id="t-scan">
+        <div class="scroll pad">
+          <div class="top a"><div class="word">ISTANBUL</div><button class="shiftpill" data-tab="shift"><i></i><span>Смена</span><b id="shiftDur"></b></button></div>
+          <div class="hello a" style="--i:1"><span id="storeName">ISTANBUL</span><b id="cName"></b></div>
+          <button class="scanner a" style="--i:2" id="scanner" aria-label="Scan">
+            <span class="gcard"><b>ISTANBUL</b><span class="gb"></span></span>
+            <span class="frame"><i></i><i></i><i></i><i></i><span class="laser"></span></span>
+            <span class="hitc" data-ic="check"></span><span class="flash"></span>
+            <span class="cap2">Сканировать карту клиента<span>Наведите камеру на штрихкод в приложении</span></span>
+          </button>
+          <div class="two a" style="--i:3"><button class="tile" id="goFind"><span class="ic" data-ic="phone"></span>По номеру телефона</button><button class="tile" id="goNew"><span class="ic" data-ic="userplus"></span>Новый клиент</button></div>
+          <div class="sec a" style="--i:4"><h4>Эта смена</h4><button data-tab="ops">Все операции</button></div>
+          <div class="totals three a" style="--i:5"><div><small>Чеков</small><b id="sCnt">0</b></div><div><small>Начислено</small><b id="sEarn">0</b></div><div><small>Списано</small><b id="sSpend">0</b></div></div>
+          <div id="lastOps"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-ops">
+        <div class="scroll pad">
+          <div class="h1 a">Операции</div>
+          <div class="chipsel a" style="--i:1;margin-top:14px" id="oFilter"><button class="on" data-f="all">Все</button><button data-f="sale">Покупки</button><button data-f="spend">Списания</button><button data-f="refund">Возвраты</button></div>
+          <div id="opsList"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-shift">
+        <div class="scroll pad">
+          <div class="h1 a">Смена</div>
+          <div class="shcard a" style="--i:1"><div class="r"><small>Смена открыта в <span id="shOpen"></span></small></div><div class="tm" id="shTimer">00:00:00</div><div class="r ft"><span id="shWho"></span><span id="shStore"></span></div></div>
+          <div class="grid2 a" style="--i:2">
+            <div class="w"><small>Выручка</small><b><span id="zRev">0</span> ₸</b></div>
+            <div><small>Чеков</small><b id="zCnt">0</b></div><div><small>Средний чек</small><b><span id="zAvg">0</span> ₸</b></div>
+            <div><small>Начислено бонусов</small><b id="zEarn">0</b></div><div><small>Списано бонусов</small><b id="zSpend">0</b></div>
+            <div><small>Новых клиентов</small><b id="zNew">0</b></div><div><small>Возвратов</small><b id="zRef">0</b></div>
+          </div>
+          <div class="hours a" style="--i:3"><h5>Продажи по часам <span>тыс. ₸</span></h5><div class="bars6" id="hours"></div></div>
+          <button class="cta ghost a" style="--i:4;margin-top:14px" id="closeShift"><span data-ic="lock"></span>Закрыть смену</button>
+        </div>
+      </div>
+
+      <div class="tab" id="t-more">
+        <div class="scroll pad">
+          <div class="h1 a">Профиль</div>
+          <div class="prof a" style="--i:1"><div class="av" id="pAv"></div><div><b id="pName"></b><span id="pStore"></span></div></div>
+          <div class="list a" style="--i:2">
+            <button data-go="v-rules"><span data-ic="star"></span>Правила начисления<span class="v"><span data-ic="next"></span></span></button>
+            <button id="langRow"><span data-ic="globe"></span>Язык<span class="v"><span id="pLang"></span><span data-ic="next"></span></span></button>
+          </div>
+          <div class="cap a" style="--i:3">Настройки</div>
+          <div class="list a" style="--i:3">
+            <div><span data-ic="sound"></span>Звук сканера<button class="toggle" role="switch" data-t="sound" aria-label="Sound"></button></div>
+            <div><span data-ic="vib"></span>Вибрация<button class="toggle" role="switch" data-t="vibro" aria-label="Vibration"></button></div>
+          </div>
+          <div class="list a" style="--i:4"><button id="lockBtn"><span data-ic="lock"></span>Заблокировать кассу</button></div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <div class="ind" id="navInd"><i></i></div>
+      <button class="on" data-tab="scan"><span data-ic="scan"></span>Касса</button>
+      <button data-tab="ops"><span data-ic="clock"></span>Операции</button>
+      <button data-tab="shift"><span data-ic="chart"></span>Смена</button>
+      <button data-tab="more"><span data-ic="user"></span>Профиль</button>
+    </nav>
+  </section>
+
+  <!-- search by phone -->
+  <section class="view" id="v-find">
+    <div class="col pad">
+      <div class="topbar"><button class="back" data-back aria-label="Back"></button>Поиск клиента</div>
+      <div class="inp" style="margin-top:12px"><span class="pre">+7</span><span id="fDigits"></span><span class="caret"></span></div>
+      <div class="found" id="found"></div>
+      <div class="keypad" data-pad="find"></div>
+    </div>
+  </section>
+
+  <!-- new customer -->
+  <section class="view" id="v-new">
+    <div class="scroll pad">
+      <div class="topbar"><button class="back" data-back aria-label="Back"></button>Новый клиент</div>
+      <h2 class="big-t" style="font-size:22px;margin-top:10px">Выдайте карту<br>за минуту</h2>
+      <label class="field a" style="--i:1"><span>Телефон</span><input id="nPhone" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="+7 700 000 00 00"></label>
+      <label class="field a" style="--i:2"><span>Имя</span><input id="nName" autocomplete="off" maxlength="40" placeholder="Например, Алихан"></label>
+      <label class="field a" style="--i:3"><span>Фамилия</span><input id="nLast" autocomplete="off" maxlength="40" placeholder="Необязательно"></label>
+      <div class="note a" style="--i:4"><span data-ic="gift"></span><span id="nNote">Клиент сразу получит приветственные бонусы. Вы увидите код для входа в приложение: скажите его клиенту.</span></div>
+    </div>
+    <div class="bb pad"><button class="cta" id="nGo" disabled>Выдать карту</button></div>
+  </section>
+
+  <!-- customer card -->
+  <section class="view" id="v-client">
+    <div class="scroll pad" id="clientBody"></div>
+    <div class="bb pad duo"><button class="cta ghost" id="cRefund"><span data-ic="undo"></span>Возврат</button><button class="cta" id="cSale"><span data-ic="bag"></span>Провести покупку</button></div>
+  </section>
+
+  <!-- purchase -->
+  <section class="view" id="v-sale">
+    <div class="col pad">
+      <div class="topbar"><button class="back" id="saleBack" aria-label="Back"></button><span id="saleTitle">Покупка</span><span class="stepno" id="stepNo"></span></div>
+      <div class="who" id="saleWho"></div>
+      <div class="step on" id="st-amt">
+        <div class="amount"><small>Сумма чека</small><div class="big"><span id="amt">0</span><em>₸</em></div><div class="calc" id="amtCalc"></div></div>
+        <div class="grow"></div>
+        <button class="cta" id="amtNext" disabled>Далее</button>
+        <div class="keypad" data-pad="amt"></div>
+      </div>
+      <div class="step" id="st-bon">
+        <div class="amount"><small>Списать бонусы</small><div class="big"><span id="spendV">0</span></div><div class="avail" id="avail"></div></div>
+        <input type="range" id="range" min="0" step="500" value="0" aria-label="Bonuses">
+        <div class="chipsel mid" id="quick"><button data-q="0">Не списывать</button><button data-q="half">Половина</button><button data-q="max">Максимум</button></div>
+        <div class="kv" id="saleKv"></div>
+        <div class="grow"></div>
+        <button class="cta" id="saleGo"></button>
+      </div>
+      <div class="step" id="st-code">
+        <h2 class="big-t" style="font-size:22px;margin-top:16px">Код от клиента</h2>
+        <p class="lead" id="codeLead"></p>
+        <div class="otp" id="otp"><span style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span></div>
+        <div class="grow"></div>
+        <div class="keypad" data-pad="code"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-done" data-dark><div class="done pad" id="doneBody"></div></section>
+  <section class="view" id="v-z" data-dark><div class="done pad" id="zBody"></div></section>
+  <section class="view" id="v-rules"><div class="scroll pad" id="rulesBody"></div></section>
+
+  <div class="dim" id="dim"></div>
+  <div class="sheet pad" id="sheet" role="dialog" aria-modal="true"></div>
+  <div class="busy" id="busy"><i></i></div>
+</div>

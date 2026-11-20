@@ -1,0 +1,127 @@
+
+<div class="app" id="app">
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- welcome -->
+  <section class="view" id="v-welcome" data-dark>
+    <button class="langbtn" id="langBtn" aria-label="Language"><span data-ic="globe"></span><b>RU</b></button>
+    <div class="wl pad">
+      <div class="wmbig" id="wmbig" aria-label="ISTANBUL"></div>
+      <p class="lead a" style="--i:8">Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.</p>
+      <div class="stage"><div class="ring r1"></div><div class="ring r2"></div>
+        <div class="democard"><b>ISTANBUL</b><span>IST •••• ••••</span></div>
+      </div>
+      <div class="perk a" style="--i:12"><b id="wPct">3%</b>Кешбэк бонусами с первой покупки</div>
+      <div class="perk a" style="--i:14"><b id="wWelcome">+1 000</b>Приветственные бонусы на карту</div>
+      <p class="whint a" style="--i:15">Карту выдаёт кассир в магазине и говорит код для входа.</p>
+      <button class="cta a" style="--i:16" id="wGo">Войти</button>
+    </div>
+  </section>
+
+  <!-- phone -->
+  <section class="view" id="v-phone">
+    <div class="col pad">
+      <button class="back" data-back aria-label="Back"></button>
+      <h2 class="big-t">Ваш номер<br>телефона</h2>
+      <p class="lead">Введите номер, который вы назвали кассиру.</p>
+      <div class="inp"><span class="pre">+7</span><span id="phDigits"></span><span class="caret"></span></div>
+      <div class="grow"></div>
+      <button class="cta" id="phNext" disabled>Далее</button>
+      <div class="keypad" data-pad="phone"></div>
+    </div>
+  </section>
+
+  <!-- code -->
+  <section class="view" id="v-otp">
+    <div class="col pad">
+      <button class="back" data-back aria-label="Back"></button>
+      <h2 class="big-t">Код от кассира</h2>
+      <p class="lead">Кассир назвал вам 6 цифр, когда выдавал карту. Если код потерялся, попросите на кассе новый.</p>
+      <div class="otp six" id="otp"><span style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span><span style="--i:4"></span><span style="--i:5"></span></div>
+      <div class="resend" id="otpPhone"></div>
+      <div class="grow"></div>
+      <div class="keypad" data-pad="otp"></div>
+    </div>
+  </section>
+
+  <!-- main -->
+  <section class="view" id="v-main">
+    <div class="tabs-area">
+      <div class="tab on" id="t-card">
+        <div class="scroll pad" id="cardScroll">
+          <div class="top a"><div class="word">ISTANBUL</div><button class="ibtn" id="reload" aria-label="Refresh"><span data-ic="refresh"></span></button></div>
+          <div class="hello a" style="--i:1"><span id="hiTime">Добрый день</span>,<b id="hiName"></b></div>
+          <button class="bcard a" style="--i:2" id="bcard" aria-label="ISTANBUL card">
+            <span class="bc-top"><span class="bword">ISTANBUL</span><span class="lvl" id="lvlPill"></span></span>
+            <span class="bc-mid"><span><small>Бонусный счёт</small><span class="bal" id="balBox"><b id="bal">0</b><span>бонусов</span></span></span><span class="chipset"><span data-ic="wave"></span><span class="chip"></span></span></span>
+            <span class="bc-row"><span class="holder" id="holder"></span><span class="num cardnum"></span></span>
+            <span class="bc-code"><span id="bcBars"></span><span class="digits" id="bcDigits"></span></span>
+            <span class="bc-hint"><span data-ic="scan"></span>Нажмите, чтобы показать кассиру</span>
+          </button>
+          <button class="rwidget a" style="--i:3" id="rw"><span class="pl" id="rwPl"></span><span class="t"><b id="rwT"></b><span id="rwS"></span></span></button>
+          <div class="box a" style="--i:4"><h5><span id="lvT" style="color:inherit;font-weight:800"></span><span id="lvR"></span></h5><div class="pbar"><i id="lvBar"></i></div>
+            <div class="steps" id="steps"></div></div>
+          <div class="sec a" style="--i:5"><h4>Операции</h4><button id="allOps">Все</button></div>
+          <div id="homeOps"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-history">
+        <div class="scroll pad">
+          <div class="h1 a">История</div>
+          <div class="chipsel a" style="--i:1;margin-top:14px" id="hFilter"><button class="on" data-f="all">Все</button><button data-f="earn">Начисления</button><button data-f="spend">Списания</button></div>
+          <div class="totals a" style="--i:2"><div><small>Начислено всего</small><b id="hEarn">0</b></div><div><small>Потрачено</small><b id="hSpend">0</b></div></div>
+          <div id="opsList"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-rating">
+        <header class="rhd pad">
+          <div class="trow"><div class="h1">Рейтинг</div><div class="timer"><span id="monthName"></span><b id="timer"></b></div></div>
+        </header>
+        <div class="rmain">
+          <div class="scroll pad" id="ratingScroll">
+            <div class="podium" id="podium"></div>
+            <div class="mecard" id="mecard">
+              <div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" id="ring" cx="32" cy="32" r="27"/></svg><div class="place" id="place"></div></div>
+              <div class="t"><small>Ваше место</small><b id="gapLine"></b><span class="sub" id="target"></span></div>
+              <div class="score"><b id="myScore">0</b><small>очков</small></div>
+            </div>
+            <div class="rlist" id="rlist"></div>
+            <p class="rnote">1 тенге покупок = 1 очко. Рейтинг обнуляется 1-го числа каждого месяца.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-profile">
+        <div class="scroll pad">
+          <div class="h1 a">Профиль</div>
+          <div class="prof a" style="--i:1"><div class="av" id="pAv"></div><div><b id="pName"></b><span id="pPhone"></span></div></div>
+          <div class="list a" style="--i:2">
+            <button data-go="v-levels"><span data-ic="star"></span>Уровни и правила<span class="v"><span id="pLvl"></span><span data-ic="next"></span></span></button>
+            <button id="langRow"><span data-ic="globe"></span>Язык<span class="v"><span id="pLang"></span><span data-ic="next"></span></span></button>
+          </div>
+          <div class="cap a" style="--i:3">Настройки</div>
+          <div class="list a" style="--i:3">
+            <div><span data-ic="trophy"></span>Участвовать в рейтинге<button class="toggle" role="switch" id="tRating" aria-label="Rating"></button></div>
+          </div>
+          <div class="list a" style="--i:4"><button id="logout"><span data-ic="out"></span>Выйти</button></div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav four" id="nav" aria-label="Sections">
+      <div class="ind" id="navInd"><i></i></div>
+      <button class="on" data-tab="card"><span data-ic="card"></span>Карта</button>
+      <button data-tab="history"><span data-ic="clock"></span>История</button>
+      <button data-tab="rating"><span data-ic="trophy"></span>Рейтинг</button>
+      <button data-tab="profile"><span data-ic="user"></span>Профиль</button>
+    </nav>
+  </section>
+
+  <section class="view" id="v-levels"><div class="scroll pad" id="levelsBody"></div></section>
+
+  <div class="dim" id="dim"></div>
+  <div class="sheet pad" id="sheet" role="dialog" aria-modal="true"></div>
+  <div class="busy" id="busy"><i></i></div>
+</div>
