@@ -1,12 +1,13 @@
 <title>ISTANBUL</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@500;600;700;800&family=Unbounded:wght@600;700&family=Montserrat:wght@700;800&display=swap">
 <style>
-/* Один экран телефона: вход → карта, история, рейтинг, акции, профиль. Чёрно-белая система. */
+/* One phone screen: sign-in, card, history, rating, offers, profile. Black and white system. */
 :root {
   --ink: #0B0B0B; --paper: #FFFFFF; --mist: #F3F3F2; --line: #E4E4E2; --grey: #8C8C88; --soft: #5C5C58; --desk: #DCDCD8;
-  --display: 'Unbounded', 'Arial Black', sans-serif;
-  --text: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --brand: 'Unbounded', 'Arial Black', sans-serif;
+  --display: var(--brand);
+  --text: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -20,6 +21,8 @@ h1, h2, h3, h4, h5, p { margin: 0; }
 svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 .app { position: relative; width: min(100%, 420px); height: min(100%, 880px); background: var(--paper); color: var(--ink); overflow: hidden; overflow: clip; transition: background .45s, color .45s; }
+/* Unbounded has no Kazakh letters, so Kazakh headings use Montserrat; the wordmark stays as is */
+.app[data-lang="kk"] { --display: 'Montserrat', 'Arial Black', sans-serif; }
 .app.is-dark { --ink: #FFFFFF; --paper: #0B0B0B; --mist: #1C1C1A; --line: #2B2B29; --soft: #BDBDB8; }
 @media (min-width: 480px) and (min-height: 700px) {
   body { padding-block: 20px; }
@@ -64,18 +67,18 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
 /* welcome */
 .wl { flex: 1; display: flex; flex-direction: column; padding-top: 54px; padding-bottom: 26px; min-height: 0; }
-.wmbig { font: 700 38px/1 var(--display); letter-spacing: 5px; display: flex; }
+.wmbig { font: 700 38px/1 var(--brand); letter-spacing: 5px; display: flex; }
 .wmbig span { animation: letter .6s cubic-bezier(.2,1.4,.4,1) backwards; animation-delay: calc(var(--i) * 60ms); }
 .stage { flex: 1; min-height: 150px; position: relative; display: grid; place-items: center; perspective: 900px; }
 .stage .ring { position: absolute; border: 1.5px solid var(--line); border-radius: 50%; animation: breathe 4s ease-in-out infinite; }
 .stage .ring.r1 { width: 250px; height: 250px; }
 .stage .ring.r2 { width: 160px; height: 160px; animation-delay: -2s; }
 .democard { width: 216px; height: 134px; border-radius: 18px; background: var(--ink); color: var(--paper); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; animation: cardIn .9s .3s cubic-bezier(.2,1.2,.3,1) backwards, floatCard 6s 1.2s ease-in-out infinite; box-shadow: 0 30px 50px -20px rgba(255,255,255,.25); }
-.democard::after, .face.front::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(128,128,128,.35) 50%, transparent 65%); transform: translateX(-120%); animation: shine 4s 1.5s infinite; pointer-events: none; }
-.democard b { font: 700 13px var(--display); letter-spacing: 3px; }
-.democard span { font: 600 12px var(--display); letter-spacing: 2px; opacity: .7; }
+.democard::after, .bcard::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(128,128,128,.35) 50%, transparent 65%); transform: translateX(-120%); animation: shine 4s 1.5s infinite; pointer-events: none; }
+.democard b { font: 700 13px var(--brand); letter-spacing: 3px; }
+.democard span { font: 600 12px var(--brand); letter-spacing: 2px; opacity: .7; }
 .perk { display: flex; gap: 12px; align-items: center; font-size: 15px; font-weight: 700; margin-top: 12px; }
-.perk b { min-width: 52px; height: 30px; padding: 0 8px; border-radius: 99px; border: 1.5px solid var(--grey); display: grid; place-items: center; font: 600 12px var(--display); }
+.perk b { min-width: 76px; height: 30px; padding: 0 8px; border-radius: 99px; border: 1.5px solid var(--grey); display: grid; place-items: center; font: 600 12px var(--display); }
 .wl .cta { margin-top: 24px; }
 
 /* phone and code */
@@ -95,7 +98,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 .resend { margin-top: 18px; font-size: 14px; color: var(--grey); font-weight: 700; }
 .sms { position: absolute; z-index: 45; top: 10px; left: 12px; right: 12px; background: #1C1C1A; color: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; transform: translateY(-170%); transition: transform .5s cubic-bezier(.2,1.2,.3,1); box-shadow: 0 16px 30px -12px rgba(0,0,0,.5); }
 .sms.on { transform: none; }
-.sms i { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; color: #0B0B0B; display: grid; place-items: center; font: 700 15px var(--display); font-style: normal; flex: none; }
+.sms i { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; color: #0B0B0B; display: grid; place-items: center; font: 700 15px var(--brand); font-style: normal; flex: none; }
 .sms b { display: block; font-size: 13px; }
 .sms span { font-size: 14px; opacity: .85; }
 .sms em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 800; border: 1.5px solid #5C5C58; border-radius: 99px; padding: 5px 10px; white-space: nowrap; }
@@ -131,36 +134,64 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
 /* home */
 .top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
-.word { font: 700 20px var(--display); letter-spacing: 3px; }
+.word { font: 700 20px var(--brand); letter-spacing: 3px; }
 .ibtn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; position: relative; transition: transform .15s; }
 .ibtn .dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; background: var(--ink); border-radius: 50%; animation: pulse 1.6s infinite; }
 .hello { margin-top: 14px; font-size: 15px; color: var(--soft); }
 .hello b { display: block; font: 600 22px var(--display); color: var(--ink); margin-top: 2px; letter-spacing: -.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flip { margin-top: 16px; height: 200px; perspective: 1100px; }
-.card3d { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .8s cubic-bezier(.3,1.25,.4,1); cursor: pointer; }
-.card3d.flipped { transform: rotateY(180deg); }
-.face { position: absolute; inset: 0; border-radius: 26px; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
-.face.front { background: #0B0B0B; color: #FFFFFF; padding: 20px 20px 16px; display: flex; flex-direction: column; }
-.face.front::before { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border: 1.5px solid rgba(255,255,255,.12); border-radius: 50%; animation: breathe 5s ease-in-out infinite; }
-.face.front .row { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; }
-.face.front small { font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 800; }
-.lvl { font-size: 11.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 1.5px solid rgba(255,255,255,.5); padding: 5px 10px; border-radius: 99px; }
-.bal { font: 700 48px/1 var(--display); letter-spacing: -1px; margin-top: 12px; position: relative; z-index: 1; }
-.bal span { font-size: 15px; letter-spacing: 0; font-weight: 600; color: rgba(255,255,255,.7); margin-left: 6px; }
-.face.front .sub { font-size: 12.5px; color: rgba(255,255,255,.6); margin-top: 6px; }
-.face.front .foot { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); }
-.num { font: 600 13px var(--display); letter-spacing: 2.5px; }
-.qrbtn { display: flex; align-items: center; gap: 8px; background: #FFFFFF; color: #0B0B0B; font-weight: 800; font-size: 13.5px; padding: 9px 13px; border-radius: 99px; }
-.qrbtn svg.i { width: 17px; height: 17px; }
-.face.backf { transform: rotateY(180deg); background: #FFFFFF; color: #0B0B0B; border: 2px solid #0B0B0B; display: flex; gap: 14px; padding: 16px; align-items: center; }
-.qrbox { width: 160px; height: 160px; flex: none; position: relative; overflow: hidden; border-radius: 8px; }
-.qrbox svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
-.scanline { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #0B0B0B; box-shadow: 0 0 0 100vmax rgba(255,255,255,0), 0 0 18px 6px rgba(0,0,0,.35); opacity: 0; }
-.qrbox.scanning .scanline { animation: scan .8s ease-in-out 2; }
-.qrinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; height: 100%; }
-.qrinfo b { font: 700 14px/1.2 var(--display); text-transform: uppercase; }
-.qrinfo span { font-size: 12.5px; color: #5C5C58; font-weight: 600; line-height: 1.35; }
-.qrinfo .num { color: #0B0B0B; letter-spacing: 1.5px; font-size: 12px; margin-top: auto; }
+.bcard { margin-top: 16px; width: 100%; display: block; position: relative; overflow: hidden; border-radius: 26px; background: #0B0B0B; color: #FFFFFF; padding: 18px 10px 4px; box-shadow: 0 24px 34px -24px rgba(0,0,0,.6); transition: transform .2s; }
+.bcard:active { transform: scale(.98); }
+.bcard::before { content: ''; position: absolute; right: -70px; top: -80px; width: 240px; height: 240px; border: 1.5px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 34px rgba(255,255,255,.035); animation: breathe 5s ease-in-out infinite; }
+.bcard > span { position: relative; z-index: 1; }
+.bc-top, .bc-mid, .bc-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 10px; }
+.bword { font: 700 15px var(--brand); letter-spacing: 3.5px; }
+.lvl { font-size: 11.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 1.5px solid rgba(255,255,255,.5); padding: 5px 10px; border-radius: 99px; white-space: nowrap; }
+.bc-mid { margin-top: 20px; align-items: flex-end; }
+.bcard small { display: block; font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 800; }
+.bal { display: block; font: 700 40px/1 var(--display); letter-spacing: -1px; margin-top: 8px; white-space: nowrap; }
+.bal b { font: inherit; }
+.bal.sm { font-size: 32px; }
+.bc-mid > span:first-child { min-width: 0; }
+.bal span { font: 600 14px var(--text); letter-spacing: 0; color: rgba(255,255,255,.7); margin-left: 7px; }
+.chipset { display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,.75); padding-bottom: 4px; flex: none; }
+.chipset svg.i { width: 24px; height: 24px; }
+.chip { width: 44px; height: 33px; border-radius: 9px; border: 1.5px solid rgba(255,255,255,.8); background: linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 50% 50% / 100% 1.5px no-repeat, linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 32% 0 / 1.5px 100% no-repeat, linear-gradient(rgba(255,255,255,.8), rgba(255,255,255,.8)) 68% 0 / 1.5px 100% no-repeat, rgba(255,255,255,.08); }
+.bc-row { margin-top: 16px; }
+.holder { font-size: 12.5px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.num { font: 600 12.5px var(--brand); letter-spacing: 2.2px; white-space: nowrap; }
+.bc-code { display: block; margin-top: 14px; background: #FFFFFF; color: #0B0B0B; border-radius: 18px; padding: 13px 20px 8px; text-align: center; }
+.bars { display: block; width: 100%; height: 48px; shape-rendering: crispEdges; }
+.bars rect { fill: #0B0B0B; transform-box: fill-box; transform-origin: 50% 100%; animation: barIn .55s cubic-bezier(.2,1.2,.3,1) backwards; animation-delay: calc(.35s + var(--i) * 14ms); }
+.digits { display: block; font: 600 11.5px var(--brand); letter-spacing: 3px; margin-top: 7px; white-space: nowrap; }
+.digits.big { font-size: 15px; letter-spacing: 4.5px; margin-top: 12px; }
+.bc-hint { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 0 8px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.62); }
+.bc-hint svg.i { width: 15px; height: 15px; }
+.paycode { position: relative; margin-top: 16px; border: 1.5px solid var(--line); border-radius: 22px; padding: 22px 26px; background: #FFFFFF; overflow: hidden; }
+.paycode .bars { height: 108px; }
+.scanline { position: absolute; top: 10px; bottom: 10px; left: 10px; width: 3px; border-radius: 2px; background: #0B0B0B; box-shadow: 0 0 18px 6px rgba(0,0,0,.3); opacity: 0; }
+.paycode.scanning .scanline { animation: scanX .85s ease-in-out 2; }
+.payrow { margin-top: 14px; display: flex; gap: 14px; align-items: center; text-align: left; background: var(--mist); border-radius: 20px; padding: 12px; }
+.qrsm { width: 86px; height: 86px; background: #FFFFFF; border-radius: 12px; padding: 7px; flex: none; }
+.qrsm svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
+.payrow small { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.payrow b { display: block; font: 600 14px var(--brand); letter-spacing: 2px; margin: 3px 0 5px; }
+.payrow span { font-size: 12.5px; color: var(--soft); font-weight: 600; line-height: 1.35; }
+.langbtn { position: absolute; z-index: 2; top: 14px; right: max(20px, env(safe-area-inset-right, 0px)); height: 38px; padding: 0 13px 0 10px; border-radius: 99px; border: 1.5px solid var(--grey); display: flex; align-items: center; gap: 7px; font: 600 11.5px var(--brand); letter-spacing: 1px; animation: fade .6s .9s backwards; transition: transform .15s; }
+.langbtn:active { transform: scale(.94); }
+.langbtn svg.i { width: 18px; height: 18px; }
+.langs { display: grid; gap: 8px; margin-top: 16px; }
+.lopt { width: 100%; display: flex; align-items: center; gap: 14px; padding: 15px 16px; border: 1.5px solid var(--line); border-radius: 18px; font-weight: 800; font-size: 15.5px; transition: transform .15s, border-color .2s; animation: rise .45s backwards; }
+.lopt:nth-child(2) { animation-delay: 60ms; } .lopt:nth-child(3) { animation-delay: 120ms; }
+.lopt:active { transform: scale(.98); }
+.lopt b { font: 600 12px var(--brand); letter-spacing: 1px; min-width: 42px; color: var(--grey); }
+.lopt span { flex: 1; }
+.lopt.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.lopt.on b { color: var(--ink); }
+.app.is-dark .sheet { box-shadow: 0 -1.5px 0 var(--line); }
+.nw { white-space: nowrap; }
+.rwidget .pl.sm { font-size: 22px; letter-spacing: -.5px; }
+.bigplace .up { white-space: nowrap; }
+.bigplace .up svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .demo { margin-top: 12px; width: 100%; height: 50px; border-radius: 16px; border: 1.5px dashed var(--ink); font-weight: 800; font-size: 14.5px; display: flex; align-items: center; justify-content: center; gap: 8px; animation: rise .4s backwards; transition: transform .15s; }
 .demo:active { transform: scale(.97); }
 .rwidget { margin-top: 12px; width: 100%; border: 1.5px solid var(--ink); border-radius: 22px; padding: 13px 16px; display: flex; align-items: center; gap: 14px; transition: transform .15s; }
@@ -232,8 +263,9 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 .rhd { flex: none; padding-top: 14px; padding-bottom: 10px; }
 .trow { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 .timer { text-align: right; font-size: 11.5px; font-weight: 800; color: var(--grey); }
-.timer b { display: block; font: 600 14.5px/1.3 var(--display); color: var(--ink); min-width: 132px; }
-.rhd .chipsel { margin-top: 10px; flex-wrap: nowrap; }
+.timer b { display: block; font: 600 14.5px/1.3 var(--brand); color: var(--ink); min-width: 132px; }
+.rhd .chipsel { margin: 10px -20px 0; padding: 0 20px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.rhd .chipsel::-webkit-scrollbar { display: none; }
 .rhd .chipsel button { padding: 9px 13px; }
 .rmain { flex: 1; min-height: 0; position: relative; }
 .scene { position: absolute; inset: 0; display: none; flex-direction: column; }
@@ -435,7 +467,8 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 @keyframes shake { 20%, 60% { transform: translateX(-9px); } 40%, 80% { transform: translateX(9px); } }
 @keyframes wiggle { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg) scale(1.05); } }
 @keyframes navpop { 40% { transform: translateY(-5px) scale(1.15); } }
-@keyframes scan { 0% { top: 0; opacity: 1; } 50% { top: calc(100% - 3px); opacity: 1; } 100% { top: 0; opacity: 1; } }
+@keyframes scanX { 0%, 100% { left: 10px; opacity: 1; } 50% { left: calc(100% - 13px); opacity: 1; } }
+@keyframes barIn { from { transform: scaleY(0); opacity: 0; } }
 @keyframes fresh { 0%, 60% { background: var(--mist); } }
 @keyframes drawCheck { to { stroke-dashoffset: 0; } }
 @keyframes marq { to { transform: translateX(-50%); } }
@@ -462,6 +495,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
   <!-- welcome -->
   <section class="view" id="v-welcome" data-dark>
+    <button class="langbtn" id="langBtn" aria-label="Language"><span data-ic="globe"></span><b>RU</b></button>
     <div class="wl pad">
       <div class="wmbig" id="wmbig" aria-label="ISTANBUL"></div>
       <p class="lead a" style="--i:8">Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.</p>
@@ -469,7 +503,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
         <div class="democard"><b>ISTANBUL</b><span>IST •••• ••••</span></div>
       </div>
       <div class="perk a" style="--i:12"><b>3%</b>Кешбэк бонусами с первой покупки</div>
-      <div class="perk a" style="--i:14"><b>+100</b>Приветственные бонусы на карту</div>
+      <div class="perk a" style="--i:14"><b>+1 000</b>Приветственные бонусы на карту</div>
       <button class="cta a" style="--i:16" id="wNew">Получить карту</button>
       <button class="link a" style="--i:18" id="wHave">У меня уже есть карта</button>
     </div>
@@ -481,7 +515,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
       <button class="back" data-back aria-label="Назад"></button>
       <h2 class="big-t">Ваш номер<br>телефона</h2>
       <p class="lead" id="phLead">Отправим SMS с кодом. Номер станет номером вашей карты.</p>
-      <div class="inp"><span class="pre">+992</span><span id="phDigits"></span><span class="caret"></span></div>
+      <div class="inp"><span class="pre">+7</span><span id="phDigits"></span><span class="caret"></span></div>
       <div class="grow"></div>
       <button class="cta" id="phNext" disabled>Получить код</button>
       <div class="keypad" data-pad="phone"></div>
@@ -508,9 +542,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
       <h2 class="big-t">Давайте<br>познакомимся</h2>
       <label class="field a" style="--i:1"><span>Имя</span><input id="rName" autocomplete="given-name" maxlength="24" placeholder="Например, Мадина"></label>
       <label class="field a" style="--i:2"><span>Фамилия</span><input id="rLast" autocomplete="family-name" maxlength="24" placeholder="Необязательно"></label>
-      <label class="field a" style="--i:3"><span>Дата рождения</span><input id="rBirth" inputmode="numeric" maxlength="10" placeholder="ДД.ММ.ГГГГ"></label>
-      <div class="giftb a" style="--i:4"><img src="img/gift.png" alt=""><div><b>+100 бонусов</b><span>начислим сразу после регистрации</span></div></div>
-      <div class="note a" style="--i:5"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V12h16v9M4 16c2 1 4-1 6 0s4 1 6 0 3-1 4 0M12 12V8M12 5v.01"/></svg>В день рождения дарим 300 бонусов</div>
+      <div class="giftb a" style="--i:3"><img src="img/gift.png" alt=""><div><b>+1 000 бонусов</b><span>начислим сразу после регистрации</span></div></div>
     </div>
     <div class="bb pad"><button class="cta" id="rGo" disabled>Создать карту</button></div>
   </section>
@@ -533,21 +565,13 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
         <div class="scroll pad">
           <div class="top a"><div class="word">ISTANBUL</div><button class="ibtn" id="bell" aria-label="Уведомления"><span class="dot"></span></button></div>
           <div class="hello a" style="--i:1"><span id="hiTime">Добрый день</span>,<b id="hiName"></b></div>
-          <div class="flip a" style="--i:2">
-            <div class="card3d" id="card3d" role="button" tabindex="0" aria-label="Перевернуть карту">
-              <div class="face front">
-                <div class="row"><small>Бонусный счёт</small><span class="lvl" id="lvlPill"></span></div>
-                <div class="bal"><b id="bal" style="font:inherit">0</b><span>бонусов</span></div>
-                <div class="sub">1 бонус = 1 сомони при оплате</div>
-                <div class="row foot"><span class="num cardnum"></span><span class="qrbtn" id="qrBtnLabel">Показать QR</span></div>
-              </div>
-              <div class="face backf">
-                <div class="qrbox" id="qrbox"><svg viewBox="0 0 25 25" aria-label="QR-код карты"><path fill="#0B0B0B" d="M0,0H1V1H0zM1,0H2V1H1zM2,0H3V1H2zM3,0H4V1H3zM4,0H5V1H4zM5,0H6V1H5zM6,0H7V1H6zM9,0H10V1H9zM14,0H15V1H14zM18,0H19V1H18zM19,0H20V1H19zM20,0H21V1H20zM21,0H22V1H21zM22,0H23V1H22zM23,0H24V1H23zM24,0H25V1H24zM0,1H1V2H0zM6,1H7V2H6zM8,1H9V2H8zM9,1H10V2H9zM11,1H12V2H11zM13,1H14V2H13zM18,1H19V2H18zM24,1H25V2H24zM0,2H1V3H0zM2,2H3V3H2zM3,2H4V3H3zM4,2H5V3H4zM6,2H7V3H6zM9,2H10V3H9zM10,2H11V3H10zM12,2H13V3H12zM15,2H16V3H15zM18,2H19V3H18zM20,2H21V3H20zM21,2H22V3H21zM22,2H23V3H22zM24,2H25V3H24zM0,3H1V4H0zM2,3H3V4H2zM3,3H4V4H3zM4,3H5V4H4zM6,3H7V4H6zM9,3H10V4H9zM10,3H11V4H10zM12,3H13V4H12zM13,3H14V4H13zM18,3H19V4H18zM20,3H21V4H20zM21,3H22V4H21zM22,3H23V4H22zM24,3H25V4H24zM0,4H1V5H0zM2,4H3V5H2zM3,4H4V5H3zM4,4H5V5H4zM6,4H7V5H6zM8,4H9V5H8zM10,4H11V5H10zM11,4H12V5H11zM13,4H14V5H13zM16,4H17V5H16zM18,4H19V5H18zM20,4H21V5H20zM21,4H22V5H21zM22,4H23V5H22zM24,4H25V5H24zM0,5H1V6H0zM6,5H7V6H6zM14,5H15V6H14zM15,5H16V6H15zM18,5H19V6H18zM24,5H25V6H24zM0,6H1V7H0zM1,6H2V7H1zM2,6H3V7H2zM3,6H4V7H3zM4,6H5V7H4zM5,6H6V7H5zM6,6H7V7H6zM8,6H9V7H8zM10,6H11V7H10zM12,6H13V7H12zM14,6H15V7H14zM16,6H17V7H16zM18,6H19V7H18zM19,6H20V7H19zM20,6H21V7H20zM21,6H22V7H21zM22,6H23V7H22zM23,6H24V7H23zM24,6H25V7H24zM15,7H16V8H15zM0,8H1V9H0zM2,8H3V9H2zM4,8H5V9H4zM6,8H7V9H6zM9,8H10V9H9zM10,8H11V9H10zM12,8H13V9H12zM16,8H17V9H16zM20,8H21V9H20zM23,8H24V9H23zM2,9H3V10H2zM4,9H5V10H4zM7,9H8V10H7zM8,9H9V10H8zM10,9H11V10H10zM11,9H12V10H11zM12,9H13V10H12zM13,9H14V10H13zM15,9H16V10H15zM17,9H18V10H17zM20,9H21V10H20zM23,9H24V10H23zM2,10H3V11H2zM3,10H4V11H3zM4,10H5V11H4zM6,10H7V11H6zM7,10H8V11H7zM9,10H10V11H9zM10,10H11V11H10zM11,10H12V11H11zM14,10H15V11H14zM15,10H16V11H15zM19,10H20V11H19zM20,10H21V11H20zM21,10H22V11H21zM23,10H24V11H23zM24,10H25V11H24zM3,11H4V12H3zM8,11H9V12H8zM10,11H11V12H10zM11,11H12V12H11zM13,11H14V12H13zM14,11H15V12H14zM17,11H18V12H17zM19,11H20V12H19zM20,11H21V12H20zM21,11H22V12H21zM23,11H24V12H23zM24,11H25V12H24zM0,12H1V13H0zM1,12H2V13H1zM2,12H3V13H2zM5,12H6V13H5zM6,12H7V13H6zM14,12H15V13H14zM16,12H17V13H16zM17,12H18V13H17zM18,12H19V13H18zM22,12H23V13H22zM1,13H2V14H1zM4,13H5V14H4zM5,13H6V14H5zM8,13H9V14H8zM9,13H10V14H9zM10,13H11V14H10zM11,13H12V14H11zM14,13H15V14H14zM19,13H20V14H19zM20,13H21V14H20zM23,13H24V14H23zM24,13H25V14H24zM0,14H1V15H0zM3,14H4V15H3zM4,14H5V15H4zM6,14H7V15H6zM8,14H9V15H8zM10,14H11V15H10zM13,14H14V15H13zM16,14H17V15H16zM17,14H18V15H17zM19,14H20V15H19zM21,14H22V15H21zM22,14H23V15H22zM23,14H24V15H23zM24,14H25V15H24zM1,15H2V16H1zM2,15H3V16H2zM3,15H4V16H3zM4,15H5V16H4zM5,15H6V16H5zM7,15H8V16H7zM8,15H9V16H8zM10,15H11V16H10zM11,15H12V16H11zM17,15H18V16H17zM18,15H19V16H18zM19,15H20V16H19zM20,15H21V16H20zM21,15H22V16H21zM22,15H23V16H22zM23,15H24V16H23zM0,16H1V17H0zM3,16H4V17H3zM5,16H6V17H5zM6,16H7V17H6zM7,16H8V17H7zM8,16H9V17H8zM9,16H10V17H9zM10,16H11V17H10zM12,16H13V17H12zM16,16H17V17H16zM17,16H18V17H17zM18,16H19V17H18zM19,16H20V17H19zM20,16H21V17H20zM23,16H24V17H23zM24,16H25V17H24zM8,17H9V18H8zM10,17H11V18H10zM11,17H12V18H11zM12,17H13V18H12zM13,17H14V18H13zM16,17H17V18H16zM20,17H21V18H20zM21,17H22V18H21zM22,17H23V18H22zM24,17H25V18H24zM0,18H1V19H0zM1,18H2V19H1zM2,18H3V19H2zM3,18H4V19H3zM4,18H5V19H4zM5,18H6V19H5zM6,18H7V19H6zM9,18H10V19H9zM11,18H12V19H11zM12,18H13V19H12zM14,18H15V19H14zM16,18H17V19H16zM18,18H19V19H18zM20,18H21V19H20zM24,18H25V19H24zM0,19H1V20H0zM6,19H7V20H6zM10,19H11V20H10zM12,19H13V20H12zM13,19H14V20H13zM14,19H15V20H14zM15,19H16V20H15zM16,19H17V20H16zM20,19H21V20H20zM22,19H23V20H22zM24,19H25V20H24zM0,20H1V21H0zM2,20H3V21H2zM3,20H4V21H3zM4,20H5V21H4zM6,20H7V21H6zM8,20H9V21H8zM9,20H10V21H9zM10,20H11V21H10zM11,20H12V21H11zM14,20H15V21H14zM16,20H17V21H16zM17,20H18V21H17zM18,20H19V21H18zM19,20H20V21H19zM20,20H21V21H20zM21,20H22V21H21zM22,20H23V21H22zM0,21H1V22H0zM2,21H3V22H2zM3,21H4V22H3zM4,21H5V22H4zM6,21H7V22H6zM11,21H12V22H11zM14,21H15V22H14zM15,21H16V22H15zM17,21H18V22H17zM20,21H21V22H20zM22,21H23V22H22zM23,21H24V22H23zM0,22H1V23H0zM2,22H3V23H2zM3,22H4V23H3zM4,22H5V23H4zM6,22H7V23H6zM8,22H9V23H8zM10,22H11V23H10zM13,22H14V23H13zM16,22H17V23H16zM18,22H19V23H18zM20,22H21V23H20zM21,22H22V23H21zM24,22H25V23H24zM0,23H1V24H0zM6,23H7V24H6zM10,23H11V24H10zM11,23H12V24H11zM16,23H17V24H16zM23,23H24V24H23zM24,23H25V24H24zM0,24H1V25H0zM1,24H2V25H1zM2,24H3V25H2zM3,24H4V25H3zM4,24H5V25H4zM5,24H6V25H5zM6,24H7V25H6zM8,24H9V25H8zM9,24H10V25H9zM12,24H13V25H12zM17,24H18V25H17zM18,24H19V25H18zM20,24H21V25H20zM22,24H23V25H22zM24,24H25V25H24z"/></svg><div class="scanline"></div></div>
-                <div class="qrinfo"><b>Покажите код кассиру</b><span>Бонусы начислятся сразу после оплаты</span><span class="num cardnum"></span></div>
-              </div>
-            </div>
-          </div>
-          <button class="demo" id="scanDemo" hidden>Демо: кассир сканирует код</button>
+          <button class="bcard a" style="--i:2" id="bcard" aria-label="ISTANBUL card">
+            <span class="bc-top"><span class="bword">ISTANBUL</span><span class="lvl" id="lvlPill"></span></span>
+            <span class="bc-mid"><span><small>Бонусный счёт</small><span class="bal" id="balBox"><b id="bal">0</b><span>бонусов</span></span></span><span class="chipset"><span data-ic="wave"></span><span class="chip"></span></span></span>
+            <span class="bc-row"><span class="holder" id="holder"></span><span class="num cardnum"></span></span>
+            <span class="bc-code"><span id="bcBars"></span><span class="digits" id="bcDigits"></span></span>
+            <span class="bc-hint"><span data-ic="scan"></span>Нажмите, чтобы показать кассиру</span>
+          </button>
           <button class="rwidget a" style="--i:3" id="rw"><span class="pl" id="rwPl"></span><span class="t"><b id="rwT">Рейтинг ноября</b><span id="rwS"></span></span></button>
           <div class="box a" style="--i:4"><h5><span id="lvT" style="color:inherit;font-weight:800"></span><span id="lvR"></span></h5><div class="pbar"><i id="lvBar"></i></div>
             <div class="steps"><span data-l="0">Базовый 3%</span><span data-l="1">Серебро 5%</span><span data-l="2">Золото 7%</span></div></div>
@@ -577,13 +601,13 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
               <div class="ticker" aria-hidden="true"><div class="track" id="track"></div></div>
               <div class="pad">
                 <div class="podium">
-                  <div class="pd r2" style="--h: 58px; --d: .25s"><div class="who"><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>2</b><span>+600</span></div></div>
-                  <div class="pd r1" style="--h: 76px; --d: .4s"><div class="who"><svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>1</b><span>+1 000</span></div></div>
-                  <div class="pd r3" style="--h: 46px; --d: .1s"><div class="who"><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>3</b><span>+400</span></div></div>
+                  <div class="pd r2" style="--h: 58px; --d: .25s"><div class="who"><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>2</b><span>+30 000</span></div></div>
+                  <div class="pd r1" style="--h: 76px; --d: .4s"><div class="who"><svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>1</b><span>+50 000</span></div></div>
+                  <div class="pd r3" style="--h: 46px; --d: .1s"><div class="who"><div class="av"></div><div class="nm"></div><div class="pts"></div></div><div class="bar"><b>3</b><span>+20 000</span></div></div>
                 </div>
                 <div class="mecard">
                   <div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" id="ring" cx="32" cy="32" r="27"/></svg><div class="place" id="place"></div></div>
-                  <div class="t"><small>Ваше место</small><b id="gapLine"><span id="gapPre"></span> <span id="gap"></span> смн</b><b id="leadLine" hidden>Вы лидер ноября</b><span class="sub" id="target"></span></div>
+                  <div class="t"><small>Ваше место</small><b id="gapLine"><span id="gapPre"></span> <span class="nw"><span id="gap"></span> ₸</span></b><b id="leadLine" hidden>Вы лидер ноября</b><span class="sub" id="target"></span></div>
                   <div class="score"><b id="myScore">0</b><small>очков</small></div>
                 </div>
                 <div class="rlist" id="rlist"></div>
@@ -604,13 +628,13 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
           </section>
           <section class="scene" id="s-prizes">
             <div class="scroll pad">
-              <p class="lead a" style="margin-top:4px">1 сомони покупок = 1 очко. Рейтинг обнуляется 1-го числа, итоги и призы — в последний день месяца.</p>
+              <p class="lead a" style="margin-top:4px">1 тенге покупок = 1 очко. Рейтинг обнуляется 1-го числа, итоги и призы в последний день месяца.</p>
               <div class="prizes">
-                <div class="pz dk a" style="--i:1"><div class="n">1</div><div class="t">+1 000 бонусов<span>и подарочный сертификат на 500 смн</span></div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg></div>
-                <div class="pz a" style="--i:2"><div class="n">2</div><div class="t">+600 бонусов<span>сразу на карту</span></div></div>
-                <div class="pz a" style="--i:3"><div class="n">3</div><div class="t">+400 бонусов<span>сразу на карту</span></div></div>
+                <div class="pz dk a" style="--i:1"><div class="n">1</div><div class="t">+50 000 бонусов<span>и подарочный сертификат на 25 000 ₸</span></div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg></div>
+                <div class="pz a" style="--i:2"><div class="n">2</div><div class="t">+30 000 бонусов<span>сразу на карту</span></div></div>
+                <div class="pz a" style="--i:3"><div class="n">3</div><div class="t">+20 000 бонусов<span>сразу на карту</span></div></div>
                 <div class="pz a" style="--i:4"><div class="n">4–10</div><div class="t">×1,5 кешбэк<span>на все покупки следующего месяца</span></div></div>
-                <div class="pz a" style="--i:5"><div class="n">11–50</div><div class="t">+100 бонусов<span>за активность</span></div></div>
+                <div class="pz a" style="--i:5"><div class="n">11–50</div><div class="t">+5 000 бонусов<span>за активность</span></div></div>
               </div>
             </div>
           </section>
@@ -619,7 +643,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
               <small>Итоги октября</small>
               <div class="medal"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="m1" cx="100" cy="100" r="92"/><circle class="m2" cx="100" cy="100" r="78"/></svg><b id="resNum">4</b></div>
               <h2>Вы на 4 месте<br>из 1 174</h2>
-              <p>Вы купили на 6 380 смн и обогнали 1 170 покупателей. До тройки не хватило 420 смн.</p>
+              <p>Вы купили на 319 000 ₸ и обогнали 1 170 покупателей. До тройки не хватило 21 000 ₸.</p>
               <div class="won"><div><span>Ваш приз</span><b>×1,5 кешбэк</b></div><span>на весь<br>ноябрь</span></div>
               <div class="acts"><button class="cta" id="share">Поделиться</button></div>
             </div>
@@ -642,6 +666,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
           </div>
           <div class="cap a" style="--i:3">Настройки</div>
           <div class="list a" style="--i:3">
+            <button id="langRow"><span data-ic="globe"></span>Язык<span class="v"><span id="pLang"></span><span data-ic="next"></span></span></button>
             <div><span data-ic="trophy"></span>Участвовать в рейтинге<button class="toggle" role="switch" data-t="inRating" aria-label="Участвовать в рейтинге"></button></div>
             <div><span data-ic="bell"></span>Уведомления о бонусах<button class="toggle" role="switch" data-t="notif" aria-label="Уведомления о бонусах"></button></div>
             <div><span data-ic="sms"></span>SMS о покупках<button class="toggle" role="switch" data-t="sms" aria-label="SMS о покупках"></button></div>
@@ -668,9 +693,9 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
       <div class="topbar"><button class="back" data-back aria-label="Назад"></button>Магазины</div>
       <div class="map"><div class="road" style="left:0;right:0;top:76px;height:14px"></div><div class="road" style="left:120px;top:0;bottom:0;width:12px"></div><div class="road" style="left:0;right:0;top:150px;height:10px;transform:rotate(-8deg)"></div><div class="road" style="left:260px;top:0;bottom:0;width:10px"></div>
         <div class="pin" style="left:104px;top:36px;--i:0"><i></i></div><div class="pin" style="left:240px;top:110px;--i:1"><i></i></div><div class="pin soon" style="left:40px;top:130px;--i:2"><i></i></div></div>
-      <div class="store a" style="--i:3"><div class="ic" data-ic="store"></div><div class="t"><b>ТЦ «Пайкар», 2 этаж</b><span>Ежедневно 10:00–21:00 · 1,2 км</span></div><span class="pill">Открыто</span></div>
-      <div class="store a" style="--i:4"><div class="ic" data-ic="store"></div><div class="t"><b>ул. Рудаки, 45</b><span>Ежедневно 09:00–20:00 · 2,8 км</span></div><span class="pill">Открыто</span></div>
-      <div class="store a" style="--i:5"><div class="ic" data-ic="store"></div><div class="t"><b>ТРЦ «Душанбе Молл»</b><span>Открытие 1 декабря · 5,4 км</span></div><span class="pill off">Скоро</span></div>
+      <div class="store a" style="--i:3"><div class="ic" data-ic="store"></div><div class="t"><b>ТЦ «Жибек», 2 этаж</b><span>Ежедневно 10:00–21:00 · 1,2 км</span></div><span class="pill">Открыто</span></div>
+      <div class="store a" style="--i:4"><div class="ic" data-ic="store"></div><div class="t"><b>пр. Абая, 45</b><span>Ежедневно 09:00–20:00 · 2,8 км</span></div><span class="pill">Открыто</span></div>
+      <div class="store a" style="--i:5"><div class="ic" data-ic="store"></div><div class="t"><b>ТРЦ «Алатау Молл»</b><span>Открытие 1 декабря · 5,4 км</span></div><span class="pill off">Скоро</span></div>
     </div>
   </section>
   <section class="view" id="v-notes"><div class="scroll pad" id="notesBody"></div></section>
@@ -685,15 +710,119 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const app = $('#app');
+  const CUR = '₸';
   const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const plain = n => String(Math.round(n));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const two = n => String(n).padStart(2, '0');
   const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 
+  /* ---------- languages: Russian text is the key, [Kazakh, English] ---------- */
+  const TR = {
+    'Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.': ['Киім дүкендерінің бонус картасы. Әр сатып алудан бонус жинап, чектің жартысына дейін бонуспен төлеңіз.', 'A bonus card for our clothing stores. Earn bonuses on every purchase and pay up to half of the bill with them.'],
+    'Кешбэк бонусами с первой покупки': ['Алғашқы сатып алудан бонуспен кешбэк', 'Cashback in bonuses from the first purchase'],
+    'Приветственные бонусы на карту': ['Картаға сәлемдесу бонустары', 'Welcome bonuses on your card'],
+    'Получить карту': ['Карта алу', 'Get a card'], 'У меня уже есть карта': ['Менде карта бар', 'I already have a card'],
+    'ISTANBUL · сейчас': ['ISTANBUL · қазір', 'ISTANBUL · now'], 'Код для входа:': ['Кіру коды:', 'Login code:'], 'Вставить': ['Қою', 'Paste'],
+    'Ваш номер': ['Телефон', 'Your phone'], 'телефона': ['нөміріңіз', 'number'],
+    'Отправим SMS с кодом. Номер станет номером вашей карты.': ['Кодпен SMS жібереміз. Нөмір картаңыздың нөмірі болады.', 'We will text you a code. Your number becomes your card number.'],
+    'Введите номер, к которому привязана карта. Отправим SMS с кодом.': ['Карта тіркелген нөмірді енгізіңіз. Кодпен SMS жібереміз.', 'Enter the number linked to your card. We will text you a code.'],
+    'Получить код': ['Код алу', 'Get code'], 'Код из SMS': ['SMS коды', 'SMS code'], 'Отправили на': ['Жіберілген нөмір:', 'Sent to'],
+    'Отправить снова через 0:{0}': ['Қайта жіберу: 0:{0}', 'Resend in 0:{0}'], 'Код можно отправить снова': ['Кодты қайта жіберуге болады', 'You can resend the code'],
+    'Неверный код. Нажмите на SMS сверху': ['Код қате. Жоғарыдағы SMS-ті басыңыз', 'Wrong code. Tap the SMS above'],
+    'С возвращением, {0}': ['Қайта келуіңізбен, {0}', 'Welcome back, {0}'],
+    'Давайте': ['Танысып', "Let's get"], 'познакомимся': ['алайық', 'acquainted'],
+    'Имя': ['Аты', 'First name'], 'Фамилия': ['Тегі', 'Last name'], 'Например, Мадина': ['Мысалы, Мадина', 'For example, Madina'], 'Необязательно': ['Міндетті емес', 'Optional'],
+    '+1 000 бонусов': ['+1 000 бонус', '+1 000 bonuses'], 'начислим сразу после регистрации': ['тіркелген бойда есептеледі', 'credited right after sign-up'],
+    'Создать карту': ['Карта жасау', 'Create card'], 'Карта готова, {0}!': ['Карта дайын, {0}!', 'Your card is ready, {0}!'],
+    'приветственных бонусов уже на карте': ['сәлемдесу бонусы картаңызда', 'welcome bonuses are already on your card'], 'Открыть карту': ['Картаны ашу', 'Open card'],
+    'Доброй ночи': ['Қайырлы түн', 'Good night'], 'Доброе утро': ['Қайырлы таң', 'Good morning'], 'Добрый день': ['Қайырлы күн', 'Good afternoon'], 'Добрый вечер': ['Қайырлы кеш', 'Good evening'],
+    'Бонусный счёт': ['Бонус шоты', 'Bonus balance'], 'бонусов': ['бонус', 'bonuses'], 'Нажмите, чтобы показать кассиру': ['Кассирге көрсету үшін басыңыз', 'Tap to show the cashier'],
+    'Рейтинг ноября': ['Қараша рейтингі', 'November rating'], 'Вы лидер месяца': ['Сіз ай көшбасшысысыз', 'You lead this month'],
+    'До топ-10 ещё {0} ₸ покупок': ['Топ-10-ға дейін тағы {0} ₸', '{0} ₸ more to reach the top 10'], 'До {0}-го места {1} ₸ покупок': ['{0}-орынға дейін {1} ₸', '{1} ₸ more to reach place {0}'],
+    'До уровня «{0}»': ['«{0}» деңгейіне дейін', 'To {0} level'], 'Максимальный уровень': ['Ең жоғары деңгей', 'Top level'], 'кешбэк 7%': ['кешбэк 7%', '7% cashback'],
+    'Базовый 3%': ['Базалық 3%', 'Basic 3%'], 'Серебро 5%': ['Күміс 5%', 'Silver 5%'], 'Золото 7%': ['Алтын 7%', 'Gold 7%'],
+    'Базовый': ['Базалық', 'Basic'], 'Серебро': ['Күміс', 'Silver'], 'Золото': ['Алтын', 'Gold'],
+    'Двойные бонусы на верхнюю одежду': ['Сырт киімге екі еселенген бонус', 'Double bonuses on outerwear'], 'до 30 ноября во всех магазинах': ['30 қарашаға дейін барлық дүкенде', 'until 30 November in all stores'],
+    'Операции': ['Операциялар', 'Activity'], 'Все': ['Барлығы', 'All'],
+    'Покупка · ТЦ «Жибек»': ['Сатып алу · «Жібек» СО', 'Purchase · Zhibek mall'], 'Покупка · пр. Абая, 45': ['Сатып алу · Абай д-лы, 45', 'Purchase · 45 Abay Ave'],
+    'Оплата бонусами': ['Бонуспен төлеу', 'Paid with bonuses'], 'Приветственные бонусы': ['Сәлемдесу бонустары', 'Welcome bonuses'],
+    'Сегодня': ['Бүгін', 'Today'], '15 ноября': ['15 қараша', '15 November'], '2 ноября': ['2 қараша', '2 November'], 'чек': ['чек', 'bill'],
+    'История': ['Тарих', 'History'], 'Начисления': ['Есептелген', 'Earned'], 'Списания': ['Жұмсалған', 'Spent'], 'Начислено всего': ['Барлығы есептелді', 'Total earned'], 'Потрачено': ['Жұмсалды', 'Spent'],
+    'Пока пусто': ['Әзірге бос', 'Nothing here yet'], 'Вы ещё не оплачивали покупки бонусами': ['Сіз әлі бонуспен төлеген жоқсыз', 'You have not paid with bonuses yet'],
+    'Покажите код карты на кассе, и здесь появятся бонусы': ['Кассада карта кодын көрсетіңіз, бонустар осында пайда болады', 'Show your card code at checkout and bonuses will appear here'],
+    'Подарок': ['Сыйлық', 'Gift'], 'Покупка': ['Сатып алу', 'Purchase'], 'Операция': ['Операция', 'Operation'], 'Сумма чека': ['Чек сомасы', 'Bill total'], 'Списано': ['Шегерілді', 'Deducted'], 'Начислено': ['Есептелді', 'Earned'], '1 бонус': ['1 бонус', '1 bonus'], 'Закрыть': ['Жабу', 'Close'],
+    'Покажите кассиру': ['Кассирге көрсетіңіз', 'Show the cashier'], 'Бонусы начислятся сразу после оплаты': ['Бонустар төлемнен кейін бірден есептеледі', 'Bonuses are credited right after payment'],
+    'Номер карты': ['Карта нөмірі', 'Card number'], 'Можно показать штрихкод или QR-код': ['Штрих-кодты немесе QR-кодты көрсетуге болады', 'Show either the barcode or the QR code'],
+    'Демо: кассир сканирует код': ['Демо: кассир кодты сканерлейді', 'Demo: cashier scans the code'],
+    'Покупка проведена': ['Сатып алу өткізілді', 'Purchase complete'], 'ТЦ «Жибек» · только что': ['«Жібек» СО · жаңа ғана', 'Zhibek mall · just now'], 'Сумма покупки': ['Сатып алу сомасы', 'Purchase total'],
+    'Оплачено бонусами': ['Бонуспен төленді', 'Paid with bonuses'], 'К оплате': ['Төлеуге', 'To pay'], 'Кешбэк {0}%': ['Кешбэк {0}%', 'Cashback {0}%'], 'Новый баланс': ['Жаңа баланс', 'New balance'], 'Отлично': ['Тамаша', 'Great'],
+    'Новый уровень: {0} · кешбэк {1}%': ['Жаңа деңгей: {0} · кешбэк {1}%', 'New level: {0} · {1}% cashback'],
+    'Рейтинг': ['Рейтинг', 'Rating'], 'Ноябрь · до итогов': ['Қараша · қорытындыға дейін', 'November · results in'], '{0} д': ['{0} к', '{0} d'],
+    'Ноябрь': ['Қараша', 'November'], 'Моё место': ['Менің орным', 'My place'], 'Призы': ['Жүлделер', 'Prizes'], 'Итоги': ['Қорытынды', 'Results'],
+    'Ваше место': ['Сіздің орныңыз', 'Your place'], 'Вы лидер ноября': ['Сіз қараша көшбасшысысыз', 'You lead November'], 'очков': ['ұпай', 'points'],
+    'До топ-10 ещё': ['Топ-10-ға дейін', 'To the top 10:'], 'До {0}-го места': ['{0}-орынға дейін', 'To place {0}:'],
+    'впереди {0} покупателей': ['алда {0} сатып алушы', '{0} shoppers ahead'], 'обгоните {0}': ['{0} басып озыңыз', 'overtake {0}'], 'держите первое место': ['бірінші орынды сақтаңыз', 'hold the first place'], 'Вы': ['Сіз', 'You'],
+    '+ Покупка': ['+ Сатып алу', '+ Purchase'], 'демо': ['демо', 'demo'],
+    '+{0} очков за покупку на {0} ₸': ['{0} ₸ сатып алу үшін +{0} ұпай', '+{0} points for a {0} ₸ purchase'],
+    'Вы в тройке лидеров: {0} место': ['Сіз үздік үштіктесіз: {0}-орын', 'You are in the top three: place {0}'], 'Вы поднялись на {0} место': ['Сіз {0}-орынға көтерілдіңіз', 'You moved up to place {0}'],
+    'Ноябрь · из 1 268 покупателей': ['Қараша · 1 268 сатып алушыдан', 'November · out of 1 268 shoppers'], 'на 2 места за неделю': ['аптасына 2 орынға', 'up 2 places this week'], '{0} очков в ноябре': ['қарашада {0} ұпай', '{0} points in November'],
+    'Ваш путь в ноябре': ['Қарашадағы жолыңыз', 'Your November path'], 'место по дням': ['күндер бойынша орын', 'place by day'],
+    'держите первое место до конца месяца': ['ай соңына дейін бірінші орынды сақтаңыз', 'hold first place until the month ends'],
+    'Обогнать ещё 100 покупателей': ['Тағы 100 сатып алушыны басып озу', 'Overtake 100 more shoppers'], 'примерно 10 000 ₸ покупок': ['шамамен 10 000 ₸ сатып алу', 'about 10 000 ₸ in purchases'],
+    'Обогнать {0}': ['{0} басып озу', 'Overtake {0}'], 'ещё {0} ₸ покупок': ['тағы {0} ₸ сатып алу', '{0} ₸ more in purchases'],
+    'Остаться в топ-10': ['Топ-10-да қалу', 'Stay in the top 10'], 'Попасть в топ-10': ['Топ-10-ға кіру', 'Reach the top 10'], '×1,5 кешбэк весь декабрь': ['желтоқсан бойы ×1,5 кешбэк', '×1.5 cashback all December'],
+    'Вы в тройке лидеров': ['Сіз үздік үштіктесіз', 'You are in the top three'], 'Войти в тройку': ['Үздік үштікке кіру', 'Reach the top three'],
+    'приз за {0} место: +{1} бонусов': ['{0}-орын жүлдесі: +{1} бонус', 'prize for place {0}: +{1} bonuses'], 'ещё {0} ₸ · приз +20 000 бонусов': ['тағы {0} ₸ · жүлде +20 000 бонус', '{0} ₸ more · prize +20 000 bonuses'],
+    '1 тенге покупок = 1 очко. Рейтинг обнуляется 1-го числа, итоги и призы в последний день месяца.': ['1 теңге сатып алу = 1 ұпай. Рейтинг айдың 1-інде нөлденеді, қорытынды мен жүлделер айдың соңғы күні.', '1 tenge spent = 1 point. The rating resets on the 1st; results and prizes come on the last day of the month.'],
+    '+50 000 бонусов': ['+50 000 бонус', '+50 000 bonuses'], 'и подарочный сертификат на 25 000 ₸': ['және 25 000 ₸ сыйлық сертификаты', 'and a 25 000 ₸ gift certificate'],
+    '+30 000 бонусов': ['+30 000 бонус', '+30 000 bonuses'], '+20 000 бонусов': ['+20 000 бонус', '+20 000 bonuses'], '+5 000 бонусов': ['+5 000 бонус', '+5 000 bonuses'],
+    'сразу на карту': ['бірден картаға', 'straight to your card'], '×1,5 кешбэк': ['×1,5 кешбэк', '×1.5 cashback'], 'на все покупки следующего месяца': ['келесі айдағы барлық сатып алуға', 'on all purchases next month'], 'за активность': ['белсенділік үшін', 'for being active'],
+    'Итоги октября': ['Қазан қорытындысы', 'October results'], 'Вы на 4 месте': ['Сіз 4-орындасыз', 'You placed 4th'], 'из 1 174': ['1 174-тен', 'out of 1 174'],
+    'Вы купили на 319 000 ₸ и обогнали 1 170 покупателей. До тройки не хватило 21 000 ₸.': ['Сіз 319 000 ₸ сатып алып, 1 170 сатып алушыны басып оздыңыз. Үздік үштікке 21 000 ₸ жетпеді.', 'You spent 319 000 ₸ and overtook 1 170 shoppers. You were 21 000 ₸ short of the top three.'],
+    'Ваш приз': ['Сіздің жүлдеңіз', 'Your prize'], 'на весь': ['бүкіл', 'for all of'], 'ноябрь': ['қараша', 'November'], 'Поделиться': ['Бөлісу', 'Share'],
+    'В приложении откроется окно «Поделиться»': ['Қолданбада «Бөлісу» терезесі ашылады', 'The app will open the Share dialog'],
+    'Акции': ['Акциялар', 'Offers'], 'до 30 ноября · все магазины': ['30 қарашаға дейін · барлық дүкен', 'until 30 November · all stores'], 'ДО 30 НОЯБРЯ': ['30 ҚАРАШАҒА ДЕЙІН', 'UNTIL 30 NOVEMBER'],
+    'Покупайте пальто, куртки и пуховики и получайте вдвое больше бонусов на карту.': ['Пальто, күрте және пуховик сатып алып, картаға екі есе көп бонус алыңыз.', 'Buy coats, jackets and puffers and earn twice the bonuses.'],
+    'Покажите код карты на кассе': ['Кассада карта кодын көрсетіңіз', 'Show your card code at checkout'],
+    'Бонусы ×2 начислятся автоматически на всю верхнюю одежду в чеке': ['Чектегі барлық сырт киімге ×2 бонус автоматты түрде есептеледі', '×2 bonuses are added automatically for all outerwear on the bill'],
+    'Акция суммируется с вашим уровнем, очки рейтинга тоже удваиваются': ['Акция деңгейіңізбен қосылады, рейтинг ұпайлары да екі еселенеді', 'The offer stacks with your level, and rating points double too'],
+    'Скидка на обувь по карте': ['Карта бойынша аяқ киімге жеңілдік', 'Card discount on shoes'], '1–7 декабря · ТЦ «Жибек»': ['1–7 желтоқсан · «Жібек» СО', '1–7 December · Zhibek mall'], '1–7 ДЕКАБРЯ': ['1–7 ЖЕЛТОҚСАН', '1–7 DECEMBER'],
+    'Вся обувь со скидкой 20% для участников программы. Бонусы начисляются на сумму после скидки.': ['Бағдарлама қатысушыларына барлық аяқ киімге 20% жеңілдік. Бонустар жеңілдіктен кейінгі сомаға есептеледі.', 'All shoes are 20% off for members. Bonuses are earned on the discounted total.'],
+    'Скидка применится ко всей обуви в чеке': ['Жеңілдік чектегі барлық аяқ киімге қолданылады', 'The discount applies to all shoes on the bill'],
+    'Оплатить бонусами можно до половины оставшейся суммы': ['Қалған соманың жартысына дейін бонуспен төлеуге болады', 'You can pay up to half of the rest with bonuses'],
+    'Показать карту': ['Картаны көрсету', 'Show card'],
+    'Профиль': ['Профиль', 'Profile'], 'Уровни и правила': ['Деңгейлер мен ережелер', 'Levels and rules'], 'Магазины': ['Дүкендер', 'Stores'], 'Уведомления': ['Хабарландырулар', 'Notifications'], 'Настройки': ['Баптаулар', 'Settings'],
+    'Язык': ['Тіл', 'Language'], 'Участвовать в рейтинге': ['Рейтингке қатысу', 'Take part in the rating'], 'Уведомления о бонусах': ['Бонус туралы хабарландырулар', 'Bonus notifications'], 'SMS о покупках': ['Сатып алу туралы SMS', 'Purchase SMS'], 'Выйти': ['Шығу', 'Log out'],
+    'Вы снова в рейтинге': ['Сіз қайтадан рейтингтесіз', 'You are back in the rating'], 'Ваше имя скрыто из рейтинга': ['Атыңыз рейтингтен жасырылды', 'Your name is hidden from the rating'],
+    'Выйти из аккаунта?': ['Аккаунттан шығасыз ба?', 'Log out?'], 'Карта и бонусы сохранятся. Чтобы вернуться, войдите по номеру телефона.': ['Карта мен бонустар сақталады. Қайта кіру үшін телефон нөмірімен кіріңіз.', 'Your card and bonuses are kept. Log in with your phone number to return.'], 'Остаться': ['Қалу', 'Stay'],
+    'Язык приложения': ['Қолданба тілі', 'App language'], 'Язык изменён': ['Тіл өзгертілді', 'Language changed'], 'Карта': ['Карта', 'Card'],
+    'Уровни': ['Деңгейлер', 'Levels'], 'Больше покупок, больше бонусов': ['Көбірек сатып алу, көбірек бонус', 'More purchases, more bonuses'],
+    'Уровень зависит от суммы покупок за последние 12 месяцев.': ['Деңгей соңғы 12 айдағы сатып алу сомасына байланысты.', 'Your level depends on purchases over the last 12 months.'],
+    '3% бонусами с каждой покупки': ['әр сатып алудан 3% бонус', '3% back in bonuses on every purchase'], '5% бонусами и ранний доступ к распродажам': ['5% бонус және жеңілдіктерге ерте қолжетімділік', '5% back and early access to sales'], '7% бонусами и бесплатная подгонка': ['7% бонус және тегін киім түзету', '7% back and free tailoring'],
+    'с первой покупки': ['алғашқы сатып алудан', 'from the first purchase'], 'от {0} ₸': ['{0} ₸-ден', 'from {0} ₸'], 'ваш': ['сіздікі', 'yours'], 'До «{0}»': ['«{0}» деңгейіне дейін', 'To {0}'], 'осталось {0} ₸': ['{0} ₸ қалды', '{0} ₸ to go'],
+    'Бонусами можно оплатить до 50% чека. Бонусы действуют 180 дней после начисления.': ['Бонуспен чектің 50%-ына дейін төлеуге болады. Бонустар есептелген күннен бастап 180 күн жарамды.', 'You can pay up to 50% of a bill with bonuses. Bonuses are valid for 180 days.'],
+    'Начислено {0} бонусов': ['Есептелді: {0} бонус', '{0} bonuses earned'], 'Списано {0} бонусов': ['Шегерілді: {0} бонус', '{0} bonuses deducted'], 'Баланс': ['Баланс', 'Balance'],
+    'Двойные бонусы до 30 ноября': ['30 қарашаға дейін екі еселенген бонус', 'Double bonuses until 30 November'], 'На всю верхнюю одежду во всех магазинах.': ['Барлық дүкендегі бүкіл сырт киімге.', 'On all outerwear in every store.'], 'Вчера': ['Кеше', 'Yesterday'],
+    'Рейтинг ноября открыт': ['Қараша рейтингі ашылды', 'November rating is open'], 'Покупайте и поднимайтесь выше: тройка лидеров получит до 50 000 бонусов.': ['Сатып алып, жоғары көтеріліңіз: үздік үштік 50 000 бонусқа дейін алады.', 'Shop and climb: the top three get up to 50 000 bonuses.'], '1 ноября': ['1 қараша', '1 November'],
+    'ТЦ «Жибек», 2 этаж': ['«Жібек» СО, 2-қабат', 'Zhibek mall, 2nd floor'], 'Ежедневно 10:00–21:00 · 1,2 км': ['Күн сайын 10:00–21:00 · 1,2 км', 'Daily 10:00–21:00 · 1.2 km'], 'пр. Абая, 45': ['Абай д-лы, 45', '45 Abay Ave'],
+    'Ежедневно 09:00–20:00 · 2,8 км': ['Күн сайын 09:00–20:00 · 2,8 км', 'Daily 09:00–20:00 · 2.8 km'], 'ТРЦ «Алатау Молл»': ['«Алатау Молл» СОО', 'Alatau Mall'], 'Открытие 1 декабря · 5,4 км': ['1 желтоқсанда ашылады · 5,4 км', 'Opens 1 December · 5.4 km'],
+    'Открыто': ['Ашық', 'Open'], 'Скоро': ['Жақында', 'Soon'],
+  };
+  const LANGS = [['ru', 'RU', 'Русский'], ['kk', 'ҚАЗ', 'Қазақша'], ['en', 'EN', 'English']];
+  let lang = 'ru';
+  try { const l = localStorage.getItem('istanbul-lang'); if (LANGS.some(x => x[0] === l)) lang = l; } catch (e) { /* storage is optional */ }
+  const t = (s, ...a) => { const e = TR[s]; let r = lang === 'ru' || !e ? s : e[lang === 'kk' ? 0 : 1]; a.forEach((v, i) => { r = r.split('{' + i + '}').join(v); }); return r; };
+  /* static texts of the page are remembered once, then re-written on every language change */
+  const statics = [];
+  (() => {
+    const w = document.createTreeWalker(app, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) { const s = n.nodeValue.trim(); if (/[А-Яа-яЁё]/.test(s)) statics.push({ n, ru: s, pre: n.nodeValue.match(/^\s*/)[0], post: n.nodeValue.match(/\s*$/)[0] }); }
+    $$('[placeholder]', app).forEach(e => statics.push({ e, ru: e.getAttribute('placeholder') }));
+  })();
+
   const P = {
     bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
-    qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h7v-4M17.5 17.5v.01"/>',
     card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8M9 18h6"/>',
@@ -709,21 +838,20 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
     out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>',
     del: '<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m16 9-6 6M10 9l6 6"/>',
     scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
-    up: '<path d="m6 15 6-6 6 6"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+    wave: '<path d="M7 8a6 6 0 0 1 0 8M11 5.5a10 10 0 0 1 0 13M15 3a14 14 0 0 1 0 18"/>',
   };
   const ic = k => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[k]}</svg>`;
   $$('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic); });
   $$('.back').forEach(b => { b.innerHTML = ic('back'); });
   $('#bell').insertAdjacentHTML('afterbegin', ic('bell'));
-  $('#qrBtnLabel').insertAdjacentHTML('afterbegin', ic('qr'));
-  $('#scanDemo').insertAdjacentHTML('afterbegin', ic('scan'));
   $('#wmbig').innerHTML = [...'ISTANBUL'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('');
 
   function count(el, from, to, ms = 900, f = fmt) {
     cancelAnimationFrame(el._raf);
     if (calm || from === to) { el.textContent = f(to); return; }
     const t0 = performance.now();
-    const step = t => { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = f(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
+    const step = now => { const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = f(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
     el._raf = requestAnimationFrame(step);
   }
   function setNum(el, v, anim, f = fmt) {
@@ -733,25 +861,48 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   }
 
   /* ---------- state ---------- */
-  const KEY = 'istanbul-demo-v1';
-  const LEVELS = [{ n: 'Базовый', p: 3, from: 0 }, { n: 'Серебро', p: 5, from: 2000 }, { n: 'Золото', p: 7, from: 5000 }];
-  const lvlIndex = total => total >= 5000 ? 2 : total >= 2000 ? 1 : 0;
+  const KEY = 'istanbul-demo-v2';
+  const LEVELS = [{ n: 'Базовый', p: 3, from: 0 }, { n: 'Серебро', p: 5, from: 100000 }, { n: 'Золото', p: 7, from: 250000 }];
+  const lvlIndex = total => total >= LEVELS[2].from ? 2 : total >= LEVELS[1].from ? 1 : 0;
+  const WELCOME = 1000;
   let st = null;
   try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage is optional */ } };
   const nowTime = () => { const d = new Date(); return two(d.getHours()) + ':' + two(d.getMinutes()); };
-  const demoState = phone => ({ demo: true, name: 'Мадина', last: 'Каримова', phone, bal: 1240, total: 3240, score: 3240, earnedAll: 2380, spentAll: 1140, n: 0, inRating: true, notif: true, sms: true,
+  const demoState = phone => ({ demo: true, name: 'Мадина', last: 'Ахметова', phone, bal: 62000, total: 162000, score: 162000, earnedAll: 119000, spentAll: 57000, n: 0, inRating: true, notif: true, sms: true,
     ops: [
-      { k: 'earn', title: 'Покупка · ТЦ «Пайкар»', day: 'Сегодня', time: '14:32', amt: 62, sum: 1240 },
-      { k: 'spend', title: 'Оплата бонусами', day: '15 ноября', time: '18:05', amt: 600, sum: 2100 },
-      { k: 'earn', title: 'Покупка · ул. Рудаки, 45', day: '15 ноября', time: '18:05', amt: 75, sum: 1500 },
-      { k: 'gift', title: 'Подарок ко дню рождения', day: '2 ноября', time: '09:00', amt: 300 },
+      { k: 'earn', title: 'Покупка · ТЦ «Жибек»', day: 'Сегодня', time: '14:32', amt: 3100, sum: 62000 },
+      { k: 'spend', title: 'Оплата бонусами', day: '15 ноября', time: '18:05', amt: 30000, sum: 105000 },
+      { k: 'earn', title: 'Покупка · пр. Абая, 45', day: '15 ноября', time: '18:05', amt: 3750, sum: 75000 },
+      { k: 'gift', title: 'Приветственные бонусы', day: '2 ноября', time: '09:00', amt: WELCOME },
     ] });
-  const newState = (phone, name, last) => ({ demo: false, name, last, phone, bal: 100, total: 0, score: 0, earnedAll: 100, spentAll: 0, n: 0, inRating: true, notif: true, sms: true,
-    ops: [{ k: 'gift', title: 'Приветственные бонусы', day: 'Сегодня', time: nowTime(), amt: 100 }] });
-  const fmtPhone = d => `+992 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7)}`;
-  const cardNo = () => `IST ${st.phone.slice(1, 5)} ${st.phone.slice(5)}`;
+  const newState = (phone, name, last) => ({ demo: false, name, last, phone, bal: WELCOME, total: 0, score: 0, earnedAll: WELCOME, spentAll: 0, n: 0, inRating: true, notif: true, sms: true,
+    ops: [{ k: 'gift', title: 'Приветственные бонусы', day: 'Сегодня', time: nowTime(), amt: WELCOME }] });
+  const fmtPhone = d => `+7 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  const cardNo = () => `IST ${st.phone.slice(2, 6)} ${st.phone.slice(6)}`;
+  const fullName = () => st.name + (st.last ? ' ' + st.last : '');
   const initials = () => (st.name[0] + (st.last ? st.last[0] : '')).toUpperCase();
+
+  /* ---------- barcode (EAN-13) and QR ---------- */
+  const EL = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+  const EG = ['0100111', '0110011', '0011011', '0100001', '0011101', '0111001', '0000101', '0010001', '0001001', '0010111'];
+  const ER = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100'];
+  const PAR = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+  function ean13(d12) {
+    let s = 0; [...d12].forEach((c, i) => { s += +c * (i % 2 ? 3 : 1); });
+    const d = d12 + ((10 - s % 10) % 10), par = PAR[+d[0]]; let b = '101';
+    for (let i = 1; i <= 6; i++) b += (par[i - 1] === 'L' ? EL : EG)[+d[i]];
+    b += '01010'; for (let i = 7; i <= 12; i++) b += ER[+d[i]];
+    return { digits: d, bits: b + '101' };
+  }
+  const cardCode = () => ean13('29' + st.phone);
+  function barsSvg(bits) {
+    let x = 0, n = 0, out = '';
+    bits.match(/1+|0+/g).forEach(r => { if (r[0] === '1') out += `<rect x="${x}" y="0" width="${r.length}" height="10" style="--i:${n++}"/>`; x += r.length; });
+    return `<svg class="bars" viewBox="0 0 95 10" preserveAspectRatio="none" aria-hidden="true">${out}</svg>`;
+  }
+  const spaced = d => `${d[0]} ${d.slice(1, 7)} ${d.slice(7)}`;
+  const QRD = 'M0,0H1V1H0zM1,0H2V1H1zM2,0H3V1H2zM3,0H4V1H3zM4,0H5V1H4zM5,0H6V1H5zM6,0H7V1H6zM9,0H10V1H9zM14,0H15V1H14zM18,0H19V1H18zM19,0H20V1H19zM20,0H21V1H20zM21,0H22V1H21zM22,0H23V1H22zM23,0H24V1H23zM24,0H25V1H24zM0,1H1V2H0zM6,1H7V2H6zM8,1H9V2H8zM9,1H10V2H9zM11,1H12V2H11zM13,1H14V2H13zM18,1H19V2H18zM24,1H25V2H24zM0,2H1V3H0zM2,2H3V3H2zM3,2H4V3H3zM4,2H5V3H4zM6,2H7V3H6zM9,2H10V3H9zM10,2H11V3H10zM12,2H13V3H12zM15,2H16V3H15zM18,2H19V3H18zM20,2H21V3H20zM21,2H22V3H21zM22,2H23V3H22zM24,2H25V3H24zM0,3H1V4H0zM2,3H3V4H2zM3,3H4V4H3zM4,3H5V4H4zM6,3H7V4H6zM9,3H10V4H9zM10,3H11V4H10zM12,3H13V4H12zM13,3H14V4H13zM18,3H19V4H18zM20,3H21V4H20zM21,3H22V4H21zM22,3H23V4H22zM24,3H25V4H24zM0,4H1V5H0zM2,4H3V5H2zM3,4H4V5H3zM4,4H5V5H4zM6,4H7V5H6zM8,4H9V5H8zM10,4H11V5H10zM11,4H12V5H11zM13,4H14V5H13zM16,4H17V5H16zM18,4H19V5H18zM20,4H21V5H20zM21,4H22V5H21zM22,4H23V5H22zM24,4H25V5H24zM0,5H1V6H0zM6,5H7V6H6zM14,5H15V6H14zM15,5H16V6H15zM18,5H19V6H18zM24,5H25V6H24zM0,6H1V7H0zM1,6H2V7H1zM2,6H3V7H2zM3,6H4V7H3zM4,6H5V7H4zM5,6H6V7H5zM6,6H7V7H6zM8,6H9V7H8zM10,6H11V7H10zM12,6H13V7H12zM14,6H15V7H14zM16,6H17V7H16zM18,6H19V7H18zM19,6H20V7H19zM20,6H21V7H20zM21,6H22V7H21zM22,6H23V7H22zM23,6H24V7H23zM24,6H25V7H24zM15,7H16V8H15zM0,8H1V9H0zM2,8H3V9H2zM4,8H5V9H4zM6,8H7V9H6zM9,8H10V9H9zM10,8H11V9H10zM12,8H13V9H12zM16,8H17V9H16zM20,8H21V9H20zM23,8H24V9H23zM2,9H3V10H2zM4,9H5V10H4zM7,9H8V10H7zM8,9H9V10H8zM10,9H11V10H10zM11,9H12V10H11zM12,9H13V10H12zM13,9H14V10H13zM15,9H16V10H15zM17,9H18V10H17zM20,9H21V10H20zM23,9H24V10H23zM2,10H3V11H2zM3,10H4V11H3zM4,10H5V11H4zM6,10H7V11H6zM7,10H8V11H7zM9,10H10V11H9zM10,10H11V11H10zM11,10H12V11H11zM14,10H15V11H14zM15,10H16V11H15zM19,10H20V11H19zM20,10H21V11H20zM21,10H22V11H21zM23,10H24V11H23zM24,10H25V11H24zM3,11H4V12H3zM8,11H9V12H8zM10,11H11V12H10zM11,11H12V12H11zM13,11H14V12H13zM14,11H15V12H14zM17,11H18V12H17zM19,11H20V12H19zM20,11H21V12H20zM21,11H22V12H21zM23,11H24V12H23zM24,11H25V12H24zM0,12H1V13H0zM1,12H2V13H1zM2,12H3V13H2zM5,12H6V13H5zM6,12H7V13H6zM14,12H15V13H14zM16,12H17V13H16zM17,12H18V13H17zM18,12H19V13H18zM22,12H23V13H22zM1,13H2V14H1zM4,13H5V14H4zM5,13H6V14H5zM8,13H9V14H8zM9,13H10V14H9zM10,13H11V14H10zM11,13H12V14H11zM14,13H15V14H14zM19,13H20V14H19zM20,13H21V14H20zM23,13H24V14H23zM24,13H25V14H24zM0,14H1V15H0zM3,14H4V15H3zM4,14H5V15H4zM6,14H7V15H6zM8,14H9V15H8zM10,14H11V15H10zM13,14H14V15H13zM16,14H17V15H16zM17,14H18V15H17zM19,14H20V15H19zM21,14H22V15H21zM22,14H23V15H22zM23,14H24V15H23zM24,14H25V15H24zM1,15H2V16H1zM2,15H3V16H2zM3,15H4V16H3zM4,15H5V16H4zM5,15H6V16H5zM7,15H8V16H7zM8,15H9V16H8zM10,15H11V16H10zM11,15H12V16H11zM17,15H18V16H17zM18,15H19V16H18zM19,15H20V16H19zM20,15H21V16H20zM21,15H22V16H21zM22,15H23V16H22zM23,15H24V16H23zM0,16H1V17H0zM3,16H4V17H3zM5,16H6V17H5zM6,16H7V17H6zM7,16H8V17H7zM8,16H9V17H8zM9,16H10V17H9zM10,16H11V17H10zM12,16H13V17H12zM16,16H17V17H16zM17,16H18V17H17zM18,16H19V17H18zM19,16H20V17H19zM20,16H21V17H20zM23,16H24V17H23zM24,16H25V17H24zM8,17H9V18H8zM10,17H11V18H10zM11,17H12V18H11zM12,17H13V18H12zM13,17H14V18H13zM16,17H17V18H16zM20,17H21V18H20zM21,17H22V18H21zM22,17H23V18H22zM24,17H25V18H24zM0,18H1V19H0zM1,18H2V19H1zM2,18H3V19H2zM3,18H4V19H3zM4,18H5V19H4zM5,18H6V19H5zM6,18H7V19H6zM9,18H10V19H9zM11,18H12V19H11zM12,18H13V19H12zM14,18H15V19H14zM16,18H17V19H16zM18,18H19V19H18zM20,18H21V19H20zM24,18H25V19H24zM0,19H1V20H0zM6,19H7V20H6zM10,19H11V20H10zM12,19H13V20H12zM13,19H14V20H13zM14,19H15V20H14zM15,19H16V20H15zM16,19H17V20H16zM20,19H21V20H20zM22,19H23V20H22zM24,19H25V20H24zM0,20H1V21H0zM2,20H3V21H2zM3,20H4V21H3zM4,20H5V21H4zM6,20H7V21H6zM8,20H9V21H8zM9,20H10V21H9zM10,20H11V21H10zM11,20H12V21H11zM14,20H15V21H14zM16,20H17V21H16zM17,20H18V21H17zM18,20H19V21H18zM19,20H20V21H19zM20,20H21V21H20zM21,20H22V21H21zM22,20H23V21H22zM0,21H1V22H0zM2,21H3V22H2zM3,21H4V22H3zM4,21H5V22H4zM6,21H7V22H6zM11,21H12V22H11zM14,21H15V22H14zM15,21H16V22H15zM17,21H18V22H17zM20,21H21V22H20zM22,21H23V22H22zM23,21H24V22H23zM0,22H1V23H0zM2,22H3V23H2zM3,22H4V23H3zM4,22H5V23H4zM6,22H7V23H6zM8,22H9V23H8zM10,22H11V23H10zM13,22H14V23H13zM16,22H17V23H16zM18,22H19V23H18zM20,22H21V23H20zM21,22H22V23H21zM24,22H25V23H24zM0,23H1V24H0zM6,23H7V24H6zM10,23H11V24H10zM11,23H12V24H11zM16,23H17V24H16zM23,23H24V24H23zM24,23H25V24H24zM0,24H1V25H0zM1,24H2V25H1zM2,24H3V25H2zM3,24H4V25H3zM4,24H5V25H4zM5,24H6V25H5zM6,24H7V25H6zM8,24H9V25H8zM9,24H10V25H9zM12,24H13V25H12zM17,24H18V25H17zM18,24H19V25H18zM20,24H21V25H20zM22,24H23V25H22zM24,24H25V25H24z';
 
   /* ---------- effects ---------- */
   const fx = $('#fx'), ctx = fx.getContext('2d');
@@ -780,12 +931,16 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   }
   const center = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
   let toastT;
-  function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2400); }
+  function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2400); }
 
   /* ---------- sheet ---------- */
   const sheet = $('#sheet'), dim = $('#dim');
   let onSheetClose = null;
-  function openSheet(html, cls = '', onClose = null) { sheet.className = 'sheet pad ' + cls; sheet.innerHTML = '<div class="grab"></div>' + html; sheet.scrollTop = 0; onSheetClose = onClose; requestAnimationFrame(() => { sheet.classList.add('on'); dim.classList.add('on'); }); }
+  function openSheet(html, cls = '', onClose = null) {
+    const was = sheet.classList.contains('on');
+    sheet.className = 'sheet pad ' + cls + (was ? ' on' : ''); sheet.innerHTML = '<div class="grab"></div>' + html; sheet.scrollTop = 0; onSheetClose = onClose;
+    requestAnimationFrame(() => { sheet.classList.add('on'); dim.classList.add('on'); });
+  }
   function closeSheet() { sheet.classList.remove('on'); dim.classList.remove('on'); const f = onSheetClose; onSheetClose = null; if (f) setTimeout(f, 250); }
   dim.addEventListener('click', closeSheet);
   sheet.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
@@ -800,24 +955,24 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
     parts = []; syncDark(); $('#sms').classList.remove('on'); app.scrollTop = 0;
   }
   function push(id) { stack.push(id); showView(id, 'fwd'); }
-  function pop() { if (stack.length > 1) { stack.pop(); showView(curView(), 'back'); if (curView() === 'v-main') showTab(curTab, true); } }
+  function pop() { if (stack.length > 1) { stack.pop(); showView(curView(), 'back'); if (curView() === 'v-main') showTab(curTab); } }
   function reset(id) { stack = [id]; showView(id, 'fwd'); }
   app.addEventListener('click', e => { if (e.target.closest('[data-back]')) pop(); const g = e.target.closest('[data-go]'); if (g) openSub(g.dataset.go); });
 
-  /* ---------- keypad ---------- */
-  $$('.keypad').forEach(k => { k.innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(d => d === '' ? '<span></span>' : `<button class="key ${d === 'del' ? 'x' : ''}" data-k="${d}" aria-label="${d === 'del' ? 'Стереть' : d}">${d === 'del' ? ic('del') : d}</button>`).join(''); });
+  /* ---------- keypad, phone, code ---------- */
+  $$('.keypad').forEach(k => { k.innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(d => d === '' ? '<span></span>' : `<button class="key ${d === 'del' ? 'x' : ''}" data-k="${d}" aria-label="${d === 'del' ? 'Delete' : d}">${d === 'del' ? ic('del') : d}</button>`).join(''); });
   app.addEventListener('click', e => { const k = e.target.closest('.key'); if (k) press(k.closest('.keypad').dataset.pad, k.dataset.k); });
   addEventListener('keydown', e => {
     const pad = curView() === 'v-phone' ? 'phone' : curView() === 'v-otp' ? 'otp' : null;
     if (!pad) return;
     if (/^\d$/.test(e.key)) press(pad, e.key); else if (e.key === 'Backspace') press(pad, 'del'); else if (e.key === 'Enter' && pad === 'phone') $('#phNext').click();
   });
-  let mode = 'new', phone = '', code = '', typed = '', resendT = 0;
+  let mode = 'new', phone = '', code = '', typed = '', resendT = 0, resendLeft = 0;
   function press(pad, k) {
     if (pad === 'phone') {
-      if (k === 'del') phone = phone.slice(0, -1); else if (phone.length < 9) phone += k;
-      $('#phDigits').textContent = [phone.slice(0, 2), phone.slice(2, 5), phone.slice(5, 7), phone.slice(7)].filter(Boolean).join(' ');
-      $('#phNext').disabled = phone.length !== 9;
+      if (k === 'del') phone = phone.slice(0, -1); else if (phone.length < 10) phone += k;
+      $('#phDigits').textContent = [phone.slice(0, 3), phone.slice(3, 6), phone.slice(6, 8), phone.slice(8)].filter(Boolean).join(' ');
+      $('#phNext').disabled = phone.length !== 10;
     } else {
       if ($('#otp').classList.contains('ok')) return;
       if (k === 'del') typed = typed.slice(0, -1); else if (typed.length < 4) typed += k;
@@ -825,50 +980,52 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
     }
   }
   function drawOtp() { $$('#otp span').forEach((s, i) => { s.textContent = typed[i] || ''; s.className = i < typed.length ? 'f' : i === typed.length ? 'cur' : ''; }); }
+  const drawResend = () => { $('#resend').textContent = resendLeft > 0 ? t('Отправить снова через 0:{0}', two(resendLeft)) : t('Код можно отправить снова'); };
   function startOtp() {
     typed = ''; code = String(1000 + Math.floor(Math.random() * 9000)); $('#otp').className = 'otp'; drawOtp();
     $('#otpPhone').textContent = fmtPhone(phone); $('#smsCode').textContent = code;
     push('v-otp'); setTimeout(() => { if (curView() === 'v-otp') $('#sms').classList.add('on'); }, 1100);
-    let left = 45; clearInterval(resendT); const el = $('#resend');
-    const tick = () => { el.textContent = left > 0 ? `Отправить снова через 0:${two(left)}` : 'Код можно отправить снова'; left--; };
-    tick(); resendT = setInterval(tick, 1000);
+    resendLeft = 45; clearInterval(resendT); drawResend(); resendT = setInterval(() => { resendLeft--; drawResend(); }, 1000);
   }
   function checkOtp() {
-    if (typed !== code) { replay($('#otp'), 'bad'); typed = ''; setTimeout(drawOtp, 350); toast('Неверный код. Нажмите на SMS сверху'); $('#sms').classList.add('on'); return; }
+    if (typed !== code) { replay($('#otp'), 'bad'); typed = ''; setTimeout(drawOtp, 350); toast(t('Неверный код. Нажмите на SMS сверху')); $('#sms').classList.add('on'); return; }
     $('#otp').classList.add('ok'); $('#sms').classList.remove('on'); clearInterval(resendT);
     setTimeout(() => {
-      if (mode === 'have') { st = demoState(phone); save(); enterMain(); toast('С возвращением, ' + st.name); }
-      else { $('#rName').value = ''; $('#rLast').value = ''; $('#rBirth').value = ''; $('#rGo').disabled = true; push('v-reg'); }
+      if (mode === 'have') { st = demoState(phone); save(); enterMain(); toast(t('С возвращением, {0}', st.name)); }
+      else { $('#rName').value = ''; $('#rLast').value = ''; $('#rGo').disabled = true; push('v-reg'); }
     }, 750);
   }
   $('#sms').addEventListener('click', () => { $('#sms').classList.remove('on'); typed = ''; [...code].forEach((d, i) => setTimeout(() => press('otp', d), 120 * (i + 1))); });
   $('#wNew').addEventListener('click', () => { mode = 'new'; startPhone(); });
   $('#wHave').addEventListener('click', () => { mode = 'have'; startPhone(); });
-  function startPhone() { phone = ''; press('phone', 'del'); $('#phLead').textContent = mode === 'new' ? 'Отправим SMS с кодом. Номер станет номером вашей карты.' : 'Введите номер, к которому привязана карта. Отправим SMS с кодом.'; push('v-phone'); }
-  $('#phNext').addEventListener('click', () => { if (phone.length === 9) startOtp(); });
+  const drawPhLead = () => { $('#phLead').textContent = t(mode === 'new' ? 'Отправим SMS с кодом. Номер станет номером вашей карты.' : 'Введите номер, к которому привязана карта. Отправим SMS с кодом.'); };
+  function startPhone() { phone = ''; press('phone', 'del'); drawPhLead(); push('v-phone'); }
+  $('#phNext').addEventListener('click', () => { if (phone.length === 10) startOtp(); });
 
   /* ---------- registration ---------- */
   $('#rName').addEventListener('input', e => { $('#rGo').disabled = e.target.value.trim().length < 2; });
-  $('#rBirth').addEventListener('input', e => { const d = e.target.value.replace(/\D/g, '').slice(0, 8); e.target.value = [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join('.'); });
   $('#rGo').addEventListener('click', () => {
     st = newState(phone, $('#rName').value.trim(), $('#rLast').value.trim()); save();
-    $('#madeNum').textContent = cardNo(); $('#madeTitle').textContent = `Карта готова, ${st.name}!`;
+    $('#madeNum').textContent = cardNo(); $('#madeTitle').textContent = t('Карта готова, {0}!', st.name);
     reset('v-made'); const c = $('#madeCnt'); c.textContent = '0';
-    setTimeout(() => { count(c, 0, 100, 1100, n => '+' + plain(n)); burst(W / 2, H * .34, 120); }, 1100);
+    setTimeout(() => { count(c, 0, WELCOME, 1100, n => '+' + fmt(n)); burst(W / 2, H * .34, 120); }, 1100);
   });
   $('#madeGo').addEventListener('click', enterMain);
 
   /* ---------- rating data ---------- */
   const OTHERS = [
-    { id: 'ash', n: 'Абдулло Ш.', acc: 'Абдулло Ш.', a: 'АШ', s: 12310 }, { id: 'fn', n: 'Фирдавс Н.', acc: 'Фирдавса Н.', a: 'ФН', s: 8940 },
-    { id: 'nu', n: 'Нигора Ю.', acc: 'Нигору Ю.', a: 'НЮ', s: 7205 }, { id: 'za', n: 'Зарина А.', acc: 'Зарину А.', a: 'ЗА', s: 5120 },
-    { id: 'pn', n: 'Парвиз Н.', acc: 'Парвиза Н.', a: 'ПН', s: 4480 }, { id: 'sm', n: 'Сухроб М.', acc: 'Сухроба М.', a: 'СМ', s: 3420 },
-    { id: 'dr', n: 'Далер Р.', acc: 'Далера Р.', a: 'ДР', s: 3010 }, { id: 'kt', n: 'Комрон Т.', acc: 'Комрона Т.', a: 'КТ', s: 2760 },
-    { id: 'si', n: 'Шахноза И.', acc: 'Шахнозу И.', a: 'ШИ', s: 2415 },
+    { id: 'ash', n: 'Арман Ш.', acc: 'Армана Ш.', l: 'Arman Sh.', a: 'АШ', la: 'AS', s: 615500 }, { id: 'fn', n: 'Ерлан Н.', acc: 'Ерлана Н.', l: 'Yerlan N.', a: 'ЕН', la: 'YN', s: 447000 },
+    { id: 'nu', n: 'Айгерим Ж.', acc: 'Айгерим Ж.', l: 'Aigerim Zh.', a: 'АЖ', la: 'AZ', s: 360250 }, { id: 'za', n: 'Зарина А.', acc: 'Зарину А.', l: 'Zarina A.', a: 'ЗА', la: 'ZA', s: 256000 },
+    { id: 'pn', n: 'Данияр Н.', acc: 'Данияра Н.', l: 'Daniyar N.', a: 'ДН', la: 'DN', s: 224000 }, { id: 'sm', n: 'Санжар М.', acc: 'Санжара М.', l: 'Sanzhar M.', a: 'СМ', la: 'SM', s: 171000 },
+    { id: 'dr', n: 'Дамир Р.', acc: 'Дамира Р.', l: 'Damir R.', a: 'ДР', la: 'DR', s: 150500 }, { id: 'kt', n: 'Канат Т.', acc: 'Каната Т.', l: 'Kanat T.', a: 'КТ', la: 'KT', s: 138000 },
+    { id: 'si', n: 'Шолпан И.', acc: 'Шолпан И.', l: 'Sholpan I.', a: 'ШИ', la: 'SI', s: 120750 },
   ];
   const me = { id: 'me', me: true, s: 0 };
   const PEOPLE = [...OTHERS, me];
-  const TOTAL = 1268;
+  const TOTAL = 1268, RATING_BUY = 21000;
+  const nm = p => lang === 'en' ? p.l : p.n;
+  const av = p => p.me || lang !== 'en' ? p.a : p.la;
+  const whom = p => lang === 'ru' ? p.acc : nm(p);
   function info() {
     me.s = st.score;
     const order = [...PEOPLE].sort((a, b) => b.s - a.s || (a.me ? -1 : b.me ? 1 : 0)), k = order.indexOf(me), above = order[k - 1], below = order[k + 1];
@@ -881,85 +1038,87 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
   /* ---------- home ---------- */
   const opIcon = o => o.k === 'spend' ? 'minus' : o.k === 'gift' ? 'gift' : 'plus';
-  const opRow = (o, idx, i) => `<button class="op a" style="--i:${i}" data-op="${idx}"><span class="ic ${o.k === 'spend' ? 'neg' : ''}">${ic(opIcon(o))}</span><span class="t"><b>${esc(o.title)}</b><span>${o.day}, ${o.time}${o.sum ? ` · чек ${fmt(o.sum)} смн` : ''}</span></span><span class="amt ${o.k === 'spend' ? 'neg' : ''}">${o.k === 'spend' ? '−' : '+'}${fmt(o.amt)}</span></button>`;
+  const opRow = (o, idx, i) => `<button class="op a${o.fresh ? ' fresh' : ''}" style="--i:${i}" data-op="${idx}"><span class="ic ${o.k === 'spend' ? 'neg' : ''}">${ic(opIcon(o))}</span><span class="t"><b>${esc(t(o.title))}</b><span>${t(o.day)}, ${o.time}${o.sum ? ` · ${t('чек')} ${fmt(o.sum)} ${CUR}` : ''}</span></span><span class="amt ${o.k === 'spend' ? 'neg' : ''}">${o.k === 'spend' ? '−' : '+'}${fmt(o.amt)}</span></button>`;
   function refreshHome(anim) {
     const h = new Date().getHours();
-    $('#hiTime').textContent = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
-    $('#hiName').textContent = st.name + (st.last ? ' ' + st.last : '');
-    setNum($('#bal'), st.bal, anim);
+    $('#hiTime').textContent = t(h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер');
+    $('#hiName').textContent = fullName(); $('#holder').textContent = fullName();
+    setNum($('#bal'), st.bal, anim); $('#balBox').classList.toggle('sm', st.bal >= 100000);
     const li = lvlIndex(st.total), L = LEVELS[li], next = LEVELS[li + 1];
-    $('#lvlPill').textContent = `${L.n} · ${L.p}%`;
+    $('#lvlPill').textContent = `${t(L.n)} · ${L.p}%`;
     $$('.cardnum').forEach(e => { e.textContent = cardNo(); });
-    $('#lvT').textContent = next ? `До уровня «${next.n}»` : 'Максимальный уровень';
-    $('#lvR').textContent = next ? `${fmt(st.total)} / ${fmt(next.from)} смн` : 'кешбэк 7%';
+    const c = cardCode(); $('#bcBars').innerHTML = barsSvg(c.bits); $('#bcDigits').textContent = spaced(c.digits);
+    $('#lvT').textContent = next ? t('До уровня «{0}»', t(next.n)) : t('Максимальный уровень');
+    $('#lvR').textContent = next ? `${fmt(st.total)} / ${fmt(next.from)} ${CUR}` : t('кешбэк 7%');
     requestAnimationFrame(() => { $('#lvBar').style.width = (next ? Math.min(100, st.total / next.from * 100) : 100) + '%'; });
     $$('.steps span').forEach(s => s.classList.toggle('on', +s.dataset.l === li));
     const r = info();
-    $('#rwPl').textContent = '#' + fmt(r.place);
-    $('#rwS').textContent = !r.above ? 'Вы лидер месяца' : r.far ? `До топ-10 ещё ${fmt(r.gap)} смн покупок` : `До ${r.k}-го места ${fmt(r.gap)} смн покупок`;
+    $('#rwPl').textContent = '#' + fmt(r.place); $('#rwPl').classList.toggle('sm', r.place > 99);
+    $('#rwS').textContent = !r.above ? t('Вы лидер месяца') : r.far ? t('До топ-10 ещё {0} ₸ покупок', fmt(r.gap)) : t('До {0}-го места {1} ₸ покупок', r.k, fmt(r.gap));
     $('#homeOps').innerHTML = st.ops.slice(0, 2).map((o, i) => opRow(o, i, 7 + i)).join('');
   }
-  const card3d = $('#card3d');
-  function flipCard(on) {
-    const f = on === undefined ? !card3d.classList.contains('flipped') : on;
-    card3d.classList.toggle('flipped', f); $('#scanDemo').hidden = !f;
-    if (f) $('#t-card .scroll').scrollTop = 0;
-  }
-  card3d.addEventListener('click', () => flipCard());
-  card3d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
 
-  /* ---------- demo purchase ---------- */
-  const AMOUNTS = [1240, 420, 860, 2100, 640];
+  /* ---------- show the card to the cashier, demo purchase ---------- */
+  const AMOUNTS = [62000, 21000, 43000, 105000, 32000];
   function demoPurchase(fixed) {
     const amount = fixed || AMOUNTS[st.n % AMOUNTS.length]; st.n++;
-    const li0 = lvlIndex(st.total), L = LEVELS[li0], bal0 = st.bal, time = nowTime(), store = 'ТЦ «Пайкар»';
+    const li0 = lvlIndex(st.total), L = LEVELS[li0], bal0 = st.bal, time = nowTime();
     let spend = 0;
-    if (!fixed && st.n % 3 === 0 && st.bal >= 200) spend = Math.min(Math.floor(st.bal / 50) * 50, Math.floor(amount * .5 / 50) * 50, 400);
+    if (!fixed && st.n % 3 === 0 && st.bal >= 10000) spend = Math.min(Math.floor(st.bal / 1000) * 1000, Math.floor(amount * .5 / 1000) * 1000, 20000);
     const pay = amount - spend, earn = Math.round(pay * L.p / 100);
     st.bal += earn - spend; st.total += amount; st.score += amount; st.earnedAll += earn; st.spentAll += spend;
     if (spend) st.ops.unshift({ k: 'spend', title: 'Оплата бонусами', day: 'Сегодня', time, amt: spend, sum: amount, fresh: 1 });
-    st.ops.unshift({ k: 'earn', title: 'Покупка · ' + store, day: 'Сегодня', time, amt: earn, sum: amount, fresh: 1 });
+    st.ops.unshift({ k: 'earn', title: 'Покупка · ТЦ «Жибек»', day: 'Сегодня', time, amt: earn, sum: amount, fresh: 1 });
     save();
     return { amount, spend, pay, earn, bal0, pct: L.p, levelUp: lvlIndex(st.total) > li0 ? LEVELS[lvlIndex(st.total)] : null };
   }
+  function openPay() {
+    const c = cardCode();
+    openSheet(`<h3>${t('Покажите кассиру')}</h3><div class="when">${t('Бонусы начислятся сразу после оплаты')}</div>
+      <div class="paycode" id="paycode">${barsSvg(c.bits)}<div class="scanline"></div></div><div class="digits big">${spaced(c.digits)}</div>
+      <div class="payrow"><div class="qrsm"><svg viewBox="0 0 25 25" aria-hidden="true"><path fill="#0B0B0B" d="${QRD}"/></svg></div><div><small>${t('Номер карты')}</small><b>${cardNo()}</b><span>${t('Можно показать штрихкод или QR-код')}</span></div></div>
+      <button class="demo" id="scanDemo">${ic('scan')}${t('Демо: кассир сканирует код')}</button>`, 'center');
+  }
+  $('#bcard').addEventListener('click', openPay);
   let scanning = false;
-  $('#scanDemo').addEventListener('click', () => {
-    if (scanning) return; scanning = true;
-    replay($('#qrbox'), 'scanning');
+  sheet.addEventListener('click', e => {
+    if (!e.target.closest('#scanDemo') || scanning) return;
+    scanning = true; replay($('#paycode'), 'scanning');
     setTimeout(() => {
-      scanning = false; $('#qrbox').classList.remove('scanning');
+      scanning = false;
       const r = demoPurchase();
-      openSheet(`<div class="okc">${ic('check')}</div><h3>Покупка проведена</h3><div class="when">ТЦ «Пайкар» · только что</div>
-        <div class="kv"><div><span>Сумма покупки</span><b>${fmt(r.amount)} смн</b></div>${r.spend ? `<div><span>Оплачено бонусами</span><b>−${fmt(r.spend)}</b></div><div><span>К оплате</span><b>${fmt(r.pay)} смн</b></div>` : ''}<div><span>Кешбэк ${r.pct}%</span><b class="big">+${fmt(r.earn)}</b></div></div>
-        <div class="newbal"><small>Новый баланс</small><b id="rcBal">${fmt(r.bal0)}</b></div><button class="cta" data-close>Отлично</button>`, 'center', () => {
-        flipCard(false); refreshHome(true);
-        if (r.levelUp) { toast(`Новый уровень: ${r.levelUp.n} · кешбэк ${r.levelUp.p}%`); rain(140, 2200); }
+      openSheet(`<div class="okc">${ic('check')}</div><h3>${t('Покупка проведена')}</h3><div class="when">${t('ТЦ «Жибек» · только что')}</div>
+        <div class="kv"><div><span>${t('Сумма покупки')}</span><b>${fmt(r.amount)} ${CUR}</b></div>${r.spend ? `<div><span>${t('Оплачено бонусами')}</span><b>−${fmt(r.spend)}</b></div><div><span>${t('К оплате')}</span><b>${fmt(r.pay)} ${CUR}</b></div>` : ''}<div><span>${t('Кешбэк {0}%', r.pct)}</span><b class="big">+${fmt(r.earn)}</b></div></div>
+        <div class="newbal"><small>${t('Новый баланс')}</small><b id="rcBal">${fmt(r.bal0)}</b></div><button class="cta" data-close>${t('Отлично')}</button>`, 'center', () => {
+        refreshHome(true);
+        if (r.levelUp) { toast(t('Новый уровень: {0} · кешбэк {1}%', t(r.levelUp.n), r.levelUp.p)); rain(140, 2200); }
       });
-      setTimeout(() => { count($('#rcBal'), r.bal0, st.bal, 1000); const c = center($('.okc')); burst(c.x, c.y, 60); }, 600);
-    }, calm ? 0 : 1650);
+      setTimeout(() => { const el = $('#rcBal'); if (!el) return; count(el, r.bal0, st.bal, 1000); const c = center($('.okc')); burst(c.x, c.y, 60); }, 600);
+    }, calm ? 0 : 1700);
   });
 
   /* ---------- history ---------- */
   let hFilter = 'all';
   function renderOps() {
-    setNum($('#hEarn'), st.earnedAll, true, n => '+' + fmt(n)); setNum($('#hSpend'), st.spentAll, true, n => '−' + fmt(n));
+    setNum($('#hEarn'), st.earnedAll, true, n => '+' + fmt(n)); setNum($('#hSpend'), st.spentAll, true, n => (Math.round(n) ? '−' : '') + fmt(n));
     const list = st.ops.map((o, idx) => ({ o, idx })).filter(x => hFilter === 'all' || (hFilter === 'spend' ? x.o.k === 'spend' : x.o.k !== 'spend'));
     let day = '', html = '';
-    list.forEach((x, i) => { if (x.o.day !== day) { day = x.o.day; html += `<div class="day a" style="--i:${3 + i}">${day}</div>`; } html += opRow(x.o, x.idx, 3 + i).replace('class="op a"', `class="op a${x.o.fresh ? ' fresh' : ''}"`); });
-    $('#opsList').innerHTML = html || `<div class="empty a" style="--i:3"><div class="c"><img src="img/bags.png" alt=""></div><h3>Пока пусто</h3><p>${hFilter === 'spend' ? 'Вы ещё не оплачивали покупки бонусами' : 'Покажите QR-код карты на кассе, и здесь появятся бонусы'}</p></div>`;
+    list.forEach((x, i) => { if (x.o.day !== day) { day = x.o.day; html += `<div class="day a" style="--i:${3 + i}">${t(day)}</div>`; } html += opRow(x.o, x.idx, 3 + i); });
+    $('#opsList').innerHTML = html || `<div class="empty a" style="--i:3"><div class="c"><img src="img/bags.png" alt=""></div><h3>${t('Пока пусто')}</h3><p>${t(hFilter === 'spend' ? 'Вы ещё не оплачивали покупки бонусами' : 'Покажите код карты на кассе, и здесь появятся бонусы')}</p></div>`;
     st.ops.forEach(o => { delete o.fresh; });
   }
   $('#hFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; hFilter = b.dataset.f; $$('#hFilter button').forEach(x => x.classList.toggle('on', x === b)); renderOps(); });
   app.addEventListener('click', e => {
     const b = e.target.closest('[data-op]'); if (!b) return;
     const o = st.ops[+b.dataset.op], neg = o.k === 'spend';
-    openSheet(`<h3>${o.k === 'gift' ? 'Подарок' : neg ? 'Оплата бонусами' : 'Покупка'}</h3><div class="amt">${neg ? '−' : '+'}${fmt(o.amt)} <small>бонусов</small></div><div class="when">${o.day}, ${o.time}</div>
-      <div class="kv"><div><span>Операция</span><b>${esc(o.title)}</b></div>${o.sum ? `<div><span>Сумма чека</span><b>${fmt(o.sum)} смн</b></div>` : ''}<div><span>${neg ? 'Списано' : 'Начислено'}</span><b>${neg ? '−' : '+'}${fmt(o.amt)}</b></div><div><span>1 бонус</span><b>1 сомони</b></div></div>
-      <button class="cta ghost" data-close>Закрыть</button>`);
+    openSheet(`<h3>${t(o.k === 'gift' ? 'Подарок' : neg ? 'Оплата бонусами' : 'Покупка')}</h3><div class="amt">${neg ? '−' : '+'}${fmt(o.amt)} <small>${t('бонусов')}</small></div><div class="when">${t(o.day)}, ${o.time}</div>
+      <div class="kv"><div><span>${t('Операция')}</span><b>${esc(t(o.title))}</b></div>${o.sum ? `<div><span>${t('Сумма чека')}</span><b>${fmt(o.sum)} ${CUR}</b></div>` : ''}<div><span>${t(neg ? 'Списано' : 'Начислено')}</span><b>${neg ? '−' : '+'}${fmt(o.amt)}</b></div><div><span>${t('1 бонус')}</span><b>1 ${CUR}</b></div></div>
+      <button class="cta ghost" data-close>${t('Закрыть')}</button>`);
   });
 
   /* ---------- rating ---------- */
-  $('#track').innerHTML = Array(2).fill(['Фирдавс Н. <b>+320</b>', 'Зарина А. <b>+1 150</b>', 'Парвиз Н. <b>+90</b>', 'Нигора Ю. <b>+640</b>', 'Абдулло Ш. <b>+2 100</b>', 'Далер Р. <b>+75</b>', 'Комрон Т. <b>+410</b>'].map(t => `<span>${t}</span>`).join('')).join('');
+  const TICK = [['fn', '+16 000'], ['za', '+57 500'], ['pn', '+4 500'], ['nu', '+32 000'], ['ash', '+105 000'], ['dr', '+3 750'], ['kt', '+20 500']];
+  const drawTicker = () => { $('#track').innerHTML = Array(2).fill(TICK.map(([id, v]) => `<span>${nm(OTHERS.find(p => p.id === id))} <b>${v}</b></span>`).join('')).join(''); };
   const rlist = $('#rlist'), rows = {}, rank = {};
   const chev = up => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${up ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4'}"/></svg>`;
   PEOPLE.forEach(p => {
@@ -972,7 +1131,8 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   const slots = [$('.pd.r1'), $('.pd.r2'), $('.pd.r3')];
   function setSlot(i, p, anim) {
     const el = slots[i], pts = $('.pts', el);
-    if (el.dataset.id !== p.id) { el.dataset.id = p.id; $('.av', el).textContent = p.a; $('.nm', el).textContent = p.me ? 'Вы' : p.n; el.classList.toggle('mine', !!p.me); cancelAnimationFrame(pts._raf); pts.textContent = fmt(p.s); pts._v = p.s; if (anim) replay(el, 'swap'); }
+    $('.nm', el).textContent = p.me ? t('Вы') : nm(p); $('.av', el).textContent = av(p);
+    if (el.dataset.id !== p.id) { el.dataset.id = p.id; el.classList.toggle('mine', !!p.me); cancelAnimationFrame(pts._raf); pts.textContent = fmt(p.s); pts._v = p.s; if (anim) replay(el, 'swap'); }
     else setNum(pts, p.s, anim);
   }
   let placeV = null;
@@ -986,9 +1146,11 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   function layout(anim) {
     const r = info(), order = r.order, top = order[0].s, before = {};
     if (anim) order.forEach(p => { const el = rows[p.id]; if (!el.classList.contains('hidden')) before[p.id] = el.getBoundingClientRect().top; });
+    $('.t b', rows.me).textContent = t('Вы') + ' · ' + st.name + (st.last ? ' ' + st.last[0] + '.' : '');
     order.forEach((p, i) => {
       const el = rows[p.id], wasHidden = el.classList.contains('hidden');
       el.classList.toggle('hidden', i < 3); el.style.order = i * 2; el.style.setProperty('--i', Math.max(0, i - 3));
+      if (!p.me) { $('.t b', el).textContent = nm(p); $('.av', el).textContent = av(p); }
       $('.pl', el).textContent = p.me ? fmt(r.place) : i + 1; el.classList.toggle('far', !!p.me && r.far);
       setNum($('.s b', el), p.s, anim);
       if (anim && wasHidden && i >= 3) replay(el, 'enter');
@@ -1005,8 +1167,8 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
     order.slice(0, 3).forEach((p, i) => setSlot(i, p, anim));
     roll(r.place);
     $('#gapLine').hidden = !r.above; $('#leadLine').hidden = !!r.above;
-    if (r.above) { $('#gapPre').textContent = r.far ? 'До топ-10 ещё' : `До ${r.k}-го места`; setNum($('#gap'), r.gap, anim); $('#target').textContent = r.far ? `впереди ${fmt(r.place - 1)} покупателей` : 'обгоните ' + r.above.acc; }
-    else $('#target').textContent = 'держите первое место';
+    if (r.above) { $('#gapPre').textContent = r.far ? t('До топ-10 ещё') : t('До {0}-го места', r.k); setNum($('#gap'), r.gap, anim); $('#target').textContent = r.far ? t('впереди {0} покупателей', fmt(r.place - 1)) : t('обгоните {0}', whom(r.above)); }
+    else $('#target').textContent = t('держите первое место');
     $('#ring').style.strokeDashoffset = 169.65 * (1 - r.prog);
     setNum($('#myScore'), me.s, anim);
     order.forEach((p, i) => { rank[p.id] = i; });
@@ -1014,23 +1176,23 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   }
   function fly(text, from, to) {
     if (calm) return;
-    const f = center(from), t = center(to), c = document.createElement('div');
+    const f = center(from), d = center(to), c = document.createElement('div');
     c.className = 'chipfly'; c.textContent = text; c.style.left = f.x + 'px'; c.style.top = f.y + 'px'; app.appendChild(c);
-    requestAnimationFrame(() => requestAnimationFrame(() => { c.style.transform = `translate(${t.x - f.x}px, ${t.y - f.y}px) scale(.7)`; c.style.opacity = '0'; }));
+    requestAnimationFrame(() => requestAnimationFrame(() => { c.style.transform = `translate(${d.x - f.x}px, ${d.y - f.y}px) scale(.7)`; c.style.opacity = '0'; }));
     setTimeout(() => c.remove(), 750);
   }
   function reveal(el) { const sc = $('#ratingScroll'), a = sc.getBoundingClientRect(), r = el.getBoundingClientRect(); if (r.bottom > a.bottom - 70) sc.scrollTop += r.bottom - a.bottom + 78; else if (r.top < a.top) sc.scrollTop -= a.top - r.top + 16; }
   let busy = false;
   $('#fab').addEventListener('click', () => {
     if (busy) return; busy = true; $('#fab').disabled = true;
-    const r0 = info(), target = r0.k < 3 ? slots[r0.k] : rows.me, amount = 420;
+    const r0 = info(), target = r0.k < 3 ? slots[r0.k] : rows.me, amount = RATING_BUY;
     if (r0.k >= 3) reveal(rows.me); else $('#ratingScroll').scrollTop = 0;
-    toast(`+${amount} очков за покупку на ${amount} смн`); fly('+' + amount, $('#fab'), target);
+    toast(t('+{0} очков за покупку на {0} ₸', fmt(amount))); fly('+' + fmt(amount), $('#fab'), target);
     setTimeout(() => {
       demoPurchase(amount); const r = layout(true);
       if (r.place < r0.place) setTimeout(() => {
         const el = r.k < 3 ? slots[r.k] : rows.me, c = center(el); burst(c.x, c.y, r.k < 3 ? 150 : 80);
-        toast(r.k < 3 ? `Вы в тройке лидеров: ${r.place} место` : `Вы поднялись на ${fmt(r.place)} место`);
+        toast(r.k < 3 ? t('Вы в тройке лидеров: {0} место', r.place) : t('Вы поднялись на {0} место', fmt(r.place)));
       }, 450);
       setTimeout(() => { busy = false; $('#fab').disabled = false; }, 1300);
     }, calm ? 0 : 520);
@@ -1038,89 +1200,102 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   setInterval(() => {
     if (!st || busy || document.hidden || curView() !== 'v-main' || curTab !== 'rating' || curScene !== 'rating') return;
     const r = info(), pool = r.order.slice(Math.max(r.k + 1, 3)); if (!pool.length) return;
-    const p = pool[Math.floor(Math.random() * pool.length)], d = 30 + Math.floor(Math.random() * 10) * 10;
-    if (p.s + d >= me.s - 20) return;
+    const p = pool[Math.floor(Math.random() * pool.length)], d = 1500 + Math.floor(Math.random() * 10) * 500;
+    if (p.s + d >= me.s - 1000) return;
     p.s += d; layout(true); replay(rows[p.id], 'tick');
-    const s = document.createElement('span'); s.className = 'plus'; s.textContent = '+' + d; $('.s', rows[p.id]).appendChild(s); setTimeout(() => s.remove(), 950);
+    const s = document.createElement('span'); s.className = 'plus'; s.textContent = '+' + fmt(d); $('.s', rows[p.id]).appendChild(s); setTimeout(() => s.remove(), 950);
   }, 4300);
 
   let left = 10 * 86400 + 4 * 3600 + 12 * 60 + 36;
-  (function tick() { const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = left % 60; $('#timer').textContent = `${d} д ${two(h)}:${two(m)}:${two(s)}`; left = Math.max(0, left - 1); setTimeout(tick, 1000); })();
+  (function tick() { const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = left % 60; $('#timer').textContent = `${t('{0} д', d)} ${two(h)}:${two(m)}:${two(s)}`; left = Math.max(0, left - 1); setTimeout(tick, 1000); })();
 
   function gbar(el, p) { const i = $('.gb i', el); i.style.transition = 'none'; i.style.width = '0'; void i.offsetWidth; i.style.transition = ''; i.style.width = Math.round(Math.min(1, p) * 100) + '%'; }
   function enterPlace() {
     const r = info(), third = r.order[2], tenth = r.order[8];
     const bn = $('#bigNum'); bn.classList.toggle('sm', r.place > 99); count(bn, TOTAL, r.place, 1500, fmt);
-    $('#weekUp').innerHTML = st.demo ? chev(true).replace('<svg', '<svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:3"') + 'на 2 места за неделю' : `${fmt(me.s)} очков в ноябре`;
+    $('#weekUp').innerHTML = st.demo ? chev(true) + t('на 2 места за неделю') : t('{0} очков в ноябре', fmt(me.s));
     $('#chartBox').hidden = !st.demo;
     if (st.demo) {
       const pts = [31, 24, 18, 14, 9, r.place], days = ['1', '5', '9', '13', '17', '20'], X = i => 18 + i * (284 / 5), Y = p => 22 + (Math.min(p, 31) - 1) / 30 * 76;
       const d = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p).toFixed(1)).join(' ');
-      $('#chart').innerHTML = `<path class="area" d="${d} L ${X(5)} 108 L ${X(0)} 108 Z"/><path class="ln" pathLength="1" d="${d}"/>` + pts.map((p, i) => `<g class="pt" style="--i:${i}"><circle cx="${X(i)}" cy="${Y(p)}" r="${i === 5 ? 6 : 4}" class="${i === 5 ? 'last' : ''}"/><text x="${X(i)}" y="${Y(p) - 11}" text-anchor="middle">${p}</text></g>`).join('') + days.map((t, i) => `<text class="dx" x="${X(i)}" y="126" text-anchor="middle">${t}</text>`).join('');
+      $('#chart').innerHTML = `<path class="area" d="${d} L ${X(5)} 108 L ${X(0)} 108 Z"/><path class="ln" pathLength="1" d="${d}"/>` + pts.map((p, i) => `<g class="pt" style="--i:${i}"><circle cx="${X(i)}" cy="${Y(p)}" r="${i === 5 ? 6 : 4}" class="${i === 5 ? 'last' : ''}"/><text x="${X(i)}" y="${Y(p) - 11}" text-anchor="middle">${p}</text></g>`).join('') + days.map((x, i) => `<text class="dx" x="${X(i)}" y="126" text-anchor="middle">${x}</text>`).join('');
     }
     const g1 = $('#g1'), g2 = $('#g2'), g3 = $('#g3');
-    if (!r.above) { $('.n', g1).textContent = '1'; $('b', g1).textContent = 'Вы лидер ноября'; $('span', g1).textContent = 'держите первое место до конца месяца'; }
-    else if (r.far) { $('.n', g1).textContent = fmt(Math.max(10, r.place - 100)); $('b', g1).textContent = 'Обогнать ещё 100 покупателей'; $('span', g1).textContent = 'примерно 200 смн покупок'; }
-    else { $('.n', g1).textContent = r.k; $('b', g1).textContent = 'Обогнать ' + r.above.acc; $('span', g1).textContent = `ещё ${fmt(r.gap)} смн покупок`; }
+    if (!r.above) { $('.n', g1).textContent = '1'; $('b', g1).textContent = t('Вы лидер ноября'); $('span', g1).textContent = t('держите первое место до конца месяца'); }
+    else if (r.far) { $('.n', g1).textContent = fmt(Math.max(10, r.place - 100)); $('b', g1).textContent = t('Обогнать ещё 100 покупателей'); $('span', g1).textContent = t('примерно 10 000 ₸ покупок'); }
+    else { $('.n', g1).textContent = r.k; $('b', g1).textContent = t('Обогнать {0}', whom(r.above)); $('span', g1).textContent = t('ещё {0} ₸ покупок', fmt(r.gap)); }
     gbar(g1, r.prog);
-    $('b', g2).textContent = r.place <= 10 ? 'Остаться в топ-10' : 'Попасть в топ-10'; gbar(g2, r.place <= 10 ? 1 : me.s / tenth.s);
-    $('b', g3).textContent = r.k < 3 ? 'Вы в тройке лидеров' : 'Войти в тройку';
-    $('span', g3).textContent = r.k < 3 ? `приз за ${r.place} место: +${['1 000', '600', '400'][r.k]} бонусов` : `ещё ${fmt(third.s - me.s)} смн · приз +400 бонусов`;
+    $('b', g2).textContent = t(r.place <= 10 ? 'Остаться в топ-10' : 'Попасть в топ-10'); gbar(g2, r.place <= 10 ? 1 : me.s / tenth.s);
+    $('b', g3).textContent = t(r.k < 3 ? 'Вы в тройке лидеров' : 'Войти в тройку');
+    $('span', g3).textContent = r.k < 3 ? t('приз за {0} место: +{1} бонусов', r.place, ['50 000', '30 000', '20 000'][r.k]) : t('ещё {0} ₸ · приз +20 000 бонусов', fmt(third.s - me.s));
     gbar(g3, r.k < 3 ? 1 : me.s / third.s);
   }
   function showScene(name) {
-    curScene = name; $$('#rTabs button').forEach(b => b.classList.toggle('on', b.dataset.s === name)); $$('.scene').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
+    curScene = name; $$('#rTabs button').forEach(b => { b.classList.toggle('on', b.dataset.s === name); if (b.dataset.s === name) $('#rTabs').scrollLeft = b.offsetLeft - 60; }); $$('.scene').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
     parts = []; syncDark();
     if (name === 'rating') layout(false);
     if (name === 'place') enterPlace();
     if (name === 'result') { count($('#resNum'), 1174, 4, 1700, plain); setTimeout(() => { if (curScene === 'result') rain(120, 2600); }, 1400); }
   }
   $('#rTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showScene(b.dataset.s); });
-  $('#share').addEventListener('click', () => toast('В приложении откроется окно «Поделиться»'));
+  $('#share').addEventListener('click', () => toast(t('В приложении откроется окно «Поделиться»')));
 
   /* ---------- promos ---------- */
   const PROMOS = [
-    { id: 'x2', x: '×2', dk: true, img: 'coat', t: 'Двойные бонусы на верхнюю одежду', d: 'до 30 ноября · все магазины', till: 'ДО 30 НОЯБРЯ', text: 'Покупайте пальто, куртки и пуховики и получайте вдвое больше бонусов на карту.', steps: ['Покажите QR-код карты на кассе', 'Бонусы ×2 начислятся автоматически на всю верхнюю одежду в чеке', 'Акция суммируется с вашим уровнем, очки рейтинга тоже удваиваются'] },
-    { id: 'm20', x: '−20%', img: 'sneakers', t: 'Скидка на обувь по карте', d: '1–7 декабря · ТЦ «Пайкар»', till: '1–7 ДЕКАБРЯ', text: 'Вся обувь со скидкой 20% для участников программы. Бонусы начисляются на сумму после скидки.', steps: ['Покажите QR-код карты на кассе', 'Скидка применится ко всей обуви в чеке', 'Оплатить бонусами можно до половины оставшейся суммы'] },
-    { id: 'bd', x: '+300', img: 'gift', t: 'Подарок ко дню рождения', d: 'каждый год · всем участникам', till: 'КАЖДЫЙ ГОД', text: 'В день рождения дарим 300 бонусов. Они придут на карту утром и действуют 30 дней.', steps: ['Укажите дату рождения в профиле', 'Утром в день рождения придут 300 бонусов', 'Потратьте их в течение 30 дней'] },
+    { id: 'x2', x: '×2', dk: true, img: 'coat', t: 'Двойные бонусы на верхнюю одежду', d: 'до 30 ноября · все магазины', till: 'ДО 30 НОЯБРЯ', text: 'Покупайте пальто, куртки и пуховики и получайте вдвое больше бонусов на карту.', steps: ['Покажите код карты на кассе', 'Бонусы ×2 начислятся автоматически на всю верхнюю одежду в чеке', 'Акция суммируется с вашим уровнем, очки рейтинга тоже удваиваются'] },
+    { id: 'm20', x: '−20%', img: 'sneakers', t: 'Скидка на обувь по карте', d: '1–7 декабря · ТЦ «Жибек»', till: '1–7 ДЕКАБРЯ', text: 'Вся обувь со скидкой 20% для участников программы. Бонусы начисляются на сумму после скидки.', steps: ['Покажите код карты на кассе', 'Скидка применится ко всей обуви в чеке', 'Оплатить бонусами можно до половины оставшейся суммы'] },
   ];
-  $('#promoList').innerHTML = PROMOS.map((p, i) => `<button class="pcard ${p.dk ? 'dk' : ''} a" style="--i:${i + 1}" data-promo="${p.id}"><div class="pic"><div class="x">${p.x}</div><img src="img/${p.img}.png" alt="" style="--i:${i + 1}"></div><div class="txt"><b>${p.t}</b><span>${p.d}</span></div></button>`).join('');
+  function renderPromos() { $('#promoList').innerHTML = PROMOS.map((p, i) => `<button class="pcard ${p.dk ? 'dk' : ''} a" style="--i:${i + 1}" data-promo="${p.id}"><div class="pic"><div class="x">${p.x}</div><img src="img/${p.img}.png" alt="" style="--i:${i + 1}"></div><div class="txt"><b>${t(p.t)}</b><span>${t(p.d)}</span></div></button>`).join(''); }
   function openPromo(id) {
     const p = PROMOS.find(x => x.id === id);
-    $('#v-promo').innerHTML = `<div class="hero"><button class="back" data-back aria-label="Назад">${ic('back')}</button><img src="img/${p.img}.png" alt=""><div class="x"><small>${p.till}</small>${p.x}</div></div>
-      <div class="scroll pad"><h2 class="big-t a" style="font-size:21px;margin-top:4px">${p.t}</h2><p class="lead a" style="--i:1">${p.text}</p><div class="rules" style="margin-top:10px">${p.steps.map((s, i) => `<div class="a" style="--i:${3 + i * 2}"><b>${i + 1}</b>${s}</div>`).join('')}</div></div>
-      <div class="bb pad"><button class="cta" id="promoCard">${ic('qr')}Показать карту</button></div>`;
+    $('#v-promo').innerHTML = `<div class="hero"><button class="back" data-back aria-label="Back">${ic('back')}</button><img src="img/${p.img}.png" alt=""><div class="x"><small>${t(p.till)}</small>${p.x}</div></div>
+      <div class="scroll pad"><h2 class="big-t a" style="font-size:21px;margin-top:4px">${t(p.t)}</h2><p class="lead a" style="--i:1">${t(p.text)}</p><div class="rules" style="margin-top:10px">${p.steps.map((s, i) => `<div class="a" style="--i:${3 + i * 2}"><b>${i + 1}</b>${t(s)}</div>`).join('')}</div></div>
+      <div class="bb pad"><button class="cta" id="promoCard">${ic('card')}${t('Показать карту')}</button></div>`;
     push('v-promo');
-    $('#promoCard').addEventListener('click', () => { stack = ['v-main']; showView('v-main', 'back'); showTab('card'); setTimeout(() => flipCard(true), 500); });
+    $('#promoCard').addEventListener('click', () => { stack = ['v-main']; showView('v-main', 'back'); showTab('card'); setTimeout(openPay, 450); });
   }
   app.addEventListener('click', e => { const b = e.target.closest('[data-promo]'); if (b) openPromo(b.dataset.promo); });
   $('#homePromo').addEventListener('click', () => openPromo('x2'));
 
-  /* ---------- profile and sub screens ---------- */
+  /* ---------- profile, language, sub screens ---------- */
   function refreshProfile() {
-    $('#pAv').textContent = initials(); $('#pName').textContent = st.name + (st.last ? ' ' + st.last : ''); $('#pPhone').textContent = fmtPhone(st.phone);
-    $('#pLvl').textContent = LEVELS[lvlIndex(st.total)].n;
-    $$('.toggle').forEach(t => t.setAttribute('aria-checked', String(!!st[t.dataset.t])));
+    $('#pAv').textContent = initials(); $('#pName').textContent = fullName(); $('#pPhone').textContent = fmtPhone(st.phone);
+    $('#pLvl').textContent = t(LEVELS[lvlIndex(st.total)].n);
+    $$('.toggle').forEach(x => x.setAttribute('aria-checked', String(!!st[x.dataset.t])));
   }
   app.addEventListener('click', e => {
-    const t = e.target.closest('.toggle'); if (!t) return;
-    st[t.dataset.t] = !st[t.dataset.t]; save(); t.setAttribute('aria-checked', String(st[t.dataset.t]));
-    if (t.dataset.t === 'inRating') toast(st.inRating ? 'Вы снова в рейтинге' : 'Ваше имя скрыто из рейтинга');
+    const x = e.target.closest('.toggle'); if (!x) return;
+    st[x.dataset.t] = !st[x.dataset.t]; save(); x.setAttribute('aria-checked', String(st[x.dataset.t]));
+    if (x.dataset.t === 'inRating') toast(t(st.inRating ? 'Вы снова в рейтинге' : 'Ваше имя скрыто из рейтинга'));
   });
-  $('#logout').addEventListener('click', () => openSheet(`<h3>Выйти из аккаунта?</h3><p class="lead">Карта и бонусы сохранятся. Чтобы вернуться, войдите по номеру телефона.</p><button class="cta" id="doLogout">Выйти</button><button class="cta ghost" style="margin-top:10px" data-close>Остаться</button>`));
-  sheet.addEventListener('click', e => { if (e.target.closest('#doLogout')) { closeSheet(); st = null; try { localStorage.removeItem(KEY); } catch (err) { /* storage is optional */ } placeV = null; reset('v-welcome'); } });
+  $('#logout').addEventListener('click', () => openSheet(`<h3>${t('Выйти из аккаунта?')}</h3><p class="lead">${t('Карта и бонусы сохранятся. Чтобы вернуться, войдите по номеру телефона.')}</p><button class="cta" id="doLogout">${t('Выйти')}</button><button class="cta ghost" style="margin-top:10px" data-close>${t('Остаться')}</button>`));
+  function openLang() { openSheet(`<h3>${t('Язык приложения')}</h3><div class="langs">${LANGS.map(([c, short, name]) => `<button class="lopt ${c === lang ? 'on' : ''}" data-lang="${c}"><b>${short}</b><span>${name}</span>${c === lang ? ic('check') : ''}</button>`).join('')}</div>`); }
+  function applyLang() {
+    statics.forEach(x => { if (x.n) x.n.nodeValue = x.pre + t(x.ru) + x.post; else x.e.setAttribute('placeholder', t(x.ru)); });
+    document.documentElement.lang = lang; app.dataset.lang = lang;
+    const cur = LANGS.find(x => x[0] === lang); $('#langBtn b').textContent = cur[1]; $('#pLang').textContent = cur[2];
+    renderPromos(); drawTicker(); drawPhLead(); if (curView() === 'v-otp') drawResend();
+    if (st && curView() === 'v-main') showTab(curTab);
+  }
+  $('#langBtn').addEventListener('click', openLang);
+  $('#langRow').addEventListener('click', openLang);
+  sheet.addEventListener('click', e => {
+    const l = e.target.closest('[data-lang]');
+    if (l) { lang = l.dataset.lang; try { localStorage.setItem('istanbul-lang', lang); } catch (err) { /* storage is optional */ } closeSheet(); applyLang(); toast(t('Язык изменён')); }
+    if (e.target.closest('#doLogout')) { closeSheet(); st = null; try { localStorage.removeItem(KEY); } catch (err) { /* storage is optional */ } placeV = null; reset('v-welcome'); }
+  });
   function openSub(id) {
     if (id === 'v-levels') {
       const li = lvlIndex(st.total), next = LEVELS[li + 1], desc = ['3% бонусами с каждой покупки', '5% бонусами и ранний доступ к распродажам', '7% бонусами и бесплатная подгонка'];
-      $('#levelsBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Назад">${ic('back')}</button>Уровни</div><h2 class="big-t a" style="font-size:22px;margin-top:10px">Больше покупок, больше бонусов</h2><p class="lead a" style="--i:1">Уровень зависит от суммы покупок за последние 12 месяцев.</p>` +
-        LEVELS.map((L, i) => `<div class="lc ${i === li ? 'cur' : ''} ${i === 2 ? 'gold' : ''} a" style="--i:${3 + i * 2}"><div><small>${i ? 'от ' + fmt(L.from) + ' смн' : 'с первой покупки'}</small><div class="n">${L.n}${i === li ? '<span class="badge">ваш</span>' : ''}</div><div class="d">${desc[i]}</div></div><div class="p">${L.p}%</div></div>`).join('') +
-        `<div class="box a" style="--i:9"><h5>${next ? `До «${next.n}»` : 'Максимальный уровень'}<span>${next ? `осталось ${fmt(next.from - st.total)} смн` : 'кешбэк 7%'}</span></h5><div class="pbar"><i id="lvBar2"></i></div></div>
-        <div class="note a" style="--i:10">${ic('alert')}Бонусами можно оплатить до 50% чека. Бонусы действуют 180 дней после начисления.</div>`;
-      push(id); setTimeout(() => { $('#lvBar2').style.width = (next ? Math.min(100, st.total / next.from * 100) : 100) + '%'; }, 50);
+      $('#levelsBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Back">${ic('back')}</button>${t('Уровни')}</div><h2 class="big-t a" style="font-size:22px;margin-top:10px">${t('Больше покупок, больше бонусов')}</h2><p class="lead a" style="--i:1">${t('Уровень зависит от суммы покупок за последние 12 месяцев.')}</p>` +
+        LEVELS.map((L, i) => `<div class="lc ${i === li ? 'cur' : ''} ${i === 2 ? 'gold' : ''} a" style="--i:${3 + i * 2}"><div><small>${i ? t('от {0} ₸', fmt(L.from)) : t('с первой покупки')}</small><div class="n">${t(L.n)}${i === li ? `<span class="badge">${t('ваш')}</span>` : ''}</div><div class="d">${t(desc[i])}</div></div><div class="p">${L.p}%</div></div>`).join('') +
+        `<div class="box a" style="--i:9"><h5>${next ? t('До «{0}»', t(next.n)) : t('Максимальный уровень')}<span>${next ? t('осталось {0} ₸', fmt(next.from - st.total)) : t('кешбэк 7%')}</span></h5><div class="pbar"><i id="lvBar2"></i></div></div>
+        <div class="note a" style="--i:10">${ic('alert')}${t('Бонусами можно оплатить до 50% чека. Бонусы действуют 180 дней после начисления.')}</div>`;
+      push(id); setTimeout(() => { const b = $('#lvBar2'); if (b) b.style.width = (next ? Math.min(100, st.total / next.from * 100) : 100) + '%'; }, 50);
     } else if (id === 'v-notes') {
-      const fromOps = st.ops.slice(0, 2).map(o => ({ ic: opIcon(o), t: `${o.k === 'spend' ? 'Списано' : 'Начислено'} ${fmt(o.amt)} бонусов`, p: esc(o.title) + (o.sum ? ` на ${fmt(o.sum)} смн` : '') + `. Баланс: ${fmt(st.bal)}.`, w: `${o.day}, ${o.time}`, n: 1 }));
-      const items = [...fromOps, { ic: 'tag', t: 'Двойные бонусы до 30 ноября', p: 'На всю верхнюю одежду во всех магазинах.', w: 'Вчера', n: 1 }, { ic: 'trophy', t: 'Рейтинг ноября открыт', p: 'Покупайте и поднимайтесь выше: тройка лидеров получит до 1 000 бонусов.', w: '1 ноября' }];
-      $('#notesBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Назад">${ic('back')}</button>Уведомления</div>` + items.map((n, i) => `<div class="nt ${n.n ? 'new' : ''} a" style="--i:${i + 1}"><div class="ic">${ic(n.ic)}</div><div><b>${n.t}</b><p>${n.p}</p><span>${n.w}</span></div></div>`).join('');
+      const fromOps = st.ops.slice(0, 2).map(o => ({ ic: opIcon(o), t: t(o.k === 'spend' ? 'Списано {0} бонусов' : 'Начислено {0} бонусов', fmt(o.amt)), p: esc(t(o.title)) + (o.sum ? `, ${fmt(o.sum)} ${CUR}` : '') + `. ${t('Баланс')}: ${fmt(st.bal)}.`, w: `${t(o.day)}, ${o.time}`, n: 1 }));
+      const items = [...fromOps, { ic: 'tag', t: t('Двойные бонусы до 30 ноября'), p: t('На всю верхнюю одежду во всех магазинах.'), w: t('Вчера'), n: 1 }, { ic: 'trophy', t: t('Рейтинг ноября открыт'), p: t('Покупайте и поднимайтесь выше: тройка лидеров получит до 50 000 бонусов.'), w: t('1 ноября') }];
+      $('#notesBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Back">${ic('back')}</button>${t('Уведомления')}</div>` + items.map((n, i) => `<div class="nt ${n.n ? 'new' : ''} a" style="--i:${i + 1}"><div class="ic">${ic(n.ic)}</div><div><b>${n.t}</b><p>${n.p}</p><span>${n.w}</span></div></div>`).join('');
       push(id); $('#bell .dot').hidden = true;
     } else push(id);
   }
@@ -1130,13 +1305,12 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
   /* ---------- tabs ---------- */
   const TABS = ['card', 'history', 'rating', 'promos', 'profile'];
-  function showTab(name, quiet) {
-    const changed = curTab !== name; curTab = name;
-    $$('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + name));
-    $$('#nav button').forEach(b => { const on = b.dataset.tab === name; if (on && !b.classList.contains('on') || !on) b.classList.toggle('on', on); });
+  function showTab(name) {
+    curTab = name;
+    $$('.tab').forEach(x => x.classList.toggle('on', x.id === 't-' + name));
+    $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     $('#navInd').style.transform = `translateX(${TABS.indexOf(name) * 100}%)`;
     parts = []; syncDark();
-    if (changed || !quiet) { if (name !== 'card') flipCard(false); }
     if (name === 'card') refreshHome(true);
     if (name === 'history') renderOps();
     if (name === 'rating') { $('#rResTab').hidden = !st.demo; showScene(st.demo || curScene !== 'result' ? curScene : 'rating'); }
@@ -1145,16 +1319,16 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   $('#nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 
   function enterMain() {
-    me.a = initials(); me.n = 'Вы · ' + st.name + (st.last ? ' ' + st.last[0] + '.' : '');
-    $('.av', rows.me).textContent = me.a; $('.t b', rows.me).textContent = me.n;
+    me.a = initials(); $('.av', rows.me).textContent = me.a;
     Object.values(rows).forEach(r => arrow(r, 0));
     if (st.demo) Object.entries({ za: 1, pn: -1, me: 2, dr: -2 }).forEach(([id, d]) => arrow(rows[id], d));
     Object.keys(rank).forEach(k => delete rank[k]); slots.forEach(s => { delete s.dataset.id; });
     $('#bal')._v = 0; $('#bal').textContent = '0'; $('#bell .dot').hidden = false;
     curScene = 'rating'; hFilter = 'all'; $$('#hFilter button').forEach((b, i) => b.classList.toggle('on', i === 0));
-    reset('v-main'); curTab = ''; showTab('card');
+    reset('v-main'); showTab('card');
   }
 
+  renderPromos(); applyLang();
   if (st && st.phone) enterMain(); else reset('v-welcome');
 })();
 </script>
