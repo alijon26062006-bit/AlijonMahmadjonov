@@ -39,6 +39,35 @@ android {
         versionName = flutter.versionName
     }
 
+    // Четыре приложения из одного кода. Сборка: flutter build apk --flavor seller -t lib/main_seller.dart
+    buildFeatures {
+        resValues = true
+    }
+
+    flavorDimensions += "app"
+    productFlavors {
+        create("buyer") {
+            dimension = "app"
+            applicationId = "com.alijon.vitrina"
+            resValue("string", "app_name", "Витрина")
+        }
+        create("seller") {
+            dimension = "app"
+            applicationId = "com.alijon.vitrina.seller"
+            resValue("string", "app_name", "Витрина Продавец")
+        }
+        create("courier") {
+            dimension = "app"
+            applicationId = "com.alijon.vitrina.courier"
+            resValue("string", "app_name", "Витрина Курьер")
+        }
+        create("admin") {
+            dimension = "app"
+            applicationId = "com.alijon.vitrina.admin"
+            resValue("string", "app_name", "Витрина Админ")
+        }
+    }
+
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {

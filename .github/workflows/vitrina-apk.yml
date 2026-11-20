@@ -16,14 +16,18 @@ concurrency:
 
 jobs:
   android:
-    name: Android APK
+    name: APK ${{ matrix.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [buyer, seller, courier, admin]
     defaults:
       run:
         working-directory: shop_app
     env:
-      APK_NAME: vitrina-1.0.${{ github.run_number }}.apk
+      APK_NAME: vitrina-${{ matrix.app }}-1.0.${{ github.run_number }}.apk
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +49,7 @@ jobs:
         run: flutter analyze
 
       - name: Тесты
+        if: matrix.app == 'buyer'
         run: flutter test
 
       # Необязательно: постоянный ключ подписи, чтобы новые версии ставились поверх старых.
@@ -69,15 +74,15 @@ jobs:
           } > android/key.properties
 
       - name: Сборка APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --flavor ${{ matrix.app }} -t lib/main_${{ matrix.app }}.dart --build-number=${{ github.run_number }}
 
       - name: Переименование
-        run: cp build/app/outputs/flutter-apk/app-release.apk "build/$APK_NAME"
+        run: cp "build/app/outputs/flutter-apk/app-${{ matrix.app }}-release.apk" "build/$APK_NAME"
 
       - name: Артефакт
         uses: actions/upload-artifact@v4
         with:
-          name: vitrina-apk-${{ github.run_number }}
+          name: vitrina-${{ matrix.app }}-${{ github.run_number }}
           path: shop_app/build/${{ env.APK_NAME }}
           if-no-files-found: error
 
@@ -89,8 +94,8 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: true
           body: |
-            📱 Android-приложение маркетплейса «Витрина».
-            Скачайте файл `${{ env.APK_NAME }}` ниже на телефон и откройте его.
+            📱 Четыре Android-приложения маркетплейса «Витрина»: покупатель, продавец, курьер, админ.
+            Скачайте нужный файл ниже на телефон и откройте его.
             Если Android спросит — разрешите установку из этого источника.
             Ветка: `${{ github.ref_name }}`, коммит: `${{ github.sha }}`.
           files: shop_app/build/${{ env.APK_NAME }}
