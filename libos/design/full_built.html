@@ -186,6 +186,78 @@
 .form .inp.light { margin-top: 10px; }
 .period { display: flex; gap: 8px; margin-top: 10px; }
 .period .inp.light { flex: 1; margin-top: 0; }
+
+/* rating */
+.rhead { display: flex; justify-content: space-between; align-items: flex-end; }
+.timer { text-align: right; font-size: 12px; font-weight: 800; color: var(--grey); letter-spacing: .5px; }
+.timer b { display: block; font-family: var(--display); font-size: 15px; color: var(--ink); letter-spacing: 0; margin-top: 2px; }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; margin-top: 18px; }
+.pd { text-align: center; }
+.pd .av { width: 54px; height: 54px; margin: 0 auto; background: var(--mist); color: var(--ink); font-size: 17px; border: 2px solid var(--ink); }
+.pd.first .av { width: 66px; height: 66px; background: var(--ink); color: #fff; font-size: 20px; }
+.pd .crown { width: 22px; height: 22px; margin: 0 auto 4px; display: block; }
+.pd .nm { font-size: 13px; font-weight: 800; margin-top: 8px; }
+.pd .pts { font-family: var(--display); font-size: 13px; font-weight: 600; color: var(--soft); margin-top: 2px; }
+.pd .step { margin-top: 10px; background: var(--mist); border-radius: 14px 14px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
+.pd.first .step { background: var(--ink); color: #fff; }
+.pd .prize { font-family: var(--text); font-size: 11.5px; font-weight: 800; color: var(--soft); }
+.pd.first .prize { color: rgba(255,255,255,.7); }
+.me { margin-top: 0; background: var(--ink); color: #fff; border-radius: 20px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+.me .pl { font-family: var(--display); font-weight: 700; font-size: 22px; min-width: 40px; }
+.me .av { background: #fff; color: var(--ink); width: 40px; height: 40px; font-size: 14px; }
+.me .t { flex: 1; } .me b { font-size: 14.5px; display: block; } .me span { font-size: 12.5px; color: rgba(255,255,255,.65); font-weight: 600; }
+.me .s { text-align: right; font-family: var(--display); font-size: 15px; }
+.me .s small { display: block; font-family: var(--text); font-size: 11.5px; font-weight: 800; color: rgba(255,255,255,.6); }
+.rk { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.rk .pl { font-family: var(--display); font-weight: 600; font-size: 15px; width: 28px; color: var(--soft); }
+.rk .av { width: 38px; height: 38px; background: var(--mist); color: var(--ink); font-size: 13px; }
+.rk .t { flex: 1; } .rk b { font-size: 14.5px; font-weight: 800; display: block; } .rk span { font-size: 12px; color: var(--grey); font-weight: 700; }
+.rk .s { font-family: var(--display); font-size: 14.5px; font-weight: 600; }
+.mv { font-size: 12px; font-weight: 800; margin-left: 4px; }
+.rk.mine { background: var(--mist); border-radius: 16px; padding: 11px 10px; border-bottom: none; margin: 4px -10px; }
+.gap { text-align: center; color: var(--grey); font-weight: 800; letter-spacing: 3px; padding: 4px 0; }
+.stickme { flex: none; padding: 10px 20px 10px; background: #fff; border-top: 1px solid var(--line); position: relative; z-index: 4; }
+.bigplace { text-align: center; margin-top: 10px; }
+.bigplace small { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.bigplace b { display: block; font-family: var(--display); font-weight: 700; font-size: 96px; letter-spacing: -4px; line-height: 1; margin-top: 6px; }
+.bigplace span { font-size: 14px; font-weight: 700; color: var(--soft); }
+.bigplace .up { display: inline-block; margin-top: 10px; background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 800; padding: 6px 12px; border-radius: 99px; }
+.ladder { margin-top: 18px; border: 1.5px solid var(--line); border-radius: 22px; padding: 6px 16px; }
+.ld { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ld:last-child { border-bottom: none; }
+.ld .n { font-size: 14px;  min-width: 46px; padding: 0 6px; height: 46px; border-radius: 14px; border: 1.5px solid var(--ink); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; flex: none; }
+.ld.dk .n { background: var(--ink); color: #fff; }
+.ld .t { flex: 1; } .ld b { font-size: 14.5px; font-weight: 800; display: block; } .ld span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.ld .bar { height: 5px; margin: 8px 0 0; }
+.prizes { display: grid; gap: 8px; margin-top: 12px; }
+.pz { display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--line); border-radius: 18px; padding: 12px 14px; }
+.pz .n { font-family: var(--display); font-weight: 700; font-size: 15px; min-width: 52px; }
+.pz .t { flex: 1; font-size: 14px; font-weight: 800; } .pz .t span { display: block; font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.pz.dk { background: var(--ink); color: #fff; border-color: var(--ink); } .pz.dk .t span { color: rgba(255,255,255,.6); }
+.result { position: absolute; inset: 0; background: var(--ink); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 96px 26px 40px; text-align: center; }
+.result small { font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 800; color: rgba(255,255,255,.55); }
+.result .medal { width: 168px; height: 168px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); display: grid; place-items: center; margin: 30px 0 4px; position: relative; }
+.result .medal::before { content: ''; position: absolute; inset: 14px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,.3); }
+.result .medal b { font-family: var(--display); font-weight: 700; font-size: 84px; letter-spacing: -3px; }
+.result h2 { font-family: var(--display); font-weight: 700; font-size: 24px; text-transform: uppercase; margin-top: 20px; line-height: 1.15; }
+.result p { color: rgba(255,255,255,.7); margin-top: 10px; font-size: 15px; line-height: 1.45; }
+.result .won { margin-top: 20px; width: 100%; border: 1.5px solid rgba(255,255,255,.2); border-radius: 20px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+.result .won b { font-family: var(--display); font-size: 22px; }
+.result .won span { font-size: 13px; color: rgba(255,255,255,.6); font-weight: 700; }
+.result .acts { margin-top: auto; width: 100%; display: grid; gap: 10px; }
+.result .cta.ghost { color: #fff; border-color: rgba(255,255,255,.4); }
+.month { border: 1.5px solid var(--line); border-radius: 22px; padding: 14px 16px; margin-top: 12px; }
+.month .h { display: flex; justify-content: space-between; align-items: baseline; }
+.month .h b { font-family: var(--display); font-weight: 600; font-size: 16px; text-transform: uppercase; }
+.month .h span { font-size: 12.5px; color: var(--grey); font-weight: 800; }
+.month .w { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 800; }
+.month .w:last-child { border-bottom: none; }
+.month .w i { font-style: normal; font-family: var(--display); width: 22px; }
+.month .w em { margin-left: auto; font-style: normal; font-family: var(--display); font-size: 13.5px; font-weight: 600; color: var(--soft); }
+.month.mine { background: var(--mist); border-color: var(--mist); }
+.rwidget { margin-top: 14px; border: 1.5px solid var(--ink); border-radius: 22px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+.rwidget .pl { font-family: var(--display); font-weight: 700; font-size: 36px; letter-spacing: -1px; }
+.rwidget .t { flex: 1; } .rwidget b { font-size: 14.5px; font-weight: 800; display: block; } .rwidget span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -226,13 +298,17 @@ const P = {
   bag: '<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/>',
   sms: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.4A8 8 0 1 1 21 12z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8M9 18h6"/>',
+  crown: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
+  share: '<path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
 };
 const i = (k, extra = '') => `<svg class="i" viewBox="0 0 24 24" ${extra}>${P[k]}</svg>`;
 const img = n => `<img src="img/${n}.png" alt="">`;
 const status = () => `<div class="island"></div><div class="status"><span>9:41</span><span class="r"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M2 18h3v-3H2zM7 18h3v-6H7zM12 18h3V9h-3zM17 18h3V5h-3z" fill="currentColor"/></svg><span class="bat"><i></i></span></span></div>`;
 const nav = (items, on) => `<div class="nav">${items.map(([k, l], n) => `<div class="it ${n === on ? 'on' : ''}">${i(k)}${l}</div>`).join('')}</div>`;
-const cNav = on => nav([['card', 'Карта'], ['clock', 'История'], ['tag', 'Акции'], ['user', 'Профиль']], on);
+const cNav = on => nav([['card', 'Карта'], ['clock', 'История'], ['trophy', 'Рейтинг'], ['tag', 'Акции'], ['user', 'Профиль']], on);
 const kNav = on => nav([['scan', 'Касса'], ['receipt', 'Операции'], ['user', 'Смена']], on);
 const aNav = on => nav([['chart', 'Обзор'], ['users', 'Клиенты'], ['tag', 'Акции'], ['store', 'Магазины'], ['settings', 'Правила']], on);
 const op = (sign, title, sub, amt) => `<div class="op"><div class="ic ${sign === '-' ? 'neg' : ''}">${i(sign === '-' ? 'minus' : sign === 'g' ? 'gift' : sign === 'u' ? 'undo' : 'plus')}</div><div class="t"><b>${title}</b><span>${sub}</span></div><div class="a ${sign === '-' || sign === 'u' ? 'neg' : ''}">${sign === '-' || sign === 'u' ? '−' : '+'}${amt}</div></div>`;
@@ -287,6 +363,18 @@ S.home = () => `${status()}<div class="scroll">
   <div class="sec"><h4>Операции</h4><a>Все</a></div>
   ${op('+', 'Покупка · ТЦ «Пайкар»', 'Сегодня, 14:32 · чек 1 240 смн', '62')}
 ${end(cNav(0))}`;
+S.homeR = () => `${status()}<div class="scroll">
+  <div class="top"><div class="word">ISTANBUL</div><div class="ibtn">${i('bell')}<span class="dot"></span></div></div>
+  <div class="hello">Добрый день,<b>Мадина Каримова</b></div>
+  <div class="card"><div class="row"><small>Бонусный счёт</small><span class="lvl">Серебро · 5%</span></div>
+    <div class="bal">1 240<span>бонусов</span></div><div class="sub">1 бонус = 1 сомони при оплате</div>
+    <div class="row foot"><span class="num">IST 4821 0937</span><span class="qrbtn">${i('qr')}Показать QR</span></div></div>
+  <div class="rwidget"><div class="pl">#7</div><div class="t"><b>Рейтинг ноября ${i('up', 'style="width:14px;height:14px;vertical-align:-2px"')}2</b><span>До 6-го места 180 смн покупок</span></div>${i('next')}</div>
+  <div class="box"><h5>До уровня «Золото» <span>3 240 / 5 000 смн</span></h5><div class="bar"><i style="width:64.8%"></i></div>
+    <div class="steps"><span>Базовый 3%</span><span class="on">Серебро 5%</span><span>Золото 7%</span></div></div>
+  <div class="sec"><h4>Операции</h4><a>Все</a></div>
+  ${op('+', 'Покупка · ТЦ «Пайкар»', 'Сегодня, 14:32 · чек 1 240 смн', '62')}
+${end(cNav(0))}`;
 S.qr = () => `${status()}<div class="scroll"><div class="ibtn close">${i('close')}</div>
   <div class="qrwrap"><h2>Ваша карта</h2><p>Покажите код кассиру при оплате</p>
     <div class="qrframe">${QR}<div class="logo"><b>I</b></div></div><div class="code">4821 0937</div>
@@ -328,7 +416,7 @@ S.promos = () => `${status()}<div class="scroll">
   <div class="tabs"><span class="on">Все</span><span>Для меня</span><span>Скоро</span></div>
   <div class="pcard dk"><div class="pic"><div class="x">×2</div>${img('coat')}</div><div class="txt"><b>Двойные бонусы на верхнюю одежду</b><span>до 30 ноября · все магазины</span></div></div>
   <div class="pcard"><div class="pic"><div class="x">−20%</div>${img('sneakers')}</div><div class="txt"><b>Скидка на обувь по карте</b><span>1–7 декабря · ТЦ «Пайкар»</span></div></div>
-${end(cNav(2))}`;
+${end(cNav(3))}`;
 S.promo = () => `${status()}<div class="scroll">
   <div class="hero"><div class="bk">${i('back')}</div>${img('coat')}<div class="x"><small>ДО 30 НОЯБРЯ</small>×2</div></div>
   <div class="big-t" style="font-size:22px">Двойные бонусы на верхнюю одежду</div>
@@ -346,7 +434,7 @@ S.stores = () => `${status()}<div class="scroll">
   <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ТЦ «Пайкар», 2 этаж</b><span>Ежедневно 10:00–21:00 · 1,2 км</span></div><span class="open">Открыто</span></div>
   <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ул. Рудаки, 45</b><span>Ежедневно 09:00–20:00 · 2,8 км</span></div><span class="open">Открыто</span></div>
   <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ТРЦ «Душанбе Молл»</b><span>Ежедневно 10:00–22:00 · 5,4 км</span></div><span class="open off">Скоро</span></div>
-${end(cNav(3))}`;
+${end(cNav(4))}`;
 S.profile = () => `${status()}<div class="scroll">
   <div class="h1">Профиль</div>
   <div class="prof"><div class="av">МК</div><div><b>Мадина Каримова</b><span>+992 90 123 45 67</span></div></div>
@@ -354,7 +442,7 @@ S.profile = () => `${status()}<div class="scroll">
   <div class="cap">Настройки</div>
   <div class="list"><div>${i('bell')}Уведомления о бонусах<span class="toggle"></span></div><div>${i('sms')}SMS о покупках<span class="toggle"></span></div><div>${i('globe')}Язык<span class="v">Русский${i('next')}</span></div></div>
   <div class="list"><div>${i('help')}Поддержка<span class="v">${i('next')}</span></div><div>${i('out')}Выйти</div></div>
-${end(cNav(3))}`;
+${end(cNav(4))}`;
 S.notifications = () => `${status()}<div class="scroll">
   ${topBar('Уведомления')}
   <div class="nt new"><div class="ic">${i('plus')}</div><div><b>Начислено 62 бонуса</b><p>За покупку в ТЦ «Пайкар» на 1 240 смн. Баланс: 1 240.</p><span>Сегодня, 14:32</span></div></div>
@@ -508,10 +596,91 @@ A.rules = () => `${status()}<div class="scroll">
   </div>
 ${end(aNav(4))}`;
 
+
+/* --------------------------- РЕЙТИНГ МЕСЯЦА --------------------------- */
+const R = {};
+const rk = (pl, a, n, sub, pts, mv, mine) => `<div class="rk ${mine ? 'mine' : ''}"><div class="pl">${pl}</div><div class="av">${a}</div><div class="t"><b>${n}</b><span>${sub}</span></div><div class="s">${pts}${mv ? `<span class="mv">${mv}</span>` : ''}</div></div>`;
+R.board = () => `${status()}<div class="scroll">
+  <div class="rhead"><div class="h1">Рейтинг</div><div class="timer">Ноябрь · до итогов<b>10 д 04 ч</b></div></div>
+  <div class="tabs"><span class="on">Ноябрь</span><span>Мой магазин</span><span>Победители</span></div>
+  <div class="podium">
+    <div class="pd"><div class="av">ФН</div><div class="nm">Фирдавс Н.</div><div class="pts">8 940</div><div class="step" style="height:78px">2<div class="prize">+600</div></div></div>
+    <div class="pd first">${i('crown', 'class="i crown"')}<div class="av">АШ</div><div class="nm">Абдулло Ш.</div><div class="pts">12 310</div><div class="step" style="height:100px">1<div class="prize">+1 000</div></div></div>
+    <div class="pd"><div class="av">НЮ</div><div class="nm">Нигора Ю.</div><div class="pts">7 205</div><div class="step" style="height:64px">3<div class="prize">+400</div></div></div>
+  </div>
+  <div style="margin-top:6px">
+  ${rk(4, 'ЗА', 'Зарина А.', 'покупок на 5 120 смн', '5 120', '↑1')}
+  ${rk(5, 'ПН', 'Парвиз Н.', 'покупок на 4 480 смн', '4 480', '↓1')}
+  ${rk(6, 'СМ', 'Сухроб М.', 'покупок на 3 420 смн', '3 420', '')}
+  ${rk(7, 'МК', 'Вы · Мадина К.', 'до 6-го места 180 смн', '3 240', '↑2', true)}
+  ${rk(8, 'ДР', 'Далер Р.', 'покупок на 3 010 смн', '3 010', '↓2')}
+  </div>
+${end(cNav(2))}`;
+R.place = () => `${status()}<div class="scroll">
+  ${topBar('Моё место')}
+  <div class="bigplace"><small>Ноябрь · из 1 268 покупателей</small><b>7</b><span>3 240 очков · 1 смн покупок = 1 очко</span><br><span class="up">${i('up', 'style="width:13px;height:13px;vertical-align:-2px"')} на 2 места за неделю</span></div>
+  <div class="ladder">
+    <div class="ld"><div class="n">6</div><div class="t"><b>Обогнать Сухроба М.</b><span>ещё 180 смн покупок</span><div class="bar"><i style="width:94%"></i></div></div></div>
+    <div class="ld"><div class="n">4–10</div><div class="t"><b>Остаться в топ-10</b><span>×1,5 кешбэк весь декабрь</span><div class="bar"><i style="width:100%"></i></div></div></div>
+    <div class="ld dk"><div class="n">3</div><div class="t"><b>Войти в тройку</b><span>ещё 3 965 смн · приз +400 бонусов</span><div class="bar"><i style="width:45%"></i></div></div></div>
+  </div>
+  <div class="note">${i('tag')}По акции «×2 на верхнюю одежду» очки тоже удваиваются</div>
+${end(cNav(2))}`;
+R.prizes = () => `${status()}<div class="scroll">
+  ${topBar('Призы ноября')}
+  <div class="big-t" style="font-size:22px;margin-top:10px">Покупайте больше — поднимайтесь выше</div>
+  <div class="lead">Рейтинг обнуляется 1-го числа. Итоги и призы — в последний день месяца в 23:59.</div>
+  <div class="prizes">
+    <div class="pz dk"><div class="n">1</div><div class="t">+1 000 бонусов<span>и подарочный сертификат на 500 смн</span></div>${i('crown')}</div>
+    <div class="pz"><div class="n">2</div><div class="t">+600 бонусов<span>сразу на карту</span></div></div>
+    <div class="pz"><div class="n">3</div><div class="t">+400 бонусов<span>сразу на карту</span></div></div>
+    <div class="pz"><div class="n">4–10</div><div class="t">×1,5 кешбэк<span>на все покупки следующего месяца</span></div></div>
+    <div class="pz"><div class="n">11–50</div><div class="t">+100 бонусов<span>за активность</span></div></div>
+  </div>
+  <div class="faq"><div>Как считаются очки?${i('next')}</div><div>Можно ли скрыть своё имя?${i('next')}</div></div>
+${end(cNav(2))}`;
+R.result = () => `${status()}<div class="result">
+  <small>Итоги октября</small>
+  <div class="medal"><b>4</b></div>
+  <h2>Вы на 4 месте<br>из 1 174</h2>
+  <p>Вы купили на 6 380 смн и обогнали 1 170 покупателей. До тройки не хватило 420 смн.</p>
+  <div class="won"><div><span>Ваш приз</span><br><b>×1,5 кешбэк</b></div><span>на весь<br>ноябрь</span></div>
+  <div class="acts"><div class="cta inv">${i('share')}Поделиться</div><div class="cta ghost">Смотреть ноябрь</div></div>
+</div><div class="home-ind" style="background:#fff"></div>`;
+R.winners = () => `${status()}<div class="scroll">
+  <div class="rhead"><div class="h1">Рейтинг</div><div class="timer">Ноябрь · до итогов<b>10 д 04 ч</b></div></div>
+  <div class="tabs"><span>Ноябрь</span><span>Мой магазин</span><span class="on">Победители</span></div>
+  <div class="month"><div class="h"><b>Октябрь</b><span>1 174 участника</span></div>
+    <div class="w"><i>1</i>Абдулло Ш.<em>14 820</em></div><div class="w"><i>2</i>Нигора Ю.<em>9 300</em></div><div class="w"><i>3</i>Фирдавс Н.<em>6 800</em></div></div>
+  <div class="month mine"><div class="h"><b>Вы в октябре</b><span>4 место</span></div><div class="w"><i>4</i>Мадина К.<em>6 380</em></div></div>
+  <div class="month"><div class="h"><b>Сентябрь</b><span>1 052 участника</span></div>
+    <div class="w"><i>1</i>Зарина А.<em>11 040</em></div><div class="w"><i>2</i>Абдулло Ш.<em>10 210</em></div><div class="w"><i>3</i>Парвиз Н.<em>7 950</em></div></div>
+${end(cNav(2))}`;
+R.privacy = () => `${status()}<div class="scroll">
+  ${topBar('Рейтинг и приватность')}
+  <div class="big-t" style="font-size:22px;margin-top:10px">Как вас видят другие</div>
+  <div class="rk mine" style="margin-top:16px"><div class="pl">7</div><div class="av">МК</div><div class="t"><b>Мадина К.</b><span>так показываем вас</span></div><div class="s">3 240</div></div>
+  <div class="list"><div>${i('trophy')}Участвовать в рейтинге<span class="toggle"></span></div><div>${i('user')}Показывать имя<span class="v">Мадина К.${i('next')}</span></div><div>${i('bell')}Сообщать, когда меня обогнали<span class="toggle"></span></div></div>
+  <div class="note">${i('lock')}Фамилия сокращается до буквы, телефон не показывается никому. Можно участвовать анонимно — как «Покупатель 4821».</div>
+${end(cNav(4))}`;
+A.rating = () => `${status()}<div class="scroll">
+  ${topBar('Рейтинг месяца')}
+  <div class="list" style="margin-top:12px"><div>${i('trophy')}Рейтинг включён<span class="toggle"></span></div><div>${i('calendar')}Период<span class="v">Месяц${i('next')}</span></div><div>${i('chart')}Очки считаются<span class="v">по сумме покупок${i('next')}</span></div><div>${i('store')}Отдельно по магазинам<span class="toggle off"></span></div></div>
+  <div class="sec"><h4>Призы</h4><a>Добавить</a></div>
+  <div class="rule">
+    <div class="r"><div class="t"><b>1 место</b><span>бонусы на карту</span></div><div class="stepper"><i>−</i><b>1 000</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>2 место</b><span>бонусы на карту</span></div><div class="stepper"><i>−</i><b>600</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>3 место</b><span>бонусы на карту</span></div><div class="stepper"><i>−</i><b>400</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>4–10 места</b><span>множитель кешбэка на месяц</span></div><div class="stepper"><i>−</i><b>×1,5</b><i>+</i></div></div>
+  </div>
+  <div class="note">${i('alert')}Минимум для участия — 1 покупка от 300 смн за месяц</div>
+${end(aNav(4))}`;
+
 const boards = [
   { id: 'client-1', name: 'Клиент · вход', desc: 'Первое знакомство: приветствие, вход по номеру, код из SMS и регистрация с приветственными бонусами.', items: [['Приветствие', S.welcome, 'stw'], ['Номер телефона', S.phone], ['Код из SMS', S.otp], ['Регистрация', S.register]] },
   { id: 'client-2', name: 'Клиент · карта', desc: 'Каждый день: карта с балансом, QR-код для кассы, история и детали покупки.', items: [['Главная', S.home], ['QR-код на кассе', S.qr], ['История', S.history], ['Детали покупки', S.opDetail]] },
   { id: 'client-3', name: 'Клиент · акции и профиль', desc: 'Уровни программы, акции, магазины, уведомления, профиль и пустое состояние.', items: [['Уровни', S.levels], ['Акции', S.promos], ['Акция', S.promo, 'stw'], ['Магазины', S.stores], ['Уведомления', S.notifications], ['Профиль', S.profile], ['Пустая история', S.empty]] },
+  { id: 'rating', name: 'Клиент · рейтинг месяца', desc: 'Все покупатели по сумме покупок за месяц: подиум, ваше место, сколько осталось до следующего, призы, итоги месяца и победители. Рейтинг обнуляется 1-го числа.', items: [['Главная с рейтингом', S.homeR], ['Рейтинг', R.board], ['Моё место', R.place], ['Призы месяца', R.prizes], ['Итоги месяца', R.result, 'stw'], ['Победители', R.winners], ['Приватность', R.privacy], ['Админ: рейтинг', A.rating]] },
   { id: 'cashier-1', w: 'w5', name: 'Кассир · поиск клиента', desc: 'Вход по PIN, сканирование QR или поиск по номеру, регистрация нового клиента и карточка клиента.', items: [['Вход по PIN', K.pin, 'dark'], ['Сканер', K.scan, 'dark'], ['Поиск по номеру', K.phone], ['Новый клиент', K.notFound], ['Карточка клиента', K.client]] },
   { id: 'cashier-2', name: 'Кассир · покупка', desc: 'Начисление с учётом акции, списание бонусов с подтверждением кодом из SMS, чек, операции смены, возврат и закрытие смены.', items: [['Начисление + акция', K.saleEarn], ['Списание бонусов', K.saleSpend], ['Код от клиента', K.confirm], ['Готово', K.done], ['Операции смены', K.ops], ['Возврат', K.refund], ['Смена', K.shift]] },
   { id: 'admin', w: 'w3', name: 'Админ', desc: 'Итоги, клиенты и ручное начисление, создание акций, магазины и кассиры, правила программы.', items: [['Обзор', A.overview], ['Клиенты', A.clients], ['Карточка клиента', A.client], ['Новая акция', A.promos], ['Магазины и кассиры', A.stores], ['Правила', A.rules]] },
