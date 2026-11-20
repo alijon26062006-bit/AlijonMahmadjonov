@@ -6,8 +6,6 @@ import '../core/store.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 
-const _vehicles = [('🚶', 'Пешком'), ('🚲', 'Велосипед'), ('🛵', 'Мопед'), ('🚗', 'Машина')];
-
 /// Регистрация нового курьера или редактирование профиля.
 class RegisterCourierScreen extends StatefulWidget {
   const RegisterCourierScreen({super.key, this.courier});
@@ -21,7 +19,7 @@ class RegisterCourierScreen extends StatefulWidget {
 class _RegisterCourierScreenState extends State<RegisterCourierScreen> {
   final _form = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.courier?.name ?? '');
-  late String _vehicle = widget.courier?.vehicle ?? '🛵';
+  late String _vehicle = widget.courier?.vehicle ?? 'scooter';
 
   @override
   void dispose() {
@@ -78,12 +76,12 @@ class _RegisterCourierScreenState extends State<RegisterCourierScreen> {
               validator: (v) => (v ?? '').trim().length < 2 ? 'Введите имя' : null,
             ),
             const FieldLabel('На чём доставляете'),
-            for (final (emoji, title) in _vehicles)
+            for (final MapEntry(key: id, value: (icon, title)) in kVehicles.entries)
               ChoiceTile(
-                emoji: emoji,
+                icon: icon,
                 title: title,
-                selected: _vehicle == emoji,
-                onTap: () => setState(() => _vehicle = emoji),
+                selected: _vehicle == id,
+                onTap: () => setState(() => _vehicle = id),
               ),
           ],
         ),

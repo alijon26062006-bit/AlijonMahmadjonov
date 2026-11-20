@@ -34,6 +34,9 @@ String ordersLabel(int n) => '$n ${plural(n, 'заказ', 'заказа', 'за
 
 String reviewsLabel(int n) => '${groupDigits(n)} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}';
 
+/// 4.8 -> «4,8»
+String ratingText(double r) => r.toStringAsFixed(1).replaceAll('.', ',');
+
 String two(int v) => v.toString().padLeft(2, '0');
 
 String formatTime(DateTime d) => '${two(d.hour)}:${two(d.minute)}';

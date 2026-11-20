@@ -29,7 +29,7 @@ class OrderScreen extends StatelessWidget {
     if (o == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const EmptyState(emoji: '🤷', title: 'Заказ не найден', subtitle: ''),
+        body: const EmptyState(image: 'search', title: 'Заказ не найден', subtitle: ''),
       );
     }
     final shop = s.shopById(o.shopId);
@@ -92,7 +92,7 @@ class OrderScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: c.accentSoft,
-                    child: Text(courier.vehicle, style: const TextStyle(fontSize: 24)),
+                    child: Icon(vehicleIcon(courier.vehicle), color: c.accentText),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -103,7 +103,7 @@ class OrderScreen extends StatelessWidget {
                           courier.name,
                           style: TextStyle(fontWeight: FontWeight.w800, color: c.text),
                         ),
-                        Text('★ ${courier.rating.toStringAsFixed(1)}', style: TextStyle(color: c.muted, fontSize: 13)),
+                        Text('Рейтинг ${ratingText(courier.rating)}', style: TextStyle(color: c.muted, fontSize: 13)),
                       ],
                     ),
                   ),

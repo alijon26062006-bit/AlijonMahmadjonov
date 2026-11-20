@@ -30,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
           ProfileHeader(
             title: user == null ? 'Гость' : (user.name.isEmpty ? 'Покупатель' : user.name),
             subtitle: user == null ? 'Войдите, чтобы видеть заказы' : formatPhone(user.phone),
-            avatar: user == null || user.name.isEmpty ? '😊' : user.name.characters.first.toUpperCase(),
+            avatar: user == null || user.name.isEmpty ? '' : user.name.characters.first.toUpperCase(),
             stats: [
               ('${orders.length}', plural(orders.length, 'заказ', 'заказа', 'заказов')),
               ('${s.favorites.length}', 'в избранном'),
@@ -51,7 +51,7 @@ class ProfileScreen extends StatelessWidget {
               child: AppCard(
                 child: Row(
                   children: [
-                    const Text('📦', style: TextStyle(fontSize: 32)),
+                    const SizedBox.square(dimension: 44, child: AppImage('package')),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
@@ -108,7 +108,7 @@ class ProfileScreen extends StatelessWidget {
                       },
                       child: Row(
                         children: [
-                          const Text('🎁', style: TextStyle(fontSize: 26)),
+                          const SizedBox.square(dimension: 36, child: AppImage('gift')),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -116,7 +116,7 @@ class ProfileScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   p.code,
-                                  style: TextStyle(fontWeight: FontWeight.w900, color: c.accentText, letterSpacing: 1),
+                                  style: TextStyle(fontWeight: FontWeight.w800, color: c.accentText, letterSpacing: 1),
                                 ),
                                 Text(p.title, style: TextStyle(fontSize: 13, color: c.muted)),
                               ],
@@ -177,8 +177,8 @@ class BuyerOrderCard extends StatelessWidget {
                 for (final i in order.items.take(4))
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: EmojiTile(
-                      emoji: i.emoji,
+                    child: ImageTile(
+                      image: i.image,
                       categoryId: s.productById(i.productId)?.categoryId ?? 'electronics',
                       size: 42,
                     ),

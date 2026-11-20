@@ -69,7 +69,8 @@ class _ShopScreenState extends State<ShopScreen> {
                               BoxShadow(color: Color(0x33000000), blurRadius: 18, offset: Offset(0, 8)),
                             ],
                           ),
-                          child: Text(shop.emoji, style: const TextStyle(fontSize: 38)),
+                          padding: const EdgeInsets.all(12),
+                          child: AppImage(shop.logo),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -81,13 +82,13 @@ class _ShopScreenState extends State<ShopScreen> {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 24,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   letterSpacing: -0.5,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '★ ${shop.rating.toStringAsFixed(1)} · ${reviewsLabel(shop.ratingCount)}',
+                                'Рейтинг ${ratingText(shop.rating)} · ${reviewsLabel(shop.ratingCount)}',
                                 style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 13.5),
                               ),
                               const SizedBox(height: 6),
@@ -129,7 +130,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       Pill(label: 'Все', selected: _category == null, onTap: () => setState(() => _category = null)),
                       for (final id in cats)
                         Pill(
-                          label: '${categoryById(id).emoji}  ${categoryById(id).name}',
+                          label: categoryById(id).name,
                           selected: _category == id,
                           onTap: () => setState(() => _category = id),
                         ),
@@ -156,7 +157,7 @@ class _ShopScreenState extends State<ShopScreen> {
             if (products.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
-                child: EmptyState(emoji: '📦', title: 'Товаров пока нет', subtitle: 'Загляните позже'),
+                child: EmptyState(image: 'package', title: 'Товаров пока нет', subtitle: 'Загляните позже'),
               )
             else
               SliverPadding(

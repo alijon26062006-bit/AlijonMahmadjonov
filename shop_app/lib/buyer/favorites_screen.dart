@@ -20,9 +20,9 @@ class FavoritesScreen extends StatelessWidget {
           Expanded(
             child: items.isEmpty
                 ? EmptyState(
-                    emoji: '💜',
+                    image: 'heart',
                     title: 'Здесь пока пусто',
-                    subtitle: 'Нажимайте ♡ на товарах,\nчтобы сохранить их на потом',
+                    subtitle: 'Нажмите на сердечко у товара,\nчтобы сохранить его на потом',
                     buttonLabel: 'Смотреть товары',
                     onButton: () => buyerNav.openCatalog(),
                   )

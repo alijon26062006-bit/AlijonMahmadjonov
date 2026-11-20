@@ -9,7 +9,7 @@ import 'store.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Подсказки для демо: номера, под которыми уже есть данные.
+/// Тестовые номера, под которыми уже есть данные.
 const _demoHints = <Role, List<(String, String)>>{
   Role.seller: [('900000001', 'магазин «ТехноМир»'), ('900000006', 'магазин «Фермер»')],
   Role.courier: [('930000001', 'курьер Рустам'), ('930000004', 'курьер Бехруз')],
@@ -126,7 +126,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: const Color(0x55FFFFFF), width: 1.5),
                     ),
-                    child: Text(brand.emoji, style: const TextStyle(fontSize: 38)),
+                    padding: const EdgeInsets.all(14),
+                    child: AppImage(brand.image),
                   ),
                   const SizedBox(height: 18),
                   Text(
@@ -134,7 +135,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 30,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -0.8,
                     ),
                   ),
@@ -169,7 +170,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       prefixIcon: Padding(
                         padding: const EdgeInsets.only(left: 16, right: 8),
                         child: Text(
-                          '🇹🇯 $kPhoneCode',
+                          kPhoneCode,
                           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text),
                         ),
                       ),
@@ -183,7 +184,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                   if (hints.isNotEmpty) ...[
                     const SizedBox(height: 28),
                     Text(
-                      'Демо-вход',
+                      'Тестовые номера',
                       style: TextStyle(fontWeight: FontWeight.w800, color: c.text),
                     ),
                     const SizedBox(height: 8),
@@ -220,7 +221,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       ),
                     Text(
                       widget.role == Role.admin
-                          ? 'В демо-режиме войти можно с любым номером.'
+                          ? 'В тестовом режиме войти можно с любым номером.'
                           : 'С любым другим номером вы зарегистрируетесь как новый ${widget.role == Role.seller ? 'продавец' : 'курьер'}.',
                       style: TextStyle(color: c.muted, fontSize: 12.5),
                     ),
@@ -310,7 +311,7 @@ class _CodeScreenState extends State<_CodeScreen> {
         children: [
           Text(
             'Код из SMS',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.6, color: c.text),
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.text),
           ),
           const SizedBox(height: 8),
           Text.rich(
@@ -326,7 +327,7 @@ class _CodeScreenState extends State<_CodeScreen> {
             style: TextStyle(fontSize: 15, color: c.muted, height: 1.4),
           ),
           const SizedBox(height: 18),
-          DemoNote(text: 'Демо-режим: SMS пока не отправляется. Ваш код: $_demoCode'),
+          InfoNote(text: 'Тестовый режим: SMS пока не отправляется. Код для входа: $_demoCode'),
           const SizedBox(height: 22),
           GestureDetector(
             onTap: () => _focus.requestFocus(),

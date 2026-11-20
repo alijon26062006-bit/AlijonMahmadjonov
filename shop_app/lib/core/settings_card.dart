@@ -40,7 +40,7 @@ class SettingsTile extends StatelessWidget {
   }
 }
 
-/// Общие настройки для всех приложений: тема, демо-режим, выход.
+/// Общие настройки для всех приложений: тема, тестовый режим, выход.
 class CommonSettings extends StatelessWidget {
   const CommonSettings({super.key, this.extra = const [], this.showLogout = true});
 
@@ -75,9 +75,9 @@ class CommonSettings extends StatelessWidget {
                     child: SegmentedButton<ThemeMode>(
                       showSelectedIcon: false,
                       segments: const [
-                        ButtonSegment(value: ThemeMode.light, label: Text('☀️ Светлая')),
-                        ButtonSegment(value: ThemeMode.dark, label: Text('🌙 Тёмная')),
-                        ButtonSegment(value: ThemeMode.system, label: Text('📱 Авто')),
+                        ButtonSegment(value: ThemeMode.light, label: Text('Светлая')),
+                        ButtonSegment(value: ThemeMode.dark, label: Text('Тёмная')),
+                        ButtonSegment(value: ThemeMode.system, label: Text('Авто')),
                       ],
                       selected: {s.themeMode},
                       onSelectionChanged: (v) => s.setThemeMode(v.first),
@@ -93,7 +93,7 @@ class CommonSettings extends StatelessWidget {
               onChanged: s.setDemoLive,
               secondary: Icon(Icons.science_outlined, color: c.accentText),
               title: Text(
-                'Живой демо-режим',
+                'Тестовый режим',
                 style: TextStyle(fontWeight: FontWeight.w600, color: c.text),
               ),
               subtitle: Text(
@@ -104,16 +104,16 @@ class CommonSettings extends StatelessWidget {
             const Divider(indent: 16, endIndent: 16),
             SettingsTile(
               icon: Icons.restart_alt_rounded,
-              title: 'Сбросить демо-данные',
+              title: 'Сбросить тестовые данные',
               onTap: () async {
                 if (await confirm(
                   context,
-                  title: 'Сбросить демо-данные?',
+                  title: 'Сбросить тестовые данные?',
                   text: 'Магазины, товары и заказы вернутся к начальным.',
                   ok: 'Сбросить',
                 )) {
                   s.resetDemo();
-                  if (context.mounted) showSnack(context, 'Демо-данные сброшены');
+                  if (context.mounted) showSnack(context, 'Тестовые данные сброшены');
                 }
               },
             ),
@@ -183,10 +183,12 @@ class ProfileHeader extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0x66FFFFFF), width: 2),
                 ),
-                child: Text(
-                  avatar,
-                  style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w800),
-                ),
+                child: avatar.isEmpty
+                    ? const Icon(Icons.person_rounded, color: Colors.white, size: 32)
+                    : Text(
+                        avatar,
+                        style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w800),
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(

@@ -71,9 +71,7 @@ class AdminOrderScreen extends StatelessWidget {
                   InfoLine(
                     icon: Icons.delivery_dining_outlined,
                     title: 'Курьер',
-                    text: courier == null
-                        ? 'Не назначен'
-                        : '${courier.vehicle} ${courier.name}, ${formatPhone(courier.phone)}',
+                    text: courier == null ? 'Не назначен' : '${courier.name}, ${formatPhone(courier.phone)}',
                     trailing: courier == null
                         ? null
                         : IconButton(
@@ -189,12 +187,12 @@ class AdminOrderScreen extends StatelessWidget {
             ),
             for (final x in free)
               ListTile(
-                leading: Text(x.vehicle, style: const TextStyle(fontSize: 26)),
+                leading: Icon(vehicleIcon(x.vehicle)),
                 title: Text(x.name),
                 subtitle: Text(
                   s.orders.any((d) => d.courierId == x.id && d.status.isActive)
                       ? 'Сейчас на доставке'
-                      : 'Свободен · ★ ${x.rating}',
+                      : 'Свободен · рейтинг ${ratingText(x.rating)}',
                 ),
                 onTap: () => Navigator.pop(ctx, x),
               ),

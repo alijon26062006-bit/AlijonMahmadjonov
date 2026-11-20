@@ -37,14 +37,14 @@ class DeliveryScreen extends StatelessWidget {
             decoration: BoxDecoration(gradient: c.headerGradient, borderRadius: BorderRadius.circular(24)),
             child: Row(
               children: [
-                _MapPin(emoji: shop?.emoji ?? '🏪', label: 'Магазин', done: pickedUp),
+                _MapPin(image: shop?.logo ?? 'store', label: 'Магазин', done: pickedUp),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         '${demoDistance(o).toStringAsFixed(1)} км',
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -70,7 +70,7 @@ class DeliveryScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                _MapPin(emoji: '🏠', label: 'Покупатель', done: o.status == OrderStatus.delivered),
+                _MapPin(image: 'house', label: 'Покупатель', done: o.status == OrderStatus.delivered),
               ],
             ),
           ),
@@ -182,7 +182,7 @@ class DeliveryScreen extends StatelessWidget {
                 ),
                 Text(
                   money(o.courierPay),
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kSuccess),
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: kSuccess),
                 ),
               ],
             ),
@@ -248,7 +248,7 @@ class DeliveryScreen extends StatelessWidget {
             HapticFeedback.heavyImpact();
             if (context.mounted) {
               Navigator.of(context).pop();
-              showSnack(context, 'Отлично! +${money(o.courierPay)} 🎉');
+              showSnack(context, 'Заказ доставлен, +${money(o.courierPay)}');
             }
           },
         );
@@ -260,9 +260,9 @@ class DeliveryScreen extends StatelessWidget {
 }
 
 class _MapPin extends StatelessWidget {
-  const _MapPin({required this.emoji, required this.label, required this.done});
+  const _MapPin({required this.image, required this.label, required this.done});
 
-  final String emoji;
+  final String image;
   final String label;
   final bool done;
 
@@ -278,7 +278,8 @@ class _MapPin extends StatelessWidget {
             height: 56,
             alignment: Alignment.center,
             decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: Text(emoji, style: const TextStyle(fontSize: 28)),
+            padding: const EdgeInsets.all(10),
+            child: AppImage(image),
           ),
           if (done)
             const Positioned(

@@ -4,11 +4,11 @@ import 'package:material_ui/material_ui.dart';
 enum Role { buyer, seller, courier, admin }
 
 class Category {
-  const Category({required this.id, required this.name, required this.emoji, required this.tint});
+  const Category({required this.id, required this.name, required this.image, required this.tint});
 
   final String id;
   final String name;
-  final String emoji;
+  final String image;
 
   /// Два пастельных цвета для фона карточек.
   final List<Color> tint;
@@ -38,7 +38,7 @@ class Shop {
   Shop({
     required this.id,
     required this.name,
-    required this.emoji,
+    required this.logo,
     required this.categoryId,
     required this.ownerName,
     required this.ownerPhone,
@@ -53,7 +53,7 @@ class Shop {
 
   final String id;
   String name;
-  String emoji;
+  String logo;
   String categoryId;
   String ownerName;
   String ownerPhone;
@@ -74,7 +74,7 @@ class Shop {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'emoji': emoji,
+    'logo': logo,
     'cat': categoryId,
     'owner': ownerName,
     'phone': ownerPhone,
@@ -90,7 +90,7 @@ class Shop {
   factory Shop.fromJson(Map<String, dynamic> j) => Shop(
     id: j['id'] as String,
     name: j['name'] as String,
-    emoji: j['emoji'] as String,
+    logo: j['logo'] as String,
     categoryId: j['cat'] as String,
     ownerName: j['owner'] as String,
     ownerPhone: j['phone'] as String,
@@ -114,7 +114,7 @@ class Product {
     required this.shopId,
     required this.title,
     required this.categoryId,
-    required this.emoji,
+    required this.image,
     required this.price,
     this.oldPrice,
     this.stock = 20,
@@ -132,7 +132,7 @@ class Product {
   final String shopId;
   String title;
   String categoryId;
-  String emoji;
+  String image;
   int price;
   int? oldPrice;
   int stock;
@@ -162,7 +162,7 @@ class Product {
     'shop': shopId,
     't': title,
     'cat': categoryId,
-    'e': emoji,
+    'img': image,
     'p': price,
     'op': oldPrice,
     'st': stock,
@@ -181,7 +181,7 @@ class Product {
     shopId: j['shop'] as String,
     title: j['t'] as String,
     categoryId: j['cat'] as String,
-    emoji: j['e'] as String,
+    image: j['img'] as String,
     price: (j['p'] as num).toInt(),
     oldPrice: (j['op'] as num?)?.toInt(),
     stock: (j['st'] as num).toInt(),
@@ -258,7 +258,7 @@ class OrderItem {
   const OrderItem({
     required this.productId,
     required this.title,
-    required this.emoji,
+    required this.image,
     required this.price,
     required this.qty,
     this.option,
@@ -266,19 +266,19 @@ class OrderItem {
 
   final String productId;
   final String title;
-  final String emoji;
+  final String image;
   final int price;
   final int qty;
   final String? option;
 
   int get sum => price * qty;
 
-  Map<String, dynamic> toJson() => {'id': productId, 't': title, 'e': emoji, 'p': price, 'q': qty, 'o': option};
+  Map<String, dynamic> toJson() => {'id': productId, 't': title, 'img': image, 'p': price, 'q': qty, 'o': option};
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
     productId: j['id'] as String,
     title: j['t'] as String,
-    emoji: j['e'] as String,
+    image: j['img'] as String,
     price: (j['p'] as num).toInt(),
     qty: (j['q'] as num).toInt(),
     option: j['o'] as String?,
@@ -429,7 +429,7 @@ class Courier {
     required this.id,
     required this.name,
     required this.phone,
-    this.vehicle = '🛵',
+    this.vehicle = 'scooter',
     this.online = false,
     this.rating = 5.0,
     this.blocked = false,
@@ -467,6 +467,18 @@ class Courier {
     createdAt: DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt()),
   );
 }
+
+/// Транспорт курьера.
+const kVehicles = <String, (IconData, String)>{
+  'foot': (Icons.directions_walk_rounded, 'Пешком'),
+  'bicycle': (Icons.pedal_bike_rounded, 'Велосипед'),
+  'scooter': (Icons.two_wheeler_rounded, 'Мопед'),
+  'car': (Icons.directions_car_rounded, 'Машина'),
+};
+
+IconData vehicleIcon(String vehicle) => (kVehicles[vehicle] ?? kVehicles['scooter']!).$1;
+
+String vehicleName(String vehicle) => (kVehicles[vehicle] ?? kVehicles['scooter']!).$2;
 
 // ---------------------------------------------------------------------------
 // Настройки маркетплейса (меняет админ)

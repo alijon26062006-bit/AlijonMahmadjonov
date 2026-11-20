@@ -24,7 +24,7 @@ class MarketStore extends ChangeNotifier {
   Timer? _timer;
   final _rnd = Random();
 
-  String get _key => 'market_v1_${role.name}';
+  String get _key => 'market_v2_${role.name}';
 
   List<Shop> shops = [];
   List<Product> products = [];
@@ -356,7 +356,7 @@ class MarketStore extends ChangeNotifier {
           OrderItem(
             productId: i.productId,
             title: productOf(i).title,
-            emoji: productOf(i).emoji,
+            image: productOf(i).image,
             price: productOf(i).price,
             qty: i.qty,
             option: i.option,
@@ -412,7 +412,7 @@ class MarketStore extends ChangeNotifier {
   Shop createShop({
     required String name,
     required String ownerName,
-    required String emoji,
+    required String logo,
     required String categoryId,
     required String address,
     String description = '',
@@ -420,7 +420,7 @@ class MarketStore extends ChangeNotifier {
     final shop = Shop(
       id: 's${DateTime.now().millisecondsSinceEpoch}',
       name: name,
-      emoji: emoji,
+      logo: logo,
       categoryId: categoryId,
       ownerName: ownerName,
       ownerPhone: user!.phone,
@@ -698,7 +698,7 @@ class MarketStore extends ChangeNotifier {
         OrderItem(
           productId: p.id,
           title: p.title,
-          emoji: p.emoji,
+          image: p.image,
           price: p.price,
           qty: 1 + (_rnd.nextInt(4) == 0 ? 1 : 0),
           option: p.options.isEmpty ? null : p.options[_rnd.nextInt(p.options.length)],

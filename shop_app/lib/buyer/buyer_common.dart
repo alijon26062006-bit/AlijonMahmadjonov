@@ -124,7 +124,7 @@ class RatingLine extends StatelessWidget {
         Icon(Icons.star_rounded, size: fontSize + 4, color: kStar),
         const SizedBox(width: 2),
         Text(
-          rating.toStringAsFixed(1),
+          ratingText(rating),
           style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700, color: c.text),
         ),
         Flexible(
@@ -168,8 +168,8 @@ class ProductCard extends StatelessWidget {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: EmojiImage(
-                          emoji: product.emoji,
+                        child: ProductImage(
+                          image: product.image,
                           categoryId: product.categoryId,
                           size: 70,
                           heroTag: tag,
@@ -275,7 +275,7 @@ class ShopCard extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              EmojiTile(emoji: shop.emoji, categoryId: shop.categoryId, size: 54),
+              ImageTile(image: shop.logo, categoryId: shop.categoryId, size: 54),
               if (!shop.isOpen)
                 Positioned(
                   right: -4,

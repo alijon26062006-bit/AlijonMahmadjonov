@@ -51,8 +51,8 @@ class _ProductScreenState extends State<ProductScreen> {
                     width: double.infinity,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
-                      child: EmojiImage(
-                        emoji: p.emoji,
+                      child: ProductImage(
+                        image: p.image,
                         categoryId: p.categoryId,
                         size: 150,
                         radius: 0,
@@ -122,7 +122,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         RatingLine(rating: p.rating, reviews: p.reviews, fontSize: 14, long: true),
-                        _Tag(text: '${cat.emoji} ${cat.name}'),
+                        _Tag(text: cat.name),
                         if (!p.inStock)
                           const StatusPill(label: 'Нет в наличии', color: kDanger)
                         else if (p.stock <= 5)
@@ -136,7 +136,7 @@ class _ProductScreenState extends State<ProductScreen> {
                         onTap: () => openShop(context, shop),
                         child: Row(
                           children: [
-                            EmojiTile(emoji: shop.emoji, categoryId: shop.categoryId, size: 44),
+                            ImageTile(image: shop.logo, categoryId: shop.categoryId, size: 44),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -157,7 +157,7 @@ class _ProductScreenState extends State<ProductScreen> {
                                     ],
                                   ),
                                   Text(
-                                    shop.isOpen ? 'Открыт · ★ ${shop.rating.toStringAsFixed(1)}' : 'Сейчас закрыт',
+                                    shop.isOpen ? 'Открыт · рейтинг ${ratingText(shop.rating)}' : 'Сейчас закрыт',
                                     style: TextStyle(fontSize: 12.5, color: shop.isOpen ? c.muted : kDanger),
                                   ),
                                 ],

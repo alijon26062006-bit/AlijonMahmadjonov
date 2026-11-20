@@ -11,7 +11,7 @@ class Brand {
   const Brand({
     required this.appName,
     required this.roleName,
-    required this.emoji,
+    required this.image,
     required this.primary,
     required this.gradient,
     required this.softLight,
@@ -21,7 +21,9 @@ class Brand {
 
   final String appName;
   final String roleName;
-  final String emoji;
+
+  /// Иллюстрация на экране входа.
+  final String image;
   final Color primary;
   final List<Color> gradient;
   final Color softLight;
@@ -33,7 +35,7 @@ class Brand {
   static const buyer = Brand(
     appName: 'Витрина',
     roleName: 'Покупатель',
-    emoji: '🛍️',
+    image: 'bags',
     primary: Color(0xFF7B2FF7),
     gradient: [Color(0xFF7B2FF7), Color(0xFFC21FD6), Color(0xFFF107A3)],
     softLight: Color(0xFFF0E9FF),
@@ -44,7 +46,7 @@ class Brand {
   static const seller = Brand(
     appName: 'Витрина Продавец',
     roleName: 'Продавец',
-    emoji: '🏪',
+    image: 'store',
     primary: Color(0xFFF2542D),
     gradient: [Color(0xFFFF8A3D), Color(0xFFFF5A4E), Color(0xFFFF3D7F)],
     softLight: Color(0xFFFFEDE6),
@@ -55,7 +57,7 @@ class Brand {
   static const courier = Brand(
     appName: 'Витрина Курьер',
     roleName: 'Курьер',
-    emoji: '🛵',
+    image: 'scooter',
     primary: Color(0xFF0A8F9E),
     gradient: [Color(0xFF00B4A0), Color(0xFF0E9AC8), Color(0xFF2F80ED)],
     softLight: Color(0xFFE2F6F6),
@@ -66,7 +68,7 @@ class Brand {
   static const admin = Brand(
     appName: 'Витрина Админ',
     roleName: 'Администратор',
-    emoji: '🛡️',
+    image: 'check',
     primary: Color(0xFF4B3BFF),
     gradient: [Color(0xFF2B2E83), Color(0xFF4B3BFF), Color(0xFF8E2DE2)],
     softLight: Color(0xFFEAE8FF),
@@ -147,13 +149,15 @@ class AppColors extends ThemeExtension<AppColors> {
   AppColors lerp(ThemeExtension<AppColors>? other, double t) => t < .5 ? this : (other as AppColors? ?? this);
 }
 
+const kFontFamily = 'Onest';
+
 ThemeData buildTheme(Brand brand, Brightness brightness) {
   final c = AppColors.build(brand, brightness);
   final scheme = ColorScheme.fromSeed(
     seedColor: brand.primary,
     brightness: brightness,
   ).copyWith(primary: brand.primary, secondary: brand.gradient.last, surface: c.surface, onSurface: c.text);
-  final base = ThemeData(useMaterial3: true, brightness: brightness, colorScheme: scheme);
+  final base = ThemeData(useMaterial3: true, brightness: brightness, colorScheme: scheme, fontFamily: kFontFamily);
 
   OutlineInputBorder border([Color? color, double width = 1.5]) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(16),

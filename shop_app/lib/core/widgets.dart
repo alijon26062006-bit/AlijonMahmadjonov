@@ -107,11 +107,16 @@ List<Color> tintFor(BuildContext context, String categoryId) {
   return c.dark ? [for (final t in tint) Color.lerp(t, c.surface, .74)!] : tint;
 }
 
-/// Эмодзи на пастельном градиенте категории (фото товара/магазина).
-class EmojiImage extends StatelessWidget {
-  const EmojiImage({
+String _assetFor(String image) => 'assets/img/$image.png';
+
+/// Картинка товара или магазина на мягком фоне категории.
+///
+/// [image] — имя иллюстрации из `assets/img` или ссылка `https://…`
+/// (фото, загруженные продавцами, после подключения сервера).
+class ProductImage extends StatelessWidget {
+  const ProductImage({
     super.key,
-    required this.emoji,
+    required this.image,
     required this.categoryId,
     this.size = 64,
     this.radius = 18,
@@ -119,7 +124,7 @@ class EmojiImage extends StatelessWidget {
     this.dimmed = false,
   });
 
-  final String emoji;
+  final String image;
   final String categoryId;
   final double size;
   final double radius;
@@ -128,25 +133,8 @@ class EmojiImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget child = SizedBox.square(
-      dimension: size * 1.3,
-      child: FittedBox(
-        child: Text(
-          emoji,
-          style: const TextStyle(
-            fontSize: 100,
-            height: 1.15,
-            shadows: [Shadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 12))],
-          ),
-        ),
-      ),
-    );
-    if (heroTag != null) {
-      child = Hero(
-        tag: heroTag!,
-        child: Material(type: MaterialType.transparency, child: child),
-      );
-    }
+    Widget picture = SizedBox.square(dimension: size * 1.3, child: AppImage(image));
+    if (heroTag != null) picture = Hero(tag: heroTag!, child: picture);
     return Opacity(
       opacity: dimmed ? .45 : 1,
       child: DecoratedBox(
@@ -158,17 +146,39 @@ class EmojiImage extends StatelessWidget {
             colors: tintFor(context, categoryId),
           ),
         ),
-        child: Center(child: child),
+        child: Center(child: picture),
       ),
     );
   }
 }
 
-/// Маленькая плитка с эмодзи (для списков).
-class EmojiTile extends StatelessWidget {
-  const EmojiTile({super.key, required this.emoji, required this.categoryId, this.size = 48});
+/// Иллюстрация из `assets/img` или изображение по ссылке.
+class AppImage extends StatelessWidget {
+  const AppImage(this.image, {super.key, this.fit = BoxFit.contain});
 
-  final String emoji;
+  final String image;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Icon(Icons.image_outlined, color: AppColors.of(context).muted);
+    if (image.startsWith('http')) {
+      return Image.network(image, fit: fit, errorBuilder: (_, _, _) => fallback);
+    }
+    return Image.asset(
+      _assetFor(image),
+      fit: fit,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+}
+
+/// Маленькая плитка с картинкой (для списков).
+class ImageTile extends StatelessWidget {
+  const ImageTile({super.key, required this.image, required this.categoryId, this.size = 48});
+
+  final String image;
   final String categoryId;
   final double size;
 
@@ -176,7 +186,7 @@ class EmojiTile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
-    alignment: Alignment.center,
+    padding: EdgeInsets.all(size * .16),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(size * .3),
       gradient: LinearGradient(
@@ -185,7 +195,7 @@ class EmojiTile extends StatelessWidget {
         end: Alignment.bottomRight,
       ),
     ),
-    child: Text(emoji, style: TextStyle(fontSize: size * .5)),
+    child: AppImage(image),
   );
 }
 
@@ -236,7 +246,7 @@ class PriceRow extends StatelessWidget {
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              money(oldPrice!),
+              groupDigits(oldPrice!),
               maxLines: 1,
               overflow: TextOverflow.fade,
               softWrap: false,
@@ -579,14 +589,14 @@ class CircleButton extends StatelessWidget {
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
-    required this.emoji,
+    required this.image,
     required this.title,
     required this.subtitle,
     this.buttonLabel,
     this.onButton,
   });
 
-  final String emoji;
+  final String image;
   final String title;
   final String subtitle;
   final String? buttonLabel;
@@ -606,7 +616,8 @@ class EmptyState extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(color: c.accentSoft, shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: Text(emoji, style: const TextStyle(fontSize: 54)),
+              padding: const EdgeInsets.all(22),
+              child: AppImage(image),
             ),
             const SizedBox(height: 22),
             Text(
@@ -638,14 +649,14 @@ class EmptyState extends StatelessWidget {
 class ChoiceTile extends StatelessWidget {
   const ChoiceTile({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.title,
     this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
-  final String emoji;
+  final IconData icon;
   final String title;
   final String? subtitle;
   final bool selected;
@@ -669,7 +680,15 @@ class ChoiceTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             child: Row(
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 26)),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selected ? c.surface : c.chip,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 21, color: selected ? c.accentText : c.muted),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -937,7 +956,7 @@ class OrderItemsList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
-                EmojiTile(emoji: i.emoji, categoryId: categoryOf?.call(i.productId) ?? 'electronics', size: 46),
+                ImageTile(image: i.image, categoryId: categoryOf?.call(i.productId) ?? 'electronics', size: 46),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1081,9 +1100,9 @@ class _TimelineStep extends StatelessWidget {
   }
 }
 
-/// Плашка «Демо-режим» с объяснением.
-class DemoNote extends StatelessWidget {
-  const DemoNote({super.key, required this.text});
+/// Плашка с пояснением.
+class InfoNote extends StatelessWidget {
+  const InfoNote({super.key, required this.text});
 
   final String text;
 
@@ -1100,7 +1119,7 @@ class DemoNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.science_outlined, size: 18, color: c.accentText),
+          Icon(Icons.info_outline_rounded, size: 18, color: c.accentText),
           const SizedBox(width: 8),
           Expanded(
             child: Text(text, style: TextStyle(fontSize: 12.5, color: c.text, height: 1.35)),

@@ -61,7 +61,7 @@ class _AdminShopsScreenState extends State<AdminShopsScreen> {
             ),
             Expanded(
               child: list.isEmpty
-                  ? const EmptyState(emoji: '🏪', title: 'Магазинов нет', subtitle: 'Измените фильтр')
+                  ? const EmptyState(image: 'store', title: 'Магазинов нет', subtitle: 'Измените фильтр')
                   : ListView(
                       padding: const EdgeInsets.only(top: 8, bottom: 24),
                       children: [for (final shop in list) AdminShopTile(shop: shop)],

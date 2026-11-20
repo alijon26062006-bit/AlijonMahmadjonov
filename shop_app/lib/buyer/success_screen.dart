@@ -50,9 +50,9 @@ class SuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               Text(
-                orders.length > 1 ? 'Оформлено ${ordersLabel(orders.length)}! 🎉' : 'Заказ оформлен! 🎉',
+                orders.length > 1 ? 'Оформлено ${ordersLabel(orders.length)}' : 'Заказ оформлен',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: c.text),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: c.text),
               ),
               const SizedBox(height: 8),
               Text(
@@ -75,7 +75,11 @@ class SuccessScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
-                            Text(s.shopById(o.shopId)?.emoji ?? '🛍️', style: const TextStyle(fontSize: 22)),
+                            ImageTile(
+                              image: s.shopById(o.shopId)?.logo ?? 'bags',
+                              categoryId: s.shopById(o.shopId)?.categoryId ?? 'electronics',
+                              size: 34,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(

@@ -51,11 +51,6 @@ android {
             applicationId = "com.alijon.vitrina"
             resValue("string", "app_name", "Витрина")
         }
-        create("seller") {
-            dimension = "app"
-            applicationId = "com.alijon.vitrina.seller"
-            resValue("string", "app_name", "Витрина Продавец")
-        }
         create("courier") {
             dimension = "app"
             applicationId = "com.alijon.vitrina.courier"

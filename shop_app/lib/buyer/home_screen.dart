@@ -50,7 +50,7 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           SliverToBoxAdapter(
-            child: SectionHeader('Хиты продаж 🔥', action: 'Смотреть все', onAction: () => buyerNav.openCatalog()),
+            child: SectionHeader('Хиты продаж', action: 'Смотреть все', onAction: () => buyerNav.openCatalog()),
           ),
           SliverToBoxAdapter(
             child: SizedBox(
@@ -115,7 +115,7 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$_greeting${name.isEmpty ? '' : ', ${name.split(' ').first}'} 👋',
+                      '$_greeting${name.isEmpty ? '' : ', ${name.split(' ').first}'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xDDFFFFFF), fontSize: 14.5),
@@ -125,7 +125,7 @@ class _Header extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 28,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: -0.8,
                       ),
                     ),
@@ -235,27 +235,27 @@ class _ActiveOrderBanner extends StatelessWidget {
 }
 
 class _Promo {
-  const _Promo(this.kicker, this.title, this.button, this.emoji, this.colors, this.onTap);
+  const _Promo(this.kicker, this.title, this.button, this.image, this.colors, this.onTap);
 
   final String kicker;
   final String title;
   final String button;
-  final String emoji;
+  final String image;
   final List<Color> colors;
   final void Function(BuildContext) onTap;
 }
 
 final _promos = <_Promo>[
-  _Promo('Чёрная пятница', '−30% на\nэлектронику', 'Успеть купить', '🎧', const [
+  _Promo('Чёрная пятница', '−30% на\nэлектронику', 'Успеть купить', 'headphones', const [
     Color(0xFF7B2FF7),
     Color(0xFFB620E0),
     Color(0xFFF107A3),
   ], (_) => buyerNav.openCatalog(category: 'electronics')),
-  _Promo('Новинки сезона', 'Осенняя\nколлекция', 'Смотреть', '🧥', const [
+  _Promo('Новинки сезона', 'Осенняя\nколлекция', 'Смотреть', 'coat', const [
     Color(0xFFFF6A3D),
     Color(0xFFFF3D7F),
   ], (_) => buyerNav.openCatalog(category: 'clothes')),
-  _Promo('Промокод', 'VITRINA20 —\nскидка 20%', 'Скопировать', '🎁', const [Color(0xFF00A99D), Color(0xFF2F80ED)], (
+  _Promo('Промокод', 'VITRINA20 —\nскидка 20%', 'Скопировать', 'gift', const [Color(0xFF00A99D), Color(0xFF2F80ED)], (
     context,
   ) {
     Clipboard.setData(const ClipboardData(text: 'VITRINA20'));
@@ -361,18 +361,11 @@ class _PromoCard extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  right: 10,
-                  bottom: 4,
-                  child: Transform.rotate(
-                    angle: -.17,
-                    child: Text(
-                      promo.emoji,
-                      style: const TextStyle(
-                        fontSize: 88,
-                        shadows: [Shadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 12))],
-                      ),
-                    ),
-                  ),
+                  right: 6,
+                  bottom: 6,
+                  width: 116,
+                  height: 116,
+                  child: Transform.rotate(angle: -.12, child: AppImage(promo.image)),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 120, 16),
@@ -398,7 +391,7 @@ class _PromoCard extends StatelessWidget {
                             color: Colors.white,
                             fontSize: 24,
                             height: 1.08,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -464,7 +457,8 @@ class _CategoriesRow extends StatelessWidget {
                       color: tintFor(context, cat.id).first,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(cat.emoji, style: const TextStyle(fontSize: 29)),
+                    padding: const EdgeInsets.all(11),
+                    child: AppImage(cat.image),
                   ),
                   const SizedBox(height: 7),
                   Text(

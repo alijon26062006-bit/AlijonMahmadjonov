@@ -100,7 +100,7 @@ class DeliveryOfferCard extends StatelessWidget {
                   '+${money(order.courierPay)}',
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: kSuccess,
                     letterSpacing: -0.5,
                   ),

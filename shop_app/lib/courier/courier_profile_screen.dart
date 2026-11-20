@@ -23,10 +23,10 @@ class CourierProfileScreen extends StatelessWidget {
           ProfileHeader(
             title: me.name,
             subtitle: formatPhone(me.phone),
-            avatar: me.vehicle,
+            avatar: me.name.characters.first.toUpperCase(),
             stats: [
               ('${done.length}', plural(done.length, 'доставка', 'доставки', 'доставок')),
-              ('★ ${me.rating.toStringAsFixed(1)}', 'рейтинг'),
+              (ratingText(me.rating), 'рейтинг'),
               (me.online ? 'На линии' : 'Не на линии', 'статус'),
             ],
           ),

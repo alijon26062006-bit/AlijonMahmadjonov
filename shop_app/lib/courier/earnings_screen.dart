@@ -98,7 +98,8 @@ class EarningsScreen extends StatelessWidget {
                         height: 42,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(13)),
-                        child: Text(s.shopById(o.shopId)?.emoji ?? '📦', style: const TextStyle(fontSize: 22)),
+                        padding: const EdgeInsets.all(8),
+                        child: AppImage(s.shopById(o.shopId)?.logo ?? 'package'),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -108,7 +108,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const FieldLabel('Способ получения'),
               ChoiceTile(
-                emoji: '🚚',
+                icon: Icons.local_shipping_outlined,
                 title: 'Курьером',
                 subtitle: fee == 0
                     ? 'Сегодня · бесплатно'
@@ -117,7 +117,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 onTap: () => setState(() => _courier = true),
               ),
               ChoiceTile(
-                emoji: '🏪',
+                icon: Icons.storefront_outlined,
                 title: 'Самовывоз из магазина',
                 subtitle: shops.length == 1 ? shops.first.address : 'Из ${shops.length} магазинов · бесплатно',
                 selected: !_courier,
@@ -153,13 +153,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
               ),
               const FieldLabel('Оплата'),
-              for (final (emoji, title, sub) in const [
-                ('💳', 'Картой при получении', 'Курьеру или в магазине'),
-                ('💵', 'Наличными', 'Подготовьте сумму без сдачи'),
-                ('📲', 'Онлайн', 'Демо-режим, деньги не списываются'),
+              for (final (icon, title, sub) in const [
+                (Icons.credit_card_rounded, 'Картой при получении', 'Курьеру или в магазине'),
+                (Icons.payments_outlined, 'Наличными', 'Подготовьте сумму без сдачи'),
               ])
                 ChoiceTile(
-                  emoji: emoji,
+                  icon: icon,
                   title: title,
                   subtitle: sub,
                   selected: _payment == title,

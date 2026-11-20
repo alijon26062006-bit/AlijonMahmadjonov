@@ -8,7 +8,6 @@ import 'package:vitrina/core/app.dart';
 import 'package:vitrina/core/models.dart';
 import 'package:vitrina/core/store.dart';
 import 'package:vitrina/courier/courier_shell.dart';
-import 'package:vitrina/seller/seller_shell.dart';
 
 Future<MarketStore> _store(Role role, {String? phone}) async {
   final s = MarketStore(role, persist: false, simulate: false);
@@ -37,7 +36,13 @@ void main() {
       expect(s.applyPromo('vitrina20'), isNull);
       final total = s.itemsTotal;
       final promo = s.promoDiscount;
-      final orders = s.placeOrders(name: 'Тест', phone: '901112233', address: 'ул. Тестовая, 1', courier: true, payment: 'Наличными');
+      final orders = s.placeOrders(
+        name: 'Тест',
+        phone: '901112233',
+        address: 'ул. Тестовая, 1',
+        courier: true,
+        payment: 'Наличными',
+      );
       expect(orders, hasLength(2));
       expect(orders.fold(0, (a, o) => a + o.discount), closeTo(promo, 1));
       expect(orders.fold(0, (a, o) => a + o.itemsTotal), total);
@@ -101,20 +106,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Оформить заказ'), findsOneWidget);
       buyerNav.tab.value = BuyerNav.home;
-    });
-
-    testWidgets('продавец: вход и все вкладки', (tester) async {
-      final s = await _store(Role.seller);
-      await _pump(tester, s, const SellerRoot());
-      expect(find.text('Получить код'), findsOneWidget);
-      s.user = AppUser(phone: '900000001', name: 'Фаррух');
-      s.setThemeMode(ThemeMode.light);
-      await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('ТехноМир'), findsWidgets);
-      for (final tab in [1, 2, 3, 0]) {
-        sellerTab.value = tab;
-        await tester.pump(const Duration(milliseconds: 300));
-      }
     });
 
     testWidgets('курьер: все вкладки', (tester) async {

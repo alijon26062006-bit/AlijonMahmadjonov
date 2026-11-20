@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [buyer, seller, courier, admin]
+        app: [buyer, courier, admin]
     defaults:
       run:
         working-directory: shop_app
@@ -94,7 +94,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: true
           body: |
-            📱 Четыре Android-приложения маркетплейса «Витрина»: покупатель, продавец, курьер, админ.
+            📱 Android-приложения маркетплейса «Витрина»: покупатель, курьер, админ.
             Скачайте нужный файл ниже на телефон и откройте его.
             Если Android спросит — разрешите установку из этого источника.
             Ветка: `${{ github.ref_name }}`, коммит: `${{ github.sha }}`.

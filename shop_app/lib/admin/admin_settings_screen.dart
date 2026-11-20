@@ -128,7 +128,7 @@ class _NumberRow extends StatelessWidget {
                 ),
                 Text(
                   '$value$suffix',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.accentText),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: c.accentText),
                 ),
               ],
             ),

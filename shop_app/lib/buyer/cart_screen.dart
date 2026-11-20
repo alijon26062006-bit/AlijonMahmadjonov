@@ -36,7 +36,7 @@ class CartScreen extends StatelessWidget {
             const PageTitle('Корзина'),
             Expanded(
               child: EmptyState(
-                emoji: '🛍️',
+                image: 'bags',
                 title: 'Корзина пуста',
                 subtitle: 'Загляните на главную —\nтам скидки и хиты продаж',
                 buttonLabel: 'За покупками',
@@ -73,9 +73,9 @@ class CartScreen extends StatelessWidget {
               if (groups.length > 1)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                  child: DemoNote(
+                  child: InfoNote(
                     text:
-                        'Товары из ${groups.length} магазинов — придёт ${groups.length} отдельных заказа, у каждого свой курьер.',
+                        'Товары из ${groups.length} магазинов. Каждый магазин отправит свой заказ, поэтому получится ${ordersLabel(groups.length)}.',
                   ),
                 ),
               for (final entry in groups.entries) ...[
@@ -83,7 +83,7 @@ class CartScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 2),
                   child: Row(
                     children: [
-                      Text(entry.key.emoji, style: const TextStyle(fontSize: 18)),
+                      ImageTile(image: entry.key.logo, categoryId: entry.key.categoryId, size: 30),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -206,7 +206,7 @@ class _FreeDeliveryCard extends StatelessWidget {
                       ),
                     ],
                   )
-                : const TextSpan(text: '🎉  Доставка курьером будет бесплатной'),
+                : const TextSpan(text: 'Доставка курьером будет бесплатной'),
             style: TextStyle(fontSize: 13.5, color: c.text, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 9),
@@ -253,7 +253,7 @@ class _CartTile extends StatelessWidget {
         children: [
           SizedBox.square(
             dimension: 88,
-            child: EmojiImage(emoji: p.emoji, categoryId: p.categoryId, size: 42, radius: 16, dimmed: problem),
+            child: ProductImage(image: p.image, categoryId: p.categoryId, size: 42, radius: 16, dimmed: problem),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -332,7 +332,7 @@ class _PromoFieldState extends State<_PromoField> {
     } else {
       FocusScope.of(context).unfocus();
       _controller.clear();
-      showSnack(context, 'Промокод применён 🎉');
+      showSnack(context, 'Промокод применён');
     }
   }
 

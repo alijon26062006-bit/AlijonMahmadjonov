@@ -43,7 +43,9 @@ class AdminOrderTile extends StatelessWidget {
                 color: o.status.color.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Text(shop?.emoji ?? '🛍️', style: const TextStyle(fontSize: 22)),
+              child: shop == null
+                  ? Icon(Icons.storefront_outlined, color: o.status.color)
+                  : Padding(padding: const EdgeInsets.all(8), child: AppImage(shop.logo)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -62,7 +64,7 @@ class AdminOrderTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${shop?.name ?? ''} → ${o.buyerName}${courier != null ? ' · ${courier.vehicle} ${courier.name.split(' ').first}' : ''}',
+                    '${shop?.name ?? ''} → ${o.buyerName}${courier != null ? ' · ${courier.name.split(' ').first}' : ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12.5, color: c.muted),
@@ -107,7 +109,7 @@ class AdminShopTile extends StatelessWidget {
         onTap: () => openAdminShop(context, shop),
         child: Row(
           children: [
-            EmojiTile(emoji: shop.emoji, categoryId: shop.categoryId, size: 48),
+            ImageTile(image: shop.logo, categoryId: shop.categoryId, size: 48),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

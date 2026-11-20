@@ -127,7 +127,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   Pill(label: 'Все', selected: selected == null, onTap: () => buyerNav.catalogCategory.value = null),
                   for (final cat in kCategories)
                     Pill(
-                      label: '${cat.emoji}  ${cat.name}',
+                      label: cat.name,
                       selected: selected == cat.id,
                       onTap: () => buyerNav.catalogCategory.value = selected == cat.id ? null : cat.id,
                     ),
@@ -151,7 +151,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             Expanded(
               child: results.isEmpty
                   ? EmptyState(
-                      emoji: '🔍',
+                      image: 'search',
                       title: 'Ничего не нашлось',
                       subtitle: 'Попробуйте изменить запрос\nили выбрать другую категорию',
                       buttonLabel: 'Сбросить фильтры',

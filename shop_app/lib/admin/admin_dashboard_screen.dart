@@ -53,11 +53,11 @@ class AdminDashboardScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('🛡️ Витрина Админ', style: TextStyle(color: Color(0xDDFFFFFF), fontSize: 14)),
+                const Text('Витрина Админ', style: TextStyle(color: Color(0xDDFFFFFF), fontSize: 14)),
                 const SizedBox(height: 2),
                 const Text(
                   'Обзор маркетплейса',
-                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.6),
+                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6),
                 ),
                 const SizedBox(height: 16),
                 Text('Оборот сегодня', style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13.5)),
@@ -66,7 +66,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 34,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: -1,
                   ),
                 ),
@@ -149,7 +149,7 @@ class AdminDashboardScreen extends StatelessWidget {
                 children: [
                   Text(
                     money(values.fold(0, (a, v) => a + v)),
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: c.text),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: c.text),
                   ),
                   Text('все магазины, без отменённых заказов', style: TextStyle(color: c.muted, fontSize: 13)),
                   const SizedBox(height: 14),

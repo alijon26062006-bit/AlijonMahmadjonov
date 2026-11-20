@@ -32,7 +32,7 @@ class AdminShopScreen extends StatelessWidget {
           AppCard(
             child: Row(
               children: [
-                EmojiTile(emoji: shop.emoji, categoryId: shop.categoryId, size: 60),
+                ImageTile(image: shop.logo, categoryId: shop.categoryId, size: 60),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -43,7 +43,7 @@ class AdminShopScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text),
                       ),
                       Text(
-                        '${categoryById(shop.categoryId).name} · ★ ${shop.rating.toStringAsFixed(1)} · с ${two(shop.createdAt.day)}.${two(shop.createdAt.month)}.${shop.createdAt.year}',
+                        '${categoryById(shop.categoryId).name} · рейтинг ${ratingText(shop.rating)} · с ${two(shop.createdAt.day)}.${two(shop.createdAt.month)}.${shop.createdAt.year}',
                         style: TextStyle(color: c.muted, fontSize: 13),
                       ),
                       const SizedBox(height: 6),
@@ -119,7 +119,7 @@ class AdminShopScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
                         children: [
-                          EmojiTile(emoji: p.emoji, categoryId: p.categoryId, size: 42),
+                          ImageTile(image: p.image, categoryId: p.categoryId, size: 42),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(

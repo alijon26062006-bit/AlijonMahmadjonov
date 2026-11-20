@@ -76,7 +76,7 @@ class CourierHomeScreen extends StatelessWidget {
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
-                emoji: '😴',
+                image: 'sleep',
                 title: 'Вы не на линии',
                 subtitle: 'Выйдите на линию, чтобы видеть\nи брать новые заказы',
                 buttonLabel: 'Выйти на линию',
@@ -93,14 +93,14 @@ class CourierHomeScreen extends StatelessWidget {
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: DemoNote(text: 'Сначала завершите текущую доставку — потом можно взять следующий заказ.'),
+                  child: InfoNote(text: 'Сначала завершите текущую доставку — потом можно взять следующий заказ.'),
                 ),
               ),
             if (offers.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: EmptyState(
-                  emoji: '🛵',
+                  image: 'scooter',
                   title: 'Пока заказов нет',
                   subtitle: 'Новые заказы появятся здесь автоматически.\nОставайтесь на линии!',
                 ),
@@ -157,7 +157,7 @@ class _Header extends StatelessWidget {
                 height: 52,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)),
-                child: Text(courier.vehicle, style: const TextStyle(fontSize: 28)),
+                child: Icon(vehicleIcon(courier.vehicle), size: 28, color: c.accent),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -172,7 +172,7 @@ class _Header extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 23,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -221,7 +221,7 @@ class _Header extends StatelessWidget {
               const SizedBox(width: 10),
               _MiniStat(value: '${today.length}', label: plural(today.length, 'доставка', 'доставки', 'доставок')),
               const SizedBox(width: 10),
-              _MiniStat(value: '★ ${courier.rating.toStringAsFixed(1)}', label: 'рейтинг'),
+              _MiniStat(value: ratingText(courier.rating), label: 'рейтинг'),
             ],
           ),
         ],

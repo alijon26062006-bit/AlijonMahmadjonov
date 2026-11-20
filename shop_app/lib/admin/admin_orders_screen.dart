@@ -95,7 +95,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             ),
             Expanded(
               child: list.isEmpty
-                  ? const EmptyState(emoji: '🧾', title: 'Заказов нет', subtitle: 'Измените фильтр или запрос')
+                  ? const EmptyState(image: 'package', title: 'Заказов нет', subtitle: 'Измените фильтр или запрос')
                   : ListView.builder(
                       padding: const EdgeInsets.only(top: 4, bottom: 24),
                       itemCount: list.length.clamp(0, 200),

@@ -58,7 +58,7 @@ class _CourierTile extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: c.accentSoft,
-                  child: Text(x.vehicle, style: const TextStyle(fontSize: 24)),
+                  child: Icon(vehicleIcon(x.vehicle), color: c.accentText),
                 ),
                 Positioned(
                   right: -1,
@@ -103,7 +103,7 @@ class _CourierTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '★ ${x.rating.toStringAsFixed(1)}',
+                  'Рейтинг ${ratingText(x.rating)}',
                   style: TextStyle(fontWeight: FontWeight.w800, color: c.text),
                 ),
                 Text('$today сегодня · ${done.length} всего', style: TextStyle(fontSize: 12, color: c.muted)),
@@ -128,7 +128,7 @@ class _CourierTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${x.vehicle} ${x.name}',
+                  x.name,
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text),
                 ),
                 Text(formatPhone(x.phone), style: TextStyle(color: c.muted)),
