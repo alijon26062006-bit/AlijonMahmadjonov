@@ -1,16 +1,16 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../format.dart';
-import '../state.dart';
-import '../widgets.dart';
+import '../core/format.dart';
+import '../core/store.dart';
+import '../core/widgets.dart';
+import 'buyer_common.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final s = ShopScope.of(context);
-    final items = s.favoriteProducts;
+    final items = StoreScope.of(context).favoriteProducts;
     return SafeArea(
       bottom: false,
       child: Column(
@@ -24,7 +24,7 @@ class FavoritesScreen extends StatelessWidget {
                     title: 'Здесь пока пусто',
                     subtitle: 'Нажимайте ♡ на товарах,\nчтобы сохранить их на потом',
                     buttonLabel: 'Смотреть товары',
-                    onButton: () => appNav.openCatalog(),
+                    onButton: () => buyerNav.openCatalog(),
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

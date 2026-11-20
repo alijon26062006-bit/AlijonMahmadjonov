@@ -1,12 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../data.dart';
-import '../format.dart';
-import '../models.dart';
-import '../state.dart';
-import '../theme.dart';
-import '../widgets.dart';
+import '../core/demo_data.dart';
+import '../core/format.dart';
+import '../core/models.dart';
+import '../core/store.dart';
+import '../core/theme.dart';
+import '../core/widgets.dart';
+import 'buyer_common.dart';
 
 class ProductScreen extends StatefulWidget {
   const ProductScreen({super.key, required this.product, this.heroTag});
@@ -24,19 +25,16 @@ class _ProductScreenState extends State<ProductScreen> {
 
   Product get p => widget.product;
 
-  List<Product> get _similar {
-    final same = kProducts.where((x) => x.categoryId == p.categoryId && x.id != p.id).toList();
-    if (same.length < 4) {
-      same.addAll(kProducts.where((x) => x.hit && x.id != p.id && !same.contains(x)).take(6 - same.length));
-    }
-    return same;
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final s = StoreScope.of(context);
     final top = MediaQuery.paddingOf(context).top;
     final cat = categoryById(p.categoryId);
+    final shop = s.shopById(p.shopId);
+    final similar = s.catalog.where((x) => x.categoryId == p.categoryId && x.id != p.id).take(8).toList();
+    final fromShop = s.catalog.where((x) => x.shopId == p.shopId && x.id != p.id).take(8).toList();
+    final canBuy = p.inStock && (shop?.isOpen ?? false) && s.isVisible(p);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: (c.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
@@ -53,9 +51,12 @@ class _ProductScreenState extends State<ProductScreen> {
                     width: double.infinity,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
-                      child: Padding(
-                        padding: EdgeInsets.zero,
-                        child: ProductImage(product: p, emojiSize: 150, radius: 0, heroTag: widget.heroTag),
+                      child: EmojiImage(
+                        emoji: p.emoji,
+                        categoryId: p.categoryId,
+                        size: 150,
+                        radius: 0,
+                        heroTag: widget.heroTag,
                       ),
                     ),
                   ),
@@ -68,7 +69,6 @@ class _ProductScreenState extends State<ProductScreen> {
                         CircleButton(
                           icon: Icons.arrow_back_ios_new_rounded,
                           background: c.surface.withValues(alpha: .8),
-                          size: 44,
                           tooltip: 'Назад',
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
@@ -78,9 +78,7 @@ class _ProductScreenState extends State<ProductScreen> {
                           background: c.surface.withValues(alpha: .8),
                           tooltip: 'Поделиться',
                           onTap: () {
-                            Clipboard.setData(
-                              ClipboardData(text: '${p.title} — ${money(p.price)} в приложении «Витрина»'),
-                            );
+                            Clipboard.setData(ClipboardData(text: '${p.title} — ${money(p.price)} в «Витрине»'));
                             showSnack(context, 'Ссылка на товар скопирована');
                           },
                         ),
@@ -123,13 +121,59 @@ class _ProductScreenState extends State<ProductScreen> {
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        RatingLine(product: p, fontSize: 14, long: true),
-                        _Tag(text: p.seller, icon: Icons.verified_rounded),
+                        RatingLine(rating: p.rating, reviews: p.reviews, fontSize: 14, long: true),
                         _Tag(text: '${cat.emoji} ${cat.name}'),
+                        if (!p.inStock)
+                          const StatusPill(label: 'Нет в наличии', color: kDanger)
+                        else if (p.stock <= 5)
+                          StatusPill(label: 'Осталось ${p.stock} шт.', color: const Color(0xFFFF8A00)),
                       ],
                     ),
+                    if (shop != null) ...[
+                      const SizedBox(height: 16),
+                      AppCard(
+                        padding: const EdgeInsets.all(12),
+                        onTap: () => openShop(context, shop),
+                        child: Row(
+                          children: [
+                            EmojiTile(emoji: shop.emoji, categoryId: shop.categoryId, size: 44),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          shop.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontWeight: FontWeight.w800, color: c.text),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.verified_rounded, size: 16, color: c.accentText),
+                                    ],
+                                  ),
+                                  Text(
+                                    shop.isOpen ? 'Открыт · ★ ${shop.rating.toStringAsFixed(1)}' : 'Сейчас закрыт',
+                                    style: TextStyle(fontSize: 12.5, color: shop.isOpen ? c.muted : kDanger),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              'В магазин',
+                              style: TextStyle(color: c.accentText, fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: c.accentText),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (p.options.isNotEmpty) ...[
-                      _Label(p.optionsLabel ?? 'Вариант'),
+                      FieldLabel(p.optionsLabel ?? 'Вариант'),
                       Wrap(
                         spacing: 9,
                         runSpacing: 9,
@@ -145,10 +189,10 @@ class _ProductScreenState extends State<ProductScreen> {
                         Expanded(
                           child: _Perk(
                             icon: Icons.local_shipping_outlined,
-                            title: 'Завтра',
-                            subtitle: p.price >= kFreeDeliveryFrom
-                                ? 'бесплатно'
-                                : 'бесплатно от ${money(kFreeDeliveryFrom)}',
+                            title: 'Сегодня',
+                            subtitle: p.price >= s.settings.freeDeliveryFrom
+                                ? 'доставка бесплатно'
+                                : 'бесплатно от ${money(s.settings.freeDeliveryFrom)}',
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -157,75 +201,83 @@ class _ProductScreenState extends State<ProductScreen> {
                         ),
                       ],
                     ),
-                    const _Label('Описание'),
-                    Text(p.description, style: TextStyle(fontSize: 15, height: 1.5, color: c.muted)),
+                    if (p.description.isNotEmpty) ...[
+                      const FieldLabel('Описание'),
+                      Text(p.description, style: TextStyle(fontSize: 15, height: 1.5, color: c.muted)),
+                    ],
                   ],
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SectionHeader('Похожие товары')),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 296,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _similar.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(
-                    width: 172,
-                    child: ProductCard(product: _similar[i], heroPrefix: 'sim-${p.id}'),
-                  ),
-                ),
-              ),
-            ),
+            if (fromShop.isNotEmpty) ...[
+              SliverToBoxAdapter(child: SectionHeader('Ещё в «${shop?.name ?? ''}»')),
+              _HorizontalProducts(products: fromShop, prefix: 'shop-${p.id}'),
+            ],
+            if (similar.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: SectionHeader('Похожие товары')),
+              _HorizontalProducts(products: similar, prefix: 'sim-${p.id}'),
+            ],
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
         bottomNavigationBar: BottomBar(
-          child: Row(
-            children: [
-              QtyStepper(value: _qty, onChanged: (v) => setState(() => _qty = v)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GradientButton(
-                  icon: Icons.shopping_bag_outlined,
-                  label: 'В корзину',
-                  trailing: money(p.price * _qty),
-                  onPressed: () {
-                    addToCartWithFeedback(context, p, option: _option, qty: _qty);
-                    setState(() => _qty = 1);
-                  },
+          child: canBuy
+              ? Row(
+                  children: [
+                    QtyStepper(value: _qty, max: p.stock.clamp(1, 99), onChanged: (v) => setState(() => _qty = v)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GradientButton(
+                        icon: Icons.shopping_bag_outlined,
+                        label: 'В корзину',
+                        trailing: money(p.price * _qty),
+                        onPressed: () {
+                          addToCartWithFeedback(context, p, option: _option, qty: _qty);
+                          setState(() => _qty = 1);
+                        },
+                      ),
+                    ),
+                  ],
+                )
+              : SoftButton(
+                  label: !p.inStock ? 'Товар закончился' : 'Магазин сейчас закрыт',
+                  icon: Icons.info_outline_rounded,
+                  onPressed: null,
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 }
 
-class _Label extends StatelessWidget {
-  const _Label(this.text);
+class _HorizontalProducts extends StatelessWidget {
+  const _HorizontalProducts({required this.products, required this.prefix});
 
-  final String text;
+  final List<Product> products;
+  final String prefix;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 20, bottom: 10),
-    child: Text(
-      text,
-      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.of(context).text),
+  Widget build(BuildContext context) => SliverToBoxAdapter(
+    child: SizedBox(
+      height: 296,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: products.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, i) => SizedBox(
+          width: 172,
+          child: ProductCard(product: products[i], heroPrefix: prefix),
+        ),
+      ),
     ),
   );
 }
 
 class _Tag extends StatelessWidget {
-  const _Tag({required this.text, this.icon});
+  const _Tag({required this.text});
 
   final String text;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -233,15 +285,9 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(99)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            text,
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.text),
-          ),
-          if (icon != null) ...[const SizedBox(width: 4), Icon(icon, size: 15, color: c.accentText)],
-        ],
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.text),
       ),
     );
   }

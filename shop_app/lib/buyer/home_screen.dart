@@ -3,31 +3,54 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../data.dart';
-import '../models.dart';
-import '../state.dart';
-import '../theme.dart';
-import '../widgets.dart';
+import '../core/demo_data.dart';
+import '../core/models.dart';
+import '../core/store.dart';
+import '../core/theme.dart';
+import '../core/widgets.dart';
+import 'buyer_common.dart';
+import 'order_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final hits = kProducts.where((p) => p.hit).toList();
-    final recommended = [...kProducts]..sort((a, b) => b.rating.compareTo(a.rating));
+    final s = StoreScope.of(context);
+    final catalog = s.catalog;
+    final hits = catalog.where((p) => p.hit).toList();
+    final recommended = [...catalog]..sort((a, b) => b.rating.compareTo(a.rating));
+    final shops = s.visibleShops;
+    final active = s.myOrders.where((o) => o.status.isActive).toList();
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
       child: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: _Header()),
+          SliverToBoxAdapter(child: _Header(productsCount: catalog.length)),
+          if (active.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _ActiveOrderBanner(order: active.first, more: active.length - 1),
+            ),
           const SliverToBoxAdapter(child: _PromoCarousel()),
           SliverToBoxAdapter(
-            child: SectionHeader('Категории', action: 'Все', onAction: () => appNav.openCatalog()),
+            child: SectionHeader('Категории', action: 'Все', onAction: () => buyerNav.openCatalog()),
           ),
           const SliverToBoxAdapter(child: _CategoriesRow()),
+          SliverToBoxAdapter(child: SectionHeader('Магазины', action: '${shops.length}')),
           SliverToBoxAdapter(
-            child: SectionHeader('Хиты продаж 🔥', action: 'Смотреть все', onAction: () => appNav.openCatalog()),
+            child: SizedBox(
+              height: 92,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: shops.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => SizedBox(width: 240, child: ShopCard(shop: shops[i])),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SectionHeader('Хиты продаж 🔥', action: 'Смотреть все', onAction: () => buyerNav.openCatalog()),
           ),
           SliverToBoxAdapter(
             child: SizedBox(
@@ -60,7 +83,9 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.productsCount});
+
+  final int productsCount;
 
   String get _greeting {
     final h = DateTime.now().hour;
@@ -74,12 +99,12 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final top = MediaQuery.paddingOf(context).top;
-    final name = ShopScope.of(context).name;
+    final name = StoreScope.of(context).user?.name ?? '';
     return Container(
       padding: EdgeInsets.fromLTRB(20, top + 14, 20, 22),
-      decoration: const BoxDecoration(
-        gradient: kHeaderGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+      decoration: BoxDecoration(
+        gradient: c.headerGradient,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
       ),
       child: Column(
         children: [
@@ -123,7 +148,7 @@ class _Header extends StatelessWidget {
             shadowColor: const Color(0x66280058),
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => appNav.openCatalog(focusSearch: true),
+              onTap: () => buyerNav.openCatalog(focusSearch: true),
               child: SizedBox(
                 height: 52,
                 child: Row(
@@ -133,7 +158,7 @@ class _Header extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Искать среди ${kProducts.length} товаров',
+                        'Искать среди $productsCount товаров',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: c.muted, fontSize: 15.5),
@@ -143,7 +168,7 @@ class _Header extends StatelessWidget {
                       width: 38,
                       height: 38,
                       margin: const EdgeInsets.only(right: 7),
-                      decoration: BoxDecoration(color: kViolet, borderRadius: BorderRadius.circular(11)),
+                      decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(11)),
                       child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
                     ),
                   ],
@@ -152,6 +177,58 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Плашка «Ваш заказ в пути» на главной.
+class _ActiveOrderBanner extends StatelessWidget {
+  const _ActiveOrderBanner({required this.order, required this.more});
+
+  final Order order;
+  final int more;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final shop = StoreScope.of(context).shopById(order.shopId);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () =>
+            Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => OrderScreen(orderId: order.id))),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: order.status.color.withValues(alpha: .14),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(order.status.icon, color: order.status.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Заказ №${order.id} · ${order.statusLabel}',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: c.text),
+                  ),
+                  Text(
+                    '${shop?.name ?? ''}${more > 0 ? ' и ещё $more' : ''}',
+                    style: TextStyle(fontSize: 13, color: c.muted),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: c.muted),
+          ],
+        ),
       ),
     );
   }
@@ -169,15 +246,15 @@ class _Promo {
 }
 
 final _promos = <_Promo>[
-  _Promo('Чёрная пятница', '−50% на\nэлектронику', 'Успеть купить', '🎧', const [
-    kViolet,
+  _Promo('Чёрная пятница', '−30% на\nэлектронику', 'Успеть купить', '🎧', const [
+    Color(0xFF7B2FF7),
     Color(0xFFB620E0),
-    kPink,
-  ], (_) => appNav.openCatalog(category: 'electronics')),
+    Color(0xFFF107A3),
+  ], (_) => buyerNav.openCatalog(category: 'electronics')),
   _Promo('Новинки сезона', 'Осенняя\nколлекция', 'Смотреть', '🧥', const [
     Color(0xFFFF6A3D),
     Color(0xFFFF3D7F),
-  ], (_) => appNav.openCatalog(category: 'clothes')),
+  ], (_) => buyerNav.openCatalog(category: 'clothes')),
   _Promo('Промокод', 'VITRINA20 —\nскидка 20%', 'Скопировать', '🎁', const [Color(0xFF00A99D), Color(0xFF2F80ED)], (
     context,
   ) {
@@ -247,7 +324,7 @@ class _PromoCarouselState extends State<_PromoCarousel> {
                 width: i == _page ? 18 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _page ? kViolet : c.muted.withValues(alpha: .35),
+                  color: i == _page ? c.accent : c.muted.withValues(alpha: .35),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -269,9 +346,7 @@ class _PromoCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
       child: Material(
         child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: promo.colors, begin: Alignment.centerLeft, end: Alignment.centerRight),
-          ),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: promo.colors)),
           child: InkWell(
             onTap: () => promo.onTap(context),
             child: Stack(
@@ -374,45 +449,35 @@ class _CategoriesRow extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final cat = kCategories[i];
-          return _CategoryTile(category: cat, colors: c);
+          return InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => buyerNav.openCatalog(category: cat.id),
+            child: SizedBox(
+              width: 68,
+              child: Column(
+                children: [
+                  Container(
+                    width: 62,
+                    height: 62,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: tintFor(context, cat.id).first,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(cat.emoji, style: const TextStyle(fontSize: 29)),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    cat.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.text),
+                  ),
+                ],
+              ),
+            ),
+          );
         },
-      ),
-    );
-  }
-}
-
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.category, required this.colors});
-
-  final Category category;
-  final AppColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = colors.dark ? Color.lerp(category.tint.first, colors.surface, .74)! : category.tint.first;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: () => appNav.openCatalog(category: category.id),
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          children: [
-            Container(
-              width: 62,
-              height: 62,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-              child: Text(category.emoji, style: const TextStyle(fontSize: 29)),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              category.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.text),
-            ),
-          ],
-        ),
       ),
     );
   }

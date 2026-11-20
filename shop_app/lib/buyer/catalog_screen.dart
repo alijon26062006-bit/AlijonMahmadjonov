@@ -1,11 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../data.dart';
-import '../format.dart';
-import '../models.dart';
-import '../state.dart';
-import '../theme.dart';
-import '../widgets.dart';
+import '../core/demo_data.dart';
+import '../core/format.dart';
+import '../core/models.dart';
+import '../core/store.dart';
+import '../core/theme.dart';
+import '../core/widgets.dart';
+import 'buyer_common.dart';
 
 enum SortMode { popular, cheap, expensive, rating, discount }
 
@@ -17,6 +18,22 @@ extension on SortMode {
     SortMode.rating => 'Высокий рейтинг',
     SortMode.discount => 'Большие скидки',
   };
+}
+
+List<Product> sortProducts(List<Product> list, SortMode sort) {
+  switch (sort) {
+    case SortMode.popular:
+      list.sort((a, b) => b.reviews.compareTo(a.reviews));
+    case SortMode.cheap:
+      list.sort((a, b) => a.price.compareTo(b.price));
+    case SortMode.expensive:
+      list.sort((a, b) => b.price.compareTo(a.price));
+    case SortMode.rating:
+      list.sort((a, b) => b.rating.compareTo(a.rating));
+    case SortMode.discount:
+      list.sort((a, b) => b.discount.compareTo(a.discount));
+  }
+  return list;
 }
 
 class CatalogScreen extends StatefulWidget {
@@ -34,14 +51,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
-    appNav.searchRequest.addListener(_onSearchRequest);
-    appNav.catalogCategory.addListener(_rebuild);
+    buyerNav.searchRequest.addListener(_onSearchRequest);
+    buyerNav.catalogCategory.addListener(_rebuild);
   }
 
   @override
   void dispose() {
-    appNav.searchRequest.removeListener(_onSearchRequest);
-    appNav.catalogCategory.removeListener(_rebuild);
+    buyerNav.searchRequest.removeListener(_onSearchRequest);
+    buyerNav.catalogCategory.removeListener(_rebuild);
     _search.dispose();
     _focus.dispose();
     super.dispose();
@@ -55,36 +72,25 @@ class _CatalogScreenState extends State<CatalogScreen> {
     });
   }
 
-  List<Product> _results() {
-    final cat = appNav.catalogCategory.value;
+  List<Product> _results(MarketStore s) {
+    final cat = buyerNav.catalogCategory.value;
     final q = _search.text.trim().toLowerCase();
-    final list = kProducts.where((p) {
+    final list = s.catalog.where((p) {
       if (cat != null && p.categoryId != cat) return false;
       if (q.isEmpty) return true;
       return p.title.toLowerCase().contains(q) ||
           categoryById(p.categoryId).name.toLowerCase().contains(q) ||
-          p.seller.toLowerCase().contains(q);
+          (s.shopById(p.shopId)?.name.toLowerCase().contains(q) ?? false);
     }).toList();
-    switch (_sort) {
-      case SortMode.popular:
-        list.sort((a, b) => b.reviews.compareTo(a.reviews));
-      case SortMode.cheap:
-        list.sort((a, b) => a.price.compareTo(b.price));
-      case SortMode.expensive:
-        list.sort((a, b) => b.price.compareTo(a.price));
-      case SortMode.rating:
-        list.sort((a, b) => b.rating.compareTo(a.rating));
-      case SortMode.discount:
-        list.sort((a, b) => b.discount.compareTo(a.discount));
-    }
-    return list;
+    return sortProducts(list, _sort);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final results = _results();
-    final selected = appNav.catalogCategory.value;
+    final s = StoreScope.of(context);
+    final results = _results(s);
+    final selected = buyerNav.catalogCategory.value;
     return SafeArea(
       bottom: false,
       child: GestureDetector(
@@ -101,7 +107,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 textInputAction: TextInputAction.search,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Искать товары и бренды',
+                  hintText: 'Искать товары и магазины',
                   prefixIcon: Icon(Icons.search_rounded, color: c.muted),
                   suffixIcon: _search.text.isEmpty
                       ? null
@@ -118,12 +124,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
                 children: [
-                  _Pill(label: 'Все', selected: selected == null, onTap: () => appNav.catalogCategory.value = null),
+                  Pill(label: 'Все', selected: selected == null, onTap: () => buyerNav.catalogCategory.value = null),
                   for (final cat in kCategories)
-                    _Pill(
+                    Pill(
                       label: '${cat.emoji}  ${cat.name}',
                       selected: selected == cat.id,
-                      onTap: () => appNav.catalogCategory.value = selected == cat.id ? null : cat.id,
+                      onTap: () => buyerNav.catalogCategory.value = selected == cat.id ? null : cat.id,
                     ),
                 ],
               ),
@@ -138,28 +144,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       style: TextStyle(color: c.muted, fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ),
-                  PopupMenuButton<SortMode>(
-                    initialValue: _sort,
-                    onSelected: (v) => setState(() => _sort = v),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    itemBuilder: (_) => [
-                      for (final m in SortMode.values) PopupMenuItem(value: m, child: Text(m.label)),
-                    ],
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.swap_vert_rounded, size: 19, color: c.accentText),
-                          const SizedBox(width: 4),
-                          Text(
-                            _sort.label,
-                            style: TextStyle(color: c.accentText, fontWeight: FontWeight.w700, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  SortButton(value: _sort, onChanged: (v) => setState(() => _sort = v)),
                 ],
               ),
             ),
@@ -172,7 +157,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       buttonLabel: 'Сбросить фильтры',
                       onButton: () {
                         _search.clear();
-                        appNav.catalogCategory.value = null;
+                        buyerNav.catalogCategory.value = null;
                         setState(() {});
                       },
                     )
@@ -191,8 +176,41 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.selected, required this.onTap});
+class SortButton extends StatelessWidget {
+  const SortButton({super.key, required this.value, required this.onChanged});
+
+  final SortMode value;
+  final ValueChanged<SortMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return PopupMenuButton<SortMode>(
+      initialValue: value,
+      onSelected: onChanged,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      itemBuilder: (_) => [for (final m in SortMode.values) PopupMenuItem(value: m, child: Text(m.label))],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.swap_vert_rounded, size: 19, color: c.accentText),
+            const SizedBox(width: 4),
+            Text(
+              value.label,
+              style: TextStyle(color: c.accentText, fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Таблетка-фильтр (категория, статус).
+class Pill extends StatelessWidget {
+  const Pill({super.key, required this.label, required this.selected, required this.onTap});
 
   final String label;
   final bool selected;
@@ -206,7 +224,7 @@ class _Pill extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          gradient: selected ? kBrandGradient : null,
+          gradient: selected ? c.gradient : null,
           color: selected ? null : c.surface,
           borderRadius: BorderRadius.circular(99),
           border: Border.all(color: selected ? Colors.transparent : c.line),
