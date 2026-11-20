@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Витрина — варианты дизайна</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, 'Noto Color Emoji', sans-serif; background: #E9E7EF; -webkit-font-smoothing: antialiased; }
+.emoji { font-family: 'Noto Color Emoji'; line-height: 1; }
+svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- Board ---------- */
+.board { padding: 48px 56px 56px; width: 1420px; }
+.board-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 36px; }
+.board-head h1 { font-family: 'Inter Display', Inter; font-size: 40px; letter-spacing: -1px; }
+.board-head p { font-size: 17px; opacity: .65; margin-top: 6px; }
+.swatches { display: flex; gap: 10px; }
+.sw { width: 44px; height: 44px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.phones { display: flex; gap: 44px; justify-content: center; }
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.phone-label { font-size: 15px; font-weight: 600; opacity: .55; letter-spacing: .5px; text-transform: uppercase; }
+.phone { width: 390px; height: 844px; border-radius: 48px; overflow: hidden; position: relative; background: var(--bg); color: var(--text);
+  box-shadow: 0 0 0 10px #16151C, 0 0 0 11px #3a3944, 0 40px 80px -20px rgba(20,10,60,.45); display: flex; flex-direction: column; }
+.status { position: absolute; top: 0; left: 0; right: 0; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px 0 34px; font-weight: 600; font-size: 15px; flex: none; z-index: 3; }
+.status .r { display: flex; gap: 6px; align-items: center; }
+.status .bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; padding: 1.5px; opacity: .9; }
+.status .bat i { display: block; height: 100%; width: 75%; background: currentColor; border-radius: 1.5px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; background: #000; border-radius: 20px; z-index: 5; }
+.scroll { flex: 1; overflow: hidden; position: relative; padding-top: 50px; }
+.scroll.under { padding-top: 0; }
+.home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--text); opacity: .85; z-index: 6; }
+
+/* ---------- Shared components ---------- */
+.row { display: flex; align-items: center; }
+.between { justify-content: space-between; }
+.muted { color: var(--muted); }
+.pad { padding: 0 20px; }
+.logo { font-family: 'Inter Display', Inter; font-weight: 800; font-size: 26px; letter-spacing: -.8px; }
+.icon-btn { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--chip); position: relative; }
+.dot { position: absolute; top: 9px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--badge); box-shadow: 0 0 0 2px var(--chip); }
+.search { height: 50px; border-radius: var(--r-md); background: var(--field); display: flex; align-items: center; gap: 10px; padding: 0 16px; color: var(--muted); font-size: 15.5px; }
+.search .filter { margin-left: auto; width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; }
+.search .filter svg { width: 18px; height: 18px; }
+.banner { margin: 18px 20px 0; height: 150px; border-radius: var(--r-lg); background: var(--banner); color: var(--banner-text); position: relative; overflow: hidden; padding: 20px 22px; }
+.banner small { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; opacity: .85; }
+.banner h3 { font-family: 'Inter Display', Inter; font-size: 27px; line-height: 1.05; letter-spacing: -.6px; margin-top: 8px; font-weight: 800; }
+.banner .btn-s { display: inline-block; margin-top: 12px; padding: 7px 14px; border-radius: 99px; background: var(--banner-btn); color: var(--banner-btn-text); font-size: 13px; font-weight: 700; }
+.banner .big { position: absolute; right: 12px; bottom: 6px; font-size: 92px; transform: rotate(-10deg); filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
+.banner .circle { position: absolute; right: -30px; top: -40px; width: 190px; height: 190px; border-radius: 50%; background: rgba(255,255,255,.14); }
+.dots { display: flex; gap: 5px; justify-content: center; margin-top: 10px; }
+.dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--muted); opacity: .35; }
+.dots i.on { width: 18px; background: var(--accent-strong); opacity: 1; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; padding: 0 20px; margin: 20px 0 12px; }
+.sec h4 { font-size: 19px; font-weight: 750; letter-spacing: -.3px; font-family: 'Inter Display', Inter; }
+.sec a { font-size: 14px; color: var(--link); font-weight: 600; }
+.cats { display: flex; gap: 14px; padding: 0 20px; }
+.cat { width: 60px; display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 12px; font-weight: 550; text-align: center; }
+.cat .c { width: 60px; height: 60px; border-radius: var(--r-cat); display: grid; place-items: center; font-size: 28px; background: var(--chip); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px; }
+.card { background: var(--surface); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--card-shadow); border: var(--card-border); }
+.card .img { height: 150px; position: relative; display: grid; place-items: center; font-size: 74px; margin: var(--img-inset); border-radius: var(--r-img); }
+.card .img .e { filter: drop-shadow(0 10px 14px rgba(0,0,0,.18)); }
+.disc { position: absolute; left: 9px; top: 9px; background: var(--sale); color: var(--sale-text); font-size: 12px; font-weight: 800; padding: 4px 8px; border-radius: 8px; }
+.fav { position: absolute; right: 9px; top: 9px; width: 32px; height: 32px; border-radius: 50%; background: var(--fav-bg); display: grid; place-items: center; color: var(--text); }
+.fav svg { width: 17px; height: 17px; }
+.fav.on { color: var(--heart); }
+.fav.on svg { fill: currentColor; }
+.card .info { padding: 10px 12px 12px; }
+.price { font-weight: 800; font-size: 17px; letter-spacing: -.3px; color: var(--price); }
+.old { font-size: 12.5px; color: var(--muted); text-decoration: line-through; margin-left: 6px; font-weight: 500; }
+.title { font-size: 13.5px; line-height: 1.3; margin-top: 3px; height: 35px; overflow: hidden; }
+.rate { font-size: 12.5px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+.rate b { color: var(--text); font-weight: 650; }
+.star { color: #FFB800; }
+.add { width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; margin-left: auto; }
+.add svg { width: 18px; height: 18px; stroke-width: 2.6; }
+.nav { height: 84px; flex: none; background: var(--nav); border-top: var(--nav-border); display: flex; justify-content: space-around; padding: 10px 8px 0; position: relative; z-index: 4; box-shadow: 0 -8px 24px -12px rgba(0,0,0,.12); }
+.nav .it { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--muted); width: 64px; position: relative; }
+.nav .it.on { color: var(--nav-on); }
+.nav .it.on .pill { background: var(--nav-pill); }
+.nav .pill { width: 52px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+.nav .badge { position: absolute; top: -3px; right: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--badge); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--nav); }
+
+/* product screen */
+.p-hero { height: 400px; position: relative; display: grid; place-items: center; background: var(--hero); padding-top: 50px; border-radius: 0 0 var(--r-hero) var(--r-hero); }
+.p-hero .e { font-size: 190px; filter: drop-shadow(0 26px 30px rgba(0,0,0,.28)); transform: rotate(-8deg); }
+.p-top { position: absolute; top: 58px; left: 20px; right: 20px; display: flex; justify-content: space-between; }
+.p-top .icon-btn { background: var(--glass); backdrop-filter: blur(8px); }
+.p-top .heart { color: var(--heart); }
+.p-top .heart svg { fill: currentColor; }
+.p-dots { position: absolute; bottom: 18px; left: 0; right: 0; }
+.p-body { padding: 18px 20px 0; }
+.p-price { display: flex; align-items: center; gap: 10px; }
+.p-price .price { font-size: 30px; letter-spacing: -.8px; }
+.p-price .old { font-size: 16px; }
+.p-price .disc { position: static; font-size: 13px; }
+.p-title { font-size: 21px; font-weight: 700; letter-spacing: -.4px; margin-top: 6px; line-height: 1.2; font-family: 'Inter Display', Inter; }
+.p-meta { display: flex; gap: 14px; align-items: center; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.p-meta .tag { padding: 5px 10px; border-radius: 99px; background: var(--chip); color: var(--text); font-weight: 600; font-size: 12.5px; }
+.opt-label { font-size: 14px; font-weight: 650; margin: 18px 0 9px; }
+.opts { display: flex; gap: 9px; }
+.opt { padding: 11px 16px; border-radius: var(--r-md); background: var(--surface); border: 1.5px solid var(--line); font-size: 14px; font-weight: 600; }
+.opt.on { border-color: var(--accent-strong); background: var(--opt-on); color: var(--opt-on-text); }
+.perks { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.perk { background: var(--surface); border-radius: var(--r-md); padding: 11px 12px; display: flex; gap: 10px; align-items: center; font-size: 12.5px; line-height: 1.3; border: var(--card-border); box-shadow: var(--card-shadow); }
+.perk .pi { width: 34px; height: 34px; border-radius: 10px; background: var(--chip); display: grid; place-items: center; color: var(--accent-strong); }
+.perk .pi svg { width: 18px; height: 18px; }
+.perk b { display: block; font-size: 13px; }
+.p-bar { height: 104px; flex: none; background: var(--nav); border-top: var(--nav-border); padding: 14px 20px 0; display: flex; gap: 12px; box-shadow: 0 -10px 30px -12px rgba(0,0,0,.15); position: relative; z-index: 4; }
+.stepper { display: flex; align-items: center; gap: 0; background: var(--chip); border-radius: var(--r-md); height: 54px; padding: 0 6px; font-weight: 700; font-size: 16px; }
+.stepper span { width: 38px; text-align: center; }
+.stepper i { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; font-style: normal; font-size: 20px; color: var(--muted); }
+.cta { flex: 1; height: 54px; border-radius: var(--r-md); background: var(--cta); color: var(--accent-text); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 750; font-size: 16px; box-shadow: var(--cta-shadow); }
+.cta small { font-weight: 600; opacity: .8; font-size: 14px; }
+
+/* cart */
+.c-head { padding: 6px 20px 0; display: flex; justify-content: space-between; align-items: center; }
+.c-head h2 { font-family: 'Inter Display', Inter; font-size: 30px; letter-spacing: -.8px; font-weight: 800; }
+.c-head h2 sup { font-size: 15px; color: var(--muted); font-weight: 600; margin-left: 6px; vertical-align: 12px; }
+.ship { margin: 14px 20px 0; padding: 13px 14px; border-radius: var(--r-md); background: var(--ship-bg); font-size: 13px; }
+.ship b { color: var(--ship-strong); }
+.bar { height: 7px; border-radius: 4px; background: var(--line); margin-top: 9px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 78%; border-radius: 4px; background: var(--progress); }
+.items { padding: 12px 20px 0; display: flex; flex-direction: column; gap: 10px; }
+.item { background: var(--surface); border-radius: var(--r-lg); padding: 10px; display: flex; gap: 12px; border: var(--card-border); box-shadow: var(--card-shadow); }
+.item .th { width: 84px; height: 84px; border-radius: var(--r-md); display: grid; place-items: center; font-size: 46px; flex: none; }
+.item .t { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.item .t .nm { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.item .t .op { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.item .t .bt { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+.item .price { font-size: 16px; }
+.mini { display: flex; align-items: center; background: var(--chip); border-radius: 10px; height: 32px; font-size: 14px; font-weight: 700; }
+.mini i { width: 30px; text-align: center; font-style: normal; color: var(--muted); font-size: 17px; }
+.mini span { width: 20px; text-align: center; }
+.promo { margin: 12px 20px 0; height: 50px; border-radius: var(--r-md); border: 1.5px dashed var(--line-strong); display: flex; align-items: center; padding: 0 6px 0 16px; gap: 10px; color: var(--muted); font-size: 14.5px; }
+.promo .ap { margin-left: auto; height: 38px; padding: 0 14px; border-radius: 10px; background: var(--chip); color: var(--text); display: grid; place-items: center; font-weight: 700; font-size: 13.5px; }
+.sum { margin: 12px 20px 0; font-size: 14.5px; display: flex; flex-direction: column; gap: 7px; }
+.sum .row span:last-child { font-weight: 600; }
+.sum .save { color: var(--save); }
+.sum .tot { font-size: 19px; font-weight: 800; letter-spacing: -.3px; padding-top: 8px; border-top: 1px solid var(--line); margin-top: 3px; }
+
+/* ---------- Variant A: Сочный градиент ---------- */
+.vA { --bg:#F4F3F9; --surface:#fff; --text:#17142B; --muted:#8A87A0; --accent:#7B2FF7; --accent-strong:#7B2FF7; --accent-text:#fff;
+  --chip:#EFEBFA; --field:#fff; --badge:#F107A3; --price:#17142B; --sale:#F107A3; --sale-text:#fff; --heart:#F107A3; --fav-bg:rgba(255,255,255,.85);
+  --r-md:16px; --r-lg:22px; --r-img:18px; --r-cat:20px; --r-hero:36px; --img-inset:6px 6px 0;
+  --banner:linear-gradient(120deg,#7B2FF7 0%,#B620E0 55%,#F107A3 100%); --banner-text:#fff; --banner-btn:#fff; --banner-btn-text:#7B2FF7;
+  --link:#7B2FF7; --card-shadow:0 6px 20px -10px rgba(60,30,140,.25); --card-border:none; --nav:#fff; --nav-border:none; --nav-on:#7B2FF7; --nav-pill:#EFE6FF;
+  --hero:linear-gradient(160deg,#E9DEFF,#FFD9F1); --glass:rgba(255,255,255,.7); --line:#E6E3F0; --line-strong:#C9C2E6; --opt-on:#F3EBFF; --opt-on-text:#7B2FF7;
+  --cta:linear-gradient(110deg,#7B2FF7,#F107A3); --cta-shadow:0 12px 24px -10px rgba(180,30,200,.6); --ship-bg:#F0E9FF; --ship-strong:#7B2FF7; --progress:linear-gradient(90deg,#7B2FF7,#F107A3); --save:#E0068F; }
+.vA .home-top { background: linear-gradient(135deg,#7B2FF7,#C21FD6 60%,#F107A3); color: #fff; padding: 60px 20px 22px; border-radius: 0 0 30px 30px; }
+.vA .home-top .icon-btn { background: rgba(255,255,255,.18); color:#fff; }
+.vA .home-top .dot { box-shadow: 0 0 0 2px #B020DA; background:#FFE14D; }
+.vA .home-top .search { margin-top: 16px; box-shadow: 0 10px 24px -10px rgba(40,0,90,.5); }
+.vA .home-top .hello { font-size: 14px; opacity: .85; }
+.vA .t1 { background: linear-gradient(150deg,#E4DBFF,#D5E4FF); } .vA .t2 { background: linear-gradient(150deg,#FFE1EF,#FFD3E3); }
+.vA .t3 { background: linear-gradient(150deg,#DDF7EA,#CBEFF5); } .vA .t4 { background: linear-gradient(150deg,#FFF0D3,#FFE0CC); }
+.vA .c1 { background:#EEE7FF } .vA .c2 { background:#FFE6F2 } .vA .c3 { background:#E2F6EC } .vA .c4 { background:#FFF1DA } .vA .c5 { background:#E3EEFF }
+.vA .status-light { color:#fff; }
+
+/* ---------- Variant B: Чистый минимализм ---------- */
+.vB { --bg:#FAF8F5; --surface:#fff; --text:#141414; --muted:#8C8880; --accent:#141414; --accent-strong:#141414; --accent-text:#fff;
+  --chip:#F0ECE6; --field:#F0ECE6; --badge:#D9462B; --price:#141414; --sale:#D9462B; --sale-text:#fff; --heart:#D9462B; --fav-bg:#fff;
+  --r-md:12px; --r-lg:14px; --r-img:10px; --r-cat:50%; --r-hero:0px; --img-inset:0;
+  --banner:#EAE3D8; --banner-text:#141414; --banner-btn:#141414; --banner-btn-text:#fff;
+  --link:#141414; --card-shadow:none; --card-border:none; --nav:#FAF8F5; --nav-border:1px solid #ECE7DF; --nav-on:#141414; --nav-pill:transparent;
+  --hero:#EFEAE2; --glass:rgba(255,255,255,.9); --line:#E7E2DA; --line-strong:#CFC8BC; --opt-on:#141414; --opt-on-text:#fff;
+  --cta:#141414; --cta-shadow:none; --ship-bg:#F0ECE6; --ship-strong:#141414; --progress:#141414; --save:#D9462B; }
+.vB .card { background: transparent; }
+.vB .card .img { background: #EFEAE2 !important; height: 165px; }
+.vB .card .info { padding: 10px 2px 4px; }
+.vB .sec h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.6px; font-weight: 700; }
+.vB .sec a { text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+.vB .logo { font-weight: 800; letter-spacing: 3px; text-transform: uppercase; font-size: 22px; }
+.vB .banner h3 { font-weight: 600; font-size: 28px; letter-spacing: -1px; }
+.vB .banner small { opacity: .6; }
+.vB .banner .circle { background: #DFD5C6; }
+.vB .disc { border-radius: 0; left: 0; top: 10px; }
+.vB .add { border-radius: 50%; }
+.vB .cat .c { background: #EFEAE2; border: 1px solid #E5DFD5; }
+.vB .item { background: transparent; padding: 10px 0; border-bottom: 1px solid #ECE7DF; border-radius: 0; }
+.vB .item .th { background: #EFEAE2 !important; border-radius: 8px; }
+.vB .p-title { font-weight: 600; }
+.vB .nav .it.on::after { content:''; position:absolute; bottom:-8px; width: 5px; height: 5px; border-radius: 50%; background: #141414; }
+.vB .dots i.on { background:#141414; }
+.vB .c-head h2 { font-weight: 600; letter-spacing: -1.2px; }
+
+/* ---------- Variant C: Тёмный неон ---------- */
+.vC { --bg:#0C0C12; --surface:#17171F; --text:#F2F2F7; --muted:#8B8B9C; --accent:#C6FF3D; --accent-strong:#C6FF3D; --accent-text:#0C0C12;
+  --chip:#1F1F2A; --field:#1A1A23; --badge:#FF3D7F; --price:#F2F2F7; --sale:#C6FF3D; --sale-text:#0C0C12; --heart:#FF3D7F; --fav-bg:rgba(12,12,18,.55);
+  --r-md:16px; --r-lg:22px; --r-img:18px; --r-cat:18px; --r-hero:36px; --img-inset:6px 6px 0;
+  --banner:radial-gradient(120% 140% at 100% 0%,#5B2DFF 0%,#2A1470 45%,#14121F 100%); --banner-text:#fff; --banner-btn:#C6FF3D; --banner-btn-text:#0C0C12;
+  --link:#C6FF3D; --card-shadow:none; --card-border:1px solid #23232F; --nav:#111118; --nav-border:1px solid #1E1E28; --nav-on:#C6FF3D; --nav-pill:rgba(198,255,61,.12);
+  --hero:radial-gradient(80% 70% at 50% 55%,#3B2A8F 0%,#1A1630 55%,#0C0C12 100%); --glass:rgba(30,30,42,.7); --line:#262632; --line-strong:#3A3A4A; --opt-on:rgba(198,255,61,.1); --opt-on-text:#C6FF3D;
+  --cta:#C6FF3D; --cta-shadow:0 0 28px -4px rgba(198,255,61,.55); --ship-bg:#17171F; --ship-strong:#C6FF3D; --progress:linear-gradient(90deg,#7B5CFF,#C6FF3D); --save:#C6FF3D; }
+.vC .search { border: 1px solid #262632; }
+.vC .t1 { background: radial-gradient(circle at 50% 60%,#3A2E86,#1C1A2E 75%); } .vC .t2 { background: radial-gradient(circle at 50% 60%,#6A1F4A,#221625 75%); }
+.vC .t3 { background: radial-gradient(circle at 50% 60%,#1E5A4A,#13221F 75%); } .vC .t4 { background: radial-gradient(circle at 50% 60%,#6A4A1A,#231C14 75%); }
+.vC .c1,.vC .c2,.vC .c3,.vC .c4,.vC .c5 { background:#1A1A24; border:1px solid #262632; }
+.vC .banner { box-shadow: 0 20px 40px -18px rgba(91,45,255,.8); border: 1px solid #2E2A55; }
+.vC .banner .circle { background: rgba(198,255,61,.12); }
+.vC .nav .it.on .pill { box-shadow: 0 0 18px -2px rgba(198,255,61,.35); }
+.vC .price { color: #fff; }
+.vC .disc { box-shadow: 0 0 14px -2px rgba(198,255,61,.6); }
+.vC .logo span { color: #C6FF3D; }
+.vC .item .th, .vC .card .img { box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const I = {
+  home: '<svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.5-9.3A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.5 4.8c-2 4.7-9.5 9.3-9.5 9.3z"/></svg>',
+  bag: '<svg viewBox="0 0 24 24"><path d="M4.5 8h15l-1.3 12.2a1 1 0 0 1-1 .8H6.8a1 1 0 0 1-1-.8z"/><path d="M8.5 10V6.5a3.5 3.5 0 0 1 7 0V10"/></svg>',
+  user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+  share: '<svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
+  truck: '<svg viewBox="0 0 24 24"><path d="M2 6h12v10H2zM14 10h4l3 3v3h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/></svg>',
+};
+const status = (cls='') => `<div class="island"></div><div class="status ${cls}"><span>9:41</span><span class="r"><svg viewBox="0 0 24 24" style="width:18px"><path d="M2 18h3v-3H2zM7 18h3v-6H7zM12 18h3V9h-3zM17 18h3V5h-3z" fill="currentColor" stroke="none"/></svg><span class="bat"><i></i></span></span></div>`;
+const nav = (on) => `<div class="nav">${[['home','Главная'],['grid','Каталог'],['heart','Избранное'],['bag','Корзина'],['user','Профиль']].map(([k,l],i)=>
+  `<div class="it ${i===on?'on':''}"><div class="pill">${I[k]}</div>${l}${k==='bag'?'<span class="badge">3</span>':''}</div>`).join('')}</div>`;
+const card = (e,t,title,price,old,disc,rate,rev,fav) => `
+  <div class="card"><div class="img ${t}"><span class="e emoji">${e}</span>${disc?`<span class="disc">−${disc}%</span>`:''}<span class="fav ${fav?'on':''}">${I.heart}</span></div>
+  <div class="info"><div class="row"><span class="price">${price} ₽</span>${old?`<span class="old">${old}</span>`:''}</div>
+  <div class="title">${title}</div>
+  <div class="row"><span class="rate"><span class="star">★</span><b>${rate}</b> · ${rev}</span><span class="add">${I.plus}</span></div></div></div>`;
+
+function homeScreen(v) {
+  const top = v==='A'
+    ? `<div class="home-top"><div class="row between"><div><div class="hello">Добрый вечер 👋</div><div class="logo">Витрина</div></div><div class="icon-btn">${I.bell}<span class="dot"></span></div></div>
+       <div class="search">${I.search}Искать среди 10 000 товаров<span class="filter">${I.sliders}</span></div></div>`
+    : `<div class="pad"><div class="row between" style="margin-top:4px"><div class="logo">${v==='C'?'Витрина<span>.</span>':'Витрина'}</div><div class="icon-btn">${I.bell}<span class="dot"></span></div></div>
+       <div class="search" style="margin-top:14px">${I.search}Искать товары<span class="filter">${I.sliders}</span></div></div>`;
+  const banner = v==='B'
+    ? `<div class="banner"><div class="circle"></div><small>Новая коллекция</small><h3>Осень<br>в деталях</h3><span class="btn-s">Смотреть</span><span class="big emoji">🧥</span></div>`
+    : `<div class="banner"><div class="circle"></div><small>Чёрная пятница</small><h3>−50% на<br>электронику</h3><span class="btn-s">Успеть купить →</span><span class="big emoji">🎧</span></div>`;
+  return `${status(v==='A'?'status-light':'')}<div class="scroll ${v==='A'?'under':''}">${top}${banner}
+    <div class="dots"><i class="on"></i><i></i><i></i></div>
+    <div class="sec"><h4>Категории</h4><a>Все</a></div>
+    <div class="cats">${[['📱','Техника','c1'],['👗','Одежда','c2'],['👟','Обувь','c3'],['🏠','Дом','c4'],['💄','Красота','c5']].map(([e,l,c])=>`<div class="cat"><div class="c ${c}"><span class="emoji">${e}</span></div>${l}</div>`).join('')}</div>
+    <div class="sec"><h4>${v==='B'?'Бестселлеры':'Хиты продаж 🔥'}</h4><a>Смотреть все</a></div>
+    <div class="grid">
+      ${card('🎧','t1','Беспроводные наушники AirBeat Pro','4 990','7 490',33,'4.8','3 410',true)}
+      ${card('👟','t3','Кроссовки Run Pro, сетка','4 990','6 990',29,'4.7','982',false)}
+      ${card('⌚','t4','Умные часы Pulse 2','7 990','',0,'4.6','876',false)}
+      ${card('☕','t2','Кофемашина Aroma','18 990','',0,'4.9','421',false)}
+    </div></div>${nav(0)}<div class="home-ind"></div>`;
+}
+
+function productScreen(v) {
+  return `${status()}<div class="scroll under"><div class="p-hero"><span class="e emoji">📱</span>
+      <div class="p-top"><div class="icon-btn">${I.back}</div><div class="row" style="gap:10px"><div class="icon-btn">${I.share}</div><div class="icon-btn heart">${I.heart}</div></div></div>
+      <div class="dots p-dots"><i class="on"></i><i></i><i></i><i></i></div></div>
+    <div class="p-body">
+      <div class="p-price"><span class="price">24 990 ₽</span><span class="old">29 990 ₽</span><span class="disc">−17%</span></div>
+      <div class="p-title">Смартфон Nova X12, 6.7″ AMOLED</div>
+      <div class="p-meta"><span><span class="star">★</span> <b style="color:var(--text)">4.8</b> · 1 243 отзыва</span><span class="tag">TechStore ✓</span></div>
+      <div class="opt-label">Память</div>
+      <div class="opts"><span class="opt">128 ГБ</span><span class="opt on">256 ГБ</span><span class="opt">512 ГБ</span></div>
+      <div class="perks"><div class="perk"><span class="pi">${I.truck}</span><div><b>Завтра</b><span class="muted">бесплатно</span></div></div>
+        <div class="perk"><span class="pi">${I.shield}</span><div><b>Гарантия</b><span class="muted">1 год</span></div></div></div>
+      <div class="opt-label">Описание</div>
+      <div class="muted" style="font-size:14px;line-height:1.5">Яркий AMOLED-экран 120 Гц, камера 108 Мп и батарея на два дня. Быстрая зарядка 67 Вт…</div>
+    </div></div>
+    <div class="p-bar"><div class="stepper"><i>−</i><span>1</span><i>+</i></div><div class="cta">${I.bag} В корзину <small>· 24 990 ₽</small></div></div><div class="home-ind"></div>`;
+}
+
+function cartScreen(v) {
+  const it = (e,t,nm,op,p,q) => `<div class="item"><div class="th ${t}"><span class="emoji">${e}</span></div><div class="t"><div class="nm">${nm}</div><div class="op">${op}</div>
+    <div class="bt"><span class="price">${p} ₽</span><div class="mini"><i>−</i><span>${q}</span><i>+</i></div></div></div></div>`;
+  return `${status()}<div class="scroll">
+    <div class="c-head"><h2>Корзина<sup>3 товара</sup></h2><div class="icon-btn">${I.trash}</div></div>
+    <div class="ship">До бесплатной доставки осталось <b>660 ₽</b><div class="bar"><i></i></div></div>
+    <div class="items">
+      ${it('📱','t1','Смартфон Nova X12','Память: 256 ГБ','24 990',1)}
+      ${it('🎧','t2','Наушники AirBeat Pro','Цвет: белый','4 990',1)}
+      ${it('👟','t3','Кроссовки Run Pro','Размер: 42','4 990',1)}
+    </div>
+    <div class="promo">${I.tag} Промокод<span class="ap">Применить</span></div>
+    <div class="sum"><div class="row between"><span class="muted">Товары (3)</span><span>42 470 ₽</span></div>
+      <div class="row between save"><span>Скидка</span><span>−7 500 ₽</span></div>
+      <div class="row between tot"><span>Итого</span><span>34 970 ₽</span></div></div>
+    </div>
+    <div class="p-bar" style="height:100px"><div class="cta">Оформить заказ <small>· 34 970 ₽</small></div></div><div class="home-ind"></div>`;
+}
+
+const variants = [
+  {k:'A', name:'Вариант A — «Сочный градиент»', desc:'Яркий фиолетово-розовый, мягкие пастельные карточки. Молодёжно и празднично.', sw:['#7B2FF7','#F107A3','#F4F3F9','#17142B'], bg:'#E9E6F3'},
+  {k:'B', name:'Вариант B — «Чистый минимализм»', desc:'Чёрно-белый с бежевым, много воздуха. Премиально, как бутик одежды.', sw:['#141414','#EAE3D8','#FAF8F5','#D9462B'], bg:'#E8E3DA'},
+  {k:'C', name:'Вариант C — «Тёмный неон»', desc:'Тёмная тема с лаймовым неоном. Современно, для техники и гаджетов.', sw:['#0C0C12','#C6FF3D','#5B2DFF','#FF3D7F'], bg:'#1B1B24'},
+];
+document.getElementById('root').innerHTML = variants.map(v => `
+  <section class="board" id="v${v.k}" style="background:${v.bg};color:${v.k==='C'?'#F2F2F7':'#17142B'}">
+    <div class="board-head"><div><h1>${v.name}</h1><p>${v.desc}</p></div><div class="swatches">${v.sw.map(c=>`<span class="sw" style="background:${c}"></span>`).join('')}</div></div>
+    <div class="phones">
+      ${[['Главная',homeScreen],['Карточка товара',productScreen],['Корзина',cartScreen]].map(([l,f])=>`<div class="phone-wrap"><div class="phone v${v.k}">${f(v.k)}</div><div class="phone-label">${l}</div></div>`).join('')}
+    </div></section>`).join('');
+</script>
+</body>
+</html>
