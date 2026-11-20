@@ -1,0 +1,1089 @@
+<title>ISTANBUL Касса</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@500;600;700;800&family=Unbounded:wght@600;700&family=Montserrat:wght@700;800&display=swap">
+<style>
+/* One phone screen for the cashier: PIN, scanner, customer card, purchase, refund, shift. Black and white system shared with the customer app. */
+:root {
+  --ink: #0B0B0B; --paper: #FFFFFF; --mist: #F3F3F2; --line: #E4E4E2; --grey: #8C8C88; --soft: #5C5C58; --desk: #DCDCD8;
+  --brand: 'Unbounded', 'Arial Black', sans-serif;
+  --display: var(--brand);
+  --text: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { box-sizing: border-box; height: 100%; }
+body { height: 100%; margin: 0; background: var(--desk); color: var(--ink); font-family: var(--text); display: grid; place-items: center; overflow: hidden; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; padding: 0; text-align: inherit; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+h1, h2, h3, h4, h5, p { margin: 0; }
+.pad { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.app { position: relative; width: min(100%, 420px); height: min(100%, 880px); background: var(--paper); color: var(--ink); overflow: hidden; overflow: clip; transition: background .45s, color .45s; }
+/* Unbounded has no Kazakh letters, so Kazakh headings use Montserrat; the wordmark stays as is */
+.app[data-lang="kk"] { --display: 'Montserrat', 'Arial Black', sans-serif; }
+.app.is-dark { --ink: #FFFFFF; --paper: #0B0B0B; --mist: #1C1C1A; --line: #2B2B29; --soft: #BDBDB8; }
+@media (min-width: 480px) and (min-height: 700px) {
+  body { padding-block: 20px; }
+  .app { border-radius: 38px; box-shadow: 0 0 0 10px #0B0B0B, 0 30px 60px -20px rgba(0,0,0,.45); }
+}
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
+.view { position: absolute; inset: 0; display: none; flex-direction: column; background: var(--paper); }
+.view.on { display: flex; }
+.view.from-r { animation: fromR .38s cubic-bezier(.2,.9,.2,1); }
+.view.from-l { animation: fromL .38s cubic-bezier(.2,.9,.2,1); }
+.col { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 14px; padding-bottom: 18px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding-top: 14px; padding-bottom: 18px; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.grow { flex: 1; }
+.a { animation: rise .5s backwards; animation-delay: calc(var(--i, 0) * 55ms); }
+.back { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; flex: none; transition: transform .15s; }
+.back:active { transform: scale(.9); }
+.topbar { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 16px; min-height: 44px; }
+.big-t { font: 700 27px/1.12 var(--display); text-transform: uppercase; margin-top: 18px; }
+.lead { font-size: 15px; color: var(--soft); margin-top: 10px; line-height: 1.45; }
+.h1 { font: 700 28px/1.1 var(--display); text-transform: uppercase; letter-spacing: -.3px; }
+.cta { width: 100%; height: 56px; border-radius: 18px; background: var(--ink); color: var(--paper); font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform .15s, opacity .2s; flex: none; }
+.cta:active { transform: scale(.97); }
+.cta[disabled] { opacity: .3; }
+.cta.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--grey); }
+.chipsel { display: flex; gap: 8px; flex-wrap: wrap; }
+.chipsel button { padding: 9px 15px; border-radius: 99px; border: 1.5px solid var(--line); font-weight: 800; font-size: 13.5px; white-space: nowrap; transition: background .25s, color .25s, border-color .25s, transform .15s; }
+.chipsel button:active { transform: scale(.94); }
+.chipsel button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.note { margin-top: 12px; background: var(--mist); border-radius: 16px; padding: 12px 14px; font-size: 13.5px; font-weight: 600; color: var(--soft); line-height: 1.45; display: flex; gap: 10px; }
+.note svg.i { width: 20px; height: 20px; color: var(--ink); }
+.toggle { width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; flex: none; margin-left: auto; transition: background .25s; }
+.toggle::after { content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .3s cubic-bezier(.3,1.5,.5,1); }
+.toggle[aria-checked="true"] { background: var(--ink); }
+.app.is-dark .toggle[aria-checked="true"]::after { background: #0B0B0B; }
+.toggle[aria-checked="true"]::after { transform: translateX(18px); }
+.inp { margin-top: 22px; border: 1.5px solid var(--ink); border-radius: 18px; height: 62px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 22px; font-weight: 800; letter-spacing: .5px; }
+.inp .pre { color: var(--grey); }
+.caret { width: 2px; height: 28px; background: var(--ink); animation: caret 1s steps(1) infinite; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; flex: none; }
+.key { height: 52px; border-radius: 16px; background: var(--mist); font: 600 21px var(--display); display: grid; place-items: center; transition: transform .1s, background .15s; }
+.key:active { transform: scale(.92); background: var(--line); }
+.key.x { background: none; }
+.otp { display: flex; gap: 12px; margin-top: 26px; }
+.otp span { width: 62px; height: 70px; border: 1.5px solid var(--line); border-radius: 18px; display: grid; place-items: center; font: 700 28px var(--display); transition: background .3s, color .3s, border-color .2s, transform .2s; transition-delay: calc(var(--i) * 70ms); }
+.otp span.f { border-color: var(--ink); animation: keyIn .25s; }
+.otp span.cur { border-color: var(--ink); border-width: 2.5px; }
+.otp.ok span { background: var(--ink); color: var(--paper); transform: translateY(-4px); }
+.otp.bad { animation: shake .4s; }
+.sms { position: absolute; z-index: 45; top: 10px; left: 12px; right: 12px; background: #1C1C1A; color: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; transform: translateY(-170%); transition: transform .5s cubic-bezier(.2,1.2,.3,1); box-shadow: 0 16px 30px -12px rgba(0,0,0,.5); }
+.sms.on { transform: none; }
+.sms i { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; color: #0B0B0B; display: grid; place-items: center; font: 700 15px var(--brand); font-style: normal; flex: none; }
+.sms b { display: block; font-size: 13px; }
+.sms span { font-size: 14px; opacity: .85; }
+.sms em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 800; border: 1.5px solid #5C5C58; border-radius: 99px; padding: 5px 10px; white-space: nowrap; }
+.field { display: block; margin-top: 14px; }
+.field > span { display: block; font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 0 0 6px 2px; }
+.field input { width: 100%; height: 54px; border: 1.5px solid var(--line); border-radius: 16px; padding: 0 16px; font: 700 16px var(--text); background: var(--paper); color: var(--ink); transition: border-color .2s; }
+.field input:focus { border-color: var(--ink); outline: none; }
+.app.is-dark .giftb img { filter: none; }
+.tabs-area { flex: 1; min-height: 0; position: relative; }
+.tab { position: absolute; inset: 0; display: none; flex-direction: column; }
+.tab.on { display: flex; }
+.nav { flex: none; height: 72px; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: var(--paper); position: relative; padding-top: 10px; transition: background .45s; }
+.nav button { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--grey); transition: color .25s; }
+.nav button.on { color: var(--ink); }
+.nav button.on svg { animation: navpop .45s cubic-bezier(.2,1.6,.4,1); }
+.nav .ind { position: absolute; top: -1px; left: 0; width: 20%; height: 2.5px; display: flex; justify-content: center; transition: transform .45s cubic-bezier(.2,1.2,.3,1); pointer-events: none; }
+.nav .ind i { width: 34px; background: var(--ink); border-radius: 2px; }
+.nav .bdg { position: absolute; }
+.top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.word { font: 700 20px var(--brand); letter-spacing: 3px; }
+.hello { margin-top: 14px; font-size: 15px; color: var(--soft); }
+.hello b { display: block; font: 600 22px var(--display); color: var(--ink); margin-top: 2px; letter-spacing: -.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lvl { font-size: 11.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 1.5px solid rgba(255,255,255,.5); padding: 5px 10px; border-radius: 99px; white-space: nowrap; }
+.num { font: 600 12.5px var(--brand); letter-spacing: 2.2px; white-space: nowrap; }
+.langbtn { position: absolute; z-index: 2; top: 14px; right: max(20px, env(safe-area-inset-right, 0px)); height: 38px; padding: 0 13px 0 10px; border-radius: 99px; border: 1.5px solid var(--grey); display: flex; align-items: center; gap: 7px; font: 600 11.5px var(--brand); letter-spacing: 1px; animation: fade .6s .9s backwards; transition: transform .15s; }
+.langbtn:active { transform: scale(.94); }
+.langbtn svg.i { width: 18px; height: 18px; }
+.langs { display: grid; gap: 8px; margin-top: 16px; }
+.lopt { width: 100%; display: flex; align-items: center; gap: 14px; padding: 15px 16px; border: 1.5px solid var(--line); border-radius: 18px; font-weight: 800; font-size: 15.5px; transition: transform .15s, border-color .2s; animation: rise .45s backwards; }
+.lopt:nth-child(2) { animation-delay: 60ms; } .lopt:nth-child(3) { animation-delay: 120ms; }
+.lopt:active { transform: scale(.98); }
+.lopt b { font: 600 12px var(--brand); letter-spacing: 1px; min-width: 42px; color: var(--grey); }
+.lopt span { flex: 1; }
+.lopt.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.lopt.on b { color: var(--ink); }
+.app.is-dark .sheet { box-shadow: 0 -1.5px 0 var(--line); }
+.nw { white-space: nowrap; }
+.box { margin-top: 12px; border: 1.5px solid var(--line); border-radius: 22px; padding: 15px 16px; }
+.box h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; gap: 10px; }
+.box h5 span { color: var(--grey); font-weight: 700; white-space: nowrap; }
+.pbar { height: 8px; background: var(--mist); border-radius: 4px; margin: 12px 0 8px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; background: var(--ink); border-radius: 4px; transition: width 1.1s .3s cubic-bezier(.2,.9,.2,1); }
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 20px 0 4px; }
+.sec h4 { font: 600 15px var(--display); text-transform: uppercase; letter-spacing: .5px; }
+.sec button { font-size: 13px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.op { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); transition: transform .15s; }
+.op:active { transform: scale(.98); }
+.op .ic { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--mist); flex: none; }
+.op .ic.neg { background: var(--paper); border: 1.5px solid var(--ink); }
+.op .t { flex: 1; min-width: 0; }
+.op .t b { font-size: 14.5px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op .t span { font-size: 12.5px; color: var(--grey); font-weight: 500; }
+.op .amt { font: 600 16px var(--display); white-space: nowrap; }
+.op .amt.neg { color: var(--soft); }
+.op.fresh { animation: fresh 1.2s; }
+.totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.totals div { background: var(--mist); border-radius: 18px; padding: 14px; }
+.totals small { font-size: 12px; color: var(--grey); font-weight: 700; display: block; }
+.totals b { font: 600 20px var(--display); }
+.day { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 18px 0 2px; }
+.empty { text-align: center; margin-top: 60px; }
+.empty h3 { font: 700 19px var(--display); text-transform: uppercase; margin-top: 20px; }
+.empty p { color: var(--soft); margin-top: 8px; font-size: 15px; line-height: 1.45; }
+.dim { position: absolute; inset: 0; background: rgba(11,11,11,.45); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.dim.on { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--paper); border-radius: 30px 30px 0 0; padding-top: 12px; padding-bottom: 26px; max-height: 88%; overflow-y: auto; transform: translateY(105%); visibility: hidden; transition: transform .5s cubic-bezier(.2,1.08,.3,1), visibility 0s .5s; }
+.sheet.on { transform: none; visibility: visible; transition-delay: 0s; }
+.grab { width: 40px; height: 5px; background: var(--line); border-radius: 3px; margin: 0 auto 14px; }
+.sheet h3 { font: 700 20px var(--display); text-transform: uppercase; }
+.sheet .amt { font: 700 44px var(--display); letter-spacing: -1px; margin-top: 12px; }
+.sheet .amt small { font-size: 17px; color: var(--grey); letter-spacing: 0; }
+.when { color: var(--grey); font-weight: 700; font-size: 14px; margin-top: 2px; }
+.kv { margin-top: 14px; border-top: 1.5px solid var(--line); }
+.kv div { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; color: var(--soft); font-weight: 600; }
+.kv div b { color: var(--ink); font-weight: 800; }
+.kv div b.big { font: 600 17px var(--display); }
+.sheet .cta { margin-top: 16px; }
+.okc { width: 72px; height: 72px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; margin: 4px auto 14px; animation: pop .55s .15s cubic-bezier(.2,1.6,.4,1) backwards; }
+.okc svg.i { width: 36px; height: 36px; stroke-width: 2.4; stroke-dasharray: 30; stroke-dashoffset: 30; animation: drawCheck .45s .5s forwards; }
+.sheet.center { text-align: center; }
+.newbal { margin-top: 12px; background: var(--ink); color: var(--paper); border-radius: 20px; padding: 15px 18px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+.newbal small { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; opacity: .6; }
+.newbal b { font: 600 26px var(--display); }
+.rules div { display: flex; gap: 12px; padding: 9px 0; font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+.rules div b { font: 600 12.5px var(--display); width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; flex: none; }
+.bb { flex: none; padding-top: 12px; padding-bottom: 18px; border-top: 1px solid var(--line); }
+.prof { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.prof .av { width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font: 600 21px var(--display); flex: none; }
+.prof b { font: 600 19px var(--display); display: block; overflow-wrap: anywhere; }
+.prof span { color: var(--grey); font-weight: 700; font-size: 14px; }
+.list { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 22px; padding: 0 16px; }
+.list > * { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 14.5px; }
+.list > *:last-child { border-bottom: none; }
+.list .v { margin-left: auto; color: var(--grey); font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.list svg.i { width: 20px; height: 20px; }
+.cap { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 20px 0 -4px 4px; }
+.lc { margin-top: 10px; border: 1.5px solid var(--line); border-radius: 22px; padding: 15px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: transform .3s; }
+.lc.cur { border-color: var(--ink); border-width: 2.5px; transform: scale(1.02); }
+.lc.gold { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lc small { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; opacity: .55; }
+.lc .n { font: 700 19px var(--display); text-transform: uppercase; margin-top: 4px; }
+.lc .d { font-size: 13px; opacity: .6; font-weight: 600; margin-top: 4px; }
+.lc .p { font: 700 32px var(--display); }
+.lc.gold .badge { background: var(--paper); color: var(--ink); }
+.toast { position: absolute; z-index: 44; top: 12px; left: 16px; right: 16px; background: #0B0B0B; color: #FFFFFF; border: 1.5px solid #3A3A38; border-radius: 16px; padding: 13px 16px; font-weight: 800; font-size: 14px; text-align: center; transform: translateY(-170%); transition: transform .45s cubic-bezier(.2,1.3,.4,1); }
+.toast.on { transform: none; }
+/* lock screen */
+.lock { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 70px; padding-bottom: 18px; }
+.wm { font: 700 28px/1 var(--brand); letter-spacing: 5px; display: flex; padding-left: 5px; }
+.wm span { animation: letter .6s cubic-bezier(.2,1.4,.4,1) backwards; animation-delay: calc(var(--i) * 60ms); }
+.tagk { margin-top: 12px; font: 600 10.5px var(--brand); letter-spacing: 3px; border: 1.5px solid var(--grey); border-radius: 99px; padding: 6px 10px 6px 13px; animation: fade .6s .6s backwards; }
+.lock .st { margin-top: 34px; color: var(--soft); font-weight: 700; font-size: 14px; animation: rise .5s .5s backwards; }
+.lock h2 { font: 700 20px var(--display); text-transform: uppercase; margin-top: 6px; animation: rise .5s .6s backwards; }
+.pins { display: flex; gap: 18px; margin-top: 28px; animation: rise .5s .7s backwards; }
+.pins i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink); transition: background .2s, transform .25s cubic-bezier(.2,1.6,.4,1); }
+.pins i.f { background: var(--ink); transform: scale(1.18); }
+.pins.bad { animation: shake .4s; }
+.pins.ok i { animation: pinOk .5s; animation-delay: calc(var(--i) * 70ms); }
+.hintpin { margin-top: 22px; font-size: 13px; font-weight: 800; color: var(--soft); border: 1.5px dashed var(--grey); border-radius: 99px; padding: 8px 14px; animation: fade .6s 1s backwards; transition: transform .15s; }
+.hintpin:active { transform: scale(.95); }
+.lock .keypad { width: 100%; margin-top: auto; }
+
+/* till tab */
+.nav { grid-template-columns: repeat(4, 1fr); }
+.nav .ind { width: 25%; }
+.shiftpill { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 99px; border: 1.5px solid var(--line); font-size: 12.5px; font-weight: 800; transition: transform .15s; }
+.shiftpill:active { transform: scale(.95); }
+.shiftpill i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); animation: pulse 1.6s infinite; }
+.shiftpill b { font: 600 12px var(--brand); }
+.scanner { display: block; margin-top: 16px; width: 100%; height: 236px; border-radius: 28px; background: #0B0B0B; color: #FFFFFF; position: relative; overflow: hidden; text-align: center; transition: transform .2s; }
+.scanner:active { transform: scale(.985); }
+.gcard { position: absolute; left: 50%; top: 20px; width: 196px; height: 122px; margin-left: -98px; border: 1.5px solid rgba(255,255,255,.3); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; animation: drift 6s ease-in-out infinite; }
+.gcard b { font: 700 9px var(--brand); letter-spacing: 2.5px; opacity: .55; }
+.gcard .gb { height: 36px; border-radius: 3px; opacity: .6; background: repeating-linear-gradient(90deg, #FFFFFF 0 2px, transparent 2px 5px, #FFFFFF 5px 6px, transparent 6px 10px, #FFFFFF 10px 13px, transparent 13px 15px, #FFFFFF 15px 16px, transparent 16px 19px); }
+.frame { position: absolute; left: 34px; right: 34px; top: 10px; bottom: 74px; transition: left .4s cubic-bezier(.2,1.3,.3,1), right .4s cubic-bezier(.2,1.3,.3,1), top .4s cubic-bezier(.2,1.3,.3,1), bottom .4s cubic-bezier(.2,1.3,.3,1); }
+.frame i { position: absolute; width: 28px; height: 28px; border: 3px solid #FFFFFF; }
+.frame i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.frame i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.frame i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.frame i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.laser { position: absolute; left: 8px; right: 8px; top: 6%; height: 2px; background: #FFFFFF; box-shadow: 0 0 14px 3px rgba(255,255,255,.55); animation: laser 2.4s ease-in-out infinite; }
+.scanner.scanning .frame { left: 74px; right: 74px; top: 22px; bottom: 88px; }
+.scanner.scanning .laser { animation-duration: .45s; }
+.hitc { position: absolute; left: 50%; top: 81px; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: #FFFFFF; color: #0B0B0B; display: grid; place-items: center; opacity: 0; }
+.hitc svg.i { width: 32px; height: 32px; stroke-width: 2.4; }
+.scanner.hit .hitc { opacity: 1; animation: pop .4s cubic-bezier(.2,1.6,.4,1) backwards; }
+.flash { position: absolute; inset: 0; background: #FFFFFF; opacity: 0; pointer-events: none; }
+.scanner.hit .flash { animation: flash .45s; }
+.cap2 { position: absolute; left: 12px; right: 12px; bottom: 16px; font-size: 13.5px; font-weight: 800; }
+.cap2 span { display: block; font-size: 12px; font-weight: 600; opacity: .55; margin-top: 3px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.tile { border: 1.5px solid var(--line); border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 12px; font-weight: 800; font-size: 14px; line-height: 1.25; transition: transform .15s; }
+.tile:active { transform: scale(.97); }
+.tile .ic { width: 42px; height: 42px; border-radius: 14px; background: var(--mist); display: grid; place-items: center; }
+.totals.three { grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.totals.three div { padding: 12px; }
+.totals.three b { font-size: 16px; }
+.op.ref .t b, .op.ref .amt { text-decoration: line-through; color: var(--grey); }
+
+/* search */
+.found { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; scrollbar-width: none; }
+.cl { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); animation: rise .35s backwards; animation-delay: calc(var(--i) * 50ms); }
+.cl .av, .who .av { width: 42px; height: 42px; border-radius: 50%; background: var(--mist); display: grid; place-items: center; font: 600 13px var(--display); flex: none; }
+.cl .t, .who .t { flex: 1; min-width: 0; }
+.cl .t b, .who .t b { font-size: 14.5px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl .t span, .who .t span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.cl .r { text-align: right; font: 600 14.5px var(--brand); white-space: nowrap; }
+.cl .r small { display: block; font: 700 11px var(--text); color: var(--grey); }
+.nf { margin: 22px 0 14px; text-align: center; color: var(--soft); font-weight: 700; font-size: 14px; line-height: 1.45; }
+
+/* customer card */
+.ccard, .shcard { margin-top: 12px; border-radius: 26px; background: #0B0B0B; color: #FFFFFF; padding: 18px 20px 16px; position: relative; overflow: hidden; }
+.ccard.in { animation: cardUp .7s cubic-bezier(.2,1.2,.3,1) backwards; }
+.ccard::before, .shcard::before { content: ''; position: absolute; right: -70px; top: -80px; width: 240px; height: 240px; border: 1.5px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 34px rgba(255,255,255,.035); animation: breathe 5s ease-in-out infinite; }
+.ccard::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(128,128,128,.35) 50%, transparent 65%); transform: translateX(-120%); animation: shine 4s 1s infinite; pointer-events: none; }
+.ccard > *, .shcard > * { position: relative; z-index: 1; }
+.ccard .r, .shcard .r { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ccard .nm { font: 600 19px var(--display); letter-spacing: -.3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccard small, .shcard small { display: block; font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 800; }
+.ccard .lb { margin-top: 16px; }
+.sheet .op .amt { font: 600 16px var(--display); letter-spacing: 0; margin-top: 0; }
+.bal { font: 700 40px/1 var(--display); letter-spacing: -1px; margin-top: 8px; white-space: nowrap; }
+.bal b { font: inherit; }
+.bal span { font: 600 14px var(--text); letter-spacing: 0; color: rgba(255,255,255,.7); margin-left: 7px; }
+.ccard .ft, .shcard .ft { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.75); }
+.ccard .ft .num { color: #FFFFFF; }
+.stats3 { display: grid; grid-template-columns: 1.25fr 1fr .8fr; gap: 8px; margin-top: 10px; }
+.stats3 div { background: var(--mist); border-radius: 18px; padding: 12px; min-width: 0; }
+.stats3 small, .grid2 small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--grey); font-weight: 700; line-height: 1.25; }
+.stats3 b { display: block; font: 600 14px var(--brand); margin-top: 4px; white-space: nowrap; }
+.duo { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.duo .cta { font-size: 15px; gap: 8px; white-space: nowrap; }
+.duo .ghost { padding: 0 16px; }
+
+/* purchase */
+.stepno { margin-left: auto; font: 600 12px var(--brand); color: var(--grey); letter-spacing: 1px; }
+.who { display: flex; align-items: center; gap: 12px; margin-top: 8px; background: var(--mist); border-radius: 20px; padding: 10px 14px 10px 10px; flex: none; }
+.who .av { background: var(--ink); color: var(--paper); }
+.who .bl { font: 600 15px var(--brand); white-space: nowrap; }
+.step { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.step.on { display: flex; animation: fromR .35s cubic-bezier(.2,.9,.2,1); }
+.amount { text-align: center; margin-top: 20px; }
+.amount small { font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--grey); font-weight: 800; }
+.amount .big { font: 700 46px/1.1 var(--brand); letter-spacing: -1.5px; margin-top: 6px; white-space: nowrap; }
+.amount .big em { font-style: normal; font-size: 30px; color: var(--grey); margin-left: 8px; }
+.calc { display: inline-block; margin-top: 10px; background: var(--ink); color: var(--paper); border-radius: 99px; padding: 7px 14px; font-size: 13px; font-weight: 800; }
+.calc.bump { animation: blink .45s; }
+.avail { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--soft); }
+.chipsel.mid { justify-content: center; margin-top: 14px; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 32px; margin: 12px 0 0; background: transparent; flex: none; }
+input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(var(--ink), var(--ink)) 0 0 / var(--p, 0%) 100% no-repeat var(--mist); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -11px; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--ink); box-shadow: 0 6px 12px -6px rgba(0,0,0,.5); }
+input[type="range"]::-moz-range-track { height: 8px; border-radius: 4px; background: var(--mist); }
+input[type="range"]::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--ink); }
+input[type="range"]::-moz-range-thumb { width: 25px; height: 25px; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--ink); }
+input[type="range"]:disabled { opacity: .35; }
+.done { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 46px; padding-bottom: 18px; scrollbar-width: none; }
+.done h2 { font: 700 22px/1.15 var(--display); text-transform: uppercase; animation: rise .5s .3s backwards; }
+.done .when { animation: rise .5s .4s backwards; }
+.done .kv, .done .newbal { width: 100%; text-align: left; animation: rise .5s .5s backwards; }
+.done .newbal + .kv { margin-top: 12px; }
+.printed { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--soft); animation: fade .6s 1.2s backwards; }
+.printed svg.i { width: 18px; height: 18px; }
+.done .acts { margin-top: auto; padding-top: 16px; width: 100%; display: grid; gap: 10px; animation: rise .5s .8s backwards; }
+
+/* shift */
+.tm { font: 700 40px/1 var(--brand); letter-spacing: -1px; margin-top: 16px; font-variant-numeric: tabular-nums; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.grid2 div { background: var(--mist); border-radius: 18px; padding: 13px 14px; min-width: 0; }
+.grid2 b { display: block; font: 600 18px var(--brand); margin-top: 4px; white-space: nowrap; }
+.grid2 .w { grid-column: 1 / -1; background: none; border: 1.5px solid var(--ink); }
+.grid2 .w b { font-size: 26px; }
+.hours { margin-top: 10px; border: 1.5px solid var(--line); border-radius: 22px; padding: 14px 14px 12px; }
+.hours h5 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; }
+.hours h5 span { color: var(--grey); font-weight: 700; }
+.bars6 { display: flex; align-items: flex-end; gap: 8px; height: 132px; margin-top: 10px; }
+.bars6 div { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; font-size: 11.5px; font-weight: 800; color: var(--grey); }
+.bars6 i { width: 100%; min-height: 4px; height: calc(var(--h) * .68); border-radius: 8px 8px 3px 3px; background: var(--line); animation: grow .8s cubic-bezier(.2,1.3,.35,1) backwards; animation-delay: calc(var(--i) * 70ms); }
+.bars6 .now i { background: var(--ink); }
+.bars6 .now { color: var(--ink); }
+.bars6 em { font: 600 10.5px var(--brand); font-style: normal; color: var(--ink); min-height: 13px; }
+
+@keyframes fromR { from { transform: translateX(34px); opacity: 0; } }
+@keyframes fromL { from { transform: translateX(-34px); opacity: 0; } }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { transform: scale(0); opacity: 0; } }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(.7); } }
+@keyframes letter { from { transform: translateY(40px) rotate(12deg); opacity: 0; } }
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: .5; } }
+@keyframes shine { 0% { transform: translateX(-120%); } 40%, 100% { transform: translateX(120%); } }
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes keyIn { from { transform: scale(.8); } }
+@keyframes shake { 20%, 60% { transform: translateX(-9px); } 40%, 80% { transform: translateX(9px); } }
+@keyframes navpop { 40% { transform: translateY(-5px) scale(1.15); } }
+@keyframes fresh { 0%, 60% { background: var(--mist); } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+@keyframes grow { from { height: 0; } }
+@keyframes blink { 40% { transform: scale(1.25); } }
+@keyframes pinOk { 50% { transform: translateY(-10px) scale(1.3); } }
+@keyframes laser { 0%, 100% { top: 6%; } 50% { top: 94%; } }
+@keyframes flash { 0% { opacity: .85; } 100% { opacity: 0; } }
+@keyframes drift { 0%, 100% { transform: translate(-6px, 2px) rotate(-3deg); } 50% { transform: translate(6px, -2px) rotate(3deg); } }
+@keyframes cardUp { from { transform: translateY(40px) scale(.94); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0s !important; }
+}
+</style>
+
+<div class="app" id="app">
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <button class="sms" id="sms"><i>I</i><div><b>Телефон клиента · сейчас</b><span>ISTANBUL: код списания <strong id="smsCode"></strong></span></div><em>Вставить</em></button>
+
+  <!-- lock -->
+  <section class="view" id="v-lock" data-dark>
+    <button class="langbtn" id="langBtn" aria-label="Language"><span data-ic="globe"></span><b>RU</b></button>
+    <div class="lock pad">
+      <div class="wm" id="wm" aria-label="ISTANBUL"></div>
+      <div class="tagk">КАССА</div>
+      <div class="st">ТЦ «Жибек» · Касса 2</div>
+      <h2>Введите PIN-код</h2>
+      <div class="pins" id="pins"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i></div>
+      <button class="hintpin" id="pinHint">Демо-PIN: 1234</button>
+      <div class="keypad" data-pad="pin"></div>
+    </div>
+  </section>
+
+  <!-- main -->
+  <section class="view" id="v-main">
+    <div class="tabs-area">
+      <div class="tab on" id="t-scan">
+        <div class="scroll pad">
+          <div class="top a"><div class="word">ISTANBUL</div><button class="shiftpill" data-tab="shift"><i></i><span>Смена</span><b id="shiftDur"></b></button></div>
+          <div class="hello a" style="--i:1"><span>ТЦ «Жибек» · Касса 2</span><b id="cName"></b></div>
+          <button class="scanner a" style="--i:2" id="scanner" aria-label="Scan">
+            <span class="gcard"><b>ISTANBUL</b><span class="gb"></span></span>
+            <span class="frame"><i></i><i></i><i></i><i></i><span class="laser"></span></span>
+            <span class="hitc" data-ic="check"></span><span class="flash"></span>
+            <span class="cap2">Наведите камеру на код карты<span>Демо: нажмите, чтобы отсканировать</span></span>
+          </button>
+          <div class="two a" style="--i:3"><button class="tile" id="goFind"><span class="ic" data-ic="phone"></span>По номеру телефона</button><button class="tile" id="goNew"><span class="ic" data-ic="userplus"></span>Новый клиент</button></div>
+          <div class="sec a" style="--i:4"><h4>Сегодня</h4><button data-tab="ops">Все операции</button></div>
+          <div class="totals three a" style="--i:5"><div><small>Чеков</small><b id="sCnt">0</b></div><div><small>Начислено</small><b id="sEarn">0</b></div><div><small>Списано</small><b id="sSpend">0</b></div></div>
+          <div id="lastOps"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-ops">
+        <div class="scroll pad">
+          <div class="h1 a">Операции</div>
+          <div class="chipsel a" style="--i:1;margin-top:14px" id="oFilter"><button class="on" data-f="all">Все</button><button data-f="sale">Покупки</button><button data-f="spend">Списания</button><button data-f="refund">Возвраты</button></div>
+          <div id="opsList"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="t-shift">
+        <div class="scroll pad">
+          <div class="h1 a">Смена</div>
+          <div class="shcard a" style="--i:1"><div class="r"><small>Смена открыта в <span id="shOpen"></span></small><span class="lvl">Касса 2</span></div><div class="tm" id="shTimer">00:00:00</div><div class="r ft"><span id="shWho"></span><span>ТЦ «Жибек»</span></div></div>
+          <div class="grid2 a" style="--i:2">
+            <div class="w"><small>Выручка</small><b><span id="zRev">0</span> ₸</b></div>
+            <div><small>Чеков</small><b id="zCnt">0</b></div><div><small>Средний чек</small><b><span id="zAvg">0</span> ₸</b></div>
+            <div><small>Начислено бонусов</small><b id="zEarn">0</b></div><div><small>Списано бонусов</small><b id="zSpend">0</b></div>
+            <div><small>Новых клиентов</small><b id="zNew">0</b></div><div><small>Возвратов</small><b id="zRef">0</b></div>
+          </div>
+          <div class="hours a" style="--i:3"><h5>Продажи по часам <span>тыс. ₸</span></h5><div class="bars6" id="hours"></div></div>
+          <button class="cta ghost a" style="--i:4;margin-top:14px" id="closeShift"><span data-ic="lock"></span>Закрыть смену</button>
+        </div>
+      </div>
+
+      <div class="tab" id="t-more">
+        <div class="scroll pad">
+          <div class="h1 a">Профиль</div>
+          <div class="prof a" style="--i:1"><div class="av" id="pAv"></div><div><b id="pName"></b><span>Кассир · ТЦ «Жибек»</span></div></div>
+          <div class="list a" style="--i:2">
+            <button data-go="v-rules"><span data-ic="star"></span>Правила начисления<span class="v"><span data-ic="next"></span></span></button>
+            <button id="langRow"><span data-ic="globe"></span>Язык<span class="v"><span id="pLang"></span><span data-ic="next"></span></span></button>
+          </div>
+          <div class="cap a" style="--i:3">Настройки</div>
+          <div class="list a" style="--i:3">
+            <div><span data-ic="sound"></span>Звук сканера<button class="toggle" role="switch" data-t="sound" aria-label="Sound"></button></div>
+            <div><span data-ic="vib"></span>Вибрация<button class="toggle" role="switch" data-t="vibro" aria-label="Vibration"></button></div>
+            <div><span data-ic="print"></span>Печатать чек<button class="toggle" role="switch" data-t="print" aria-label="Print"></button></div>
+          </div>
+          <div class="list a" style="--i:4"><button id="lockBtn"><span data-ic="lock"></span>Заблокировать кассу</button></div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <div class="ind" id="navInd"><i></i></div>
+      <button class="on" data-tab="scan"><span data-ic="scan"></span>Касса</button>
+      <button data-tab="ops"><span data-ic="clock"></span>Операции</button>
+      <button data-tab="shift"><span data-ic="chart"></span>Смена</button>
+      <button data-tab="more"><span data-ic="user"></span>Профиль</button>
+    </nav>
+  </section>
+
+  <!-- search by phone -->
+  <section class="view" id="v-find">
+    <div class="col pad">
+      <div class="topbar"><button class="back" data-back aria-label="Back"></button>Поиск клиента</div>
+      <div class="inp" style="margin-top:12px"><span class="pre">+7</span><span id="fDigits"></span><span class="caret"></span></div>
+      <div class="found" id="found"></div>
+      <div class="keypad" data-pad="find"></div>
+    </div>
+  </section>
+
+  <!-- new customer -->
+  <section class="view" id="v-new">
+    <div class="scroll pad">
+      <div class="topbar"><button class="back" data-back aria-label="Back"></button>Новый клиент</div>
+      <h2 class="big-t" style="font-size:22px;margin-top:10px">Выдайте карту<br>за минуту</h2>
+      <label class="field a" style="--i:1"><span>Телефон</span><input id="nPhone" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="+7 700 000 00 00"></label>
+      <label class="field a" style="--i:2"><span>Имя</span><input id="nName" autocomplete="off" maxlength="24" placeholder="Например, Алихан"></label>
+      <label class="field a" style="--i:3"><span>Фамилия</span><input id="nLast" autocomplete="off" maxlength="24" placeholder="Необязательно"></label>
+      <div class="note a" style="--i:4"><span data-ic="gift"></span><span>Клиент сразу получит 1 000 приветственных бонусов и SMS со ссылкой на приложение</span></div>
+    </div>
+    <div class="bb pad"><button class="cta" id="nGo" disabled>Выдать карту</button></div>
+  </section>
+
+  <!-- customer card -->
+  <section class="view" id="v-client">
+    <div class="scroll pad" id="clientBody"></div>
+    <div class="bb pad duo"><button class="cta ghost" id="cRefund"><span data-ic="undo"></span>Возврат</button><button class="cta" id="cSale"><span data-ic="bag"></span>Провести покупку</button></div>
+  </section>
+
+  <!-- purchase -->
+  <section class="view" id="v-sale">
+    <div class="col pad">
+      <div class="topbar"><button class="back" id="saleBack" aria-label="Back"></button><span id="saleTitle">Покупка</span><span class="stepno" id="stepNo"></span></div>
+      <div class="who" id="saleWho"></div>
+      <div class="step on" id="st-amt">
+        <div class="amount"><small>Сумма чека</small><div class="big"><span id="amt">0</span><em>₸</em></div><div class="calc" id="amtCalc"></div></div>
+        <div class="chipsel mid" id="promos"><button data-p="x2">×2 · Верхняя одежда</button><button data-p="m20">−20% · Обувь</button></div>
+        <div class="grow"></div>
+        <button class="cta" id="amtNext" disabled>Далее</button>
+        <div class="keypad" data-pad="amt"></div>
+      </div>
+      <div class="step" id="st-bon">
+        <div class="amount"><small>Списать бонусы</small><div class="big"><span id="spendV">0</span></div><div class="avail" id="avail"></div></div>
+        <input type="range" id="range" min="0" step="500" value="0" aria-label="Bonuses">
+        <div class="chipsel mid" id="quick"><button data-q="0">Не списывать</button><button data-q="half">Половина</button><button data-q="max">Максимум</button></div>
+        <div class="kv" id="saleKv"></div>
+        <div class="grow"></div>
+        <button class="cta" id="saleGo"></button>
+      </div>
+      <div class="step" id="st-code">
+        <h2 class="big-t" style="font-size:22px;margin-top:16px">Код от клиента</h2>
+        <p class="lead" id="codeLead"></p>
+        <div class="otp" id="otp"><span style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span></div>
+        <div class="grow"></div>
+        <div class="keypad" data-pad="code"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-done" data-dark><div class="done pad" id="doneBody"></div></section>
+  <section class="view" id="v-z" data-dark><div class="done pad" id="zBody"></div></section>
+  <section class="view" id="v-rules"><div class="scroll pad" id="rulesBody"></div></section>
+
+  <div class="dim" id="dim"></div>
+  <div class="sheet pad" id="sheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const app = $('#app');
+  const CUR = '₸';
+  const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const two = n => String(n).padStart(2, '0');
+  const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+
+  /* ---------- languages: Russian text is the key, [Kazakh, English] ---------- */
+  const TR = {
+    'КАССА': ['КАССА', 'CASHIER'], 'ТЦ «Жибек» · Касса 2': ['«Жібек» СО · 2-касса', 'Zhibek mall · Till 2'], 'ТЦ «Жибек»': ['«Жібек» СО', 'Zhibek mall'], 'Касса 2': ['2-касса', 'Till 2'],
+    'Введите PIN-код': ['PIN-кодты енгізіңіз', 'Enter your PIN'], 'Демо-PIN: 1234': ['Демо-PIN: 1234', 'Demo PIN: 1234'], 'Неверный PIN-код': ['PIN-код қате', 'Wrong PIN'],
+    'Смена открыта в {0}': ['Ауысым {0}-де ашылды', 'Shift opened at {0}'], 'Смена': ['Ауысым', 'Shift'],
+    'Телефон клиента · сейчас': ['Клиент телефоны · қазір', "Customer's phone · now"], 'ISTANBUL: код списания': ['ISTANBUL: шегеру коды', 'ISTANBUL: redemption code'], 'Вставить': ['Қою', 'Paste'],
+    'Наведите камеру на код карты': ['Камераны карта кодына бағыттаңыз', 'Point the camera at the card code'], 'Демо: нажмите, чтобы отсканировать': ['Демо: сканерлеу үшін басыңыз', 'Demo: tap to scan'],
+    'По номеру телефона': ['Телефон нөмірі бойынша', 'By phone number'], 'Новый клиент': ['Жаңа клиент', 'New customer'],
+    'Сегодня': ['Бүгін', 'Today'], 'Все операции': ['Барлық операция', 'All activity'], 'Чеков': ['Чектер', 'Receipts'], 'Начислено': ['Есептелді', 'Earned'], 'Списано': ['Шегерілді', 'Redeemed'],
+    'Операции': ['Операциялар', 'Activity'], 'Все': ['Барлығы', 'All'], 'Покупки': ['Сатып алулар', 'Purchases'], 'Списания': ['Шегерімдер', 'Redemptions'], 'Возвраты': ['Қайтарулар', 'Refunds'],
+    'Пока пусто': ['Әзірге бос', 'Nothing here yet'], 'Операции появятся после первой покупки': ['Операциялар алғашқы сатып алудан кейін пайда болады', 'Activity appears after the first purchase'], 'Таких операций в этой смене нет': ['Бұл ауысымда мұндай операция жоқ', 'No such activity in this shift'],
+    'Смена открыта в': ['Ауысым ашылған уақыт:', 'Shift opened at'], 'Выручка': ['Түсім', 'Revenue'], 'Средний чек': ['Орташа чек', 'Average receipt'],
+    'Начислено бонусов': ['Есептелген бонус', 'Bonuses earned'], 'Списано бонусов': ['Шегерілген бонус', 'Bonuses redeemed'], 'Новых клиентов': ['Жаңа клиенттер', 'New customers'], 'Возвратов': ['Қайтарулар', 'Refunds'],
+    'Продажи по часам': ['Сағат бойынша сату', 'Sales by hour'], 'тыс. ₸': ['мың ₸', 'thousand ₸'], 'Закрыть смену': ['Ауысымды жабу', 'Close shift'],
+    'Профиль': ['Профиль', 'Profile'], 'Кассир · ТЦ «Жибек»': ['Кассир · «Жібек» СО', 'Cashier · Zhibek mall'], 'Правила начисления': ['Есептеу ережелері', 'Bonus rules'], 'Язык': ['Тіл', 'Language'], 'Настройки': ['Баптаулар', 'Settings'],
+    'Звук сканера': ['Сканер дыбысы', 'Scanner sound'], 'Вибрация': ['Діріл', 'Vibration'], 'Печатать чек': ['Чек басып шығару', 'Print receipt'], 'Заблокировать кассу': ['Кассаны құлыптау', 'Lock the till'],
+    'Касса': ['Касса', 'Till'], 'Язык приложения': ['Қолданба тілі', 'App language'], 'Язык изменён': ['Тіл өзгертілді', 'Language changed'],
+    'Поиск клиента': ['Клиентті іздеу', 'Find a customer'], 'Введите первые цифры номера или последние четыре': ['Нөмірдің алғашқы немесе соңғы төрт санын енгізіңіз', 'Type the first digits of the number or the last four'],
+    'Нет совпадений': ['Сәйкестік жоқ', 'No matches'], 'Клиента с таким номером нет': ['Мұндай нөмірлі клиент жоқ', 'No customer with this number'], 'Выдать карту на этот номер': ['Осы нөмірге карта беру', 'Issue a card for this number'], 'бонусов': ['бонус', 'bonuses'],
+    'Выдайте карту': ['Картаны бір минутта', 'Issue a card'], 'за минуту': ['беріңіз', 'in a minute'], 'Телефон': ['Телефон', 'Phone'], 'Имя': ['Аты', 'First name'], 'Фамилия': ['Тегі', 'Last name'],
+    'Например, Алихан': ['Мысалы, Алихан', 'For example, Alikhan'], 'Необязательно': ['Міндетті емес', 'Optional'],
+    'Клиент сразу получит 1 000 приветственных бонусов и SMS со ссылкой на приложение': ['Клиент бірден 1 000 сәлемдесу бонусын және қолданба сілтемесі бар SMS алады', 'The customer gets 1 000 welcome bonuses right away and an SMS with a link to the app'],
+    'Выдать карту': ['Карта беру', 'Issue card'], 'Клиент с таким номером уже есть': ['Мұндай нөмірлі клиент бар', 'This number already has a card'], 'Карта выдана · +1 000 бонусов': ['Карта берілді · +1 000 бонус', 'Card issued · +1 000 bonuses'],
+    'Клиент': ['Клиент', 'Customer'], 'Бонусный счёт': ['Бонус шоты', 'Bonus balance'], 'Покупки за год': ['Жылдық сатып алу', 'Purchases, 12 mo'], 'Рейтинг': ['Рейтинг', 'Rating'], 'Визитов': ['Келу саны', 'Visits'],
+    'До уровня «{0}»': ['«{0}» деңгейіне дейін', 'To {0} level'], 'Максимальный уровень': ['Ең жоғары деңгей', 'Top level'], 'кешбэк 7%': ['кешбэк 7%', '7% cashback'],
+    'Базовый': ['Базалық', 'Basic'], 'Серебро': ['Күміс', 'Silver'], 'Золото': ['Алтын', 'Gold'],
+    'Акция: двойные бонусы на верхнюю одежду до 30 ноября': ['Акция: 30 қарашаға дейін сырт киімге екі еселенген бонус', 'Offer: double bonuses on outerwear until 30 November'],
+    'Операции клиента': ['Клиент операциялары', 'Customer activity'], 'Операций пока нет': ['Әзірге операция жоқ', 'No activity yet'],
+    'Возврат': ['Қайтару', 'Refund'], 'Провести покупку': ['Сатып алуды өткізу', 'New purchase'], 'Покупка': ['Сатып алу', 'Purchase'], 'Новая карта': ['Жаңа карта', 'New card'], 'возврат оформлен': ['қайтарылды', 'refunded'],
+    'чек': ['чек', 'bill'], '15 ноября': ['15 қараша', '15 November'], '12 ноября': ['12 қараша', '12 November'], '9 ноября': ['9 қараша', '9 November'],
+    'Сумма чека': ['Чек сомасы', 'Bill total'], 'Кешбэк {0}%': ['Кешбэк {0}%', 'Cashback {0}%'], 'Скидка −{0} ₸': ['Жеңілдік −{0} ₸', 'Discount −{0} ₸'],
+    '×2 · Верхняя одежда': ['×2 · Сырт киім', '×2 · Outerwear'], '−20% · Обувь': ['−20% · Аяқ киім', '−20% · Shoes'], 'Далее': ['Әрі қарай', 'Next'],
+    'Списать бонусы': ['Бонус шегеру', 'Redeem bonuses'], 'На счёте {0} · можно списать до {1}': ['Шотта {0} · {1} дейін шегеруге болады', '{0} on the card · up to {1} can be redeemed'],
+    'Для списания нужно минимум 500 бонусов': ['Шегеру үшін кемінде 500 бонус қажет', 'At least 500 bonuses are needed to redeem'],
+    'Не списывать': ['Шегермеу', 'None'], 'Половина': ['Жартысы', 'Half'], 'Максимум': ['Барынша', 'Maximum'],
+    'Скидка по акции': ['Акция жеңілдігі', 'Offer discount'], 'Оплата бонусами': ['Бонуспен төлеу', 'Paid with bonuses'], 'К оплате': ['Төлеуге', 'To pay'], 'Будет начислено': ['Есептеледі', 'Will be earned'],
+    'Отправить код клиенту': ['Клиентке код жіберу', 'Send code to customer'], 'Подтверждение': ['Растау', 'Confirmation'], 'Код от клиента': ['Клиенттің коды', 'Code from customer'],
+    'Отправили SMS на {0}. Клиент называет код, чтобы списать {1} бонусов.': ['{0} нөміріне SMS жіберілді. {1} бонус шегеру үшін клиент кодты айтады.', 'We sent an SMS to {0}. The customer tells you the code to redeem {1} bonuses.'],
+    'Неверный код. Нажмите на SMS сверху': ['Код қате. Жоғарыдағы SMS-ті басыңыз', 'Wrong code. Tap the SMS above'],
+    'Покупка проведена': ['Сатып алу өткізілді', 'Purchase complete'], 'чек № {0}': ['чек № {0}', 'receipt no. {0}'], 'Новый баланс клиента': ['Клиенттің жаңа балансы', "Customer's new balance"],
+    'Чек отправлен на печать': ['Чек басып шығаруға жіберілді', 'Receipt sent to the printer'], 'Следующий клиент': ['Келесі клиент', 'Next customer'], 'Карта клиента': ['Клиент картасы', 'Customer card'],
+    'Новый уровень клиента: {0} · кешбэк {1}%': ['Клиенттің жаңа деңгейі: {0} · кешбэк {1}%', 'New customer level: {0} · {1}% cashback'],
+    'Операция': ['Операция', 'Type'], 'Чек №': ['Чек №', 'Receipt no.'], 'Время': ['Уақыты', 'Time'], 'Закрыть': ['Жабу', 'Close'], 'Оформить возврат': ['Қайтаруды рәсімдеу', 'Make a refund'],
+    'Какую покупку вернуть?': ['Қай сатып алуды қайтару керек?', 'Which purchase to refund?'], 'У клиента нет покупок для возврата': ['Клиентте қайтаратын сатып алу жоқ', 'This customer has no purchases to refund'],
+    'Возврат покупки': ['Сатып алуды қайтару', 'Purchase refund'], 'Вернуть клиенту': ['Клиентке қайтару', 'Return to customer'], 'Снять начисленные бонусы': ['Есептелген бонусты алып тастау', 'Take back earned bonuses'],
+    'Вернуть списанные бонусы': ['Шегерілген бонусты қайтару', 'Return redeemed bonuses'], 'Баланс после возврата': ['Қайтарудан кейінгі баланс', 'Balance after refund'], 'Отмена': ['Болдырмау', 'Cancel'],
+    'Возврат оформлен · {0} ₸': ['Қайтару рәсімделді · {0} ₸', 'Refund done · {0} ₸'],
+    'Закрыть смену?': ['Ауысымды жабасыз ба?', 'Close the shift?'], 'Сформируем отчёт за смену и заблокируем кассу.': ['Ауысым есебі жасалып, касса құлыпталады.', 'We will make the shift report and lock the till.'],
+    'Смена закрыта': ['Ауысым жабылды', 'Shift closed'], '{0} ч {1} мин': ['{0} сағ {1} мин', '{0} h {1} min'], 'Готово': ['Дайын', 'Done'],
+    'Правила': ['Ережелер', 'Rules'], 'Как начисляются бонусы': ['Бонус қалай есептеледі', 'How bonuses work'], 'с первой покупки': ['алғашқы сатып алудан', 'from the first purchase'], 'от {0} ₸': ['{0} ₸-ден', 'from {0} ₸'],
+    'Уровень считается по сумме покупок за 12 месяцев': ['Деңгей 12 айдағы сатып алу сомасы бойынша есептеледі', 'The level depends on purchases over 12 months'],
+    '1 бонус = 1 тенге при оплате': ['Төлегенде 1 бонус = 1 теңге', '1 bonus = 1 tenge when paying'], 'Бонусами можно оплатить до 50% чека': ['Бонуспен чектің 50%-ына дейін төлеуге болады', 'Bonuses cover up to 50% of a bill'],
+    'Списание подтверждается кодом из SMS клиента': ['Шегеру клиенттің SMS кодымен расталады', "Redemption is confirmed with a code from the customer's SMS"],
+    'Кешбэк начисляется на сумму, оплаченную деньгами': ['Кешбэк ақшамен төленген сомаға есептеледі', 'Cashback is earned on the part paid with money'],
+    'При возврате начисленные бонусы снимаются, списанные возвращаются': ['Қайтарғанда есептелген бонус алынып, шегерілген бонус қайтарылады', 'On a refund, earned bonuses are taken back and redeemed ones are returned'],
+    'Бонусы действуют 180 дней': ['Бонустар 180 күн жарамды', 'Bonuses are valid for 180 days'],
+  };
+  const LANGS = [['ru', 'RU', 'Русский'], ['kk', 'ҚАЗ', 'Қазақша'], ['en', 'EN', 'English']];
+  let lang = 'ru';
+  try { const l = localStorage.getItem('istanbul-lang'); if (LANGS.some(x => x[0] === l)) lang = l; } catch (e) { /* storage is optional */ }
+  const t = (s, ...a) => { const e = TR[s]; let r = lang === 'ru' || !e ? s : e[lang === 'kk' ? 0 : 1]; a.forEach((v, i) => { r = r.split('{' + i + '}').join(v); }); return r; };
+  /* static texts of the page are remembered once, then re-written on every language change */
+  const statics = [];
+  (() => {
+    const w = document.createTreeWalker(app, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) { const s = n.nodeValue.trim(); if (/[А-Яа-яЁё]/.test(s)) statics.push({ n, ru: s, pre: n.nodeValue.match(/^\s*/)[0], post: n.nodeValue.match(/\s*$/)[0] }); }
+    $$('[placeholder]', app).forEach(e => { if (/[А-Яа-яЁё]/.test(e.getAttribute('placeholder'))) statics.push({ e, ru: e.getAttribute('placeholder') }); });
+  })();
+
+  const P = {
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    userplus: '<circle cx="10" cy="8" r="4"/><path d="M2 21a8 8 0 0 1 16 0M19 8v6M16 11h6"/>',
+    gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3.5 7.5 8 12 8zM12 8s1.5-5 4-4.5S16.5 8 12 8z"/>',
+    back: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M5 12.5 10 17 19 7"/>',
+    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    sms: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.4A8 8 0 1 1 21 12z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
+    del: '<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m16 9-6 6M10 9l6 6"/>',
+    scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+    phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+    bag: '<path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/>',
+    lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+    print: '<path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/>',
+    sound: '<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+    vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 9v6M20 9v6"/>',
+  };
+  const ic = k => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[k]}</svg>`;
+  $$('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic); });
+  $$('.back').forEach(b => { b.innerHTML = ic('back'); });
+  $('#wm').innerHTML = [...'ISTANBUL'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('');
+
+  function count(el, from, to, ms = 900, f = fmt) {
+    cancelAnimationFrame(el._raf);
+    if (calm || from === to) { el.textContent = f(to); return; }
+    const t0 = performance.now();
+    const step = now => { const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = f(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
+    el._raf = requestAnimationFrame(step);
+  }
+  function setNum(el, v, anim, f = fmt) {
+    if (el._v === undefined || !anim) { cancelAnimationFrame(el._raf); el.textContent = f(v); }
+    else if (el._v !== v) count(el, el._v, v, 900, f);
+    el._v = v;
+  }
+
+  /* ---------- state: demo data of one till, kept in the browser ---------- */
+  const KEY = 'istanbul-cashier-v1';
+  const LEVELS = [{ n: 'Базовый', p: 3, from: 0 }, { n: 'Серебро', p: 5, from: 100000 }, { n: 'Золото', p: 7, from: 250000 }];
+  const lvlIndex = total => total >= LEVELS[2].from ? 2 : total >= LEVELS[1].from ? 1 : 0;
+  const WELCOME = 1000, STEP = 500;
+  const CASHIER = { name: 'Айгуль Сарсенова', pin: '1234' };
+  function seed() {
+    const open = Date.now() - (4 * 60 + 12) * 60000, at = m => open + m * 60000;
+    return { open, seq: 1046, scanN: 0, sound: true, vibro: true, print: true,
+      clients: [
+        { id: 'c1', name: 'Мадина', last: 'Ахметова', phone: '7012345678', bal: 62000, total: 162000, place: 7, visits: 9 },
+        { id: 'c2', name: 'Ерлан', last: 'Нурланов', phone: '7054441290', bal: 148500, total: 447000, place: 2, visits: 21 },
+        { id: 'c3', name: 'Зарина', last: 'Абенова', phone: '7771108834', bal: 12400, total: 256000, place: 4, visits: 14 },
+        { id: 'c4', name: 'Данияр', last: 'Нуржанов', phone: '7479032211', bal: 8200, total: 224000, place: 5, visits: 11 },
+        { id: 'c5', name: 'Айгерим', last: 'Жумабаева', phone: '7026657700', bal: 31000, total: 360250, place: 3, visits: 17 },
+        { id: 'c6', name: 'Тимур', last: 'Касымов', phone: '7083320945', bal: 1000, total: 0, place: 1268, visits: 0 },
+      ],
+      ops: [
+        { id: 1046, k: 'sale', cid: 'c5', ts: at(228), amount: 43000, disc: 0, spend: 0, pay: 43000, earn: 3010 },
+        { id: 1045, k: 'sale', cid: 'c2', ts: at(190), amount: 105000, disc: 0, spend: 20000, pay: 85000, earn: 5950 },
+        { id: 1044, k: 'new', cid: 'c6', ts: at(151), earn: WELCOME },
+        { id: 1043, k: 'sale', cid: 'c4', ts: at(118), amount: 32000, disc: 0, spend: 0, pay: 32000, earn: 1600 },
+        { id: 1042, k: 'refund', cid: 'c3', ts: at(84), amount: 21000, spend: 0, pay: 21000, earn: 1470 },
+        { id: 1041, k: 'sale', cid: 'c3', ts: at(40), amount: 21000, disc: 0, spend: 0, pay: 21000, earn: 1470, ref: 1 },
+        { id: 1040, k: 'sale', cid: 'c1', ts: at(14), amount: 62000, disc: 0, spend: 0, pay: 62000, earn: 3100 },
+        { id: 1012, k: 'sale', cid: 'c1', day: '15 ноября', time: '18:05', amount: 105000, disc: 0, spend: 30000, pay: 75000, earn: 3750 },
+        { id: 1003, k: 'sale', cid: 'c2', day: '12 ноября', time: '12:40', amount: 86000, disc: 0, spend: 0, pay: 86000, earn: 6020 },
+        { id: 987, k: 'sale', cid: 'c5', day: '9 ноября', time: '16:22', amount: 57500, disc: 0, spend: 0, pay: 57500, earn: 4025 },
+      ] };
+  }
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }
+  if (!st || !st.clients || (st.open && Date.now() - st.open > 12 * 3600000)) st = seed();
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage is optional */ } };
+  const hhmm = ts => { const d = new Date(ts); return two(d.getHours()) + ':' + two(d.getMinutes()); };
+  const client = id => st.clients.find(c => c.id === id);
+  const cname = c => c.name + (c.last ? ' ' + c.last : '');
+  const cinit = c => (c.name[0] + (c.last ? c.last[0] : '')).toUpperCase();
+  const fmtPhone = d => `+7 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  const cardNo = c => `IST ${c.phone.slice(2, 6)} ${c.phone.slice(6)}`;
+  const opTime = o => o.time || hhmm(o.ts);
+  const opDay = o => o.day || 'Сегодня';
+  const inShift = o => !!o.ts && o.ts >= st.open;
+  function stats() {
+    const s = { cnt: 0, gross: 0, rev: 0, earn: 0, spend: 0, news: 0, refs: 0 };
+    st.ops.filter(inShift).forEach(o => {
+      if (o.k === 'sale') { s.cnt++; s.gross += o.pay; s.rev += o.pay; s.earn += o.earn; s.spend += o.spend; }
+      else if (o.k === 'refund') { s.refs++; s.rev -= o.pay; s.earn -= o.earn; s.spend -= o.spend; }
+      else { s.news++; s.earn += o.earn; }
+    });
+    s.avg = s.cnt ? s.gross / s.cnt : 0;
+    return s;
+  }
+  const durText = ms => t('{0} ч {1} мин', Math.floor(ms / 3600000), Math.floor(ms % 3600000 / 60000));
+
+  /* ---------- effects ---------- */
+  const fx = $('#fx'), ctx = fx.getContext('2d');
+  let parts = [], raf = 0, W = 0, H = 0;
+  function size() { const r = app.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2); W = r.width; H = r.height; fx.width = W * d; fx.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
+  size(); addEventListener('resize', size);
+  const palette = () => app.classList.contains('is-dark') ? ['#FFFFFF', '#BDBDB8', '#6A6A66'] : ['#0B0B0B', '#5C5C58', '#BDBDB8'];
+  function particle(x, y, vx, vy) {
+    const c = palette();
+    parts.push({ x, y, vx, vy, r: 3 + Math.random() * 5, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, life: 1, c: c[Math.floor(Math.random() * c.length)], round: Math.random() < .4 });
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+  function burst(x, y, n) { if (calm) return; for (let i = 0; i < n; i++) particle(x, y, (Math.random() - .5) * 11, -Math.random() * 10 - 2); }
+  function rain(n, ms) { if (calm) return; for (let i = 0; i < n; i++) setTimeout(() => particle(Math.random() * W, -10, (Math.random() - .5) * 1.6, 1.5 + Math.random() * 3), Math.random() * ms); }
+  function frame() {
+    ctx.clearRect(0, 0, W, H);
+    parts.forEach(p => {
+      p.vy += .13; p.x += p.vx; p.y += p.vy; p.vx *= .985; p.rot += p.vr; p.life -= .008;
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.r / 2, 0, 7); ctx.fill(); } else ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
+      ctx.restore();
+    });
+    parts = parts.filter(p => p.life > 0 && p.y < H + 20);
+    raf = parts.length ? requestAnimationFrame(frame) : 0;
+    if (!raf) ctx.clearRect(0, 0, W, H);
+  }
+  const center = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
+  let toastT;
+  function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2400); }
+  let audio = null;
+  function beep() {
+    if (st.vibro && navigator.vibrate) navigator.vibrate(40);
+    if (!st.sound) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain(), now = audio.currentTime;
+      o.frequency.value = 1250; g.gain.setValueAtTime(.08, now); g.gain.exponentialRampToValueAtTime(.0001, now + .13);
+      o.connect(g); g.connect(audio.destination); o.start(now); o.stop(now + .14);
+    } catch (e) { /* sound is optional */ }
+  }
+
+  /* ---------- sheet ---------- */
+  const sheet = $('#sheet'), dim = $('#dim');
+  function openSheet(html, cls = '') {
+    const was = sheet.classList.contains('on');
+    sheet.className = 'sheet pad ' + cls + (was ? ' on' : ''); sheet.innerHTML = '<div class="grab"></div>' + html; sheet.scrollTop = 0;
+    requestAnimationFrame(() => { sheet.classList.add('on'); dim.classList.add('on'); });
+  }
+  function closeSheet() { sheet.classList.remove('on'); dim.classList.remove('on'); }
+  dim.addEventListener('click', closeSheet);
+  sheet.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
+
+  /* ---------- navigation ---------- */
+  let stack = [], curTab = 'scan', cur = null;
+  const curView = () => stack[stack.length - 1];
+  const syncDark = () => app.classList.toggle('is-dark', $('#' + curView()).hasAttribute('data-dark'));
+  function showView(id, dir) {
+    $$('.view').forEach(v => v.classList.toggle('on', v.id === id));
+    const v = $('#' + id); v.classList.remove('from-r', 'from-l'); void v.offsetWidth; if (dir) v.classList.add(dir === 'back' ? 'from-l' : 'from-r');
+    parts = []; syncDark(); $('#sms').classList.remove('on'); app.scrollTop = 0;
+  }
+  function push(id) { stack.push(id); showView(id, 'fwd'); }
+  function pop() {
+    if (stack.length < 2) return;
+    stack.pop(); showView(curView(), 'back');
+    if (curView() === 'v-main') showTab(curTab);
+    if (curView() === 'v-client') renderClient(false);
+  }
+  function reset(id) { stack = [id]; showView(id, 'fwd'); }
+  function goHome() { stack = ['v-main']; showView('v-main', 'back'); showTab('scan'); }
+  app.addEventListener('click', e => {
+    if (e.target.closest('[data-back]')) pop();
+    const g = e.target.closest('[data-go]'); if (g) openSub(g.dataset.go);
+    const tb = e.target.closest('[data-tab]'); if (tb) showTab(tb.dataset.tab);
+  });
+
+  /* ---------- keypads ---------- */
+  $$('.keypad').forEach(k => {
+    const mid = k.dataset.pad === 'amt' ? '00' : '';
+    k.innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', mid, '0', 'del'].map(d => d === '' ? '<span></span>' : `<button class="key ${d === 'del' ? 'x' : ''}" data-k="${d}" aria-label="${d === 'del' ? 'Delete' : d}">${d === 'del' ? ic('del') : d}</button>`).join('');
+  });
+  const PADS = { pin: k => pressPin(k), find: k => pressFind(k), amt: k => pressAmt(k), code: k => pressCode(k) };
+  app.addEventListener('click', e => { const k = e.target.closest('.key'); if (k) PADS[k.closest('.keypad').dataset.pad](k.dataset.k); });
+  addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || sheet.classList.contains('on')) return;
+    const v = curView(), pad = v === 'v-lock' ? 'pin' : v === 'v-find' ? 'find' : v === 'v-sale' && sale.step === 'amt' ? 'amt' : v === 'v-sale' && sale.step === 'code' ? 'code' : null;
+    if (!pad) return;
+    if (/^\d$/.test(e.key)) PADS[pad](e.key); else if (e.key === 'Backspace') PADS[pad]('del'); else if (e.key === 'Enter' && pad === 'amt') $('#amtNext').click();
+  });
+
+  /* ---------- lock screen ---------- */
+  let pin = '';
+  const pins = $('#pins');
+  const drawPins = () => $$('i', pins).forEach((d, i) => d.classList.toggle('f', i < pin.length));
+  function pressPin(k) {
+    if (pins.classList.contains('ok')) return;
+    if (k === 'del') pin = pin.slice(0, -1); else if (pin.length < 4) pin += k;
+    drawPins(); if (pin.length === 4) setTimeout(checkPin, 180);
+  }
+  function checkPin() {
+    if (pin !== CASHIER.pin) { replay(pins, 'bad'); pin = ''; setTimeout(drawPins, 350); toast(t('Неверный PIN-код')); return; }
+    pins.classList.add('ok');
+    setTimeout(() => {
+      pin = ''; pins.classList.remove('ok'); drawPins();
+      if (!st.open) { st.open = Date.now(); save(); }
+      reset('v-main'); showTab('scan'); toast(t('Смена открыта в {0}', hhmm(st.open)));
+    }, 650);
+  }
+  $('#pinHint').addEventListener('click', () => { pin = ''; drawPins(); [...CASHIER.pin].forEach((d, i) => setTimeout(() => pressPin(d), 110 * (i + 1))); });
+
+  /* ---------- operations ---------- */
+  const opIcon = o => o.k === 'refund' ? 'undo' : o.k === 'new' ? 'userplus' : 'bag';
+  const opKind = o => t(o.k === 'refund' ? 'Возврат' : o.k === 'new' ? 'Новая карта' : 'Покупка');
+  function opRow(o, i, byClient) {
+    const neg = o.k === 'refund';
+    const sub = (byClient ? `${t(opDay(o))}, ` : '') + opTime(o) + (o.k === 'new' ? (byClient ? '' : ` · ${t('Новая карта')}`) : ` · ${t('чек')} ${fmt(o.amount)} ${CUR}` + (o.spend && !neg ? ` · −${fmt(o.spend)}` : ''));
+    return `<button class="op a${o.fresh ? ' fresh' : ''}${o.ref ? ' ref' : ''}" style="--i:${i}" data-op="${o.id}"><span class="ic ${neg ? 'neg' : ''}">${ic(opIcon(o))}</span><span class="t"><b>${byClient ? opKind(o) : esc(cname(client(o.cid)))}</b><span>${sub}${o.ref ? ` · ${t('возврат оформлен')}` : ''}</span></span><span class="amt ${neg ? 'neg' : ''}">${neg ? '−' : '+'}${fmt(o.earn)}</span></button>`;
+  }
+  const kvRow = (k, v, big) => `<div><span>${k}</span><b${big ? ' class="big"' : ''}>${v}</b></div>`;
+  function opSheet(o) {
+    const c = client(o.cid), neg = o.k === 'refund';
+    openSheet(`<h3>${opKind(o)}</h3><div class="amt">${neg ? '−' : '+'}${fmt(o.earn)} <small>${t('бонусов')}</small></div><div class="when">${t(opDay(o))}, ${opTime(o)}</div>
+      <div class="kv">${kvRow(t('Клиент'), esc(cname(c)))}${kvRow(t('Чек №'), o.id)}${o.k === 'new' ? '' : kvRow(t('Сумма чека'), `${fmt(o.amount)} ${CUR}`) + (o.disc ? kvRow(t('Скидка по акции'), `−${fmt(o.disc)} ${CUR}`) : '') + (o.spend ? kvRow(t(neg ? 'Вернуть списанные бонусы' : 'Оплата бонусами'), (neg ? '+' : '−') + fmt(o.spend)) : '') + kvRow(t(neg ? 'Вернуть клиенту' : 'К оплате'), `${fmt(o.pay)} ${CUR}`)}</div>
+      ${o.k === 'sale' && !o.ref ? `<button class="cta ghost" data-refund="${o.id}">${ic('undo')}${t('Оформить возврат')}</button>` : ''}<button class="cta ${o.k === 'sale' && !o.ref ? '' : 'ghost'}" style="margin-top:10px" data-close>${t('Закрыть')}</button>`);
+  }
+  app.addEventListener('click', e => { const b = e.target.closest('[data-op]'); if (b) opSheet(st.ops.find(o => o.id === +b.dataset.op)); });
+  function refundSheet(o) {
+    const c = client(o.cid), after = Math.max(0, c.bal - o.earn + o.spend);
+    openSheet(`<h3>${t('Возврат покупки')}</h3><div class="when">${esc(cname(c))} · ${t(opDay(o))}, ${opTime(o)}</div>
+      <div class="kv">${kvRow(t('Вернуть клиенту'), `${fmt(o.pay)} ${CUR}`, true)}${kvRow(t('Снять начисленные бонусы'), '−' + fmt(o.earn))}${o.spend ? kvRow(t('Вернуть списанные бонусы'), '+' + fmt(o.spend)) : ''}${kvRow(t('Баланс после возврата'), fmt(after))}</div>
+      <button class="cta" data-dorefund="${o.id}">${ic('undo')}${t('Оформить возврат')}</button><button class="cta ghost" style="margin-top:10px" data-close>${t('Отмена')}</button>`);
+  }
+  function doRefund(o) {
+    const c = client(o.cid);
+    c.bal = Math.max(0, c.bal - o.earn + o.spend); c.total = Math.max(0, c.total - (o.amount - (o.disc || 0))); o.ref = 1;
+    st.ops.unshift({ id: ++st.seq, k: 'refund', cid: c.id, ts: Date.now(), amount: o.amount, spend: o.spend, pay: o.pay, earn: o.earn, fresh: 1 }); save();
+    closeSheet(); toast(t('Возврат оформлен · {0} ₸', fmt(o.pay)));
+    if (curView() === 'v-client') renderClient(false); else showTab(curTab);
+  }
+  sheet.addEventListener('click', e => {
+    const r = e.target.closest('[data-refund]'); if (r) refundSheet(st.ops.find(o => o.id === +r.dataset.refund));
+    const d = e.target.closest('[data-dorefund]'); if (d) doRefund(st.ops.find(o => o.id === +d.dataset.dorefund));
+  });
+
+  /* ---------- till tab: scanner ---------- */
+  function refreshScan(anim) {
+    const s = stats();
+    $('#cName').textContent = CASHIER.name;
+    setNum($('#sCnt'), s.cnt, anim); setNum($('#sEarn'), s.earn, anim, n => '+' + fmt(n)); setNum($('#sSpend'), s.spend, anim, n => (Math.round(n) ? '−' : '') + fmt(n));
+    $('#lastOps').innerHTML = st.ops.filter(inShift).slice(0, 3).map((o, i) => opRow(o, 6 + i)).join('');
+    st.ops.forEach(o => { delete o.fresh; });
+  }
+  const scanner = $('#scanner');
+  let scanning = false;
+  scanner.addEventListener('click', () => {
+    if (scanning) return; scanning = true; scanner.classList.add('scanning');
+    setTimeout(() => {
+      scanner.classList.add('hit'); beep();
+      setTimeout(() => { scanner.classList.remove('scanning', 'hit'); scanning = false; const c = st.clients[st.scanN++ % st.clients.length]; save(); openClient(c); }, calm ? 0 : 650);
+    }, calm ? 0 : 900);
+  });
+
+  /* ---------- search by phone ---------- */
+  let fq = '';
+  function pressFind(k) { if (k === 'del') fq = fq.slice(0, -1); else if (fq.length < 10) fq += k; drawFind(); }
+  function drawFind() {
+    $('#fDigits').textContent = [fq.slice(0, 3), fq.slice(3, 6), fq.slice(6, 8), fq.slice(8)].filter(Boolean).join(' ');
+    const box = $('#found');
+    if (fq.length < 2) { box.innerHTML = `<p class="nf">${t('Введите первые цифры номера или последние четыре')}</p>`; return; }
+    const list = st.clients.filter(c => c.phone.startsWith(fq) || c.phone.endsWith(fq) || (fq.length > 3 && c.phone.includes(fq)));
+    box.innerHTML = list.map((c, i) => `<button class="cl" style="--i:${i}" data-cl="${c.id}"><span class="av">${cinit(c)}</span><span class="t"><b>${esc(cname(c))}</b><span>${fmtPhone(c.phone)}</span></span><span class="r">${fmt(c.bal)}<small>${t('бонусов')}</small></span></button>`).join('')
+      || (fq.length === 10 ? `<p class="nf">${t('Клиента с таким номером нет')}</p><button class="cta ghost" id="regFound">${ic('userplus')}${t('Выдать карту на этот номер')}</button>` : `<p class="nf">${t('Нет совпадений')}</p>`);
+  }
+  $('#goFind').addEventListener('click', () => { fq = ''; drawFind(); push('v-find'); });
+  $('#found').addEventListener('click', e => {
+    const b = e.target.closest('[data-cl]'); if (b) { stack = ['v-main']; openClient(client(b.dataset.cl)); }
+    if (e.target.closest('#regFound')) { stack = ['v-main']; openNew(fq); }
+  });
+
+  /* ---------- new customer ---------- */
+  let nd = '';
+  const nPhone = $('#nPhone'), nName = $('#nName'), nLast = $('#nLast');
+  const drawNew = () => { nPhone.value = nd ? fmtPhone(nd).trimEnd() : ''; $('#nGo').disabled = nd.length !== 10 || nName.value.trim().length < 2; };
+  function openNew(phone) { nd = phone || ''; nName.value = ''; nLast.value = ''; drawNew(); push('v-new'); }
+  nPhone.addEventListener('input', () => {
+    const v = nPhone.value; let d = v.replace(/\D/g, '');
+    if (v.startsWith('+7')) d = d.slice(1); else if (d.length > 10 && (d[0] === '7' || d[0] === '8')) d = d.slice(1);
+    d = d.slice(0, 10);
+    if (d === nd && v.length < fmtPhone(nd).trimEnd().length) d = d.slice(0, -1);
+    nd = d; drawNew();
+  });
+  nName.addEventListener('input', drawNew);
+  $('#goNew').addEventListener('click', () => openNew(''));
+  $('#nGo').addEventListener('click', () => {
+    const had = st.clients.find(c => c.phone === nd);
+    if (had) { toast(t('Клиент с таким номером уже есть')); stack = ['v-main']; openClient(had); return; }
+    const c = { id: 'c' + (++st.seq), name: nName.value.trim(), last: nLast.value.trim(), phone: nd, bal: WELCOME, total: 0, place: 1268, visits: 0 };
+    st.clients.push(c); st.ops.unshift({ id: ++st.seq, k: 'new', cid: c.id, ts: Date.now(), earn: WELCOME, fresh: 1 }); save();
+    stack = ['v-main']; openClient(c); toast(t('Карта выдана · +1 000 бонусов')); setTimeout(() => burst(W / 2, H * .3, 110), 350);
+  });
+
+  /* ---------- customer card ---------- */
+  function openClient(c) { cur = c; renderClient(true); push('v-client'); }
+  function renderClient(anim) {
+    const c = cur, li = lvlIndex(c.total), L = LEVELS[li], next = LEVELS[li + 1];
+    const ops = st.ops.filter(o => o.cid === c.id).slice(0, 4);
+    $('#clientBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Back">${ic('back')}</button>${t('Клиент')}</div>
+      <div class="ccard${anim ? ' in' : ''}"><div class="nm">${esc(cname(c))}</div>
+        <div class="r lb"><small>${t('Бонусный счёт')}</small><span class="lvl">${t(L.n)} · ${L.p}%</span></div><div class="bal"><b id="cBal">${fmt(c.bal)}</b><span>${t('бонусов')}</span></div>
+        <div class="r ft"><span class="num">${cardNo(c)}</span><span>${fmtPhone(c.phone)}</span></div></div>
+      <div class="stats3 a" style="--i:2"><div><small>${t('Покупки за год')}</small><b>${fmt(c.total)} ${CUR}</b></div><div><small>${t('Рейтинг')}</small><b>#${fmt(c.place)}</b></div><div><small>${t('Визитов')}</small><b>${c.visits}</b></div></div>
+      <div class="box a" style="--i:3"><h5>${next ? t('До уровня «{0}»', t(next.n)) : t('Максимальный уровень')}<span>${next ? `${fmt(next.from - c.total)} ${CUR}` : t('кешбэк 7%')}</span></h5><div class="pbar"><i id="cBar"></i></div></div>
+      <div class="note a" style="--i:4">${ic('tag')}<span>${t('Акция: двойные бонусы на верхнюю одежду до 30 ноября')}</span></div>
+      <div class="sec a" style="--i:5"><h4>${t('Операции клиента')}</h4></div>${ops.map((o, i) => opRow(o, 6 + i, true)).join('') || `<p class="nf">${t('Операций пока нет')}</p>`}`;
+    st.ops.forEach(o => { delete o.fresh; });
+    if (anim) count($('#cBal'), 0, c.bal, 900);
+    requestAnimationFrame(() => { const b = $('#cBar'); if (b) b.style.width = (next ? Math.min(100, c.total / next.from * 100) : 100) + '%'; });
+  }
+  $('#cRefund').addEventListener('click', () => {
+    const list = st.ops.filter(o => o.cid === cur.id && o.k === 'sale' && !o.ref).slice(0, 5);
+    openSheet(`<h3>${t('Какую покупку вернуть?')}</h3>` + (list.map(o => `<button class="op" data-refund="${o.id}"><span class="ic">${ic('bag')}</span><span class="t"><b>${fmt(o.amount)} ${CUR}</b><span>${t(opDay(o))}, ${opTime(o)} · ${t('чек № {0}', o.id)}</span></span><span class="amt">+${fmt(o.earn)}</span></button>`).join('') || `<p class="lead">${t('У клиента нет покупок для возврата')}</p>`) + `<button class="cta ghost" data-close>${t('Закрыть')}</button>`);
+  });
+
+  /* ---------- purchase: amount, bonuses, code ---------- */
+  let sale = { step: '' };
+  function calc() {
+    const a = +sale.amt || 0, L = LEVELS[lvlIndex(sale.c.total)];
+    const disc = sale.promo === 'm20' ? Math.round(a * .2) : 0, base = a - disc;
+    const maxSpend = Math.floor(Math.min(sale.c.bal, base * .5) / STEP) * STEP;
+    const spend = Math.min(sale.spend, maxSpend), pay = base - spend;
+    return { a, disc, base, maxSpend, spend, pay, pct: L.p, earn: Math.round(pay * L.p / 100) * (sale.promo === 'x2' ? 2 : 1) };
+  }
+  function setStep(s) {
+    sale.step = s; $$('.step').forEach(x => x.classList.toggle('on', x.id === 'st-' + s));
+    $('#stepNo').textContent = s === 'amt' ? '1 / 2' : s === 'bon' ? '2 / 2' : ''; $('#saleTitle').textContent = t(s === 'code' ? 'Подтверждение' : 'Покупка'); $('#sms').classList.remove('on');
+  }
+  function drawAmt() {
+    const r = calc();
+    $('#amt').textContent = fmt(r.a); $('#amtNext').disabled = r.a < 100;
+    $('#amtCalc').textContent = (r.disc ? t('Скидка −{0} ₸', fmt(r.disc)) + ' · ' : '') + t('Кешбэк {0}%', r.pct) + (sale.promo === 'x2' ? ' ×2' : '') + ` · +${fmt(r.earn)}`;
+  }
+  function pressAmt(k) {
+    if (k === 'del') sale.amt = sale.amt.slice(0, -1); else if ((sale.amt + k).length <= 7 && (sale.amt || !/^0+$/.test(k))) sale.amt += k;
+    drawAmt();
+  }
+  $('#cSale').addEventListener('click', () => {
+    sale = { c: cur, amt: '', promo: null, spend: 0, code: '', typed: '', step: 'amt' };
+    $$('#promos button').forEach(b => b.classList.remove('on'));
+    $('#saleWho').innerHTML = `<span class="av">${cinit(cur)}</span><span class="t"><b>${esc(cname(cur))}</b><span>${t(LEVELS[lvlIndex(cur.total)].n)} · ${cardNo(cur)}</span></span><span class="bl">${fmt(cur.bal)}</span>`;
+    setStep('amt'); drawAmt(); push('v-sale');
+  });
+  $('#promos').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    sale.promo = sale.promo === b.dataset.p ? null : b.dataset.p; $$('#promos button').forEach(x => x.classList.toggle('on', x.dataset.p === sale.promo)); drawAmt(); replay($('#amtCalc'), 'bump');
+  });
+  const range = $('#range');
+  function drawBon(anim) {
+    const r = calc(); sale.spend = r.spend;
+    setNum($('#spendV'), r.spend, anim, n => (Math.round(n) ? '−' : '') + fmt(n));
+    range.value = r.spend; range.style.setProperty('--p', (r.maxSpend ? r.spend / r.maxSpend * 100 : 0) + '%');
+    $('#avail').textContent = r.maxSpend ? t('На счёте {0} · можно списать до {1}', fmt(sale.c.bal), fmt(r.maxSpend)) : t('Для списания нужно минимум 500 бонусов');
+    const half = Math.floor(r.maxSpend / 2 / STEP) * STEP;
+    $$('#quick button').forEach(b => b.classList.toggle('on', (b.dataset.q === '0' ? 0 : b.dataset.q === 'half' ? half : r.maxSpend) === r.spend && (b.dataset.q !== 'half' || half > 0 && half < r.maxSpend)));
+    $('#saleKv').innerHTML = kvRow(t('Сумма чека'), `${fmt(r.a)} ${CUR}`) + (r.disc ? kvRow(t('Скидка по акции'), `−${fmt(r.disc)} ${CUR}`) : '') + (r.spend ? kvRow(t('Оплата бонусами'), '−' + fmt(r.spend)) : '') + kvRow(t('К оплате'), `${fmt(r.pay)} ${CUR}`, true) + kvRow(t('Будет начислено'), '+' + fmt(r.earn));
+    $('#saleGo').innerHTML = r.spend ? ic('sms') + t('Отправить код клиенту') : ic('check') + t('Провести покупку');
+  }
+  $('#amtNext').addEventListener('click', () => {
+    sale.spend = 0; const r = calc();
+    range.max = r.maxSpend || STEP; range.disabled = !r.maxSpend; $('#quick').hidden = !r.maxSpend; $('#spendV')._v = undefined;
+    setStep('bon'); drawBon(false);
+  });
+  range.addEventListener('input', () => { sale.spend = +range.value; drawBon(false); });
+  $('#quick').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return; const max = calc().maxSpend;
+    sale.spend = b.dataset.q === '0' ? 0 : b.dataset.q === 'half' ? Math.floor(max / 2 / STEP) * STEP : max; drawBon(true);
+  });
+  const drawOtp = () => $$('#otp span').forEach((s, i) => { s.textContent = sale.typed[i] || ''; s.className = i < sale.typed.length ? 'f' : i === sale.typed.length ? 'cur' : ''; });
+  $('#saleGo').addEventListener('click', () => {
+    const r = calc(); if (!r.spend) { finishSale(); return; }
+    sale.code = String(1000 + Math.floor(Math.random() * 9000)); sale.typed = ''; $('#otp').className = 'otp'; drawOtp();
+    $('#codeLead').textContent = t('Отправили SMS на {0}. Клиент называет код, чтобы списать {1} бонусов.', fmtPhone(sale.c.phone), fmt(r.spend));
+    $('#smsCode').textContent = sale.code; setStep('code');
+    setTimeout(() => { if (curView() === 'v-sale' && sale.step === 'code') $('#sms').classList.add('on'); }, 900);
+  });
+  function pressCode(k) {
+    if ($('#otp').classList.contains('ok')) return;
+    if (k === 'del') sale.typed = sale.typed.slice(0, -1); else if (sale.typed.length < 4) sale.typed += k;
+    drawOtp();
+    if (sale.typed.length === 4) setTimeout(() => {
+      if (sale.typed !== sale.code) { replay($('#otp'), 'bad'); sale.typed = ''; setTimeout(drawOtp, 350); toast(t('Неверный код. Нажмите на SMS сверху')); $('#sms').classList.add('on'); return; }
+      $('#otp').classList.add('ok'); $('#sms').classList.remove('on'); setTimeout(finishSale, 700);
+    }, 200);
+  }
+  $('#sms').addEventListener('click', () => { $('#sms').classList.remove('on'); sale.typed = ''; [...sale.code].forEach((d, i) => setTimeout(() => pressCode(d), 120 * (i + 1))); });
+  $('#saleBack').addEventListener('click', () => { if (sale.step === 'code') { setStep('bon'); drawBon(false); } else if (sale.step === 'bon') { setStep('amt'); drawAmt(); } else pop(); });
+  function finishSale() {
+    const r = calc(), c = sale.c, li0 = lvlIndex(c.total), bal0 = c.bal;
+    c.bal += r.earn - r.spend; c.total += r.base; c.visits++;
+    const o = { id: ++st.seq, k: 'sale', cid: c.id, ts: Date.now(), amount: r.a, disc: r.disc, spend: r.spend, pay: r.pay, earn: r.earn, fresh: 1 };
+    st.ops.unshift(o); save();
+    const up = lvlIndex(c.total) > li0 ? LEVELS[lvlIndex(c.total)] : null;
+    $('#doneBody').innerHTML = `<div class="okc">${ic('check')}</div><h2>${t('Покупка проведена')}</h2><div class="when">${esc(cname(c))} · ${t('чек № {0}', o.id)}</div>
+      <div class="kv">${kvRow(t('Сумма чека'), `${fmt(r.a)} ${CUR}`)}${r.disc ? kvRow(t('Скидка по акции'), `−${fmt(r.disc)} ${CUR}`) : ''}${r.spend ? kvRow(t('Оплата бонусами'), '−' + fmt(r.spend)) : ''}${kvRow(t('К оплате'), `${fmt(r.pay)} ${CUR}`, true)}${kvRow(t('Кешбэк {0}%', r.pct) + (sale.promo === 'x2' ? ' ×2' : ''), '+' + fmt(r.earn))}</div>
+      <div class="newbal"><small>${t('Новый баланс клиента')}</small><b id="dBal">${fmt(bal0)}</b></div>
+      ${st.print ? `<div class="printed">${ic('print')}${t('Чек отправлен на печать')}</div>` : ''}
+      <div class="acts"><button class="cta" id="dNext">${ic('scan')}${t('Следующий клиент')}</button><button class="cta ghost" id="dCard">${t('Карта клиента')}</button></div>`;
+    stack = ['v-main', 'v-client', 'v-done']; showView('v-done', 'fwd'); beep();
+    setTimeout(() => {
+      const el = $('#dBal'); if (!el || curView() !== 'v-done') return;
+      count(el, bal0, c.bal, 1000); const p = center($('.okc')); burst(p.x, p.y, 70);
+      if (up) { toast(t('Новый уровень клиента: {0} · кешбэк {1}%', t(up.n), up.p)); rain(140, 2200); }
+    }, 600);
+  }
+  $('#doneBody').addEventListener('click', e => {
+    if (e.target.closest('#dNext')) goHome();
+    if (e.target.closest('#dCard')) { stack = ['v-main', 'v-client']; renderClient(false); showView('v-client', 'back'); }
+  });
+
+  /* ---------- operations tab ---------- */
+  let oFilter = 'all';
+  function renderOps() {
+    const list = st.ops.filter(o => oFilter === 'all' || (oFilter === 'spend' ? o.k === 'sale' && o.spend > 0 : o.k === oFilter));
+    let day = '', html = '';
+    list.forEach((o, i) => { if (opDay(o) !== day) { day = opDay(o); html += `<div class="day a" style="--i:${2 + i}">${t(day)}</div>`; } html += opRow(o, 2 + i); });
+    $('#opsList').innerHTML = html || `<div class="empty a" style="--i:2"><h3>${t('Пока пусто')}</h3><p>${t(oFilter === 'all' ? 'Операции появятся после первой покупки' : 'Таких операций в этой смене нет')}</p></div>`;
+    st.ops.forEach(o => { delete o.fresh; });
+  }
+  $('#oFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; oFilter = b.dataset.f; $$('#oFilter button').forEach(x => x.classList.toggle('on', x === b)); renderOps(); });
+
+  /* ---------- shift tab ---------- */
+  function renderShift() {
+    const s = stats(), now = new Date(), h = now.getHours();
+    $('#shOpen').textContent = hhmm(st.open); $('#shWho').textContent = CASHIER.name;
+    setNum($('#zRev'), s.rev, true); setNum($('#zCnt'), s.cnt, true); setNum($('#zAvg'), s.avg, true);
+    setNum($('#zEarn'), s.earn, true, n => '+' + fmt(n)); setNum($('#zSpend'), s.spend, true, n => (Math.round(n) ? '−' : '') + fmt(n)); setNum($('#zNew'), s.news, true); setNum($('#zRef'), s.refs, true);
+    const hours = Array.from({ length: 6 }, (_, i) => ({ h: (h - 5 + i + 24) % 24, v: 0 }));
+    st.ops.filter(o => inShift(o) && o.k === 'sale').forEach(o => { const b = hours.find(x => x.h === new Date(o.ts).getHours()); if (b) b.v += o.pay; });
+    const max = Math.max(1, ...hours.map(x => x.v));
+    $('#hours').innerHTML = hours.map((x, i) => `<div class="${i === 5 ? 'now' : ''}"><em>${x.v ? fmt(x.v / 1000) : ''}</em><i style="--h:${Math.round(x.v / max * 100)}%;--i:${i}"></i>${two(x.h)}</div>`).join('');
+  }
+  (function tick() {
+    if (st.open) { const d = Math.floor((Date.now() - st.open) / 1000), hm = two(Math.floor(d / 3600)) + ':' + two(Math.floor(d % 3600 / 60)); $('#shTimer').textContent = hm + ':' + two(d % 60); $('#shiftDur').textContent = hm; }
+    setTimeout(tick, 1000);
+  })();
+  $('#closeShift').addEventListener('click', () => {
+    const s = stats();
+    openSheet(`<h3>${t('Закрыть смену?')}</h3><p class="lead">${t('Сформируем отчёт за смену и заблокируем кассу.')}</p><div class="kv">${kvRow(t('Выручка'), `${fmt(s.rev)} ${CUR}`, true)}${kvRow(t('Чеков'), s.cnt)}</div><button class="cta" id="doClose">${ic('lock')}${t('Закрыть смену')}</button><button class="cta ghost" style="margin-top:10px" data-close>${t('Отмена')}</button>`);
+  });
+  sheet.addEventListener('click', e => {
+    if (!e.target.closest('#doClose')) return;
+    const s = stats(), now = Date.now();
+    $('#zBody').innerHTML = `<div class="okc">${ic('check')}</div><h2>${t('Смена закрыта')}</h2><div class="when">${hhmm(st.open)} – ${hhmm(now)} · ${durText(now - st.open)}</div>
+      <div class="newbal"><small>${t('Выручка')}</small><b><span id="zTotal">0</span> ${CUR}</b></div>
+      <div class="kv">${kvRow(t('Чеков'), s.cnt)}${kvRow(t('Средний чек'), `${fmt(s.avg)} ${CUR}`)}${kvRow(t('Начислено бонусов'), '+' + fmt(s.earn))}${kvRow(t('Списано бонусов'), (s.spend ? '−' : '') + fmt(s.spend))}${kvRow(t('Новых клиентов'), s.news)}${kvRow(t('Возвратов'), s.refs)}</div>
+      <div class="acts"><button class="cta" id="zDone">${t('Готово')}</button></div>`;
+    /* the closed shift stays in history, the next sign-in opens a new one */
+    st.ops.forEach(o => { if (o.ts) { o.day = 'Сегодня'; o.time = hhmm(o.ts); delete o.ts; } });
+    st.open = 0; save(); closeSheet(); reset('v-z');
+    setTimeout(() => { if (curView() !== 'v-z') return; count($('#zTotal'), 0, s.rev, 1300); rain(110, 2400); }, 500);
+  });
+  $('#zBody').addEventListener('click', e => { if (e.target.closest('#zDone')) reset('v-lock'); });
+
+  /* ---------- profile, language, rules ---------- */
+  function refreshMore() {
+    $('#pAv').textContent = CASHIER.name.split(' ').map(w => w[0]).join(''); $('#pName').textContent = CASHIER.name;
+    $$('.toggle').forEach(x => x.setAttribute('aria-checked', String(!!st[x.dataset.t])));
+  }
+  app.addEventListener('click', e => {
+    const x = e.target.closest('.toggle'); if (!x) return;
+    st[x.dataset.t] = !st[x.dataset.t]; save(); x.setAttribute('aria-checked', String(st[x.dataset.t])); if (x.dataset.t !== 'print' && st[x.dataset.t]) beep();
+  });
+  $('#lockBtn').addEventListener('click', () => reset('v-lock'));
+  function openLang() { openSheet(`<h3>${t('Язык приложения')}</h3><div class="langs">${LANGS.map(([c, short, name]) => `<button class="lopt ${c === lang ? 'on' : ''}" data-lang="${c}"><b>${short}</b><span>${name}</span>${c === lang ? ic('check') : ''}</button>`).join('')}</div>`); }
+  function applyLang() {
+    statics.forEach(x => { if (x.n) x.n.nodeValue = x.pre + t(x.ru) + x.post; else x.e.setAttribute('placeholder', t(x.ru)); });
+    document.documentElement.lang = lang; app.dataset.lang = lang;
+    const now = LANGS.find(x => x[0] === lang); $('#langBtn b').textContent = now[1]; $('#pLang').textContent = now[2];
+    if (curView() === 'v-main') showTab(curTab);
+  }
+  $('#langBtn').addEventListener('click', openLang);
+  $('#langRow').addEventListener('click', openLang);
+  sheet.addEventListener('click', e => {
+    const l = e.target.closest('[data-lang]'); if (!l) return;
+    lang = l.dataset.lang; try { localStorage.setItem('istanbul-lang', lang); } catch (err) { /* storage is optional */ }
+    closeSheet(); applyLang(); toast(t('Язык изменён'));
+  });
+  function openSub(id) {
+    if (id === 'v-rules') {
+      const rules = ['Уровень считается по сумме покупок за 12 месяцев', '1 бонус = 1 тенге при оплате', 'Бонусами можно оплатить до 50% чека', 'Списание подтверждается кодом из SMS клиента', 'Кешбэк начисляется на сумму, оплаченную деньгами', 'При возврате начисленные бонусы снимаются, списанные возвращаются', 'Бонусы действуют 180 дней'];
+      $('#rulesBody').innerHTML = `<div class="topbar"><button class="back" data-back aria-label="Back">${ic('back')}</button>${t('Правила')}</div><h2 class="big-t a" style="font-size:22px;margin-top:10px">${t('Как начисляются бонусы')}</h2>` +
+        LEVELS.map((L, i) => `<div class="lc ${i === 2 ? 'gold' : ''} a" style="--i:${1 + i}"><div><small>${i ? t('от {0} ₸', fmt(L.from)) : t('с первой покупки')}</small><div class="n">${t(L.n)}</div></div><div class="p">${L.p}%</div></div>`).join('') +
+        `<div class="rules" style="margin-top:14px">${rules.map((r, i) => `<div class="a" style="--i:${4 + i}"><b>${i + 1}</b>${t(r)}</div>`).join('')}</div>`;
+    }
+    push(id);
+  }
+
+  /* ---------- tabs ---------- */
+  const TABS = ['scan', 'ops', 'shift', 'more'];
+  function showTab(name) {
+    curTab = name;
+    $$('.tab').forEach(x => x.classList.toggle('on', x.id === 't-' + name));
+    $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    $('#navInd').style.transform = `translateX(${TABS.indexOf(name) * 100}%)`;
+    parts = [];
+    if (name === 'scan') refreshScan(true);
+    if (name === 'ops') renderOps();
+    if (name === 'shift') renderShift();
+    if (name === 'more') refreshMore();
+  }
+
+  applyLang();
+  reset('v-lock');
+})();
+</script>
