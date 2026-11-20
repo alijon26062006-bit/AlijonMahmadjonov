@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>ISTANBUL — бонусная программа</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.board { width: 1900px; }
+.board.w5 { width: 2400px; }
+.board.w3 { width: 1440px; }
+.stw .status { color: #fff; }
+.phones { flex-wrap: wrap; row-gap: 56px; justify-content: flex-start; padding-left: 10px; }
+.board-head h1 { letter-spacing: 1px; }
+.group { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; margin: 12px 0 26px; display: flex; align-items: center; gap: 14px; }
+.group::after { content: ''; flex: 1; height: 1.5px; background: #BDBDB8; }
+
+/* splash / auth */
+.splash { position: absolute; inset: 0; background: var(--ink); color: #fff; display: flex; flex-direction: column; padding: 90px 28px 46px; }
+.splash .wm { font-family: var(--display); font-weight: 700; font-size: 40px; letter-spacing: 6px; }
+.splash .sub { font-size: 16px; color: rgba(255,255,255,.65); margin-top: 12px; line-height: 1.45; }
+.splash .art { flex: 1; position: relative; margin: 26px 0; }
+.splash .art img { position: absolute; width: 210px; filter: invert(1) brightness(1.1); opacity: .95; }
+.splash .ring { position: absolute; border: 1.5px solid rgba(255,255,255,.16); border-radius: 50%; }
+.splash .perk { display: flex; gap: 12px; align-items: center; font-size: 15px; font-weight: 700; margin-top: 12px; }
+.splash .perk b { min-width: 46px; height: 30px; padding: 0 8px; border-radius: 99px; border: 1.5px solid rgba(255,255,255,.4); display: grid; place-items: center; font-family: var(--display); font-size: 12px; }
+.splash .cta { margin-top: 26px; }
+.legal { font-size: 12px; color: var(--grey); text-align: center; margin-top: 12px; line-height: 1.4; }
+.splash .legal { color: rgba(255,255,255,.45); }
+.big-t { font-family: var(--display); font-weight: 700; font-size: 28px; text-transform: uppercase; line-height: 1.12; margin-top: 18px; }
+.lead { font-size: 15px; color: var(--soft); margin-top: 10px; line-height: 1.45; }
+.inp { margin-top: 22px; border: 1.5px solid var(--ink); border-radius: 18px; height: 62px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 22px; font-weight: 800; letter-spacing: .5px; }
+.inp .pre { color: var(--grey); }
+.inp .caret { width: 2px; height: 28px; background: var(--ink); }
+.inp.light { border-color: var(--line); font-size: 16px; font-weight: 700; height: 56px; letter-spacing: 0; }
+.inp.light .ph { color: var(--grey); font-weight: 600; }
+.flabel { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 18px 0 -12px 2px; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 20px 0; }
+.keypad span { height: 54px; display: grid; place-items: center; font-family: var(--display); font-weight: 600; font-size: 22px; border-radius: 16px; }
+.keypad span.k { background: var(--mist); }
+.dark .keypad span.k { background: #1D1D1B; color: #fff; }
+.keypad svg.i { width: 26px; height: 26px; }
+.otp { display: flex; gap: 12px; margin-top: 26px; }
+.otp span { width: 62px; height: 70px; border: 1.5px solid var(--line); border-radius: 18px; display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 28px; }
+.otp span.f { border-color: var(--ink); }
+.otp span.cur { border-color: var(--ink); border-width: 2.5px; }
+.resend { margin-top: 18px; font-size: 14px; color: var(--grey); font-weight: 700; }
+.chips { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.chips span { padding: 10px 16px; border: 1.5px solid var(--line); border-radius: 99px; font-weight: 800; font-size: 14px; }
+.chips span.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.gift { margin-top: 22px; background: var(--ink); color: #fff; border-radius: 22px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+.gift img { width: 52px; filter: invert(1); }
+.gift b { font-family: var(--display); font-size: 22px; display: block; }
+.gift span { font-size: 13px; color: rgba(255,255,255,.65); font-weight: 600; }
+.check { display: flex; gap: 10px; margin-top: 16px; font-size: 13.5px; color: var(--soft); font-weight: 600; line-height: 1.4; }
+.check i { width: 22px; height: 22px; border-radius: 7px; background: var(--ink); flex: none; display: grid; place-items: center; color: #fff; }
+.check i svg.i { width: 15px; height: 15px; stroke-width: 2.6; }
+
+/* sheet */
+.dim { position: absolute; inset: 0; background: rgba(11,11,11,.42); z-index: 8; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 30px 30px 0 0; padding: 12px 20px 34px; z-index: 9; }
+.grab { width: 40px; height: 5px; background: var(--line); border-radius: 3px; margin: 0 auto 14px; }
+.sheet h3 { font-family: var(--display); font-weight: 700; font-size: 20px; text-transform: uppercase; }
+.sheet .amt { font-family: var(--display); font-weight: 700; font-size: 44px; letter-spacing: -1px; margin-top: 14px; }
+.sheet .when { color: var(--grey); font-weight: 700; font-size: 14px; }
+.kv { margin-top: 14px; border-top: 1.5px solid var(--line); }
+.kv div { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; color: var(--soft); font-weight: 600; }
+.kv div b { color: var(--ink); font-weight: 800; }
+.items { margin-top: 12px; display: grid; gap: 8px; }
+.item { display: flex; gap: 12px; align-items: center; background: var(--mist); border-radius: 16px; padding: 10px; }
+.item img { width: 42px; height: 42px; object-fit: contain; }
+.item .t { flex: 1; font-size: 14px; font-weight: 800; } .item .t span { display: block; font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.item b { font-family: var(--display); font-size: 14px; }
+
+/* levels */
+.lvlcards { display: grid; gap: 10px; margin-top: 16px; }
+.lc { border: 1.5px solid var(--line); border-radius: 22px; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+.lc.cur { border-color: var(--ink); border-width: 2px; }
+.lc.gold { background: var(--ink); color: #fff; border-color: var(--ink); }
+.lc small { font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); }
+.lc.gold small { color: rgba(255,255,255,.6); }
+.lc .n { font-family: var(--display); font-weight: 700; font-size: 20px; text-transform: uppercase; margin-top: 4px; }
+.lc .d { font-size: 13px; color: var(--grey); font-weight: 600; margin-top: 4px; }
+.lc.gold .d { color: rgba(255,255,255,.6); }
+.lc .p { font-family: var(--display); font-weight: 700; font-size: 34px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; background: var(--ink); color: #fff; padding: 4px 8px; border-radius: 99px; margin-left: 8px; vertical-align: 2px; }
+.faq { margin-top: 18px; }
+.faq div { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; font-weight: 800; font-size: 14.5px; }
+
+/* promos */
+.pcard { margin-top: 14px; border-radius: 24px; overflow: hidden; position: relative; }
+.pcard .pic { height: 170px; background: var(--mist); position: relative; }
+.pcard .pic img { position: absolute; right: 10px; bottom: -6px; height: 150px; }
+.pcard .pic .x { position: absolute; left: 18px; top: 16px; font-family: var(--display); font-weight: 700; font-size: 46px; letter-spacing: -1.5px; }
+.pcard.dk .pic { background: var(--ink); color: #fff; } .pcard.dk .pic img { filter: invert(1); }
+.pcard .txt { padding: 14px 16px 16px; border: 1.5px solid var(--line); border-top: none; border-radius: 0 0 24px 24px; }
+.pcard .txt b { font-size: 16px; font-weight: 800; display: block; }
+.pcard .txt span { font-size: 13px; color: var(--grey); font-weight: 600; }
+.hero { height: 300px; margin: -58px -20px 0; background: var(--ink); color: #fff; position: relative; overflow: hidden; }
+.hero img { position: absolute; right: -10px; bottom: -20px; height: 260px; filter: invert(1); }
+.hero .x { position: absolute; left: 20px; bottom: 26px; font-family: var(--display); font-weight: 700; font-size: 80px; letter-spacing: -3px; line-height: .9; }
+.hero .x small { display: block; font-size: 14px; letter-spacing: 2px; font-weight: 600; color: rgba(255,255,255,.6); margin-bottom: 8px; }
+.hero .bk { position: absolute; top: 56px; left: 20px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+.rules { margin-top: 10px; }
+.rules div { display: flex; gap: 12px; padding: 10px 0; font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+.rules div b { font-family: var(--display); font-size: 13px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; flex: none; }
+
+/* stores */
+.map { margin-top: 14px; height: 210px; border-radius: 24px; background: var(--mist); position: relative; overflow: hidden; }
+.map .road { position: absolute; background: #fff; }
+.map .pin { position: absolute; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--ink); display: grid; place-items: center; }
+.map .pin i { width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+.store { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; gap: 12px; }
+.store .ic { width: 44px; height: 44px; border-radius: 14px; background: var(--mist); display: grid; place-items: center; flex: none; }
+.store .t { flex: 1; } .store b { font-size: 15px; font-weight: 800; display: block; } .store span { font-size: 13px; color: var(--grey); font-weight: 600; }
+.open { font-size: 12px; font-weight: 800; border: 1.5px solid var(--ink); padding: 4px 9px; border-radius: 99px; align-self: flex-start; }
+.open.off { border-color: var(--line); color: var(--grey); }
+
+/* profile */
+.prof { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.prof .av { width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: var(--display); font-size: 22px; }
+.prof b { font-family: var(--display); font-weight: 600; font-size: 20px; display: block; } .prof span { color: var(--grey); font-weight: 700; font-size: 14px; }
+.list { margin-top: 16px; border: 1.5px solid var(--line); border-radius: 22px; padding: 0 16px; }
+.list div { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 14.5px; }
+.list div:last-child { border-bottom: none; }
+.list div .v { margin-left: auto; color: var(--grey); font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.list div svg.i { width: 20px; height: 20px; }
+.list div .toggle { margin-left: auto; }
+.cap { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; color: var(--grey); margin: 20px 0 -6px 4px; }
+
+/* notifications */
+.nt { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.nt .ic { width: 42px; height: 42px; border-radius: 14px; background: var(--mist); display: grid; place-items: center; flex: none; }
+.nt.new .ic { background: var(--ink); color: #fff; }
+.nt b { font-size: 14.5px; font-weight: 800; display: block; } .nt p { font-size: 13.5px; color: var(--soft); margin-top: 2px; line-height: 1.4; } .nt span { font-size: 12px; color: var(--grey); font-weight: 700; display: block; margin-top: 4px; }
+
+/* empty */
+.empty { text-align: center; margin-top: 110px; }
+.empty .c { width: 120px; height: 120px; border-radius: 50%; background: var(--mist); margin: 0 auto; display: grid; place-items: center; }
+.empty .c img { width: 70px; }
+.empty h3 { font-family: var(--display); font-weight: 700; font-size: 20px; text-transform: uppercase; margin-top: 22px; }
+.empty p { color: var(--soft); margin-top: 8px; font-size: 15px; line-height: 1.45; }
+
+/* cashier */
+.pinwrap { text-align: center; padding-top: 30px; }
+.pinwrap .wm { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 4px; }
+.pinwrap p { color: rgba(255,255,255,.6); margin-top: 10px; font-size: 15px; }
+.dots { display: flex; justify-content: center; gap: 16px; margin: 30px 0 10px; }
+.dots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); }
+.dots i.f { background: #fff; border-color: #fff; }
+.who { display: flex; align-items: center; gap: 12px; justify-content: center; margin-top: 18px; }
+.who .av { width: 44px; height: 44px; }
+.who b { font-size: 15px; display: block; text-align: left; } .who span { font-size: 12.5px; color: rgba(255,255,255,.5); font-weight: 600; }
+.cprof { margin-top: 16px; background: var(--ink); color: #fff; border-radius: 26px; padding: 18px; }
+.cprof .row { display: flex; align-items: center; gap: 12px; }
+.cprof .av { background: #fff; color: var(--ink); width: 52px; height: 52px; font-size: 18px; }
+.cprof b { font-size: 17px; display: block; } .cprof span { font-size: 13px; color: rgba(255,255,255,.6); font-weight: 600; }
+.cprof .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.cprof .nums div { background: rgba(255,255,255,.08); border-radius: 16px; padding: 12px; }
+.cprof .nums small { font-size: 11.5px; color: rgba(255,255,255,.55); font-weight: 700; display: block; }
+.cprof .nums b { font-family: var(--display); font-size: 17px; margin-top: 4px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.tile { border: 1.5px solid var(--line); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px; font-weight: 800; font-size: 14.5px; }
+.tile.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tile span { font-size: 12.5px; font-weight: 600; color: var(--grey); }
+.tile.on span { color: rgba(255,255,255,.6); }
+.shift { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.shift div { background: var(--mist); border-radius: 16px; padding: 12px; }
+.shift small { font-size: 11.5px; color: var(--grey); font-weight: 700; display: block; }
+.shift b { font-family: var(--display); font-size: 17px; margin-top: 4px; display: block; }
+.refund { margin-top: 14px; border: 2px solid var(--ink); border-radius: 22px; padding: 16px; }
+.refund .h { display: flex; justify-content: space-between; font-weight: 800; }
+.note { margin-top: 12px; background: var(--mist); border-radius: 16px; padding: 12px 14px; font-size: 13.5px; font-weight: 600; color: var(--soft); line-height: 1.45; display: flex; gap: 10px; }
+.note svg.i { width: 20px; height: 20px; color: var(--ink); }
+.cta.red { background: #fff; color: var(--ink); border: 2px solid var(--ink); }
+.search { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 16px; height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 14px; color: var(--grey); font-weight: 600; }
+.row2 { display: flex; justify-content: space-between; align-items: center; }
+.pill { font-size: 12px; font-weight: 800; border: 1.5px solid var(--line); padding: 4px 9px; border-radius: 99px; }
+.pill.dk { background: var(--ink); color: #fff; border-color: var(--ink); }
+.cl { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.cl .av { background: var(--mist); color: var(--ink); width: 42px; height: 42px; font-size: 14px; }
+.cl .t { flex: 1; } .cl b { font-size: 14.5px; font-weight: 800; display: block; } .cl span { font-size: 12.5px; color: var(--grey); font-weight: 600; }
+.cl .r { text-align: right; } .cl .r b { font-family: var(--display); font-size: 15px; }
+.adj { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 22px; padding: 16px; }
+.adj .seg { margin-top: 0; }
+.adj .inp { margin-top: 12px; height: 56px; font-size: 20px; }
+.form .inp.light { margin-top: 10px; }
+.period { display: flex; gap: 8px; margin-top: 10px; }
+.period .inp.light { flex: 1; margin-top: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const QR = `<svg version="1.1" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M0,0H1V1H0zM1,0H2V1H1zM2,0H3V1H2zM3,0H4V1H3zM4,0H5V1H4zM5,0H6V1H5zM6,0H7V1H6zM10,0H11V1H10zM11,0H12V1H11zM14,0H15V1H14zM15,0H16V1H15zM16,0H17V1H16zM17,0H18V1H17zM18,0H19V1H18zM19,0H20V1H19zM20,0H21V1H20zM0,1H1V2H0zM6,1H7V2H6zM10,1H11V2H10zM11,1H12V2H11zM14,1H15V2H14zM20,1H21V2H20zM0,2H1V3H0zM2,2H3V3H2zM3,2H4V3H3zM4,2H5V3H4zM6,2H7V3H6zM8,2H9V3H8zM9,2H10V3H9zM11,2H12V3H11zM12,2H13V3H12zM14,2H15V3H14zM16,2H17V3H16zM17,2H18V3H17zM18,2H19V3H18zM20,2H21V3H20zM0,3H1V4H0zM2,3H3V4H2zM3,3H4V4H3zM4,3H5V4H4zM6,3H7V4H6zM8,3H9V4H8zM9,3H10V4H9zM10,3H11V4H10zM14,3H15V4H14zM16,3H17V4H16zM17,3H18V4H17zM18,3H19V4H18zM20,3H21V4H20zM0,4H1V5H0zM2,4H3V5H2zM3,4H4V5H3zM4,4H5V5H4zM6,4H7V5H6zM8,4H9V5H8zM9,4H10V5H9zM12,4H13V5H12zM14,4H15V5H14zM16,4H17V5H16zM17,4H18V5H17zM18,4H19V5H18zM20,4H21V5H20zM0,5H1V6H0zM6,5H7V6H6zM8,5H9V6H8zM9,5H10V6H9zM10,5H11V6H10zM12,5H13V6H12zM14,5H15V6H14zM20,5H21V6H20zM0,6H1V7H0zM1,6H2V7H1zM2,6H3V7H2zM3,6H4V7H3zM4,6H5V7H4zM5,6H6V7H5zM6,6H7V7H6zM8,6H9V7H8zM10,6H11V7H10zM12,6H13V7H12zM14,6H15V7H14zM15,6H16V7H15zM16,6H17V7H16zM17,6H18V7H17zM18,6H19V7H18zM19,6H20V7H19zM20,6H21V7H20zM8,7H9V8H8zM9,7H10V8H9zM12,7H13V8H12zM0,8H1V9H0zM2,8H3V9H2zM3,8H4V9H3zM4,8H5V9H4zM5,8H6V9H5zM6,8H7V9H6zM9,8H10V9H9zM10,8H11V9H10zM11,8H12V9H11zM14,8H15V9H14zM15,8H16V9H15zM16,8H17V9H16zM17,8H18V9H17zM18,8H19V9H18zM0,9H1V10H0zM1,9H2V10H1zM2,9H3V10H2zM4,9H5V10H4zM5,9H6V10H5zM8,9H9V10H8zM9,9H10V10H9zM11,9H12V10H11zM12,9H13V10H12zM13,9H14V10H13zM15,9H16V10H15zM16,9H17V10H16zM17,9H18V10H17zM18,9H19V10H18zM19,9H20V10H19zM20,9H21V10H20zM3,10H4V11H3zM4,10H5V11H4zM5,10H6V11H5zM6,10H7V11H6zM8,10H9V11H8zM12,10H13V11H12zM13,10H14V11H13zM14,10H15V11H14zM16,10H17V11H16zM18,10H19V11H18zM0,11H1V12H0zM1,11H2V12H1zM4,11H5V12H4zM5,11H6V12H5zM8,11H9V12H8zM9,11H10V12H9zM11,11H12V12H11zM12,11H13V12H12zM15,11H16V12H15zM18,11H19V12H18zM0,12H1V13H0zM3,12H4V13H3zM4,12H5V13H4zM6,12H7V13H6zM7,12H8V13H7zM8,12H9V13H8zM10,12H11V13H10zM12,12H13V13H12zM14,12H15V13H14zM16,12H17V13H16zM18,12H19V13H18zM19,12H20V13H19zM20,12H21V13H20zM8,13H9V14H8zM9,13H10V14H9zM11,13H12V14H11zM12,13H13V14H12zM13,13H14V14H13zM15,13H16V14H15zM17,13H18V14H17zM19,13H20V14H19zM20,13H21V14H20zM0,14H1V15H0zM1,14H2V15H1zM2,14H3V15H2zM3,14H4V15H3zM4,14H5V15H4zM5,14H6V15H5zM6,14H7V15H6zM9,14H10V15H9zM13,14H14V15H13zM16,14H17V15H16zM17,14H18V15H17zM0,15H1V16H0zM6,15H7V16H6zM8,15H9V16H8zM9,15H10V16H9zM12,15H13V16H12zM14,15H15V16H14zM15,15H16V16H15zM17,15H18V16H17zM18,15H19V16H18zM20,15H21V16H20zM0,16H1V17H0zM2,16H3V17H2zM3,16H4V17H3zM4,16H5V17H4zM6,16H7V17H6zM8,16H9V17H8zM9,16H10V17H9zM12,16H13V17H12zM14,16H15V17H14zM18,16H19V17H18zM20,16H21V17H20zM0,17H1V18H0zM2,17H3V18H2zM3,17H4V18H3zM4,17H5V18H4zM6,17H7V18H6zM8,17H9V18H8zM9,17H10V18H9zM12,17H13V18H12zM14,17H15V18H14zM16,17H17V18H16zM17,17H18V18H17zM18,17H19V18H18zM0,18H1V19H0zM2,18H3V19H2zM3,18H4V19H3zM4,18H5V19H4zM6,18H7V19H6zM8,18H9V19H8zM9,18H10V19H9zM12,18H13V19H12zM15,18H16V19H15zM17,18H18V19H17zM18,18H19V19H18zM0,19H1V20H0zM6,19H7V20H6zM9,19H10V20H9zM11,19H12V20H11zM17,19H18V20H17zM18,19H19V20H18zM20,19H21V20H20zM0,20H1V21H0zM1,20H2V21H1zM2,20H3V21H2zM3,20H4V21H3zM4,20H5V21H4zM5,20H6V21H5zM6,20H7V21H6zM8,20H9V21H8zM9,20H10V21H9zM10,20H11V21H10zM14,20H15V21H14zM15,20H16V21H15zM17,20H18V21H17zM18,20H19V21H18z" id="qr-path" fill="#000000" fill-opacity="1" fill-rule="nonzero" stroke="none"/></svg>`;
+const P = {
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h7v-4M17.5 17.5v.01"/>',
+  card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
+  gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3.5 7.5 8 12 8zM12 8s1.5-5 4-4.5S16.5 8 12 8z"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  back: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>', check: '<path d="M5 12.5 10 17 19 7"/>',
+  store: '<path d="M4 9h16l-1-5H5zM5 9v11h14V9M9 20v-6h6v6"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.01"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 4 6"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+  del: '<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m16 9-6 6M10 9l6 6"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  pin: '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  cake: '<path d="M4 21V12h16v9M4 16c2 1 4-1 6 0s4 1 6 0 3-1 4 0M12 12V8M12 5v.01"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17v.01"/>',
+  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>',
+  lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  receipt: '<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  bag: '<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/>',
+  sms: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.4A8 8 0 1 1 21 12z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+};
+const i = (k, extra = '') => `<svg class="i" viewBox="0 0 24 24" ${extra}>${P[k]}</svg>`;
+const img = n => `<img src="img/${n}.png" alt="">`;
+const status = () => `<div class="island"></div><div class="status"><span>9:41</span><span class="r"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M2 18h3v-3H2zM7 18h3v-6H7zM12 18h3V9h-3zM17 18h3V5h-3z" fill="currentColor"/></svg><span class="bat"><i></i></span></span></div>`;
+const nav = (items, on) => `<div class="nav">${items.map(([k, l], n) => `<div class="it ${n === on ? 'on' : ''}">${i(k)}${l}</div>`).join('')}</div>`;
+const cNav = on => nav([['card', 'Карта'], ['clock', 'История'], ['tag', 'Акции'], ['user', 'Профиль']], on);
+const kNav = on => nav([['scan', 'Касса'], ['receipt', 'Операции'], ['user', 'Смена']], on);
+const aNav = on => nav([['chart', 'Обзор'], ['users', 'Клиенты'], ['tag', 'Акции'], ['store', 'Магазины'], ['settings', 'Правила']], on);
+const op = (sign, title, sub, amt) => `<div class="op"><div class="ic ${sign === '-' ? 'neg' : ''}">${i(sign === '-' ? 'minus' : sign === 'g' ? 'gift' : sign === 'u' ? 'undo' : 'plus')}</div><div class="t"><b>${title}</b><span>${sub}</span></div><div class="a ${sign === '-' || sign === 'u' ? 'neg' : ''}">${sign === '-' || sign === 'u' ? '−' : '+'}${amt}</div></div>`;
+const keypad = (dark) => `<div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','⌫'].map(k => k === '' ? '<span></span>' : k === '⌫' ? `<span>${i('del')}</span>` : `<span class="k">${k}</span>`).join('')}</div>`;
+const end = navHtml => `</div>${navHtml || ''}<div class="home-ind"></div>`;
+const topBar = (title, right = '') => `<div class="top"><div class="back">${i('back')}${title}</div>${right}</div>`;
+
+/* ------------------------------ КЛИЕНТ ------------------------------ */
+const S = {};
+S.welcome = () => `${status()}<div class="splash">
+  <div class="wm">ISTANBUL</div>
+  <div class="sub">Бонусная карта магазинов одежды. Получайте бонусы с каждой покупки и оплачивайте ими до половины чека.</div>
+  <div class="art"><div class="ring" style="width:260px;height:260px;left:50px;top:10px"></div><div class="ring" style="width:160px;height:160px;left:100px;top:60px"></div><img src="img/coat.png" style="left:70px;top:20px"></div>
+  <div class="perk"><b>3%</b>Кешбэк бонусами с первой покупки</div>
+  <div class="perk"><b>+100</b>Приветственные бонусы на карту</div>
+  <div class="cta inv">Получить карту</div>
+  <div class="legal">Уже есть карта? Войдите по номеру телефона</div>
+</div><div class="home-ind" style="background:#fff"></div>`;
+S.phone = () => `${status()}<div class="scroll">
+  ${topBar('')}
+  <div class="big-t">Ваш номер<br>телефона</div>
+  <div class="lead">Отправим SMS с кодом. Номер станет номером вашей карты.</div>
+  <div class="inp"><span class="pre">+992</span>90 123 45<span class="caret"></span></div>
+  <div class="legal" style="text-align:left">Продолжая, вы соглашаетесь с правилами программы лояльности</div>
+</div><div style="flex:none;padding:0 20px 14px"><div class="cta">Получить код</div></div>${keypad()}<div style="height:30px"></div><div class="home-ind"></div>`;
+S.otp = () => `${status()}<div class="scroll">
+  ${topBar('')}
+  <div class="big-t">Код из SMS</div>
+  <div class="lead">Отправили на +992 90 123 45 67</div>
+  <div class="otp"><span class="f">4</span><span class="f">8</span><span class="cur"></span><span></span></div>
+  <div class="resend">Отправить снова через 0:42</div>
+</div>${keypad()}<div style="height:30px"></div><div class="home-ind"></div>`;
+S.register = () => `${status()}<div class="scroll form">
+  ${topBar('')}
+  <div class="big-t">Давайте<br>познакомимся</div>
+  <div class="flabel">Имя</div><div class="inp light">Мадина</div>
+  <div class="flabel">Фамилия</div><div class="inp light">Каримова</div>
+  <div class="flabel">Дата рождения</div><div class="inp light">${i('cake')}<span>14 марта 1998</span></div>
+  <div class="chips"><span>Мужской</span><span class="on">Женский</span></div>
+  <div class="gift">${img('gift')}<div><b>+100 бонусов</b><span>начислим сразу после регистрации</span></div></div>
+  <div class="check"><i>${i('check')}</i>В день рождения дарим 300 бонусов</div>
+</div><div class="bb"><div class="cta">Создать карту</div></div><div class="home-ind"></div>`;
+S.home = () => `${status()}<div class="scroll">
+  <div class="top"><div class="word">ISTANBUL</div><div class="ibtn">${i('bell')}<span class="dot"></span></div></div>
+  <div class="hello">Добрый день,<b>Мадина Каримова</b></div>
+  <div class="card"><div class="row"><small>Бонусный счёт</small><span class="lvl">Серебро · 5%</span></div>
+    <div class="bal">1 240<span>бонусов</span></div><div class="sub">1 бонус = 1 сомони при оплате</div>
+    <div class="row foot"><span class="num">IST 4821 0937</span><span class="qrbtn">${i('qr')}Показать QR</span></div></div>
+  <div class="box"><h5>До уровня «Золото» <span>3 240 / 5 000 смн</span></h5><div class="bar"><i style="width:64.8%"></i></div>
+    <div class="steps"><span>Базовый 3%</span><span class="on">Серебро 5%</span><span>Золото 7%</span></div></div>
+  <div class="promo"><p>Двойные бонусы на верхнюю одежду<span>до 30 ноября во всех магазинах</span></p><b>×2</b></div>
+  <div class="sec"><h4>Операции</h4><a>Все</a></div>
+  ${op('+', 'Покупка · ТЦ «Пайкар»', 'Сегодня, 14:32 · чек 1 240 смн', '62')}
+${end(cNav(0))}`;
+S.qr = () => `${status()}<div class="scroll"><div class="ibtn close">${i('close')}</div>
+  <div class="qrwrap"><h2>Ваша карта</h2><p>Покажите код кассиру при оплате</p>
+    <div class="qrframe">${QR}<div class="logo"><b>I</b></div></div><div class="code">4821 0937</div>
+    <div class="mini"><div><small>Баланс</small><b>1 240</b></div><div><small>Уровень</small><b>Серебро</b></div></div>
+    <div class="hint">${i('sun', 'style="width:18px;height:18px"')}Яркость экрана увеличена</div></div>
+${end(cNav(0))}`;
+S.history = () => `${status()}<div class="scroll">
+  <div class="h1">История</div>
+  <div class="tabs"><span class="on">Все</span><span>Начисления</span><span>Списания</span></div>
+  <div class="totals"><div><small>Начислено всего</small><b>+2 380</b></div><div><small>Потрачено</small><b>−1 140</b></div></div>
+  <div class="warn">${i('alert')}150 бонусов сгорят 15 декабря</div>
+  <div class="day">Сегодня</div>${op('+', 'Покупка · ТЦ «Пайкар»', '14:32 · чек 1 240 смн', '62')}
+  <div class="day">15 ноября</div>${op('-', 'Оплата бонусами', '18:05 · чек 2 100 смн', '600')}${op('+', 'Покупка · ул. Рудаки, 45', '18:05 · чек 1 500 смн', '75')}
+  <div class="day">2 ноября</div>${op('g', 'Подарок ко дню рождения', '09:00', '300')}
+${end(cNav(1))}`;
+S.opDetail = () => `${status()}<div class="scroll">
+  <div class="h1">История</div>
+  <div class="tabs"><span class="on">Все</span><span>Начисления</span><span>Списания</span></div>
+  <div class="day">Сегодня</div>${op('+', 'Покупка · ТЦ «Пайкар»', '14:32 · чек 1 240 смн', '62')}
+</div><div class="dim"></div><div class="sheet"><div class="grab"></div>
+  <h3>Покупка</h3><div class="amt">+62 <span style="font-size:18px;color:var(--grey)">бонуса</span></div><div class="when">Сегодня, 14:32 · ТЦ «Пайкар»</div>
+  <div class="items"><div class="item">${img('coat')}<div class="t">Пальто шерстяное<span>Размер M · 1 шт.</span></div><b>890</b></div><div class="item">${img('tshirt')}<div class="t">Футболка базовая<span>Размер S · 2 шт.</span></div><b>350</b></div></div>
+  <div class="kv"><div><span>Сумма чека</span><b>1 240 смн</b></div><div><span>Оплачено бонусами</span><b>0</b></div><div><span>Кешбэк уровня «Серебро»</span><b>5%</b></div><div><span>Чек</span><b>№ 004812</b></div></div>
+</div><div class="home-ind"></div>`;
+S.levels = () => `${status()}<div class="scroll">
+  ${topBar('Уровни')}
+  <div class="big-t" style="font-size:24px">Больше покупок — больше бонусов</div>
+  <div class="lead">Уровень зависит от суммы покупок за последние 12 месяцев.</div>
+  <div class="lvlcards">
+    <div class="lc"><div><small>с 0 смн</small><div class="n">Базовый</div><div class="d">3% бонусами с покупки</div></div><div class="p">3%</div></div>
+    <div class="lc cur"><div><small>от 2 000 смн</small><div class="n">Серебро<span class="badge">ваш</span></div><div class="d">5% бонусами + ранний доступ к распродажам</div></div><div class="p">5%</div></div>
+    <div class="lc gold"><div><small>от 5 000 смн</small><div class="n">Золото</div><div class="d">7% бонусами, бесплатная подгонка</div></div><div class="p">7%</div></div>
+  </div>
+  <div class="box"><h5>До «Золота» <span>осталось 1 760 смн</span></h5><div class="bar"><i style="width:64.8%"></i></div></div>
+  <div class="faq"><div>Как оплатить бонусами?${i('next')}</div><div>Когда сгорают бонусы?${i('next')}</div></div>
+${end()}`;
+S.promos = () => `${status()}<div class="scroll">
+  <div class="h1">Акции</div>
+  <div class="tabs"><span class="on">Все</span><span>Для меня</span><span>Скоро</span></div>
+  <div class="pcard dk"><div class="pic"><div class="x">×2</div>${img('coat')}</div><div class="txt"><b>Двойные бонусы на верхнюю одежду</b><span>до 30 ноября · все магазины</span></div></div>
+  <div class="pcard"><div class="pic"><div class="x">−20%</div>${img('sneakers')}</div><div class="txt"><b>Скидка на обувь по карте</b><span>1–7 декабря · ТЦ «Пайкар»</span></div></div>
+${end(cNav(2))}`;
+S.promo = () => `${status()}<div class="scroll">
+  <div class="hero"><div class="bk">${i('back')}</div>${img('coat')}<div class="x"><small>ДО 30 НОЯБРЯ</small>×2</div></div>
+  <div class="big-t" style="font-size:22px">Двойные бонусы на верхнюю одежду</div>
+  <div class="lead">Покупайте пальто, куртки и пуховики и получайте вдвое больше бонусов на карту.</div>
+  <div class="rules">
+    <div><b>1</b>Покажите QR-код карты на кассе</div>
+    <div><b>2</b>Бонусы ×2 начислятся автоматически на всю верхнюю одежду в чеке</div>
+    <div><b>3</b>Акция суммируется с вашим уровнем: «Серебро» получит 10%</div>
+  </div>
+</div><div class="bb"><div class="cta">${i('qr')}Показать карту</div></div><div class="home-ind"></div>`;
+S.stores = () => `${status()}<div class="scroll">
+  ${topBar('Магазины')}
+  <div class="map"><div class="road" style="left:0;right:0;top:80px;height:14px"></div><div class="road" style="left:120px;top:0;bottom:0;width:12px"></div><div class="road" style="left:0;right:0;top:160px;height:10px;transform:rotate(-8deg)"></div><div class="road" style="left:260px;top:0;bottom:0;width:10px"></div>
+    <div class="pin" style="left:104px;top:40px"><i></i></div><div class="pin" style="left:240px;top:118px"><i></i></div><div class="pin" style="left:40px;top:140px;background:#8C8C88"><i></i></div></div>
+  <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ТЦ «Пайкар», 2 этаж</b><span>Ежедневно 10:00–21:00 · 1,2 км</span></div><span class="open">Открыто</span></div>
+  <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ул. Рудаки, 45</b><span>Ежедневно 09:00–20:00 · 2,8 км</span></div><span class="open">Открыто</span></div>
+  <div class="store"><div class="ic">${i('store')}</div><div class="t"><b>ТРЦ «Душанбе Молл»</b><span>Ежедневно 10:00–22:00 · 5,4 км</span></div><span class="open off">Скоро</span></div>
+${end(cNav(3))}`;
+S.profile = () => `${status()}<div class="scroll">
+  <div class="h1">Профиль</div>
+  <div class="prof"><div class="av">МК</div><div><b>Мадина Каримова</b><span>+992 90 123 45 67</span></div></div>
+  <div class="list"><div>${i('star')}Уровни и правила<span class="v">Серебро${i('next')}</span></div><div>${i('store')}Магазины<span class="v">3${i('next')}</span></div><div>${i('edit')}Личные данные<span class="v">${i('next')}</span></div></div>
+  <div class="cap">Настройки</div>
+  <div class="list"><div>${i('bell')}Уведомления о бонусах<span class="toggle"></span></div><div>${i('sms')}SMS о покупках<span class="toggle"></span></div><div>${i('globe')}Язык<span class="v">Русский${i('next')}</span></div></div>
+  <div class="list"><div>${i('help')}Поддержка<span class="v">${i('next')}</span></div><div>${i('out')}Выйти</div></div>
+${end(cNav(3))}`;
+S.notifications = () => `${status()}<div class="scroll">
+  ${topBar('Уведомления')}
+  <div class="nt new"><div class="ic">${i('plus')}</div><div><b>Начислено 62 бонуса</b><p>За покупку в ТЦ «Пайкар» на 1 240 смн. Баланс: 1 240.</p><span>Сегодня, 14:32</span></div></div>
+  <div class="nt new"><div class="ic">${i('tag')}</div><div><b>Двойные бонусы до 30 ноября</b><p>На всю верхнюю одежду во всех магазинах.</p><span>Вчера</span></div></div>
+  <div class="nt"><div class="ic">${i('alert')}</div><div><b>150 бонусов сгорят 15 декабря</b><p>Успейте потратить их на покупки.</p><span>12 ноября</span></div></div>
+  <div class="nt"><div class="ic">${i('gift')}</div><div><b>С днём рождения!</b><p>Дарим 300 бонусов, они уже на карте.</p><span>2 ноября</span></div></div>
+${end()}`;
+S.empty = () => `${status()}<div class="scroll">
+  <div class="h1">История</div>
+  <div class="empty"><div class="c">${img('bags')}</div><h3>Пока пусто</h3><p>Покажите QR-код карты на кассе —<br>и здесь появятся бонусы за покупку</p></div>
+</div><div class="bb" style="border:none"><div class="cta">${i('qr')}Показать карту</div></div>${cNav(1)}<div class="home-ind"></div>`;
+
+/* ------------------------------ КАССИР ------------------------------ */
+const K = {};
+K.pin = () => `${status()}<div class="scroll">
+  <div class="pinwrap"><div class="wm">ISTANBUL</div><p>Касса · ТЦ «Пайкар»</p>
+    <div class="who"><div class="av">ДР</div><div><b>Дилноза Рахимова</b><span>Кассир · смена с 09:00</span></div></div>
+    <div class="dots"><i class="f"></i><i class="f"></i><i></i><i></i></div><p style="font-size:13px">Введите PIN-код</p></div>
+</div>${keypad(true)}<div style="height:34px"></div><div class="home-ind"></div>`;
+K.scan = () => `${status()}<div class="scroll">
+  <div class="ctop"><span class="w">ISTANBUL</span><span class="store">${i('store')}ТЦ «Пайкар»</span></div>
+  <div class="cam"><div class="ghost">${QR}</div><div class="frame"><i></i><i></i><i></i><i></i></div><div class="scanline"></div><p>Наведите камеру на QR-код клиента</p></div>
+  <div class="or">или номер телефона</div>
+  <div class="field"><span class="pre">+992</span><span class="ph">90 123 45 67</span><span class="go">${i('arrow')}</span></div>
+  <div class="recent"><small>Недавние клиенты</small><div class="rc"><div class="av">ФН</div><div class="t"><b>Фирдавс Назаров</b><span>•• •• 12 08 · Золото</span></div><div class="a">3 410</div></div></div>
+${end(kNav(0))}`;
+K.phone = () => `${status()}<div class="scroll">
+  ${topBar('Поиск по номеру')}
+  <div class="inp"><span class="pre">+992</span>90 123 4<span class="caret"></span></div>
+  <div class="cl"><div class="av">МК</div><div class="t"><b>Мадина Каримова</b><span>+992 90 123 45 67 · Серебро</span></div><div class="r"><b>1 240</b><span>бонусов</span></div></div>
+  <div class="cl"><div class="av">МН</div><div class="t"><b>Мехрона Нуриддинова</b><span>+992 90 123 41 09 · Базовый</span></div><div class="r"><b>210</b><span>бонусов</span></div></div>
+</div>${keypad()}<div style="height:30px"></div><div class="home-ind"></div>`;
+K.notFound = () => `${status()}<div class="scroll form">
+  ${topBar('Новый клиент')}
+  <div class="note">${i('alert')}Номер +992 93 555 20 18 не найден. Зарегистрируйте клиента — он получит SMS со ссылкой на карту.</div>
+  <div class="flabel">Телефон</div><div class="inp light">+992 93 555 20 18</div>
+  <div class="flabel">Имя клиента</div><div class="inp light">Сухроб<span class="caret" style="width:2px;height:22px;background:var(--ink)"></span></div>
+  <div class="flabel">Дата рождения (необязательно)</div><div class="inp light"><span class="ph">дд.мм.гггг</span></div>
+  <div class="gift">${img('gift')}<div><b>+100 бонусов</b><span>приветственные, можно потратить со следующей покупки</span></div></div>
+</div><div class="bb"><div class="cta">Зарегистрировать</div></div><div class="home-ind"></div>`;
+K.client = () => `${status()}<div class="scroll">
+  ${topBar('Клиент', `<div class="ibtn">${i('close')}</div>`)}
+  <div class="cprof"><div class="row"><div class="av">МК</div><div><b>Мадина Каримова</b><span>+992 •• ••• 45 67 · с марта 2024</span></div></div>
+    <div class="nums"><div><small>Баланс</small><b>1 240</b></div><div><small>Уровень</small><b>5%</b></div><div><small>Покупок</small><b>14</b></div></div></div>
+  <div class="note" style="margin-top:12px">${i('cake')}День рождения 14 марта</div>
+  <div class="sec"><h4>Последние покупки</h4></div>
+  ${op('+', 'Покупка · 1 240 смн', 'Сегодня, 14:32 · ТЦ «Пайкар»', '62')}${op('-', 'Оплата бонусами', '15 ноября · ул. Рудаки, 45', '600')}
+</div><div class="bb"><div class="cta">${i('bag')}Новая покупка</div></div><div class="home-ind"></div>`;
+K.saleEarn = () => `${status()}<div class="scroll">
+  ${topBar('Новая покупка', `<div class="ibtn">${i('close')}</div>`)}
+  <div class="client"><div class="av">МК</div><div class="t"><b>Мадина Каримова</b><span>•• •• 45 67 · Серебро 5%</span></div><div class="bl"><b>1 240</b><span>бонусов</span></div></div>
+  <div class="amount"><small>Сумма покупки</small><div class="v">2 400<span>смн</span><i></i></div></div>
+  <div class="seg"><span class="on">Только начислить</span><span>Списать бонусы</span></div>
+  <div class="note">${i('tag')}Акция «×2 на верхнюю одежду» — укажите сумму верхней одежды в чеке</div>
+  <div class="flabel" style="margin-top:14px">Из них верхняя одежда</div><div class="inp light" style="margin-top:20px">1 600 смн</div>
+  <div class="earn" style="margin-top:14px"><span>Будет начислено: 5% + ×2 на 1 600</span><b>+200</b></div>
+</div><div class="bb"><div class="cta">Провести покупку</div></div><div class="home-ind"></div>`;
+K.saleSpend = () => `${status()}<div class="scroll">
+  ${topBar('Новая покупка', `<div class="ibtn">${i('close')}</div>`)}
+  <div class="client"><div class="av">МК</div><div class="t"><b>Мадина Каримова</b><span>•• •• 45 67 · Серебро 5%</span></div><div class="bl"><b>1 240</b><span>бонусов</span></div></div>
+  <div class="amount"><small>Сумма покупки</small><div class="v">1 850<span>смн</span><i></i></div></div>
+  <div class="seg"><span>Только начислить</span><span class="on">Списать бонусы</span></div>
+  <div class="spend"><div class="r"><span>Оплатить бонусами</span><b>400</b></div><div class="slider"><i></i><b></b></div><div class="lim"><span>0</span><span>макс. 925 (50% чека)</span></div></div>
+  <div class="sum"><div class="r"><span>Сумма покупки</span><b>1 850 смн</b></div><div class="r"><span>Бонусами</span><b>−400 смн</b></div><div class="r tot"><span>К оплате</span><b>1 450 смн</b></div></div>
+  <div class="earn"><span>Будет начислено (5% от 1 450)</span><b>+73</b></div>
+</div><div class="bb"><div class="cta">Списать и провести</div></div><div class="home-ind"></div>`;
+K.confirm = () => `${status()}<div class="scroll">
+  ${topBar('Подтверждение')}
+  <div class="big-t" style="font-size:24px">Код от клиента</div>
+  <div class="lead">Клиенту пришло SMS с кодом для списания 400 бонусов. Попросите назвать его.</div>
+  <div class="otp"><span class="f">7</span><span class="f">2</span><span class="f">0</span><span class="cur"></span></div>
+  <div class="resend">${i('sms', 'style="width:16px;height:16px;vertical-align:-3px"')} Отправить снова через 0:38</div>
+</div>${keypad()}<div style="height:30px"></div><div class="home-ind"></div>`;
+K.done = () => `${status()}<div class="scroll">
+  <div class="done"><div class="ok">${i('check')}</div><h2>Готово</h2><p>Покупка проведена, клиент получил SMS</p></div>
+  <div class="receipt"><div class="r"><span>Клиент</span><b>Мадина Каримова</b></div><div class="r"><span>Сумма покупки</span><b>1 850 смн</b></div><div class="r"><span>Оплачено бонусами</span><b>−400</b></div><div class="r"><span>Начислено</span><b>+73</b></div><hr><div class="r big"><span>Клиент заплатил</span><b>1 450 смн</b></div></div>
+  <div class="newbal"><small>Новый баланс</small><b>913</b></div>
+</div><div class="bb"><div class="cta">${i('scan')}Следующий клиент</div></div><div class="home-ind"></div>`;
+K.ops = () => `${status()}<div class="scroll">
+  <div class="h1">Операции</div>
+  <div class="shift"><div><small>Чеков</small><b>23</b></div><div><small>Начислено</small><b>+1 184</b></div><div><small>Списано</small><b>−2 600</b></div></div>
+  <div class="search">${i('search')}Номер чека или телефон</div>
+  <div class="day">Сегодня</div>
+  ${op('+', 'Мадина Каримова', '14:32 · чек № 004812 · 1 850 смн', '73')}${op('-', 'Мадина Каримова', '14:32 · оплата бонусами', '400')}${op('+', 'Фирдавс Назаров', '13:10 · чек № 004811 · 3 200 смн', '224')}${op('u', 'Возврат · Анвар Саидов', '12:44 · чек № 004809', '45')}
+${end(kNav(1))}`;
+K.refund = () => `${status()}<div class="scroll">
+  ${topBar('Возврат')}
+  <div class="refund"><div class="h"><span>Чек № 004811</span><span>13:10</span></div>
+    <div class="kv" style="border-top:none;margin-top:6px"><div><span>Клиент</span><b>Фирдавс Назаров</b></div><div><span>Сумма покупки</span><b>3 200 смн</b></div><div><span>Начислено</span><b>+224</b></div><div><span>Списано бонусами</span><b>0</b></div></div></div>
+  <div class="flabel">Сумма возврата</div><div class="inp light" style="margin-top:20px;font-size:20px;font-weight:800">1 200 смн</div>
+  <div class="note">${i('undo')}С карты клиента спишем 84 бонуса, начисленные за возвращённые товары.</div>
+</div><div class="bb"><div class="cta red">Оформить возврат</div></div><div class="home-ind"></div>`;
+K.shift = () => `${status()}<div class="scroll">
+  <div class="h1">Смена</div>
+  <div class="prof"><div class="av">ДР</div><div><b>Дилноза Рахимова</b><span>Кассир · ТЦ «Пайкар»</span></div></div>
+  <div class="cprof"><div class="row"><div><span>Смена открыта в 09:00</span><b style="font-family:var(--display);font-size:22px;margin-top:4px">5 ч 41 мин</b></div></div>
+    <div class="nums"><div><small>Чеков</small><b>23</b></div><div><small>Продажи</small><b>41 900</b></div><div><small>Новых</small><b>4</b></div></div></div>
+  <div class="list"><div>${i('lock')}Сменить PIN-код<span class="v">${i('next')}</span></div><div>${i('help')}Как проводить покупки<span class="v">${i('next')}</span></div></div>
+</div><div class="bb"><div class="cta">${i('out')}Закрыть смену</div></div>${kNav(2)}<div class="home-ind"></div>`;
+
+/* ------------------------------ АДМИН ------------------------------ */
+const A = {};
+A.overview = () => `${status()}<div class="scroll">
+  <div class="top"><div class="word">ISTANBUL</div><span class="lvl" style="border-color:var(--line);color:var(--ink)">Админ</span></div>
+  <div class="h1" style="margin-top:14px">Ноябрь</div>
+  <div class="stats"><div class="k"><small>Продажи по картам</small><b>184 300</b><em>смн · +12%</em></div><div><small>Клиентов</small><b>1 268</b><em>+94 за месяц</em></div><div><small>Начислено</small><b>+8 940</b><em>бонусов</em></div><div><small>Списано</small><b>−5 120</b><em>бонусов</em></div></div>
+  <div class="chart"><h5>Бонусы по дням <span>неделя</span></h5>
+    <div class="bars">${[[60,30],[45,20],[80,40],[55,35],[95,30],[120,60],[70,28]].map(([p,m])=>`<div><div class="p" style="height:${p*0.75}px"></div><div class="m" style="height:${m*0.5}px"></div></div>`).join('')}</div>
+    <div class="days">${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=>`<span>${d}</span>`).join('')}</div>
+    <div class="legend"><span><i style="background:var(--ink)"></i>начислено</span><span><i style="background:#BDBDB8"></i>списано</span></div></div>
+${end(aNav(0))}`;
+A.clients = () => `${status()}<div class="scroll">
+  <div class="h1">Клиенты</div>
+  <div class="search">${i('search')}Имя или телефон</div>
+  <div class="tabs"><span class="on">Все · 1 268</span><span>Золото</span><span>Серебро</span></div>
+  ${[['ФН','Фирдавс Назаров','Золото · 32 покупки','3 410'],['МК','Мадина Каримова','Серебро · 14 покупок','1 240'],['СМ','Сухроб Мирзоев','Базовый · новый','100'],['НЮ','Нигора Юсупова','Серебро · 9 покупок','860'],['АШ','Абдулло Шарипов','Золото · 41 покупка','5 020']].map(([a,n,s,b])=>`<div class="cl"><div class="av">${a}</div><div class="t"><b>${n}</b><span>${s}</span></div><div class="r"><b>${b}</b><span>бонусов</span></div></div>`).join('')}
+${end(aNav(1))}`;
+A.client = () => `${status()}<div class="scroll">
+  ${topBar('Клиент')}
+  <div class="cprof"><div class="row"><div class="av">МК</div><div><b>Мадина Каримова</b><span>+992 90 123 45 67</span></div></div>
+    <div class="nums"><div><small>Баланс</small><b>1 240</b></div><div><small>Покупки</small><b>32 400</b></div><div><small>Уровень</small><b>Серебро</b></div></div></div>
+  <div class="adj"><div class="seg"><span class="on">Начислить</span><span>Списать</span></div>
+    <div class="inp">500<span class="pre" style="font-size:16px">бонусов</span></div>
+    <div class="flabel" style="margin-top:14px">Причина</div><div class="inp light" style="margin-top:20px">Компенсация за задержку заказа</div></div>
+  <div class="sec"><h4>История</h4><a>Все</a></div>${op('+', 'Покупка · ТЦ «Пайкар»', 'Сегодня · кассир Дилноза', '62')}
+</div><div class="bb"><div class="cta">Начислить 500 бонусов</div></div><div class="home-ind"></div>`;
+A.promos = () => `${status()}<div class="scroll form">
+  ${topBar('Новая акция')}
+  <div class="flabel">Название</div><div class="inp light">Двойные бонусы на верхнюю одежду</div>
+  <div class="flabel">Что даём</div><div class="two" style="margin-top:20px"><div class="tile on">×2 бонуса<span>умножить кешбэк</span></div><div class="tile">−20%<span>скидка по карте</span></div></div>
+  <div class="flabel">Категория</div><div class="chips" style="margin-top:20px"><span class="on">Верхняя одежда</span><span>Обувь</span><span>Платья</span><span>Все товары</span></div>
+  <div class="flabel">Период</div><div class="period" style="margin-top:20px"><div class="inp light">${i('calendar')}1 ноя</div><div class="inp light">${i('calendar')}30 ноя</div></div>
+  <div class="flabel">Магазины</div><div class="chips" style="margin-top:20px"><span class="on">Все 3</span><span>ТЦ «Пайкар»</span></div>
+</div><div class="bb"><div class="cta">Запустить акцию</div></div><div class="home-ind"></div>`;
+A.stores = () => `${status()}<div class="scroll">
+  <div class="h1">Магазины</div>
+  ${[['ТЦ «Пайкар», 2 этаж','3 кассира · 23 чека сегодня','Открыто'],['ул. Рудаки, 45','2 кассира · 17 чеков сегодня','Открыто'],['ТРЦ «Душанбе Молл»','открытие 1 декабря','Скоро']].map(([n,s,o])=>`<div class="store"><div class="ic">${i('store')}</div><div class="t"><b>${n}</b><span>${s}</span></div><span class="open ${o==='Скоро'?'off':''}">${o}</span></div>`).join('')}
+  <div class="sec"><h4>Кассиры</h4><a>Добавить</a></div>
+  ${[['ДР','Дилноза Рахимова','ТЦ «Пайкар» · на смене'],['ЗА','Зарина Алиева','ТЦ «Пайкар» · выходной'],['ПН','Парвиз Нуров','ул. Рудаки · на смене']].map(([a,n,s])=>`<div class="cl"><div class="av">${a}</div><div class="t"><b>${n}</b><span>${s}</span></div><span class="pill ${s.includes('на смене')?'dk':''}">${s.includes('на смене')?'В смене':'Не в смене'}</span></div>`).join('')}
+${end(aNav(3))}`;
+A.rules = () => `${status()}<div class="scroll">
+  <div class="h1">Правила</div>
+  <div class="sec" style="margin-top:14px"><h4>Уровни и кешбэк</h4><a>Изменить</a></div>
+  <div class="lvls"><div><small>Базовый</small><b>3%</b><span>с 0 смн</span></div><div><small>Серебро</small><b>5%</b><span>от 2 000 смн</span></div><div><small>Золото</small><b>7%</b><span>от 5 000 смн</span></div></div>
+  <div class="rule">
+    <div class="r"><div class="t"><b>Оплата бонусами</b><span>максимум от суммы чека</span></div><div class="stepper"><i>−</i><b>50%</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Срок жизни бонусов</b><span>после начисления</span></div><div class="stepper"><i>−</i><b>180 д</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Приветственный бонус</b><span>за регистрацию</span></div><div class="stepper"><i>−</i><b>100</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>Бонус ко дню рождения</b><span>начисляется автоматически</span></div><div class="stepper"><i>−</i><b>300</b><i>+</i></div></div>
+    <div class="r"><div class="t"><b>SMS-код при списании</b><span>защита от чужого списания</span></div><div class="toggle"></div></div>
+  </div>
+${end(aNav(4))}`;
+
+const boards = [
+  { id: 'client-1', name: 'Клиент · вход', desc: 'Первое знакомство: приветствие, вход по номеру, код из SMS и регистрация с приветственными бонусами.', items: [['Приветствие', S.welcome, 'stw'], ['Номер телефона', S.phone], ['Код из SMS', S.otp], ['Регистрация', S.register]] },
+  { id: 'client-2', name: 'Клиент · карта', desc: 'Каждый день: карта с балансом, QR-код для кассы, история и детали покупки.', items: [['Главная', S.home], ['QR-код на кассе', S.qr], ['История', S.history], ['Детали покупки', S.opDetail]] },
+  { id: 'client-3', name: 'Клиент · акции и профиль', desc: 'Уровни программы, акции, магазины, уведомления, профиль и пустое состояние.', items: [['Уровни', S.levels], ['Акции', S.promos], ['Акция', S.promo, 'stw'], ['Магазины', S.stores], ['Уведомления', S.notifications], ['Профиль', S.profile], ['Пустая история', S.empty]] },
+  { id: 'cashier-1', w: 'w5', name: 'Кассир · поиск клиента', desc: 'Вход по PIN, сканирование QR или поиск по номеру, регистрация нового клиента и карточка клиента.', items: [['Вход по PIN', K.pin, 'dark'], ['Сканер', K.scan, 'dark'], ['Поиск по номеру', K.phone], ['Новый клиент', K.notFound], ['Карточка клиента', K.client]] },
+  { id: 'cashier-2', name: 'Кассир · покупка', desc: 'Начисление с учётом акции, списание бонусов с подтверждением кодом из SMS, чек, операции смены, возврат и закрытие смены.', items: [['Начисление + акция', K.saleEarn], ['Списание бонусов', K.saleSpend], ['Код от клиента', K.confirm], ['Готово', K.done], ['Операции смены', K.ops], ['Возврат', K.refund], ['Смена', K.shift]] },
+  { id: 'admin', w: 'w3', name: 'Админ', desc: 'Итоги, клиенты и ручное начисление, создание акций, магазины и кассиры, правила программы.', items: [['Обзор', A.overview], ['Клиенты', A.clients], ['Карточка клиента', A.client], ['Новая акция', A.promos], ['Магазины и кассиры', A.stores], ['Правила', A.rules]] },
+];
+document.getElementById('root').innerHTML = boards.map(b => `
+  <section class="board ${b.w || ''}" id="${b.id}">
+    <div class="board-head"><div><h1>ISTANBUL · ${b.name}</h1><p>${b.desc}</p></div><span class="tag">${b.items.length} ${b.items.length < 5 ? 'экрана' : 'экранов'}</span></div>
+    <div class="phones">${b.items.map(([l, f, cls]) => `<div class="wrap"><div class="phone ${cls || ''}">${f()}</div><div class="label">${l}</div></div>`).join('')}</div>
+  </section>`).join('');
+</script>
+</body>
+</html>
