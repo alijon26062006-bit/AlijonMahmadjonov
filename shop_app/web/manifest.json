@@ -1,11 +1,11 @@
 {
-    "name": "vitrina",
-    "short_name": "vitrina",
+    "name": "Витрина",
+    "short_name": "Витрина",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Маркетплейс Витрина",
+    "background_color": "#F4F3F9",
+    "theme_color": "#7B2FF7",
+    "description": "Маркетплейс «Витрина»",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

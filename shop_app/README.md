@@ -1,17 +1,37 @@
-# vitrina
+# 🛍️ Витрина — маркетплейс на Flutter
 
-Маркетплейс Витрина
+Мобильное приложение интернет-магазина (Android, iPhone через веб, Android-планшеты).
 
-## Getting Started
+## Что умеет
+- **Главная** — баннеры акций, категории, хиты продаж, рекомендации
+- **Каталог** — поиск, фильтр по категориям, сортировка (цена, рейтинг, скидка)
+- **Карточка товара** — выбор памяти / размера / цвета, количество, похожие товары
+- **Избранное** — ♡ на любом товаре
+- **Корзина** — изменение количества, свайп для удаления, промокоды, бесплатная доставка от 5 000 ₽
+- **Оформление заказа** — курьер или самовывоз, способ оплаты, комментарий
+- **Профиль** — история заказов со статусами, светлая / тёмная тема
 
-This project is a starting point for a Flutter application.
+Данные (корзина, избранное, заказы) сохраняются на телефоне.
+Промокоды для проверки: `VITRINA20`, `SALE10`, `WELCOME`.
 
-A few resources to get you started if this is your first Flutter project:
+## Как получить APK
+Каждый push в папку `shop_app/` запускает GitHub Actions (`.github/workflows/vitrina-apk.yml`):
+1. проверка кода и тесты;
+2. сборка `vitrina-1.0.N.apk`;
+3. файл появляется в **Actions → запуск → Artifacts** и в **Releases** (удобно качать с телефона).
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Где что менять
+| Что | Файл |
+|---|---|
+| Товары и категории | `lib/data.dart` |
+| Валюта (₽) | `lib/format.dart` → `kCurrency` |
+| Цвета дизайна | `lib/theme.dart` |
+| Промокоды, порог бесплатной доставки | `lib/state.dart` |
+| Экраны | `lib/screens/` |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Локальный запуск
+```bash
+flutter pub get
+flutter run          # на телефоне/эмуляторе
+flutter test         # тесты
+```
