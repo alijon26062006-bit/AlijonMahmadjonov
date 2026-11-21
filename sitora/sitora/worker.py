@@ -41,7 +41,7 @@ class Worker:
                           reply_markup={"inline_keyboard": buttons} if buttons else None)
 
     def tell_admins(self, text: str) -> None:
-        for a in self.config.admin_ids:
+        for a in shop.admin_list(self.conn, self.config):
             self.tell(a, text)
 
     # ── цены ──

@@ -43,7 +43,7 @@ def main() -> None:
         threading.Thread(target=poll, args=(config, Handler(config, bot, supplier), stop), daemon=True, name="bot").start()
     threading.Thread(target=Worker(config, bot, supplier).run, args=(stop,), daemon=True, name="worker").start()
     try:
-        uvicorn.run(create_app(config, bot), host=a.host, port=a.port, log_level="warning", proxy_headers=True)
+        uvicorn.run(create_app(config, bot, supplier), host=a.host, port=a.port, log_level="warning", proxy_headers=True)
     finally:
         stop.set()
 

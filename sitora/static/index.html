@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Магазин</title>
-<link rel="preload" href="/static/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/unbounded-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/app.css?v=1">
+<link rel="preload" href="static/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="static/fonts/unbounded-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="static/app.css?v=1">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -25,6 +25,7 @@
 <symbol id="warn" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.5M12 17v.2"/></symbol>
 <symbol id="copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
 <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
 <symbol id="share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
 </svg>
 
@@ -91,6 +92,43 @@
   </div>
 </section>
 
+<!-- АДМИН (видит только админ) -->
+<section class="page" data-page="admin">
+  <div class="rise" style="display:flex;flex-direction:column;gap:13px">
+    <div class="top"><div><div class="cap">Только для вас</div><h1 class="h1" style="margin-top:4px">Админ</h1></div>
+      <button class="lang" id="aRefresh">Обновить</button></div>
+    <div class="main"><div style="display:flex;justify-content:space-between;align-items:center"><span class="cap">Продажи сегодня</span><span class="pill" id="aTodayN">0 заказов</span></div>
+      <div style="margin-top:8px"><span class="num" id="aToday">0</span> <b>сомони</b></div>
+      <div class="bars" id="aBars" style="height:70px;margin-top:14px"></div></div>
+    <div class="grid3" style="grid-template-columns:1fr 1fr">
+      <div class="tile"><span class="cap">За 7 дней</span><b id="aWeek">0</b><small>сомони</small></div>
+      <div class="tile"><span class="cap">Клиентов</span><b id="aUsers">0</b><small>всего</small></div>
+      <div class="tile"><span class="cap">Поставщик</span><b id="aSup" style="font-size:16px">—</b><small>баланс $</small></div>
+      <div class="tile"><span class="cap">Stars бота</span><b id="aStars">—</b><small>для подарков</small></div>
+    </div>
+    <h2 class="h1" style="font-size:15px">Чеки <span id="aTopN"></span></h2>
+    <div class="list" id="aTopups"></div>
+    <h2 class="h1" style="font-size:15px">Заказы в работе</h2>
+    <div class="list" id="aOrders"></div>
+    <h2 class="h1" style="font-size:15px">Цены</h2>
+    <div class="card" style="display:grid;gap:10px">
+      <label class="cap">Курс, сомони за 1 $<input class="field" id="aRate" inputmode="decimal" style="margin-top:6px"></label>
+      <label class="cap">Наценка, %<input class="field" id="aMarkup" inputmode="decimal" style="margin-top:6px"></label>
+      <label class="cap">Цена 1 звезды подарка, с. (пусто — как Stars)<input class="field" id="aGift" inputmode="decimal" style="margin-top:6px"></label>
+      <button class="btn" id="aSave">Сохранить цены</button></div>
+    <h2 class="h1" style="font-size:15px">Карты для оплаты</h2>
+    <div class="list" id="aCards"></div>
+    <div class="card" style="display:grid;gap:10px">
+      <div class="chips" id="aMethod"></div>
+      <input class="field" id="aDetails" placeholder="+992 90 000 00 00 · Имя Фамилия" autocomplete="off">
+      <button class="btn ghost" id="aAddCard">Добавить карту</button></div>
+    <h2 class="h1" style="font-size:15px">Клиент</h2>
+    <div style="display:flex;gap:8px"><input class="field" id="aFind" placeholder="ID или @username" autocapitalize="none" autocomplete="off">
+      <button class="chip" id="aFindGo" style="height:56px;border-radius:18px">Найти</button></div>
+    <div id="aUser"></div>
+  </div>
+</section>
+
 <!-- УСПЕХ -->
 <section class="page dark" data-page="success" data-nonav>
   <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;flex:1;padding-top:16px">
@@ -114,6 +152,7 @@
   <button data-go="orders"><svg class="i"><use href="#clock"/></svg><span data-t="orders">Заказы</span></button>
   <button data-go="balance"><svg class="i"><use href="#wallet"/></svg><span data-t="balance">Баланс</span></button>
   <button data-go="help"><svg class="i"><use href="#help"/></svg><span data-t="help">Помощь</span></button>
+  <button data-go="admin" id="navAdmin" hidden><svg class="i"><use href="#gear"/></svg><span>Админ</span></button>
 </nav>
 
 <!-- ЛИСТ ОПЛАТЫ -->
@@ -121,7 +160,7 @@
   <div class="rise" style="display:flex;flex-direction:column;gap:12px" id="payBody"></div>
 </div>
 
-<script src="/static/motion.js?v=1"></script>
-<script src="/static/app.js?v=1"></script>
+<script src="static/motion.js?v=1"></script>
+<script src="static/app.js?v=1"></script>
 </body>
 </html>

@@ -24,6 +24,17 @@ class ShopError(Exception):
     """Понятная клиенту ошибка: текст показываем как есть."""
 
 
+# ── админы: Telegram ID из .env (SITORA_ADMIN_IDS) и добавленные в админ-панели ──
+
+def admin_list(conn: sqlite3.Connection, config) -> list[int]:
+    saved = json.loads(db.get_setting(conn, "admins", "[]"))
+    return sorted(set(config.admin_ids) | {int(x) for x in saved})
+
+
+def is_admin(conn: sqlite3.Connection, config, tg_id) -> bool:
+    return tg_id is not None and int(tg_id) in admin_list(conn, config)
+
+
 # ── пользователи и баланс ─────────────────────────────────────
 
 def touch_user(conn: sqlite3.Connection, u: dict[str, Any]) -> sqlite3.Row:

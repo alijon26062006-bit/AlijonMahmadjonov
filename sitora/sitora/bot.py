@@ -1,7 +1,8 @@
 """Бот: /start с картинкой и кнопкой мини-приложения, подарок по ссылке, чеки и команды админа.
 
 Админ — Telegram ID из SITORA_ADMIN_IDS. Команды админа (/help в боте):
-  /admin                 — сводка
+  /admin                 — кнопка админ-панели (всё главное — там)
+  /stats                 — сводка текстом
   /rate 11.2             — курс сомони за 1 USD
   /markup 10             — наценка, %
   /giftstar 0.25         — цена 1 звезды подарка в сомони (пусто — как у Stars)
@@ -54,6 +55,9 @@ class Handler:
     def open_button(self, text: str = "Открыть магазин · Магазинро кушоед") -> list:
         return [[{"text": text, "web_app": {"url": self.config.base_url + "/app"}}]]
 
+    def admin_button(self) -> list:
+        return [[{"text": "⚙️ Админ-панель", "web_app": {"url": self.config.base_url + "/app#admin"}}]]
+
     # ── входящие ──
     def handle(self, upd: dict) -> None:
         if "callback_query" in upd:
@@ -76,7 +80,10 @@ class Handler:
         cmd = cmd.split("@")[0].lower()
         if cmd == "/start":
             return self.start(user, arg.strip())
-        if self.config.is_admin(user["id"]) and cmd.startswith("/"):
+        admin = shop.is_admin(self.conn, self.config, user["id"])
+        if admin and cmd in ("/panel", "/admin"):
+            return self.bot.send(user["id"], "⚙️ Админ-панель: чеки, заказы, карты, цены, клиенты.", self.admin_button())
+        if admin and cmd.startswith("/"):
             return self.admin(user["id"], cmd, arg.strip())
         if cmd == "/help":
             return self.bot.send(user["id"], "Магазин работает в мини-приложении — кнопка ниже."
@@ -93,7 +100,7 @@ class Handler:
             else:
                 self.bot.send(user["id"], "Эта ссылка уже использована или устарела.")
         caption = WELCOME.format(name=self.config.name)
-        markup = {"inline_keyboard": self.open_button()}
+        markup = {"inline_keyboard": self.open_button() + (self.admin_button() if shop.is_admin(self.conn, self.config, user["id"]) else [])}
         file_id = db.get_setting(self.conn, "start_photo")
         try:
             if file_id:
@@ -115,36 +122,19 @@ class Handler:
     def on_button(self, cq: dict) -> None:
         who = cq.get("from") or {}
         data = cq.get("data") or ""
-        if not self.config.is_admin(who.get("id")) or not data.startswith("tp:"):
+        if not shop.is_admin(self.conn, self.config, who.get("id")) or not data.startswith("tp:"):
             self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
             return
         _, act, tid = data.split(":")
-        t = shop.decide_topup(self.conn, int(tid), act == "ok", who.get("first_name") or str(who["id"]))
-        if t is None:
-            self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"], text="Уже решено")
-            return
-        self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"], text="Готово")
-        verdict = (f"✅ Зачислено {fmt(t['amount'])} с. — {t['decided_by']}" if act == "ok"
-                   else f"❌ Отклонено — {t['decided_by']}")
-        for m in json.loads(t["admin_msgs"] or "[]"):   # итог видят все админы, кнопки исчезают
-            self.bot.safe("editMessageCaption", chat_id=m[0], message_id=m[1], caption=f"Пополнение № {t['id']}\n{verdict}")
-        if act == "ok":
-            order = shop.run_intent(self.conn, t)
-            self.bot.safe("sendMessage", chat_id=t["user_id"], text=(
-                f"✅ Баланс пополнен на {fmt(t['amount'])} с. / Баланс пур шуд."
-                + (f"\n🛒 Заказ № {order['id']} оформлен: {order['title']}" if order else "")),
-                reply_markup={"inline_keyboard": self.open_button()})
-        else:
-            self.bot.safe("sendMessage", chat_id=t["user_id"],
-                          text="❌ Пополнение не подтверждено: перевод не найден. Если это ошибка — напишите в поддержку.\n"
-                               "Пардохт тасдиқ нашуд.")
+        t = finish_topup(self.config, self.bot, self.conn, int(tid), act == "ok", who.get("first_name") or str(who["id"]))
+        self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"], text="Готово" if t else "Уже решено")
 
     # ── админ ──
     def admin(self, chat: int, cmd: str, arg: str) -> None:
         c = self.conn
         say = lambda t: self.bot.send(chat, t)   # noqa: E731
         try:
-            if cmd in ("/help", "/admin"):
+            if cmd in ("/help", "/stats"):
                 users = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
                 today = c.execute("SELECT COUNT(*), COALESCE(SUM(price),0) FROM orders WHERE created_at >= date('now') "
                                   "AND status NOT IN ('failed')").fetchone()
@@ -220,6 +210,29 @@ class Handler:
             say(f"Telegram: {exc}")
 
 
+def finish_topup(config: Config, bot: Bot | None, conn, topup_id: int, ok: bool, who: str, note: str = ""):
+    """Решение по чеку — из бота или из админ-панели. Один раз; итог видят все админы, клиенту — сообщение."""
+    t = shop.decide_topup(conn, topup_id, ok, who, note)
+    if t is None:
+        return None
+    order = shop.run_intent(conn, t) if ok else None
+    if bot is None:
+        return t
+    verdict = f"✅ Зачислено {fmt(t['amount'])} с. — {who}" if ok else f"❌ Отклонено — {who}"
+    for m in json.loads(t["admin_msgs"] or "[]"):   # кнопки у всех админов исчезают
+        bot.safe("editMessageCaption", chat_id=m[0], message_id=m[1], caption=f"Пополнение № {t['id']}\n{verdict}")
+    app = {"inline_keyboard": [[{"text": "Открыть магазин", "web_app": {"url": config.base_url + "/app"}}]]}
+    if ok:
+        bot.safe("sendMessage", chat_id=t["user_id"], reply_markup=app, text=(
+            f"✅ Баланс пополнен на {fmt(t['amount'])} с. / Баланс пур шуд."
+            + (f"\n🛒 Заказ № {order['id']} оформлен: {order['title']}" if order else "")))
+    else:
+        bot.safe("sendMessage", chat_id=t["user_id"], text=(
+            "❌ Пополнение не подтверждено" + (f": {note}" if note else ": перевод не найден")
+            + ". Если это ошибка — напишите в поддержку.\nПардохт тасдиқ нашуд."))
+    return t
+
+
 def notify_receipt(config: Config, bot: Bot, conn, topup_id: int, data: bytes, ext: str) -> None:
     """Чек — всем админам, с кнопками. ID сообщений запоминаем, чтобы показать итог у всех."""
     t = conn.execute("SELECT t.*, u.username, u.first_name FROM topups t JOIN users u ON u.id = t.user_id WHERE t.id = ?",
@@ -230,7 +243,7 @@ def notify_receipt(config: Config, bot: Bot, conn, topup_id: int, data: bytes, e
     kb = {"inline_keyboard": [[{"text": "✅ Зачислить", "callback_data": f"tp:ok:{t['id']}"},
                                {"text": "❌ Отклонить", "callback_data": f"tp:no:{t['id']}"}]]}
     sent = []
-    for a in config.admin_ids:
+    for a in shop.admin_list(conn, config):
         try:
             method, field = ("sendDocument", "document") if ext == "pdf" else ("sendPhoto", "photo")
             m = bot.call(method, files={field: (f"check.{ext}", data)}, chat_id=a, caption=cap[:1000], reply_markup=kb)

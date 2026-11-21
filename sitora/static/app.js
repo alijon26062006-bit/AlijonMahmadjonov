@@ -116,7 +116,7 @@
     orders(); pending();
     return old;
   }
-  function refresh() { return api("/api/me").then(setMe).catch(function () {}); }
+  function refresh() { return api("api/me").then(setMe).catch(function () {}); }
 
   // ── заказы ──
   function shareLink(token) {
@@ -177,12 +177,12 @@
     $("#payGo").onclick = function () {
       var m = picked(); if (!m) { M.toast(t("choose")); return; }
       if (m === "balance") return buy(item, c, v);
-      api("/api/topup", { method: m, intent: item }).then(function (d) { requisites(d.topup, true); }).catch(fail);
+      api("api/topup", { method: m, intent: item }).then(function (d) { requisites(d.topup, true); }).catch(fail);
     };
   }
   function buy(item, c, v) {
     var btn = $("#payGo"); btn.disabled = true;
-    api("/api/order", item).then(function (d) {
+    api("api/order", item).then(function (d) {
       var was = S.me.user.balance; setMe(d); close && close();
       success(c.title, v, d.order, was, d.user.balance); haptic("success");
     }).catch(function (e) { btn.disabled = false; fail(e); });
@@ -201,7 +201,7 @@
     $("#rcpt").onchange = function (e) {
       var f = e.target.files[0]; if (!f) return;
       $("#rcptHint").textContent = "…";
-      api("/api/topup/" + tp.id + "/receipt", null, f).then(function () {
+      api("api/topup/" + tp.id + "/receipt", null, f).then(function () {
         haptic("success");
         sheet('<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:10px 0"><div class="ok" style="background:#0B0B0B;color:#fff"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
           '<div class="h1">' + t("sent") + '</div><p class="muted">' + t("wait") + '</p><button class="btn" id="closeSheet">OK</button></div>');
@@ -233,6 +233,77 @@
   }
   function fail(e) { haptic("error"); M.toast(e.message || String(e)); }
 
+  // ── админ-панель ──
+  var A = { method: "alif" };
+  var ST = { "new": "ждёт отправки поставщику", processing: "у поставщика", attention: "⚠ нет связи — проверьте у поставщика",
+    paid: "подарок отправляется", sending: "подарок отправляется", awaiting_recipient: "ждёт, пока друг откроет ссылку",
+    completed: "выполнен", sent: "подарок доставлен", failed: "возврат" };
+  function admin() {
+    return api("api/admin/summary").then(function (d) {
+      M.count($("#aToday"), d.today.sum / 100); $("#aTodayN").textContent = d.today.n + " заказов";
+      M.count($("#aWeek"), d.week.sum / 100); M.count($("#aUsers"), d.users);
+      $("#aSup").textContent = d.supplier == null ? "нет ключа" : d.supplier; $("#aStars").textContent = d.bot_stars == null ? "—" : M.fmt(+d.bot_stars);
+      var days = {}, max = 1; d.days.forEach(function (x) { days[x.d] = x.s; max = Math.max(max, x.s); });
+      var bars = ""; for (var i = 6; i >= 0; i--) { var k = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10), v = days[k] || 0;
+        bars += '<i class="' + (i ? "soft" : "") + '" style="--h:' + Math.max(4, Math.round(v / max * 100)) + ";--i:" + (6 - i) + ';background:' + (i ? "rgba(255,255,255,.25)" : "#fff") + '"></i>'; }
+      $("#aBars").innerHTML = bars;
+      $("#aTopN").textContent = d.topups.length ? "· " + d.topups.length : "";
+      $("#aTopups").innerHTML = d.topups.length ? d.topups.map(function (t) {
+        return '<div class="card col" data-tid="' + t.id + '"><div style="display:flex;justify-content:space-between;gap:10px"><div><div class="tt">№ ' + t.id + " · " + som(t.amount) +
+          ' с.</div><div class="ss">' + esc(t.who) + " · " + esc(t.method) + '</div><div class="ss">' + esc(t.card) + "</div>" + (t.ai ? '<div class="ss">ИИ: ' + esc(t.ai) + "</div>" : "") +
+          '</div></div><div class="abtns"><button class="chip" data-a="see">Открыть чек</button><button class="chip sel" data-a="ok">Зачислить</button><button class="chip" data-a="no">Отклонить</button></div><div class="img"></div></div>';
+      }).join("") : '<div class="empty">Чеков нет</div>';
+      $("#aOrders").innerHTML = d.attention.length ? d.attention.map(function (o) {
+        return '<div class="card col" data-aoid="' + o.id + '"><div class="tt">№ ' + o.id + " · " + esc(o.title) + (o.to ? " → @" + esc(o.to) : "") +
+          '</div><div class="ss">' + esc(ST[o.status] || o.status) + " · " + som(o.price) + " с." + (o.supplier ? " · поставщик " + esc(o.supplier) : "") + "</div>" + (o.error ? '<div class="ss">' + esc(o.error) + "</div>" : "") +
+          '<div class="abtns">' + (o.status === "attention" ? '<button class="chip" data-o="retry">Повторить</button>' : "") +
+          '<button class="chip" data-o="done">Выполнен</button><button class="chip" data-o="refund">Вернуть деньги</button></div></div>';
+      }).join("") : '<div class="empty">Всё выполнено</div>';
+      $("#aRate").value = d.settings.rate; $("#aMarkup").value = d.settings.markup; $("#aGift").value = d.settings.gift_star;
+      $("#aCards").innerHTML = d.cards.length ? d.cards.map(function (c) {
+        return '<div class="card"><span class="ico"><svg class="i"><use href="#' + (c.method === "card" ? "card" : "phone") + '"/></svg></span><div><div class="tt">' + esc(c.title) +
+          '</div><div class="ss">' + esc(c.details) + '</div></div><div class="r"><button class="chip" data-coff="' + c.id + '">Выкл.</button></div></div>';
+      }).join("") : '<div class="empty">Добавьте карту — без неё клиенты не смогут оплатить переводом</div>';
+      $("#aMethod").innerHTML = d.methods.map(function (m) { return '<button class="chip' + (m.code === A.method ? " sel" : "") + '" data-am="' + m.code + '">' + esc(m.title) + "</button>"; }).join("");
+    }).catch(fail);
+  }
+  function adminUser(q) {
+    api("api/admin/user?q=" + encodeURIComponent(q)).then(function (d) {
+      var u = d.user;
+      $("#aUser").innerHTML = '<div class="card col"><div class="tt">' + esc(u.name) + (u.username ? " @" + esc(u.username) : "") + " · ID " + u.id +
+        '</div><div class="ss">Баланс: <b>' + som(u.balance) + " с.</b>" + (u.banned ? " · заблокирован" : "") + "</div>" +
+        '<div style="display:flex;gap:8px;margin-top:10px"><input class="field" id="aAmt" placeholder="+50 или -10" inputmode="decimal"><button class="chip" id="aAmtGo" style="height:56px;border-radius:18px">Провести</button></div>' +
+        '<input class="field" id="aAmtNote" placeholder="Комментарий (клиент увидит)" style="margin-top:8px">' +
+        '<div class="abtns"><button class="chip" id="aBan">' + (u.banned ? "Разблокировать" : "Заблокировать") + "</button></div>" +
+        '<div class="ss" style="margin-top:10px">' + d.orders.map(function (o) { return "№ " + o.id + " " + esc(o.title) + " · " + esc(ST[o.status] || o.status); }).join("<br>") + "</div></div>";
+      $("#aAmtGo").onclick = function () { api("api/admin/user/" + u.id, { amount: $("#aAmt").value, note: $("#aAmtNote").value }).then(function () { M.toast("Баланс изменён"); adminUser(String(u.id)); }).catch(fail); };
+      $("#aBan").onclick = function () { api("api/admin/user/" + u.id, { banned: !u.banned }).then(function () { adminUser(String(u.id)); }).catch(fail); };
+    }).catch(function (e) { M.shake($("#aFind")); fail(e); });
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-a]");
+    if (b) { var card = b.closest("[data-tid]"), id = card.dataset.tid;
+      if (b.dataset.a === "see") {
+        fetch("api/admin/receipt/" + id, { headers: { "X-Init-Data": TG.initData } }).then(function (r) { return r.blob(); }).then(function (bl) {
+          var box = $(".img", card); box.innerHTML = bl.type === "application/pdf" ? '<a class="chip" target="_blank" href="' + URL.createObjectURL(bl) + '">PDF</a>' : '<img class="rimg" alt="Чек" src="' + URL.createObjectURL(bl) + '">';
+        });
+      } else {
+        var ok = b.dataset.a === "ok", note = ok ? "" : (window.prompt("Причина отказа (клиент увидит):", "Перевод не найден") || "");
+        api("api/admin/topup/" + id, { ok: ok, note: note }).then(function () { M.toast(ok ? "Зачислено" : "Отклонено"); haptic("success"); admin(); }).catch(fail);
+      } }
+    var o = e.target.closest("[data-o]");
+    if (o) { var oid = o.closest("[data-aoid]").dataset.aoid, act = o.dataset.o;
+      if (act === "refund" && !window.confirm("Вернуть деньги клиенту? Делайте это, только если у поставщика заказа точно нет.")) return;
+      api("api/admin/order/" + oid, { action: act }).then(function () { M.toast("Готово"); admin(); }).catch(fail); }
+    var off = e.target.closest("[data-coff]"); if (off) api("api/admin/cards/" + off.dataset.coff + "/off", {}).then(admin).catch(fail);
+    var am = e.target.closest("[data-am]"); if (am) { A.method = am.dataset.am; $$("#aMethod .chip").forEach(function (x) { x.classList.toggle("sel", x === am); }); }
+  });
+  $("#aRefresh").onclick = admin;
+  $("#aSave").onclick = function () { api("api/admin/settings", { rate: $("#aRate").value, markup: $("#aMarkup").value, gift_star: $("#aGift").value }).then(function () { M.toast("Цены сохранены"); refresh(); }).catch(fail); };
+  $("#aAddCard").onclick = function () { api("api/admin/cards", { method: A.method, details: $("#aDetails").value }).then(function () { $("#aDetails").value = ""; M.toast("Карта добавлена"); admin(); refresh(); }).catch(function (e) { M.shake($("#aDetails")); fail(e); }); };
+  $("#aFindGo").onclick = function () { var q = $("#aFind").value.trim(); if (q) adminUser(q); else M.shake($("#aFind")); };
+  $('.page[data-page="admin"]')._enter = admin;
+
   // ── запуск ──
   if (TG) { try { TG.ready(); TG.expand(); TG.setHeaderColor("#FFFFFF"); TG.setBackgroundColor("#FFFFFF"); TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {} }
   M.stagger(document);
@@ -242,7 +313,7 @@
   $("#qty").addEventListener("input", function () { $$("#items .tile").forEach(function (x) { x.classList.remove("sel"); }); price(); });
   $("#me").onclick = function () { if (S.me && S.me.user.username) { $("#who").value = "@" + S.me.user.username; $("#whoHint").textContent = ""; } else if (S.tab === "gifts") { $("#who").value = ""; } else M.toast(t("badWho")); };
   $("#buy").onclick = openBuy;
-  $("#lang").onclick = function () { S.lang = S.lang === "tj" ? "ru" : "tj"; texts(); api("/api/lang", { lang: S.lang }).catch(function () {}); };
+  $("#lang").onclick = function () { S.lang = S.lang === "tj" ? "ru" : "tj"; texts(); api("api/lang", { lang: S.lang }).catch(function () {}); };
   $("#supportBtn").onclick = function () { var s = S.me.support; if (/^@/.test(s)) s = "https://t.me/" + s.slice(1); TG && TG.openTelegramLink && /t\.me/.test(s) ? TG.openTelegramLink(s) : window.open(s, "_blank"); };
   document.addEventListener("click", function (e) {
     var m = e.target.closest("[data-m]"); if (m && !m.disabled) $$("#payBody [data-m]").forEach(function (x) { x.classList.toggle("sel", x === m); });
@@ -261,11 +332,14 @@
       (S.me.methods.length ? '<button class="btn" id="tpGo">' + t("pay") + "</button>" : ""));
     var go = $("#tpGo"); if (go) go.onclick = function () {
       var m = picked(); if (!m) { M.toast(t("choose")); return; }
-      api("/api/topup", { method: m, amount: S.amount }).then(function (d) { requisites(d.topup, false); S.amount = 0; M.count($("#amount"), 0, 300); }).catch(fail);
+      api("api/topup", { method: m, amount: S.amount }).then(function (d) { requisites(d.topup, false); S.amount = 0; M.count($("#amount"), 0, 300); }).catch(fail);
     };
   };
   setInterval(function () { if (!document.hidden && S.me) refresh(); }, 15000);
 
   if (!TG || !TG.initData) { document.body.innerHTML = '<div class="page dark on" style="justify-content:center;align-items:center;text-align:center"><div class="h1">' + T.ru.open + "<br><br>" + T.tj.open + "</div></div>"; return; }
-  api("/api/me").then(function (d) { S.lang = d.user.lang || "tj"; setMe(d); texts(); }).catch(function (e) { M.toast(e.message); });
+  api("api/me").then(function (d) {
+    S.lang = d.user.lang || "tj"; setMe(d); texts();
+    if (d.admin) { $("#navAdmin").hidden = false; placeBar(); if (location.hash === "#admin") $("#navAdmin").click(); }
+  }).catch(function (e) { M.toast(e.message); });
 })();
