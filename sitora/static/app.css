@@ -199,3 +199,9 @@ label.cap{display:block}
 .tile .gfx.on canvas,.tile .gfx.on video,.tile .gfx.on img{opacity:1;transform:none}
 .tile .gfx.on .em{opacity:0}
 @media (prefers-reduced-motion:reduce){.tile .gfx canvas,.tile .gfx video,.tile .gfx img{transition:none;transform:none}}
+
+/* минимальная сумма пополнения */
+#minHint{font-size:13px;font-weight:600;color:var(--mute-2);transition:color .2s var(--ease)}
+#minHint.bad,#amountBox.bad,#amountBox.bad .num{color:#E5484D}
+#amountBox .num,#amountBox b{transition:color .2s var(--ease)}
+.btn:disabled{opacity:.35;pointer-events:none}

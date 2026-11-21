@@ -239,12 +239,23 @@ def methods(conn) -> list[dict[str, Any]]:
     return [{"code": k, "title": v} for k, v in METHODS.items() if k in have]
 
 
+def min_topup(conn) -> int:
+    """Минимальная сумма пополнения в дирамах (ставит админ). По умолчанию 1 сомони."""
+    try:
+        return max(100, int(db.get_setting(conn, "min_topup", "100") or 100))
+    except ValueError:
+        return 100
+
+
 def create_topup(conn: sqlite3.Connection, user_id: int, method: str, amount: int,
                  intent: dict[str, Any] | None = None) -> sqlite3.Row:
     if method not in METHODS:
         raise ShopError("Выберите способ оплаты.")
-    if not 100 <= amount <= 5_000_000:
-        raise ShopError("Сумма — от 1 до 50 000 сомони. / Маблағ — аз 1 то 50 000 сомонӣ.")
+    low = min_topup(conn)
+    if amount < low:
+        raise ShopError(f"Минимальная сумма — {fmt(low)} сомони. / Маблағи ҳадди ақал — {fmt(low)} сомонӣ.")
+    if amount > 5_000_000:
+        raise ShopError("Сумма — до 50 000 сомони. / Маблағ — то 50 000 сомонӣ.")
     pool = cards(conn, method)
     if not pool:
         raise ShopError("Этот способ сейчас недоступен. / Ин усул ҳоло дастрас нест.")

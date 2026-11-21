@@ -23,7 +23,7 @@
       intentNote: "Баъди тасдиқи чек фармоиш худ ба худ иҷро мешавад", done: "Харид<br>анҷом шуд",
       giftWait: "Тӯҳфа<br>пардохт шуд", item: "Мол", to: "Гиранда", paid: "Пардохт", st_done: "Расонида шуд",
       st_work: "Дар кор", st_wait: "Интизори гиранда", st_fail: "Баргардонида шуд", empty: "Ҳоло фармоиш нест",
-      enterSum: "Маблағро ворид кунед", choose: "Усули пардохтро интихоб кунед", noMethods: "Ҳоло усули пардохт нест",
+      enterSum: "Маблағро ворид кунед", minSum: "Ҳадди ақал", lowSum: "Камтар аз ҳадди ақал:", choose: "Усули пардохтро интихоб кунед", noMethods: "Ҳоло усули пардохт нест",
       back: "Бозгашт", open: "Аз Telegram кушоед", soon: "Ҳоло нест", cancel: "Бекор кардан",
       giftText: "Тӯҳфа барои ту! Ин пайвандро кушо ва Start-ро пахш кун" },
     ru: { shop: "Магазин", balance: "Баланс", somoni: "сомони", gifts: "Подарки", gift: "Подарок", ownQty: "Своё количество", toMe: "Себе",
@@ -41,7 +41,7 @@
       intentNote: "После проверки чека заказ оформится сам", done: "Покупка<br>проведена",
       giftWait: "Подарок<br>оплачен", item: "Товар", to: "Получатель", paid: "Оплачено", st_done: "Доставлено",
       st_work: "В работе", st_wait: "Ждёт получателя", st_fail: "Возврат", empty: "Заказов пока нет",
-      enterSum: "Введите сумму пополнения", choose: "Выберите способ оплаты", noMethods: "Способов оплаты пока нет",
+      enterSum: "Введите сумму пополнения", minSum: "Минимум", lowSum: "Меньше минимума:", choose: "Выберите способ оплаты", noMethods: "Способов оплаты пока нет",
       back: "Назад", open: "Откройте из Telegram", soon: "Пока нет", cancel: "Отменить",
       giftText: "Подарок для тебя! Открой ссылку и нажми Start" }
   };
@@ -68,6 +68,7 @@
     $("#lang").textContent = S.lang === "tj" ? "ТҶ · ru" : "tj · RU";
     $("#note").placeholder = t("note");
     document.documentElement.lang = S.lang === "tj" ? "tg" : "ru";
+    if (S.me) checkSum();
     items();
   }
 
@@ -152,6 +153,16 @@
   }
   function price() { var c = current(); M.count($("#price"), c ? c.price / 100 : 0, 500); }
 
+  // ── минимальная сумма: меньше — красным, кнопка не нажимается ──
+  function checkSum() {
+    var low = S.me ? S.me.min_topup / 100 : 1, bad = S.amount > 0 && S.amount < low;
+    $("#amountBox").classList.toggle("bad", bad);
+    var h = $("#minHint"); h.classList.toggle("bad", bad);
+    h.textContent = (bad ? t("lowSum") : t("minSum")) + " " + M.fmt(low) + " " + t("somoni");
+    $("#topup").disabled = !S.amount || bad;
+    return !!S.amount && !bad;
+  }
+
   // ── баланс ──
   function setMe(d) {
     var old = S.me ? S.me.user.balance : null; S.me = d;
@@ -160,7 +171,7 @@
     $("#myId").textContent = "ID · " + d.user.id;
     $$("[data-balance]").forEach(function (el) { M.count(el, d.user.balance / 100); });
     $("#supportBtn").hidden = !d.support;
-    orders(); pending();
+    orders(); pending(); checkSum();
     return old;
   }
   function refresh() { return api("api/me").then(setMe).catch(function () {}); }
@@ -306,7 +317,7 @@
           '<div class="abtns">' + (o.status === "attention" ? '<button class="chip" data-o="retry">Повторить</button>' : "") +
           '<button class="chip" data-o="done">Выполнен</button><button class="chip" data-o="refund">Вернуть деньги</button></div></div>';
       }).join("") : '<div class="empty">Всё выполнено</div>';
-      $("#aRate").value = d.settings.rate; $("#aMarkup").value = d.settings.markup; $("#aGift").value = d.settings.gift_star;
+      $("#aRate").value = d.settings.rate; $("#aMarkup").value = d.settings.markup; $("#aGift").value = d.settings.gift_star; $("#aMin").value = d.settings.min_topup;
       $("#aCards").innerHTML = d.cards.length ? d.cards.map(function (c) {
         return '<div class="card"><span class="ico"><svg class="i"><use href="#' + (c.method === "card" ? "card" : "phone") + '"/></svg></span><div><div class="tt">' + esc(c.title) +
           '</div><div class="ss">' + esc(c.details) + '</div></div><div class="r"><button class="chip" data-coff="' + c.id + '">Выкл.</button></div></div>';
@@ -346,7 +357,7 @@
     var am = e.target.closest("[data-am]"); if (am) { A.method = am.dataset.am; $$("#aMethod .chip").forEach(function (x) { x.classList.toggle("sel", x === am); }); }
   });
   $("#aRefresh").onclick = admin;
-  $("#aSave").onclick = function () { api("api/admin/settings", { rate: $("#aRate").value, markup: $("#aMarkup").value, gift_star: $("#aGift").value }).then(function () { M.toast("Цены сохранены"); refresh(); }).catch(fail); };
+  $("#aSave").onclick = function () { api("api/admin/settings", { rate: $("#aRate").value, markup: $("#aMarkup").value, gift_star: $("#aGift").value, min_topup: $("#aMin").value }).then(function () { M.toast("Цены сохранены"); refresh(); }).catch(fail); };
   $("#aAddCard").onclick = function () { api("api/admin/cards", { method: A.method, details: $("#aDetails").value }).then(function () { $("#aDetails").value = ""; M.toast("Карта добавлена"); admin(); refresh(); }).catch(function (e) { M.shake($("#aDetails")); fail(e); }); };
   $("#aFindGo").onclick = function () { var q = $("#aFind").value.trim(); if (q) adminUser(q); else M.shake($("#aFind")); };
   $('.page[data-page="admin"]')._enter = admin;
@@ -370,16 +381,16 @@
   });
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "←"].forEach(function (k) {
     var b = document.createElement("button"); b.className = "key"; b.textContent = k; b.setAttribute("aria-label", k === "←" ? "⌫" : k);
-    b.onclick = function () { S.amount = k === "←" ? Math.floor(S.amount / 10) : Math.min(50000, +(String(S.amount) + k)); M.count($("#amount"), S.amount, 300); };
+    b.onclick = function () { S.amount = k === "←" ? Math.floor(S.amount / 10) : Math.min(50000, +(String(S.amount) + k)); M.count($("#amount"), S.amount, 300); checkSum(); };
     $("#keys").appendChild(b);
   });
   $("#topup").onclick = function () {
-    if (!S.amount) { M.toast(t("enterSum")); return; }
+    if (!checkSum()) { M.shake($("#amountBox")); haptic("error"); return; }
     sheet('<div class="cap">' + t("topup") + '</div><div><span class="num">' + M.fmt(S.amount) + '</span> <b>' + t("somoni") + "</b></div>" + methodsHtml(S.amount * 100, false) +
       (S.me.methods.length ? '<button class="btn" id="tpGo">' + t("pay") + "</button>" : ""));
     var go = $("#tpGo"); if (go) go.onclick = function () {
       var m = picked(); if (!m) { M.toast(t("choose")); return; }
-      api("api/topup", { method: m, amount: S.amount }).then(function (d) { requisites(d.topup, false); S.amount = 0; M.count($("#amount"), 0, 300); }).catch(fail);
+      api("api/topup", { method: m, amount: S.amount }).then(function (d) { requisites(d.topup, false); S.amount = 0; M.count($("#amount"), 0, 300); checkSum(); }).catch(fail);
     };
   };
   setInterval(function () { if (!document.hidden && S.me) refresh(); }, 15000);

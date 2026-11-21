@@ -110,7 +110,7 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
         return {"ok": True, "name": config.name, "bot": db.get_setting(c, "bot_username"),
                 "user": {"id": u["id"], "first_name": u["first_name"], "username": u["username"], "lang": u["lang"],
                          "balance": c.execute("SELECT balance FROM users WHERE id = ?", (u["id"],)).fetchone()[0]},
-                "catalog": shop.catalog(c), "methods": shop.methods(c), "support": config.support,
+                "catalog": shop.catalog(c), "methods": shop.methods(c), "min_topup": shop.min_topup(c), "support": config.support,
                 "orders": [shop.public_order(o) for o in orders],
                 "admin": shop.is_admin(c, config, u["id"]),
                 "topup": shop.topup_view(c, waiting) if waiting else None}
@@ -150,7 +150,8 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
                 shop.clean_username(intent.get("to") or "")
             bal = conn().execute("SELECT balance FROM users WHERE id = ?", (u["id"],)).fetchone()[0]
             need = q["price"] - bal
-            amount = need if need >= 100 else q["price"]   # баланса хватает, но выбрал перевод — платит полную цену
+            # не хватает — доплачивает разницу; хватает, но выбрал перевод — полную цену; но не меньше минимума
+            amount = max(need if need > 0 else q["price"], shop.min_topup(conn()))
         t = shop.create_topup(conn(), u["id"], str(body.get("method") or ""), amount, intent)
         return {"ok": True, "topup": shop.topup_view(conn(), t)}
 
@@ -233,7 +234,8 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
                 "week": {"n": week[0], "sum": week[1]}, "days": [{"d": r["d"], "s": r["s"]} for r in days],
                 "supplier": sup, "bot_stars": bal,
                 "settings": {"rate": str(shop.rate(c)), "markup": str(shop.markup(c)),
-                             "gift_star": fmt(int(db.get_setting(c, "gift_star_diram") or 0)) if db.get_setting(c, "gift_star_diram") else ""},
+                             "gift_star": fmt(int(db.get_setting(c, "gift_star_diram") or 0)) if db.get_setting(c, "gift_star_diram") else "",
+                             "min_topup": fmt(shop.min_topup(c))},
                 "topups": [{"id": t["id"], "user_id": t["user_id"], "who": (t["first_name"] or "") + (" @" + t["username"] if t["username"] else ""),
                             "amount": t["amount"], "method": shop.METHODS.get(t["method"], t["method"]), "card": card.get(t["card_id"], ""),
                             "ai": t["ai_note"], "at": t["created_at"]} for t in pend],
@@ -314,6 +316,11 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
                 if not Decimal(0) <= v <= Decimal(100):
                     raise shop.ShopError("Наценка — от 0 до 100%.")
                 db.set_setting(c, "markup", str(v))
+            if body.get("min_topup") not in (None, ""):
+                v = to_diram(body["min_topup"])
+                if not 100 <= v <= 5_000_000:
+                    raise shop.ShopError("Минимальная сумма — от 1 до 50 000 сомони.")
+                db.set_setting(c, "min_topup", str(v))
             if "gift_star" in body:
                 db.set_setting(c, "gift_star_diram", str(to_diram(body["gift_star"])) if str(body["gift_star"]).strip() else "")
         except InvalidOperation:

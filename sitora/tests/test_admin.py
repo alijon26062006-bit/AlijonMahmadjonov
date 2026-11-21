@@ -44,3 +44,22 @@ def test_admin_flow(config, conn, bot, faketg):
     assert conn.execute("SELECT balance FROM users WHERE id = 1").fetchone()[0] == 2000
     a.post("/api/admin/user/1", json={"banned": True})
     assert cl.get("/api/me").status_code == 403
+
+
+def test_min_topup_everywhere(config, conn):
+    a = client(config, uid=999, name="boss")
+    c = client(config)
+    assert c.get("/api/me").json()["min_topup"] == 100                    # по умолчанию 1 сомони
+    assert a.post("/api/admin/settings", json={"min_topup": "0,5"}).status_code == 400
+    assert a.post("/api/admin/settings", json={"min_topup": "5"}).status_code == 200
+    assert a.get("/api/admin/summary").json()["settings"]["min_topup"] == "5"
+    assert c.get("/api/me").json()["min_topup"] == 500
+    r = c.post("/api/topup", json={"method": "alif", "amount": 2})
+    assert r.status_code == 400 and "5" in r.json()["error"]              # 2 < 5 — нельзя
+    assert c.post("/api/topup", json={"method": "alif", "amount": 5}).json()["topup"]["amount"] == 500
+    # покупка переводом: не хватает 1 сомони, а минимум 5 — платит 5 (остаток на баланс)
+    price = shop.quote(conn, {"kind": "stars", "qty": 100})["price"]
+    with db.tx(conn):
+        shop.move(conn, 1, price - 100, "seed")
+    t = c.post("/api/topup", json={"method": "alif", "intent": {"kind": "stars", "qty": 100, "to": "@ali_dev"}}).json()["topup"]
+    assert t["amount"] == 500
