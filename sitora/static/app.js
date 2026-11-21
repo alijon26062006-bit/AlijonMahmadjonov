@@ -23,7 +23,7 @@
       intentNote: "Баъди тасдиқи чек фармоиш худ ба худ иҷро мешавад", done: "Харид<br>анҷом шуд",
       giftWait: "Тӯҳфа<br>пардохт шуд", item: "Мол", to: "Гиранда", paid: "Пардохт", st_done: "Расонида шуд",
       st_work: "Дар кор", st_wait: "Интизори гиранда", st_fail: "Баргардонида шуд", empty: "Ҳоло фармоиш нест",
-      enterSum: "Маблағро ворид кунед", minSum: "Ҳадди ақал", lowSum: "Камтар аз ҳадди ақал:", choose: "Усули пардохтро интихоб кунед", noMethods: "Ҳоло усули пардохт нест",
+      enterSum: "Маблағро ворид кунед", minSum: "Ҳадди ақал", stepSum: "Маблағ", stepBank: "Бонк", stepCheck: "Чек", pickBank: "Бонкро интихоб кунед", next: "Минбаъд", lowSum: "Камтар аз ҳадди ақал:", choose: "Усули пардохтро интихоб кунед", noMethods: "Ҳоло усули пардохт нест",
       back: "Бозгашт", open: "Аз Telegram кушоед", soon: "Ҳоло нест", cancel: "Бекор кардан",
       giftText: "Тӯҳфа барои ту! Ин пайвандро кушо ва Start-ро пахш кун" },
     ru: { shop: "Магазин", balance: "Баланс", somoni: "сомони", gifts: "Подарки", gift: "Подарок", ownQty: "Своё количество", toMe: "Себе",
@@ -41,7 +41,7 @@
       intentNote: "После проверки чека заказ оформится сам", done: "Покупка<br>проведена",
       giftWait: "Подарок<br>оплачен", item: "Товар", to: "Получатель", paid: "Оплачено", st_done: "Доставлено",
       st_work: "В работе", st_wait: "Ждёт получателя", st_fail: "Возврат", empty: "Заказов пока нет",
-      enterSum: "Введите сумму пополнения", minSum: "Минимум", lowSum: "Меньше минимума:", choose: "Выберите способ оплаты", noMethods: "Способов оплаты пока нет",
+      enterSum: "Введите сумму пополнения", minSum: "Минимум", stepSum: "Сумма", stepBank: "Банк", stepCheck: "Чек", pickBank: "Выберите банк", next: "Далее", lowSum: "Меньше минимума:", choose: "Выберите способ оплаты", noMethods: "Способов оплаты пока нет",
       back: "Назад", open: "Откройте из Telegram", soon: "Пока нет", cancel: "Отменить",
       giftText: "Подарок для тебя! Открой ссылку и нажми Start" }
   };
@@ -160,6 +160,7 @@
     var h = $("#minHint"); h.classList.toggle("bad", bad);
     h.textContent = (bad ? t("lowSum") : t("minSum")) + " " + M.fmt(low) + " " + t("somoni");
     $("#topup").disabled = !S.amount || bad;
+    $("#steps1").innerHTML = steps(1);
     return !!S.amount && !bad;
   }
 
@@ -198,6 +199,14 @@
 
   // ── лист оплаты ──
   var close = null;
+  // ── шаги пополнения: 1 сумма → 2 банк → 3 чек ──
+  function steps(n) {
+    return '<div class="steps" role="list">' + ["stepSum", "stepBank", "stepCheck"].map(function (k, i) {
+      var st = i + 1 < n ? "done" : i + 1 === n ? "now" : "";
+      return '<span role="listitem" class="' + st + '"' + (st === "now" ? ' aria-current="step"' : "") + "><i>" +
+        (st === "done" ? '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : i + 1) + "</i>" + t(k) + "</span>";
+    }).join("") + "</div>";
+  }
   function sheet(html) {
     $("#payBody").innerHTML = html;
     if (!close || $("#pay").hidden) close = M.sheet($("#pay")); else M.stagger($("#pay"));
@@ -208,7 +217,7 @@
       '><span class="ico"><svg class="i"><use href="#wallet"/></svg></span><span style="text-align:left"><span class="tt" style="display:block">' + t("fromBal") +
       '</span><span class="ss">' + (bal >= need ? t("instant") + " · " + som(bal) + " с." : t("lack") + " " + som(need - bal) + " с.") + "</span></span></button>";
     S.me.methods.forEach(function (m, i) {
-      var sel = !(withBalance && bal >= need) && i === 0;
+      var sel = withBalance && !(bal >= need) && i === 0;   // при пополнении банк выбирает сам клиент
       out += '<button class="card' + (sel ? " sel" : "") + '" data-m="' + m.code + '"><span class="ico"><svg class="i"><use href="#' + (m.code === "card" ? "card" : "phone") +
         '"/></svg></span><span style="text-align:left"><span class="tt" style="display:block">' + esc(m.title) + '</span><span class="ss">' + t("transfer") + "</span></span></button>";
     });
@@ -246,7 +255,7 @@
     }).catch(function (e) { btn.disabled = false; fail(e); });
   }
   function requisites(tp, intent) {
-    sheet('<div class="cap">' + t("sendExact") + '</div><div><span class="num">' + esc(tp.amount_text) + '</span> <b>' + t("somoni") + '</b></div>' +
+    sheet((intent ? "" : steps(3)) + '<div class="cap">' + t("sendExact") + '</div><div><span class="num">' + esc(tp.amount_text) + '</span> <b>' + t("somoni") + '</b></div>' +
       '<p class="muted">' + esc(tp.method) + " · № " + tp.id + '</p><div class="req" id="req">' + esc(tp.details) + "</div>" +
       '<button class="btn ghost" id="copyReq"><svg class="i"><use href="#copy"/></svg>' + t("copy") + "</button>" +
       '<label class="drop"><span class="ico"><svg class="i"><use href="#up"/></svg></span><span><span class="tt" style="display:block">' + t("attach") +
@@ -374,7 +383,8 @@
   $("#lang").onclick = function () { S.lang = S.lang === "tj" ? "ru" : "tj"; texts(); api("api/lang", { lang: S.lang }).catch(function () {}); };
   $("#supportBtn").onclick = function () { var s = S.me.support; if (/^@/.test(s)) s = "https://t.me/" + s.slice(1); TG && TG.openTelegramLink && /t\.me/.test(s) ? TG.openTelegramLink(s) : window.open(s, "_blank"); };
   document.addEventListener("click", function (e) {
-    var m = e.target.closest("[data-m]"); if (m && !m.disabled) $$("#payBody [data-m]").forEach(function (x) { x.classList.toggle("sel", x === m); });
+    var m = e.target.closest("[data-m]");
+    if (m && !m.disabled) { $$("#payBody [data-m]").forEach(function (x) { x.classList.toggle("sel", x === m); }); var go = $("#tpGo"); if (go) go.disabled = false; haptic("success"); }
     var sh = e.target.closest("[data-share]"); if (sh) shareLink(sh.dataset.share);
     var bk = e.target.closest("[data-back]");
     if (bk) { $$(".nav button").forEach(function (x) { x.toggleAttribute("aria-current", false); if (x.dataset.go === bk.dataset.back) x.setAttribute("aria-current", "page"); }); M.go(bk.dataset.back, true); placeBar(); }
@@ -386,8 +396,8 @@
   });
   $("#topup").onclick = function () {
     if (!checkSum()) { M.shake($("#amountBox")); haptic("error"); return; }
-    sheet('<div class="cap">' + t("topup") + '</div><div><span class="num">' + M.fmt(S.amount) + '</span> <b>' + t("somoni") + "</b></div>" + methodsHtml(S.amount * 100, false) +
-      (S.me.methods.length ? '<button class="btn" id="tpGo">' + t("pay") + "</button>" : ""));
+    sheet(steps(2) + '<div><span class="num">' + M.fmt(S.amount) + '</span> <b>' + t("somoni") + '</b></div><div class="cap">' + t("pickBank") + "</div>" +
+      methodsHtml(S.amount * 100, false) + (S.me.methods.length ? '<button class="btn" id="tpGo" disabled>' + t("next") + "</button>" : ""));
     var go = $("#tpGo"); if (go) go.onclick = function () {
       var m = picked(); if (!m) { M.toast(t("choose")); return; }
       api("api/topup", { method: m, amount: S.amount }).then(function (d) { requisites(d.topup, false); S.amount = 0; M.count($("#amount"), 0, 300); checkSum(); }).catch(fail);

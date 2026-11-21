@@ -205,3 +205,14 @@ label.cap{display:block}
 #minHint.bad,#amountBox.bad,#amountBox.bad .num{color:#E5484D}
 #amountBox .num,#amountBox b{transition:color .2s var(--ease)}
 .btn:disabled{opacity:.35;pointer-events:none}
+
+/* шаги пополнения */
+.steps{display:flex;gap:6px;margin-bottom:4px}
+.steps span{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:999px;background:var(--tile);
+  color:var(--mute-2);font-size:12px;font-weight:700;transition:background .25s var(--ease),color .25s var(--ease)}
+.steps i{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;color:var(--ink);font-style:normal;font-size:11px}
+.steps i svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.steps .now{background:var(--ink);color:#fff}
+.steps .done{background:none;border:1.5px solid var(--ink);color:var(--ink)}
+.steps .done i{background:var(--ink);color:#fff}
+.btn{transition:opacity .2s var(--ease),transform .15s var(--ease)}
