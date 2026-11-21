@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- фон экрана запуска — как у сайта -->
+    <color name="launch_bg">#16181C</color>
+	<color name="ic_launcher_background">#16A34A</color>
+</resources>
