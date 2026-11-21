@@ -27,7 +27,9 @@ def test_one_request_at_a_time_with_waiting_spinner(app, config, conn, monkeypat
     again = _send(client, token, {"receipt": ("b.png", RECEIPT_PNG + b"2", "image/png")})
     assert "Заявка #1 на проверке" in again.text and len(sent) == 1        # вторая не создана, админу — один чек
     assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
-    assert "❌ Отменить заявку" in page                                    # передумал — может отменить и с чеком
+    assert "❌ Отменить заявку" not in page and "решает администратор" in page   # чек отправлен — решает только админ
+    r = client.post("/panel/balance/1/cancel", data={"csrf": token})
+    assert client.get("/panel/data/payment/1").json()["status"] == "pending"       # и запросом в обход — тоже нельзя
 
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")

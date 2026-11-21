@@ -304,7 +304,7 @@ def test_accepted_receipt_never_passes_again(app, config, conn, monkeypatch):
     payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"1")
     assert json.loads(conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (pid,)).fetchone()[0])["dup_of"] == first
     assert tgbot.dup_buttons(conn, pid) == [[(f"🔎 Этот чек уже был — открыть заявку #{first}", f"q:show:{first}")]]
-    payments.cancel(conn, gid, pid, config)
+    payments.reject(conn, config, pid, 1, "тест")       # с чеком клиент не отменяет — освобождает админ
 
     payments.confirm(conn, config, first, 1)              # приняли — теперь этот чек не пройдёт нигде
     for body in (RECEIPT_PNG, RECEIPT_PNG + b"other-screenshot"):   # тот же файл и другой скриншот того же перевода

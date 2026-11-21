@@ -52,7 +52,10 @@ def setup(app, config, conn, monkeypatch):
             payments.attach_receipt(conn, config, uid, pid, body, seen=seen)
         finally:
             if not keep:   # одна заявка на проверке за раз — освобождаем место для следующей
-                payments.cancel(conn, uid, pid, config)
+                if payments.has_receipt(conn, pid):   # с чеком клиент не отменяет — решает админ
+                    payments.reject(conn, config, pid, 1, "тест")
+                else:
+                    payments.cancel(conn, uid, pid, config)
         return pid
     first = pay(_picture("100.00", "12.11.2026 14:03", "8812345"), _seen(100.0, "2026-11-12 14:03", "8812345"),
                 keep=True)

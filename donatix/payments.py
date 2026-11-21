@@ -667,9 +667,9 @@ LOCKED_TEXT = ("Чек уже отправлен — заявку проверя
 
 
 def has_receipt(conn: sqlite3.Connection, payment_id: int) -> bool:
-    """Чек отправлен — заявку решает только админ (подтвердить или отклонить), клиент отменить не может."""
-    row = conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
-    return bool(row and row["receipt_file"])
+    """Чек отправлен и заявка ждёт — её решает только админ (подтвердить или отклонить), клиент отменить не может."""
+    row = conn.execute("SELECT receipt_file, status FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    return bool(row and row["receipt_file"] and row["status"] == "pending")
 
 
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Config | None = None) -> bool:
