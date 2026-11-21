@@ -92,13 +92,22 @@ class Handler:
         self.bot.send(user["id"], "Покупки — в мини-приложении 👇 / Харид — дар мини-барнома 👇", self.open_button())
 
     def start(self, user: dict, payload: str) -> None:
+        got = []
         if payload.startswith("g_"):
-            o = shop.claim_gift(self.conn, payload[2:], int(user["id"]))
-            if o:
-                self.bot.send(user["id"], "🎁 Вам подарок! Он придёт через несколько секунд.\nБа шумо тӯҳфа! Пас аз чанд сония мерасад.")
-                self.bot.safe("sendMessage", chat_id=o["user_id"], text=f"🎁 Получатель открыл ссылку — подарок № {o['id']} отправляется.")
-            else:
+            res, o = shop.claim_gift(self.conn, payload[2:], user)
+            if res == "ok":
+                got.append(o)
+            elif res == "notyours":
+                self.bot.send(user["id"], "🔒 Этот подарок предназначен другому человеку — открыть его может только получатель.\n"
+                                          "Ин тӯҳфа барои шахси дигар аст — онро танҳо гиранда кушода метавонад.")
+            elif res == "buyer":
+                self.bot.send(user["id"], f"Это ссылка на ваш подарок для @{o['recipient']}. Отправьте её получателю — "
+                                          "сработает только у него.\nИн пайвандро ба гиранда фиристед.")
+            elif res == "gone":
                 self.bot.send(user["id"], "Эта ссылка уже использована или устарела.")
+        for o in got + shop.claim_waiting(self.conn, user):   # подарки на его @username (со ссылкой и без)
+            self.bot.send(user["id"], "🎁 Вам подарок! Он придёт через несколько секунд.\nБа шумо тӯҳфа! Пас аз чанд сония мерасад.")
+            self.bot.safe("sendMessage", chat_id=o["user_id"], text=f"🎁 @{o['recipient']} зашёл в бота — подарок № {o['id']} отправляется.")
         caption = WELCOME.format(name=self.config.name)
         markup = {"inline_keyboard": self.open_button() + (self.admin_button() if shop.is_admin(self.conn, self.config, user["id"]) else [])}
         file_id = db.get_setting(self.conn, "start_photo")

@@ -8,16 +8,17 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import db, receipt, shop
 from .config import ROOT, Config
 from .money import fmt, to_diram
-from .tg import Bot, check_init_data
+from .tg import Bot, TgError, check_init_data
 
 STATIC = ROOT / "static"
 MAX_RECEIPT = 10 * 1024 * 1024
+GIFT_TYPES = {"tgs": "application/json", "webm": "video/webm", "webp": "image/webp"}
 
 
 def _sniff(data: bytes) -> str | None:
@@ -74,6 +75,32 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
     @app.get("/healthz")
     def health():
         return {"ok": True}
+
+    gift_lock = threading.Lock()
+
+    @app.get("/gift/{gift_id}")
+    def gift_animation(gift_id: str):
+        """Анимация подарка — та же, что в Telegram (стикер подарка). Скачивается один раз и хранится у нас."""
+        g = shop.gift_for(conn(), gift_id)
+        if not g or not g.get("file") or g.get("fmt") not in GIFT_TYPES or bot is None:
+            raise HTTPException(404)
+        safe = hashlib.sha256(str(g["id"]).encode()).hexdigest()[:24]
+        path = Path(config.db_path).parent / "gifts" / f"{safe}.{g['fmt']}"
+        if not path.exists():
+            with gift_lock:
+                if not path.exists():
+                    try:
+                        data = bot.download(g["file"])
+                    except TgError:
+                        raise HTTPException(404) from None
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = path.with_suffix(".part")
+                    tmp.write_bytes(data)
+                    tmp.replace(path)
+        headers = {"Cache-Control": "public, max-age=604800, immutable"}
+        if g["fmt"] == "tgs":          # .tgs = Lottie JSON, сжатый gzip — браузер распакует сам
+            headers["Content-Encoding"] = "gzip"
+        return Response(path.read_bytes(), media_type=GIFT_TYPES[g["fmt"]], headers=headers)
 
     def me_view(u: dict) -> dict[str, Any]:
         c = conn()

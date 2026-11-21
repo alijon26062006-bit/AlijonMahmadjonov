@@ -191,3 +191,11 @@ canvas.confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:non
 .rimg{width:100%;border-radius:14px;margin-top:10px;display:block}
 .card.col{display:block}
 label.cap{display:block}
+
+/* подарки: анимация как в Telegram; пока грузится — эмодзи */
+.tile .gfx{position:relative;display:block;width:68px;height:68px;margin:6px auto 4px}
+.tile .gfx .em{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;line-height:1;transition:opacity .2s var(--ease)}
+.tile .gfx canvas,.tile .gfx video,.tile .gfx img{position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:contain;opacity:0;transform:scale(.85);transition:opacity .3s var(--ease),transform .4s cubic-bezier(.2,1.5,.4,1)}
+.tile .gfx.on canvas,.tile .gfx.on video,.tile .gfx.on img{opacity:1;transform:none}
+.tile .gfx.on .em{opacity:0}
+@media (prefers-reduced-motion:reduce){.tile .gfx canvas,.tile .gfx video,.tile .gfx img{transition:none;transform:none}}

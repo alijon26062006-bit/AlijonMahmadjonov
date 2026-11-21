@@ -73,6 +73,7 @@ class FakeTg:
     def __init__(self):
         self.calls = []
         self.gift_error = None
+        self.file_bytes = __import__("gzip").compress(b'{"v":"5.5.2","fr":60,"ip":0,"op":180,"w":512,"h":512,"layers":[]}')
 
     def transport(self):
         def h(req: httpx.Request):
@@ -82,6 +83,10 @@ class FakeTg:
                 return httpx.Response(400, json={"ok": False, "error_code": 400, "description": self.gift_error})
             if method in ("sendPhoto", "sendDocument"):
                 return httpx.Response(200, json={"ok": True, "result": {"message_id": 7, "photo": [{"file_id": "F"}]}})
+            if method == "getFile":
+                return httpx.Response(200, json={"ok": True, "result": {"file_path": "stickers/g1.tgs", "file_size": 30}})
+            if req.url.path.startswith("/file/"):
+                return httpx.Response(200, content=self.file_bytes)
             if method == "getMe":
                 return httpx.Response(200, json={"ok": True, "result": {"username": "SitoraTestBot"}})
             return httpx.Response(200, json={"ok": True, "result": {"message_id": 5}})

@@ -90,6 +90,34 @@ def test_gift_link_start(config, conn, bot):
     assert conn.execute("SELECT status, recipient_id FROM orders").fetchone()[:] == ("paid", 7)
 
 
+def test_gift_link_works_only_for_recipient(config, conn, bot, faketg):
+    shop.touch_user(conn, {"id": 1, "username": "ali_dev"})
+    with db.tx(conn):
+        shop.move(conn, 1, 10000, "seed")
+    o = shop.place_order(conn, 1, {"kind": "gift", "gift_id": "g1", "to": "@new_friend"})
+    h = Handler(config, bot)
+    h.handle({"message": {"from": {"id": 8, "username": "thief"}, "chat": {"id": 8, "type": "private"},
+                          "text": f"/start g_{o['gift_token']}"}})
+    assert conn.execute("SELECT status FROM orders").fetchone()[0] == "awaiting_recipient"
+    from urllib.parse import unquote_plus
+    assert any("другому" in unquote_plus(c.decode("utf-8", "ignore")) for m, c in faketg.calls if m == "sendMessage")
+    # получатель зашёл в бота просто так, без ссылки — подарок всё равно его
+    h.handle({"message": {"from": {"id": 9, "username": "New_Friend"}, "chat": {"id": 9, "type": "private"}, "text": "/start"}})
+    assert conn.execute("SELECT status, recipient_id FROM orders").fetchone()[:] == ("paid", 9)
+
+
+def test_gift_animation_served_and_cached(config, conn, bot, faketg):
+    db.set_setting(conn, "gifts", json.dumps([{"id": "g1", "stars": 15, "emoji": "❤", "file": "FILE1", "fmt": "tgs"}]))
+    c = TestClient(create_app(config, bot))
+    assert shop.catalog(conn)["gifts"][0]["anim"] == "tgs"
+    r = c.get("/gift/g1")
+    assert r.status_code == 200 and r.json()["fr"] == 60          # gzip распакован клиентом
+    assert r.headers["content-encoding"] == "gzip" and "max-age" in r.headers["cache-control"]
+    n = faketg.methods().count("getFile")
+    assert c.get("/gift/g1").status_code == 200 and faketg.methods().count("getFile") == n   # второй раз — из кэша
+    assert c.get("/gift/nope").status_code == 404 and c.get("/gift/..%2f..%2fetc").status_code == 404
+
+
 def test_bank_topup_amount(config, conn):
     c = client(config)
     price = shop.quote(conn, {"kind": "stars", "qty": 100})["price"]

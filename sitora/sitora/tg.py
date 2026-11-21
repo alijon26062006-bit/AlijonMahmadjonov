@@ -40,6 +40,19 @@ class Bot:
             raise TgError(f"{method}: {body.get('description')}", int(body.get("error_code") or r.status_code))
         return body.get("result")
 
+    def download(self, file_id: str, limit: int = 2_000_000) -> bytes:
+        """Скачать файл Telegram (например, анимацию подарка) по file_id."""
+        f = self.call("getFile", file_id=file_id) or {}
+        if not f.get("file_path") or int(f.get("file_size") or 0) > limit:
+            raise TgError("getFile: нет файла или слишком большой")
+        try:
+            r = self._c.get(f"https://api.telegram.org/file/bot{self.token}/{f['file_path']}")
+        except httpx.HTTPError as exc:
+            raise TgError(f"file: {exc}") from exc
+        if r.status_code != 200 or len(r.content) > limit:
+            raise TgError(f"file: HTTP {r.status_code}", r.status_code)
+        return r.content
+
     def send(self, chat_id: int, text: str, buttons: list | None = None, **kw: Any) -> Any:
         markup = {"inline_keyboard": buttons} if buttons else None
         return self.call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML",

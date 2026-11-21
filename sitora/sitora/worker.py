@@ -67,7 +67,10 @@ class Worker:
         except TgError as exc:
             log.warning("подарки: %s", exc)
             return
-        out = [{"id": g["id"], "stars": int(g.get("star_count") or 0), "emoji": (g.get("sticker") or {}).get("emoji", "")}
+        def fmt(st: dict) -> str:
+            return "tgs" if st.get("is_animated") else "webm" if st.get("is_video") else "webp"
+        out = [{"id": g["id"], "stars": int(g.get("star_count") or 0), "emoji": (g.get("sticker") or {}).get("emoji", ""),
+                "file": (g.get("sticker") or {}).get("file_id", ""), "fmt": fmt(g.get("sticker") or {})}
                for g in gifts if g.get("id") and g.get("star_count") and not g.get("remaining_count") == 0]
         db.set_setting(self.conn, "gifts", json.dumps(sorted(out, key=lambda g: g["stars"])[:24]))
 

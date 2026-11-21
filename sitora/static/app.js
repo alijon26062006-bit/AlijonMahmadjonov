@@ -76,7 +76,7 @@
     var c = S.me ? S.me.catalog : {};
     if (S.tab === "stars") return ((c.stars || {}).packs || []).map(function (p) { return { cap: "Stars", n: M.fmt(p.qty), price: p.price, item: { kind: "stars", qty: p.qty } }; });
     if (S.tab === "premium") return (c.premium || []).map(function (p) { return { cap: "Premium", n: p.months + (S.lang === "tj" ? " моҳ" : " мес."), price: p.price, item: { kind: "premium", months: p.months } }; });
-    return (c.gifts || []).map(function (g) { return { cap: "★ " + g.stars, em: g.emoji || "", n: "", price: g.price, item: { kind: "gift", gift_id: g.id } }; });
+    return (c.gifts || []).map(function (g) { return { cap: "★ " + g.stars, em: g.emoji || "🎁", anim: g.anim || "", gid: g.id, n: "", price: g.price, item: { kind: "gift", gift_id: g.id } }; });
   }
   function items() {
     var box = $("#items"), rows = list(), stars = S.me && S.me.catalog.stars;
@@ -85,17 +85,64 @@
     S.pick = Math.min(S.pick, Math.max(0, rows.length - 1));
     rows.forEach(function (p, i) {
       var b = document.createElement("button"); b.className = "tile" + (i === S.pick ? " sel" : "");
-      b.innerHTML = '<span class="cap"></span>' + (p.em ? '<span class="em"></span>' : "<b></b>") + "<small></small>";
-      b.children[0].textContent = p.cap; b.children[1].textContent = p.em || p.n; b.children[2].textContent = som(p.price) + " с.";
+      b.innerHTML = '<span class="cap"></span>' + (p.em ? '<span class="gfx"><span class="em"></span></span>' : "<b></b>") + "<small></small>";
+      b.children[0].textContent = p.cap; b.children[2].textContent = som(p.price) + " с.";
+      if (p.em) { b.children[1].firstChild.textContent = p.em; if (p.anim) { b.children[1].dataset.gift = p.gid; b.children[1].dataset.fmt = p.anim; } }
+      else b.children[1].textContent = p.n;
       b.style.animation = "rise .5s var(--ease) both"; b.style.animationDelay = i * 55 + "ms";
-      b.addEventListener("click", function () { S.pick = i; $("#qty").value = ""; $$(".tile", box).forEach(function (x, k) { x.classList.toggle("sel", k === i); }); price(); });
+      b.addEventListener("click", function () { var g = b.querySelector(".gfx"); if (g && g._a) g._a.goToAndPlay(0, true); S.pick = i; $("#qty").value = ""; $$(".tile", box).forEach(function (x, k) { x.classList.toggle("sel", k === i); }); price(); });
       box.appendChild(b);
     });
+    gifts(box);
     $("#custom").hidden = S.tab !== "stars" || !stars;
     if (stars) { $("#qty").min = stars.min; $("#qty").max = stars.max; $("#qty").placeholder = stars.min + " – " + M.fmt(stars.max); }
     $("#note").style.display = S.tab === "gifts" ? "" : "none";
     $("#who").placeholder = t(S.tab === "gifts" ? "whoGift" : "who");
     price();
+  }
+  // ── анимации подарков — те же, что в Telegram (Lottie-стикер подарка), играют только на экране ──
+  var G = { lib: null, data: {}, live: [], io: null, still: !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) };
+  function lottieLib() {
+    if (!G.lib) G.lib = new Promise(function (ok, no) {
+      var sc = document.createElement("script"); sc.src = "static/lottie.min.js?v=5122";
+      sc.onload = function () { ok(window.lottie); }; sc.onerror = function () { G.lib = null; no(); }; document.head.appendChild(sc);
+    });
+    return G.lib;
+  }
+  function giftJson(id) {   // текст, а не объект: Lottie меняет данные, у каждой копии — свои
+    if (!G.data[id]) G.data[id] = fetch("gift/" + encodeURIComponent(id)).then(function (r) { if (!r.ok) throw r.status; return r.text(); })
+      .catch(function (e) { G.data[id] = null; throw e; });
+    return G.data[id];
+  }
+  function mountGift(el) {
+    el._busy = true;
+    var id = el.dataset.gift, kind = el.dataset.fmt, url = "gift/" + encodeURIComponent(id);
+    if (kind === "webm" || kind === "webp") {
+      var m = document.createElement(kind === "webm" ? "video" : "img");
+      if (kind === "webm") { m.muted = true; m.loop = true; m.autoplay = !G.still; m.setAttribute("playsinline", ""); m.onloadeddata = function () { el.classList.add("on"); }; }
+      else m.onload = function () { el.classList.add("on"); };
+      m.src = url; el.appendChild(m); return;
+    }
+    Promise.all([lottieLib(), giftJson(id)]).then(function (r) {
+      if (!el.isConnected) return;
+      var a = r[0].loadAnimation({ container: el, renderer: "canvas", loop: true, autoplay: !G.still, animationData: JSON.parse(r[1]),
+        rendererSettings: { clearCanvas: true, dpr: Math.min(2, window.devicePixelRatio || 1) } });
+      el._a = a; G.live.push(a);
+      a.addEventListener("DOMLoaded", function () { el.classList.add("on"); if (G.still) a.goToAndStop(0, true); });
+    }).catch(function () { el._busy = false; });   // не загрузилось — остаётся эмодзи
+  }
+  function gifts(box) {
+    G.live.forEach(function (a) { a.destroy(); }); G.live = [];
+    if (G.io) G.io.disconnect();
+    var els = $$(".gfx[data-gift]", box); if (!els.length) return;
+    G.io = "IntersectionObserver" in window ? new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        var el = e.target;
+        if (e.isIntersecting) { if (!el._busy) mountGift(el); else if (el._a && !G.still) el._a.play(); }
+        else if (el._a) el._a.pause();
+      });
+    }, { rootMargin: "120px" }) : null;
+    els.forEach(function (el) { if (G.io) G.io.observe(el); else mountGift(el); });
   }
   function current() {
     var rows = list(), q = parseInt($("#qty").value, 10), stars = S.me && S.me.catalog.stars;

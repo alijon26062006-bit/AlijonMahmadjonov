@@ -108,8 +108,13 @@ def test_gift_to_self_and_by_link(config, conn, bot, faketg):
     w.send_gifts()
     assert faketg.methods().count("sendGift") == 1
     user(conn, uid=2, name="friend_x")
-    got = shop.claim_gift(conn, b["gift_token"], 2)
-    assert got["recipient_id"] == 2 and shop.claim_gift(conn, b["gift_token"], 3) is None   # ссылка одноразовая
+    tok = b["gift_token"]
+    assert shop.claim_gift(conn, tok, {"id": 3, "username": "stranger"})[0] == "notyours"   # чужой — нельзя
+    assert shop.claim_gift(conn, tok, {"id": 4})[0] == "notyours"                            # без @username — нельзя
+    assert shop.claim_gift(conn, tok, {"id": 1, "username": "buyer"})[0] == "buyer"          # сам покупатель
+    res, got = shop.claim_gift(conn, tok, {"id": 2, "username": "Friend_X"})                  # получатель (регистр не важен)
+    assert res == "ok" and got["recipient_id"] == 2
+    assert shop.claim_gift(conn, tok, {"id": 2, "username": "friend_x"})[0] == "gone"        # ссылка одноразовая
     w.send_gifts()
     assert conn.execute("SELECT status FROM orders WHERE id = ?", (b["id"],)).fetchone()[0] == "sent"
 
@@ -166,3 +171,12 @@ def test_client_price_formula_matches_server(conn):
     per = shop.catalog(conn)["stars"]["per_star_diram"]
     for q in (50, 77, 133, 999, 4321):
         assert math.ceil(q * per / 10 - 1e-9) * 10 == shop.stars_price(conn, q)
+
+
+def test_gift_claimed_when_recipient_just_starts_bot(conn):
+    user(conn, balance=100000)
+    o = shop.place_order(conn, 1, {"kind": "gift", "gift_id": "g1", "to": "@late_friend"})
+    assert shop.claim_waiting(conn, {"id": 5, "username": "someone"}) == []
+    rows = shop.claim_waiting(conn, {"id": 6, "username": "Late_Friend"})
+    assert [r["id"] for r in rows] == [o["id"]]
+    assert conn.execute("SELECT status, recipient_id FROM orders WHERE id = ?", (o["id"],)).fetchone()[:] == ("paid", 6)

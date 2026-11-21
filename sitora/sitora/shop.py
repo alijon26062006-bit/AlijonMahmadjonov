@@ -87,6 +87,7 @@ def catalog(conn: sqlite3.Connection) -> dict[str, Any]:
     gift_star = gift_star_price(conn)
     for g in json.loads(db.get_setting(conn, "gifts", "[]")):
         out["gifts"].append({"id": g["id"], "stars": g["stars"], "emoji": g.get("emoji", ""),
+                             "anim": g.get("fmt", "") if g.get("file") else "",
                              "price": int(gift_star * g["stars"])})
     return out
 
@@ -182,15 +183,41 @@ def refund(conn: sqlite3.Connection, order_id: int, reason: str) -> bool:
     return True
 
 
-def claim_gift(conn: sqlite3.Connection, token: str, recipient_id: int) -> sqlite3.Row | None:
-    """Получатель открыл ссылку подарка и нажал Start: подарок уйдёт ему."""
+def gift_for(conn, gift_id: str) -> dict[str, Any] | None:
+    """Подарок из каталога (с file_id анимации) — для отдачи анимации в мини-приложение."""
+    return next((g for g in json.loads(db.get_setting(conn, "gifts", "[]")) if str(g.get("id")) == str(gift_id)), None)
+
+
+def claim_gift(conn: sqlite3.Connection, token: str, user: dict[str, Any]) -> tuple[str, sqlite3.Row | None]:
+    """Кто-то открыл ссылку подарка и нажал Start.
+
+    Подарок отдаётся ТОЛЬКО тому, чей @username указал покупатель. Чужой человек ссылку использовать не может.
+    Ответ: ("ok", заказ) · ("gone", None) — ссылка использована/устарела · ("buyer", заказ) — открыл сам покупатель ·
+    ("notyours", заказ) — это не получатель.
+    """
     with db.tx(conn):
         o = conn.execute("SELECT * FROM orders WHERE gift_token = ? AND status = 'awaiting_recipient'", (token,)).fetchone()
         if o is None:
-            return None
+            return "gone", None
+        mine = (user.get("username") or "").lower()
+        if not mine or mine != (o["recipient"] or "").lower():
+            return ("buyer" if int(user["id"]) == o["user_id"] else "notyours"), o
         conn.execute("UPDATE orders SET recipient_id = ?, status = 'paid', updated_at = ? WHERE id = ?",
-                     (recipient_id, db.now(), o["id"]))
-    return conn.execute("SELECT * FROM orders WHERE id = ?", (o["id"],)).fetchone()
+                     (int(user["id"]), db.now(), o["id"]))
+    return "ok", conn.execute("SELECT * FROM orders WHERE id = ?", (o["id"],)).fetchone()
+
+
+def claim_waiting(conn: sqlite3.Connection, user: dict[str, Any]) -> list[sqlite3.Row]:
+    """Получатель сам зашёл в бота (без ссылки): все подарки на его @username уходят ему."""
+    name = (user.get("username") or "").lower()
+    if not name:
+        return []
+    with db.tx(conn):
+        rows = conn.execute("SELECT * FROM orders WHERE status = 'awaiting_recipient' AND lower(recipient) = ?", (name,)).fetchall()
+        for o in rows:
+            conn.execute("UPDATE orders SET recipient_id = ?, status = 'paid', updated_at = ? WHERE id = ?",
+                         (int(user["id"]), db.now(), o["id"]))
+    return rows
 
 
 def public_order(o: sqlite3.Row) -> dict[str, Any]:
