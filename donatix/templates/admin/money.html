@@ -70,7 +70,7 @@
     <div class="note">продажи − закупка ${{ usd(s.cost) }}</div></div>
   <div class="kpi money-own"><span class="tile ok">{{ icon('check', 20) }}</span>
     <div class="label">Вам чистыми</div><div class="value">{{ big(s.owner_profit) }}</div>
-    <div class="note">после рефералов, D-коина и кассиров</div></div>
+    <div class="note">расходов нет — вся прибыль ваша</div></div>
 </div>
 
 <section class="card money-flow">
@@ -85,17 +85,7 @@
   </div>
 </section>
 
-<div class="grid two money-side">
-  <section class="card">
-    <h3>Расходы за период</h3>
-    <div class="fin-rows exp">
-      <div><span>🎁 Бонусы рефералам</span><b>{{ both(s.referral) }}</b></div>
-      <div><span>🪙 В копилку D-коина</span><b>{{ both(s.dcoin) }}</b></div>
-      {% for c in s.cashiers %}<div><span>👤 Кассир {{ c.name }} ({{ c.percent }}%)</span><b>{{ both(c.share) }}</b></div>{% endfor %}
-      {% if not s.cashiers %}<div><span>👤 Кассиры</span><b class="muted">нет</b></div>{% endif %}
-      <div class="total"><span>Итого расходов</span><b>{{ both(s.referral + s.dcoin + s.cashiers_total) }}</b></div>
-    </div>
-  </section>
+<div class="money-side">
   <section class="card">
     <h3>Прочие движения</h3>
     <div class="fin-rows">
@@ -120,17 +110,13 @@
     <table class="money-table">
       <thead><tr>
         <th>{{ 'Месяц' if m.by_month else 'День' }}</th><th class="num">Поступило</th><th class="num">Продано</th>
-        <th class="num">Закупка</th><th class="num">Прибыль</th><th class="num">Рефералам</th><th class="num">D-коин</th>
-        {% for c in m.cashiers %}<th class="num">{{ c.name }}</th>{% endfor %}
-        <th class="num">Возвраты</th><th class="num">Вам</th>
+        <th class="num">Закупка</th><th class="num">Возвраты</th><th class="num">Прибыль</th>
       </tr></thead>
       <tbody>
         {% for r in m.rows %}
         <tr>
           <td class="nowrap">{{ r.label }}</td><td class="num">{{ cell(r.received) }}</td><td class="num">{{ cell(r.revenue) }}</td>
-          <td class="num">{{ cell(r.cost) }}</td><td class="num">{{ cell(r.gross_profit) }}</td>
-          <td class="num">{{ cell(r.referral) }}</td><td class="num">{{ cell(r.dcoin) }}</td>
-          {% for c in m.cashiers %}<td class="num">{{ cell(r.shares.get(c.tg_id, 0)) }}</td>{% endfor %}
+          <td class="num">{{ cell(r.cost) }}</td>
           <td class="num">{{ cell(r.refunded) }}</td>
           <td class="num"><b class="{{ 'bad' if r.owner_profit < 0 else 'ok-text' if r.owner_profit else '' }}">{{ cell(r.owner_profit) }}</b></td>
         </tr>
@@ -138,13 +124,11 @@
       </tbody>
       <tfoot><tr>
         <th>Итого</th><th class="num">{{ usd(s.received) }}</th><th class="num">{{ usd(s.revenue) }}</th>
-        <th class="num">{{ usd(s.cost) }}</th><th class="num">{{ usd(s.gross_profit) }}</th>
-        <th class="num">{{ usd(s.referral) }}</th><th class="num">{{ usd(s.dcoin) }}</th>
-        {% for c in m.cashiers %}<th class="num">{{ usd((s.cashiers | selectattr('tg_id', 'equalto', c.tg_id) | first).share) }}</th>{% endfor %}
+        <th class="num">{{ usd(s.cost) }}</th>
         <th class="num">{{ usd(s.refunded) }}</th><th class="num">{{ usd(s.owner_profit) }}</th>
       </tr></tfoot>
     </table>
   </div>
-  <p class="hint">Кассирам — их доля от прибыли за пополнения через их банки. «Вам» = прибыль − рефералы − D-коин − кассиры.</p>
+  <p class="hint">Прибыль = продано − закупка у поставщика. Расходов нет — вся прибыль ваша.</p>
 </section>
 {% endblock %}

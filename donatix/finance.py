@@ -90,9 +90,16 @@ def _sales(conn: sqlite3.Connection, a: str, b: str, rub_rate: Any = 0) -> tuple
     return o, referral
 
 
+# У проекта один админ, расходов нет: ни кассирам, ни рефералам, ни в копилку D-коина.
+# Прибыль = продажи − закупка у поставщика, вся — владельцу.
+NO_EXPENSES = True
+
+
 def net_profit(conn: sqlite3.Connection, a: str, b: str) -> int:
-    """Чистая прибыль за [a, b): продажи − закупка − реферальные бонусы."""
+    """Чистая прибыль за [a, b): продажи − закупка."""
     o, referral = _sales(conn, a, b)
+    if NO_EXPENSES:
+        return int(o["revenue"]) - int(o["cost"])
     return int(o["revenue"]) - int(o["cost"]) - referral - _dcoin(conn, a, b)
 
 
@@ -127,11 +134,15 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
     extra = services(conn, a, b, config.fivesim_rub_rate)
     revenue, cost = int(o["revenue"]), int(o["cost"])
     profit = revenue - cost
-    dcoin_pool = _dcoin(conn, a, b)
+    if NO_EXPENSES:   # расходов нет — вся прибыль владельцу
+        referral = dcoin_pool = 0
+        staff: list[dict[str, Any]] = []
+    else:
+        dcoin_pool = _dcoin(conn, a, b)
     net = profit - referral - dcoin_pool
-    # Доли кассиров — из чистой прибыли; остальное владельцу
-    from . import cashiers
-    staff = [c for c in cashiers.shares(conn, config, a, b, net) if c["share"] or c["active"]]
+    if not NO_EXPENSES:   # доли кассиров — из чистой прибыли; остальное владельцу
+        from . import cashiers
+        staff = [c for c in cashiers.shares(conn, config, a, b, net) if c["share"] or c["active"]]
     staff_total = sum(c["share"] for c in staff)
     manual = int(conn.execute(
         "SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE amount_micro > 0 AND order_id IS NULL "
@@ -228,8 +239,9 @@ def maybe_send(conn: sqlite3.Connection, config: Config, now: datetime | None = 
     db.set_setting(conn, "finance.last_day", key)
     notify_admin(config, report_text(summary(conn, config, start, end)), html=True)
     send_day_file(conn, config, start, end)
-    from .cashiers import daily_reports
-    daily_reports(conn, config, start, end)
+    if not NO_EXPENSES:   # кассирам доли не платим — и «ваш доход» им не шлём
+        from .cashiers import daily_reports
+        daily_reports(conn, config, start, end)
     return True
 
 
@@ -274,6 +286,8 @@ def flow(s: dict[str, Any]) -> list[dict[str, Any]]:
     parts = [("cost", "Поставщику (закупка)", s["cost"]), ("ref", "Рефералам", s["referral"]),
              ("dcoin", "Копилка D-коина", s["dcoin"]), ("cash", "Кассирам", s["cashiers_total"]),
              ("own", "Вам", s["owner_profit"])]
+    if NO_EXPENSES:
+        parts = [p for p in parts if p[0] in ("cost", "own")]
     total = sum(max(0, v) for _, _, v in parts) or 1
     return [{"key": k, "label": t, "micro": v, "pct": round(max(0, v) * 100 / total, 1)} for k, t, v in parts]
 

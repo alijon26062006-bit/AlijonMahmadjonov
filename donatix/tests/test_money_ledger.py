@@ -40,8 +40,9 @@ def test_money_page_for_admin(app, config, conn):
     web_login(admin, "admin@example.com", "adminpass123")
     page = admin.get("/admin/money?period=7d").text
     for text in ("Учёт денег", "Куда ушли деньги", "Поставщику", "Рефералам", "Копилка D-коина", "Кассирам",
-                 "Вам чистыми", "Возвраты клиентам", "Али", "По дням"):
+                 "Вам чистыми", "Возвраты клиентам", "По дням"):
         assert text in page, text
+    assert "Расходы за период" not in page                                # блока расходов больше нет
     assert page.count("<tr>") >= 8                                        # 7 дней + шапка + итог
     assert "По месяцам" in admin.get("/admin/money?period=all&date_from=2025-01-01&date_to=2026-09-30").text
     client = TestClient(app)

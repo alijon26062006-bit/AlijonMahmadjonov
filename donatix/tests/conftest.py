@@ -135,3 +135,10 @@ def _cancel_any_time(monkeypatch):
     """В проекте отменить заявку можно через 10 минут; старые тесты отменяют сразу (свой тест — в test_smartpay)."""
     from donatix import payments
     monkeypatch.setattr(payments, "CANCEL_AFTER_MIN", 0)
+
+
+@pytest.fixture(autouse=True)
+def _expenses_on(monkeypatch):
+    """В проекте расходов нет (finance.NO_EXPENSES); старые тесты проверяют подсчёт с кассирами и рефералами."""
+    from donatix import finance
+    monkeypatch.setattr(finance, "NO_EXPENSES", False)

@@ -85,3 +85,31 @@ def test_finance_shows_net_profit_after_referral(config, conn):
     assert s["profit"] == 6_400                                          # минус рефералу и копилка D-коина
     assert s["profit"] > 0
     assert "Бонусы рефералам" in finance.report_text(s)
+
+
+def test_no_expenses_all_profit_to_owner(config, conn, monkeypatch, app):
+    """В проекте расходов нет: прибыль = продажи − закупка, вся — владельцу; на странице «Деньги» нет расходов."""
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi.testclient import TestClient
+
+    from conftest import web_login
+    from donatix import cashiers, finance
+    monkeypatch.setattr(finance, "NO_EXPENSES", True)
+    inviter, _ = make_client(conn, "inv8", balance="0")
+    friend, _ = make_client(conn, "fr8", balance="0")
+    conn.execute("UPDATE users SET referred_by = ? WHERE id = ?", (inviter, friend))
+    cashiers.add(conn, 777001, "Амири")                                # кассир есть, но доли ему не считаем
+    oid = _order(conn, friend, 8, total=108_000, cost=100_000)
+    orders.complete(conn, oid, {}, "completed")
+    now = datetime.now(timezone.utc)
+    s = finance.summary(conn, config, now - timedelta(hours=1), now + timedelta(hours=1))
+    assert s["gross_profit"] == 8_000 and s["profit"] == 8_000 and s["owner_profit"] == 8_000
+    assert s["referral"] == 0 and s["dcoin"] == 0 and s["cashiers"] == [] and s["cashiers_total"] == 0
+    text = finance.report_text(s)
+    assert "Бонусы рефералам" not in text and "Кассир" not in text and "Ваша прибыль" in text
+    assert [f["key"] for f in finance.flow(s)] == ["cost", "own"]
+    admin = TestClient(app)
+    web_login(admin, "admin@example.com", "adminpass123")
+    page = admin.get("/admin/money").text
+    assert "Расходы за период" not in page and "Кассир" not in page and "расходов нет" in page
