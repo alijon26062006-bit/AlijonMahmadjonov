@@ -31,6 +31,28 @@
   .cx-go .btn { min-width: 170px; }
   @media (max-width: 560px) { .cx-go .btn { width: 100%; } }
   .pay-warn { margin: 8px 0 12px; padding: 9px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: .82rem; }
+  /* пополнение по шагам: 1 сумма → 2 банк → 3 чек */
+  .wz-steps { display: flex; gap: 8px; margin: 0 0 16px; }
+  .wz-steps button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; width: auto; min-height: 42px; margin: 0;
+    padding: 6px 10px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--bg); box-shadow: none;
+    color: var(--muted); font-weight: 700; font-size: .9rem; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+  .wz-steps i { font-style: normal; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--line); color: var(--text, inherit); font-size: .78rem; }
+  .wz-steps .now { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .wz-steps .now i { background: #fff; color: var(--accent); }
+  .wz-steps .done { border-color: var(--accent); color: var(--accent); }
+  .wz-steps .done i { background: var(--accent); color: #fff; }
+  .wz-steps button:disabled { cursor: default; opacity: 1; }
+  .wz-pane[hidden] { display: none !important; }
+  #amount.wz-bad { border-color: var(--bad) !important; color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft, rgba(196, 43, 43, .12)); }
+  .wz-bad-t { color: var(--bad) !important; font-weight: 700; }
+  .wz-next { margin-top: 16px; transition: opacity .2s, filter .2s; }
+  .wz-next:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
+  .wz-back { display: inline-block; width: auto; min-height: 0; margin: 0 0 8px; padding: 4px 0; border: 0; background: none; box-shadow: none;
+    color: var(--muted); font-weight: 600; cursor: pointer; }
+  .wz-sum { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 12px;
+    border-radius: var(--r); background: var(--accent-soft); font-size: .92rem; }
+  @media (max-width: 420px) { .wz-steps button { font-size: .82rem; gap: 6px; padding: 6px 6px; } }
 </style>
 <section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1></section>
 
@@ -65,7 +87,8 @@
     {% else %}
     {%- set sp_only = methods | length == 1 and methods[0].auto == 'smartpay' %}
     {#- SmartPay: ответ — переход на чужой сайт (smartpay.tj), его нельзя «подменить» на месте — обычная отправка -#}
-    <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data"{{ ' data-no-swap' if sp_only }}>
+    <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data"{{ ' data-no-swap' if sp_only }}
+          data-min="{{ min_tjs if not buy else 0 }}" data-buy="{{ '1' if buy }}" data-pre="{{ pre_method or '' }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       {% if buy %}
       <input type="hidden" name="buy" value="1">
@@ -162,7 +185,8 @@
       <label for="amount" id="amount-label">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
       <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off" {% if buy %}value="{{ buy.tjs }}" readonly{% endif %}>
       <div class="flash warn usd-warn" id="usd-warn" hidden role="alert"></div>
-      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони. {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b> <button type="button" class="btn sm" id="topay-copy" hidden data-copy="">📋 сумму</button></div>
+      <div class="hint" id="min-note">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони.{% else %}Любая сумма.{% endif %}</div>
+      <div class="hint" id="topay-row">К переводу: <b id="topay">—</b> <button type="button" class="btn sm" id="topay-copy" hidden data-copy="">📋 сумму</button></div>
 
       <div class="step-head" id="step3" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
@@ -490,6 +514,106 @@
   if (v) v.addEventListener("ended", function () { seen = true; sync(); });
   agree.addEventListener("change", sync);
   sync();
+})();
+(function () {   // пошагово: 1 сумма → 2 банк → 3 чек (без JS — обычная форма, как раньше)
+  var f = document.getElementById("payform"), inp = document.getElementById("amount"),
+      pm = f && f.querySelector(".paymethods"), rest = document.getElementById("pay-rest");
+  if (!f || !inp || !pm || !rest || f.dataset.wiz) return;
+  f.dataset.wiz = "1";
+  var min = parseFloat(f.dataset.min) || 0, buy = !!f.dataset.buy, rate0 = parseFloat("{{ tjs_rate }}") || 0;
+  function rate() { var r = document.getElementById("rate"); return (r && parseFloat(r.textContent)) || rate0; }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function btn(cls, text) { var b = el("button", cls, text); b.type = "button"; return b; }
+  var minText = String(+min.toFixed(2)).replace(".", ",");
+
+  // раскладываем то, что уже есть на странице, по трём шагам
+  var head2 = pm.previousElementSibling;
+  while (head2 && !head2.classList.contains("step-head")) head2 = head2.previousElementSibling;
+  if (!head2) return;
+  var bar = el("div", "wz-steps", ["Сумма", "Банк", "Чек"].map(function (n, i) {
+    return '<button type="button" data-wz="' + (i + 1) + '"><i>' + (i + 1) + "</i><span>" + n + "</span></button>"; }).join(""));
+  var s1 = el("div", "wz-pane"), s2 = el("div", "wz-pane"), s3 = el("div", "wz-pane");
+  f.insertBefore(bar, head2); f.insertBefore(s1, head2); f.insertBefore(s2, head2); f.insertBefore(s3, head2);
+  // шаг 1 — сумма
+  var old = rest.querySelector(".step-head");
+  s1.appendChild(el("div", "step-head", '<span class="n">1</span><h3>Сумма</h3>'));
+  [rest.querySelector(".amt-cur"), document.getElementById("amount-label"), inp,
+   document.getElementById("usd-warn"), document.getElementById("min-note")].forEach(function (x) { if (x) s1.appendChild(x); });
+  if (old) old.hidden = true;
+  var next1 = btn("btn primary lg block wz-next", "Далее →"); s1.appendChild(next1);
+  // шаг 2 — банк
+  var back2 = btn("wz-back", "← Изменить сумму");
+  s2.appendChild(back2);
+  var x = head2; while (x) { var nx = x.nextElementSibling; s2.appendChild(x); if (x === pm) break; x = nx; }
+  head2.querySelector(".n").textContent = "2"; head2.querySelector("h3").textContent = "Выберите банк";
+  var next2 = btn("btn primary lg block wz-next", "Далее →"); s2.appendChild(next2);
+  // шаг 3 — реквизиты и чек (или страница оплаты для автоплатежей)
+  var back3 = btn("wz-back", "← Выбрать другой банк"), sum = el("div", "wz-sum");
+  s3.appendChild(back3); s3.appendChild(sum);
+  ["dcv", "cx-pane"].forEach(function (id) { var e = document.getElementById(id); if (e) s3.appendChild(e); });
+  s3.appendChild(rest);
+
+  // банк клиент выбирает сам (если не пришёл с уже выбранным способом, ?m=…)
+  if (!f.dataset.pre) pm.querySelectorAll("input[name=method]").forEach(function (r) { r.checked = false; r.closest(".paym").classList.remove("on"); });
+
+  function tjs() {
+    var a = parseFloat((inp.value || "").replace(",", ".").replace(/\s/g, ""));
+    if (!(a > 0)) return 0;
+    return inp.name === "amount_tjs" ? a : a * rate();
+  }
+  function check1() {   // меньше минимума — красным, кнопка не нажимается
+    var v = tjs(), low = !buy && min > 0 && v > 0 && v + 1e-9 < min, note = document.getElementById("min-note");
+    inp.classList.toggle("wz-bad", low);
+    inp.setAttribute("aria-invalid", low ? "true" : "false");
+    if (note && min > 0 && !buy) {
+      note.classList.toggle("wz-bad-t", low);
+      note.textContent = low ? "Меньше минимума. Минимальная сумма — " + minText + " сомони." : "Минимум " + minText + " сомони.";
+    }
+    next1.disabled = !(v > 0) || low;
+    return !next1.disabled;
+  }
+  function picked() { return pm.querySelector("input[name=method]:checked"); }
+  function check2() { next2.disabled = !picked(); }
+  var cur = 1;
+  function go(n) {
+    if (n >= 2 && !check1()) n = 1;
+    if (n === 3 && !picked()) n = 2;
+    cur = n;
+    [s1, s2, s3].forEach(function (p, i) { p.hidden = i + 1 !== n; });
+    var r = picked(), auto = r && r.dataset.auto;
+    bar.querySelectorAll("button").forEach(function (b) {
+      var k = +b.dataset.wz;
+      b.className = k === n ? "now" : k < n ? "done" : "";
+      b.disabled = k > n; b.setAttribute("aria-current", k === n ? "step" : "false");
+      b.querySelector("i").textContent = k < n ? "✓" : k;
+      if (k === 3) b.querySelector("span").textContent = auto ? "Оплата" : "Чек";
+    });
+    if (n === 3) {
+      var name = r.closest(".paym").querySelector("b");
+      sum.innerHTML = "<span>Сумма: <b></b></span><span></span>";
+      sum.querySelector("b").textContent = (inp.name === "amount_tjs" ? inp.value + " сомони" : "$" + inp.value);
+      sum.lastChild.textContent = name ? name.textContent : "";
+      var cx = document.getElementById("cx-amount");
+      if (r.dataset.crypto && cx && !cx.readOnly) {   // крипта: сумму пересчитали в USDT — клиенту вводить заново не нужно
+        var usd = inp.name === "amount_tjs" ? tjs() / rate() : parseFloat(inp.value.replace(",", "."));
+        cx.value = (Math.ceil(usd * 100) / 100).toFixed(2); cx.dispatchEvent(new Event("input", {bubbles: true}));
+      }
+      r.dispatchEvent(new Event("change", {bubbles: true}));   // реквизиты выбранного банка
+    }
+    var top = f.getBoundingClientRect().top + window.scrollY - 90;
+    if (window.scrollY > top) window.scrollTo({top: top, behavior: "smooth"});
+    if (n === 1 && !buy) setTimeout(function () { try { inp.focus({preventScroll: true}); } catch (e) {} }, 50);
+  }
+  inp.addEventListener("input", check1);
+  f.addEventListener("change", function (e) { if (e.target.name === "amount_cur") check1(); if (e.target.closest && e.target.closest(".paymethods")) check2(); });
+  inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); if (check1()) go(2); } });
+  next1.addEventListener("click", function () { if (check1()) go(2); });
+  next2.addEventListener("click", function () { if (picked()) go(3); });
+  back2.addEventListener("click", function () { go(1); });
+  back3.addEventListener("click", function () { go(2); });
+  bar.addEventListener("click", function (e) { var b = e.target.closest("[data-wz]"); if (b && !b.disabled) go(+b.dataset.wz); });
+  check1(); check2();
+  go(buy ? 2 : 1);
 })();
 </script>
 {% endblock %}
