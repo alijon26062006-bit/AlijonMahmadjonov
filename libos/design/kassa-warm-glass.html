@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
+<style>
+:root { --ink: #1E1914; --soft: #7A6E64; --line: rgba(255,255,255,.75); --glass: rgba(255,255,255,.55); --chipg: #DCEBD9; --chipgt: #2F6B3A; --chipr: #F6DCD4; --chiprt: #B0412E; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: 'Onest', system-ui, sans-serif; background: #CFC8C0; display: flex; gap: 40px; padding: 40px; font-variant-numeric: tabular-nums; }
+.phone { width: 390px; height: 844px; border-radius: 0; position: relative; overflow: hidden; color: var(--ink); background: #EFE7DE; }
+.phone::before { content: ''; position: absolute; inset: -60px; background:
+  radial-gradient(260px 200px at 18% 6%, #B99A7B 0%, transparent 70%),
+  radial-gradient(300px 220px at 85% 2%, #D8C2A8 0%, transparent 70%),
+  radial-gradient(380px 300px at 70% 55%, #F6EEE6 0%, transparent 70%),
+  radial-gradient(320px 260px at 10% 90%, #E4D3C2 0%, transparent 70%); filter: blur(10px); }
+.phone > * { position: relative; }
+.wrap { padding: 16px 16px 110px; display: flex; flex-direction: column; gap: 14px; height: 100%; overflow: hidden; }
+.glass { background: var(--glass); backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); border: 1px solid var(--line); border-radius: 32px; box-shadow: 0 24px 50px -28px rgba(90,60,30,.45), inset 0 1px 0 rgba(255,255,255,.9); }
+.bar { display: flex; align-items: center; gap: 8px; padding: 7px; border-radius: 99px; }
+.av { width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #6B4A35, #3A271B); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 17px; flex: none; }
+.search { flex: 1; height: 42px; border-radius: 99px; background: rgba(255,255,255,.7); display: flex; align-items: center; gap: 10px; padding: 0 14px; color: #9A8F86; font-size: 15px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.orb { width: 20px; height: 20px; border-radius: 50%; flex: none; background: radial-gradient(circle at 35% 30%, #fff 0 10%, #B7A8FF 35%, #6D55F0 75%); box-shadow: 0 0 12px rgba(120,95,255,.7); }
+.ic { width: 42px; height: 42px; border-radius: 50%; background: #fff; display: grid; place-items: center; flex: none; box-shadow: 0 6px 14px -8px rgba(60,40,20,.4); }
+.ic.dk { background: var(--ink); color: #fff; font-weight: 800; font-size: 14px; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+h1 { font-size: 28px; font-weight: 800; letter-spacing: -.6px; line-height: 1.1; margin-top: 4px; }
+.sub { color: var(--soft); font-size: 15px; margin-top: -6px; }
+.pill { display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 20px; border-radius: 99px; font-weight: 700; font-size: 15.5px; white-space: nowrap; }
+.pill.dk { background: var(--ink); color: #fff; box-shadow: 0 14px 24px -14px rgba(30,25,20,.8); }
+.pill.lt { background: rgba(255,255,255,.75); border: 1px solid var(--line); }
+.row { display: flex; gap: 10px; align-items: center; }
+.card { padding: 20px; }
+.lbl { color: var(--soft); font-size: 15px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+.big { font-size: 40px; font-weight: 800; letter-spacing: -1.2px; margin-top: 10px; }
+.chip { display: inline-flex; padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; }
+.chip.g { background: var(--chipg); color: var(--chipgt); }
+.chip.r { background: var(--chipr); color: var(--chiprt); }
+.cur { background: rgba(255,255,255,.75); padding: 7px 12px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; border-radius: 24px; background: rgba(255,255,255,.35); border: 1px solid var(--line); margin-top: 14px; }
+.tile { background: rgba(255,255,255,.6); border-radius: 18px; padding: 12px; }
+.tile b { display: block; font-size: 17px; font-weight: 800; margin-top: 8px; }
+.tile span { font-size: 12px; color: var(--soft); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.green { background: linear-gradient(145deg, #4FA46E, #3C8A5A); color: #fff; border-radius: 28px; padding: 18px; position: relative; overflow: hidden; box-shadow: 0 20px 34px -22px rgba(40,110,70,.9); }
+.green::after { content: ''; position: absolute; right: -40px; bottom: -60px; width: 170px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.14); }
+.green .lbl, .green .sub2 { color: rgba(255,255,255,.85); }
+.mid { white-space: nowrap; font-size: 26px; font-weight: 800; letter-spacing: -.6px; margin: 12px 0 10px; }
+.sub2 { font-size: 13px; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+.chip.w { background: #fff; color: var(--chiprt); }
+.nav { position: absolute; left: 14px; right: 14px; bottom: 22px; display: flex; align-items: center; gap: 10px; }
+.nav .glass { flex: 1; display: flex; justify-content: space-around; padding: 6px; border-radius: 99px; }
+.nav a { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #4A4038; padding: 7px 12px; border-radius: 99px; }
+.nav a.on { background: #fff; box-shadow: 0 6px 16px -8px rgba(60,40,20,.5); color: var(--ink); font-weight: 700; }
+.fab { width: 58px; height: 58px; border-radius: 50%; background: #fff; display: grid; place-items: center; flex: none; box-shadow: 0 14px 26px -12px rgba(60,40,20,.55); }
+.fab svg { width: 26px; height: 26px; }
+.warn { color: var(--chiprt); font-size: 13.5px; display: flex; gap: 8px; margin-top: 12px; line-height: 1.35; }
+/* card variant */
+.bank { border-radius: 30px; padding: 20px; color: #fff; background: radial-gradient(260px 180px at 90% 0%, #6B4A35 0%, transparent 70%), linear-gradient(150deg, #2A211B, #15110D); box-shadow: 0 30px 50px -26px rgba(30,20,10,.9); position: relative; overflow: hidden; }
+.bank small { color: rgba(255,255,255,.6); font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+.bank .big { color: #fff; }
+.code { margin-top: 16px; background: rgba(255,255,255,.92); border-radius: 18px; padding: 12px 18px 8px; color: var(--ink); text-align: center; }
+.bars { height: 46px; background: repeating-linear-gradient(90deg, #1E1914 0 2px, transparent 2px 5px, #1E1914 5px 6px, transparent 6px 9px, #1E1914 9px 12px, transparent 12px 14px, #1E1914 14px 15px, transparent 15px 19px); border-radius: 2px; }
+.code span { font-size: 12px; letter-spacing: 3px; font-weight: 700; display: block; margin-top: 6px; }
+.op { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid rgba(120,90,60,.12); }
+.op:last-child { border-bottom: 0; }
+.op .oi { width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,.8); display: grid; place-items: center; flex: none; }
+.op .t { flex: 1; min-width: 0; }
+.op b { display: block; font-size: 15px; font-weight: 700; }
+.op .t span { font-size: 12.5px; color: var(--soft); }
+.op .a { font-weight: 800; font-size: 16px; }
+.seg { display: flex; padding: 5px; border-radius: 99px; gap: 4px; }
+.seg span { flex: 1; text-align: center; padding: 9px 0; border-radius: 99px; font-size: 14px; font-weight: 700; color: var(--soft); }
+.seg span.on { background: var(--ink); color: #fff; }
+/* dark */
+.phone.dark { background: #17120E; color: #F4ECE4; --ink: #F4ECE4; --soft: #A89A8D; --line: rgba(255,255,255,.12); --glass: rgba(255,255,255,.06); --chipg: rgba(95,176,123,.18); --chipgt: #8FD3A6; --chipr: rgba(230,120,95,.18); --chiprt: #F0A08A; }
+.phone.dark::before { background:
+  radial-gradient(260px 200px at 15% 4%, #6A4527 0%, transparent 70%),
+  radial-gradient(300px 240px at 90% 30%, #3B2A1C 0%, transparent 70%),
+  radial-gradient(340px 260px at 10% 85%, #2E2016 0%, transparent 70%); }
+.dark .glass { box-shadow: 0 24px 50px -28px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.08); }
+.dark .search, .dark .cur, .dark .pill.lt, .dark .tile, .dark .op .oi { background: rgba(255,255,255,.08); color: var(--ink); }
+.dark .ic { background: rgba(255,255,255,.1); color: var(--ink); }
+.dark .ic.dk { background: #F4ECE4; color: #17120E; }
+.dark .pill.dk { background: #F4ECE4; color: #17120E; }
+.dark .seg span.on { background: #F4ECE4; color: #17120E; }
+.dark .tiles { background: rgba(255,255,255,.03); }
+.dark .nav a { color: #CFC3B8; }
+.dark .nav a.on { background: #F4ECE4; color: #17120E; }
+.dark .fab { background: #F4ECE4; color: #17120E; }
+.dark .op { border-color: rgba(255,255,255,.07); }
+.bars6 { display: flex; align-items: flex-end; gap: 10px; height: 110px; margin-top: 16px; }
+.bars6 div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--soft); height: 100%; justify-content: flex-end; }
+.bars6 i { width: 100%; border-radius: 10px; background: rgba(255,255,255,.12); }
+.bars6 .now i { background: linear-gradient(#E9B98C, #B9824F); }
+
+.word { font-weight: 800; letter-spacing: 3px; font-size: 19px; }
+.shift { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 99px; font-size: 13px; font-weight: 700; }
+.shift i { width: 8px; height: 8px; border-radius: 50%; background: #3C8A5A; box-shadow: 0 0 0 4px rgba(60,138,90,.18); }
+.scan { height: 210px; border-radius: 30px; position: relative; overflow: hidden; color: #fff; text-align: center; background: radial-gradient(240px 160px at 85% 0%, #6B4A35 0%, transparent 70%), linear-gradient(150deg, #2A211B, #15110D); box-shadow: 0 30px 50px -26px rgba(30,20,10,.9); }
+.ghostc { position: absolute; left: 50%; top: 22px; width: 180px; height: 110px; margin-left: -90px; border: 1px solid rgba(255,255,255,.3); border-radius: 14px; transform: rotate(-4deg); background: rgba(255,255,255,.06); }
+.ghostc::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 14px; height: 34px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.7) 0 2px, transparent 2px 5px, rgba(255,255,255,.7) 5px 6px, transparent 6px 10px); border-radius: 3px; }
+.fr { position: absolute; left: 40px; right: 40px; top: 12px; height: 128px; }
+.fr i { position: absolute; width: 26px; height: 26px; border: 3px solid #E9B98C; }
+.fr i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.fr i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.fr i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.fr i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.laser { position: absolute; left: 10px; right: 10px; top: 60%; height: 2px; background: #E9B98C; box-shadow: 0 0 14px 4px rgba(233,185,140,.55); }
+.scan .cap { position: absolute; left: 0; right: 0; bottom: 18px; font-weight: 700; font-size: 14.5px; }
+.scan .cap span { display: block; font-size: 12.5px; font-weight: 500; opacity: .6; margin-top: 3px; }
+.tile2 { padding: 14px; border-radius: 24px; display: flex; flex-direction: column; gap: 12px; font-weight: 700; font-size: 14.5px; line-height: 1.25; }
+.tile2 .oi { width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,.85); display: grid; place-items: center; }
+.stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats3 > div { padding: 12px 14px; border-radius: 20px; }
+.stats3 small { font-size: 12px; color: var(--soft); font-weight: 600; }
+.stats3 b { display: block; font-size: 18px; font-weight: 800; margin-top: 4px; white-space: nowrap; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
+.sec h4 { font-size: 17px; font-weight: 800; }
+.sec a { font-size: 13px; font-weight: 700; color: var(--soft); }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 4px 4px 0; }
+.hello span { color: var(--soft); font-size: 14.5px; }
+.hello b { display: block; font-size: 25px; font-weight: 800; letter-spacing: -.5px; margin-top: 2px; }
+.back { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; }
+.tb { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 16px; }
+.lvl { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 99px; background: rgba(255,255,255,.14); }
+.duo { position: absolute; left: 14px; right: 14px; bottom: 22px; display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+.duo .pill { height: 54px; justify-content: center; font-size: 15.5px; }
+.amt { text-align: center; padding: 22px 16px 18px; }
+.amt small { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--soft); font-weight: 700; }
+.amt .big { font-size: 46px; margin-top: 6px; }
+.amt .big em { font-style: normal; color: var(--soft); font-size: 30px; margin-left: 6px; }
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.keys span { height: 54px; border-radius: 18px; display: grid; place-items: center; font-size: 22px; font-weight: 700; }
+.who { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 22px; }
+.who .av { width: 40px; height: 40px; font-size: 14px; }
+.who .t { flex: 1; } .who b { display: block; font-size: 15px; } .who span { font-size: 12.5px; color: var(--soft); }
+</style></head><body><!-- ICONS -->
+<svg style="display:none"><defs>
+<symbol id="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+<symbol id="menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></symbol>
+<symbol id="wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2M7 6V4h10v2"/></symbol>
+<symbol id="chart" viewBox="0 0 24 24"><path d="M4 19h16M6 15l4-4 3 3 6-7"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></symbol>
+<symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+<symbol id="home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.01"/></symbol>
+<symbol id="card" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/></symbol>
+<symbol id="gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3.5 7.5 8 12 8zM12 8s1.5-5 4-4.5S16.5 8 12 8z"/></symbol>
+<symbol id="trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></symbol>
+</defs></svg>
+
+
+<!-- till -->
+<div class="phone" id="k1"><div class="wrap">
+  <div class="top"><div class="word">ISTANBUL</div><div class="shift glass"><i></i>Смена <b>04:12</b></div></div>
+  <div class="hello"><span>ТЦ «Жибек» · Касса 2</span><b>Айгуль Сарсенова</b></div>
+  <div class="scan"><div class="ghostc"></div><div class="fr"><i></i><i></i><i></i><i></i><div class="laser"></div></div><div class="cap">Сканировать карту клиента<span>Наведите камеру на штрихкод в приложении</span></div></div>
+  <div class="two"><div class="glass tile2"><div class="oi"><svg><use href="#users"/></svg></div>По номеру телефона</div><div class="glass tile2"><div class="oi"><svg><use href="#plus"/></svg></div>Новый клиент</div></div>
+  <div class="sec"><h4>Эта смена</h4><a>Все операции</a></div>
+  <div class="stats3"><div class="glass"><small>Чеков</small><b>12</b></div><div class="glass"><small>Начислено</small><b>+33 000</b></div><div class="glass"><small>Списано</small><b>−20 000</b></div></div>
+  <div class="glass card" style="padding:4px 16px;border-radius:26px">
+    <div class="op"><div class="oi"><svg><use href="#bag"/></svg></div><div class="t"><b>Ерлан Нурланов</b><span>12:48 · чек 105 000 ₸</span></div><div class="a">+5 950</div></div>
+  </div>
+</div>
+<div class="nav"><div class="glass"><a class="on"><svg><use href="#scan"/></svg>Касса</a><a><svg><use href="#clock"/></svg>Операции</a><a><svg><use href="#chart"/></svg>Смена</a><a><svg><use href="#user"/></svg>Профиль</a></div></div>
+</div>
+
+<!-- customer -->
+<div class="phone" id="k2"><div class="wrap">
+  <div class="tb"><div class="back glass"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>Клиент</div>
+  <div class="bank">
+    <div class="row" style="justify-content:space-between"><b style="font-size:19px;font-weight:700">Мадина Ахметова</b></div>
+    <div class="row" style="justify-content:space-between;margin-top:16px"><small>Бонусный счёт</small><span class="lvl">Серебро · 5%</span></div>
+    <div class="big" style="margin-top:6px">62 000 <span style="font-size:15px;font-weight:600;color:rgba(255,255,255,.7)">бонусов</span></div>
+    <div class="row" style="justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14);font-size:12.5px;color:rgba(255,255,255,.75);font-weight:600"><span style="letter-spacing:2px;color:#fff">IST 1234 5678</span><span>+7 701 234 56 78</span></div>
+  </div>
+  <div class="stats3"><div class="glass"><small>Покупки за год</small><b>162 000 ₸</b></div><div class="glass"><small>Рейтинг</small><b>#7</b></div><div class="glass"><small>Визитов</small><b>9</b></div></div>
+  <div class="glass card" style="padding:16px 18px;border-radius:26px"><div class="lbl" style="font-size:14px;color:var(--ink);font-weight:700">До уровня «Золото» <span style="color:var(--soft);font-weight:600">88 000 ₸</span></div><div style="height:8px;border-radius:4px;background:rgba(255,255,255,.7);margin-top:12px;overflow:hidden"><div style="width:65%;height:100%;border-radius:4px;background:linear-gradient(90deg,#B9824F,#E9B98C)"></div></div></div>
+  <div class="sec"><h4>Операции клиента</h4></div>
+  <div class="glass card" style="padding:4px 16px;border-radius:26px">
+    <div class="op"><div class="oi"><svg><use href="#bag"/></svg></div><div class="t"><b>Покупка</b><span>Сегодня, 14:32 · чек 62 000 ₸</span></div><div class="a">+3 100</div></div>
+    <div class="op"><div class="oi"><svg><use href="#wallet"/></svg></div><div class="t"><b>Покупка</b><span>15 ноября · −30 000</span></div><div class="a">+3 750</div></div>
+  </div>
+</div>
+<div class="duo"><span class="pill lt glass" style="padding:0 18px">Возврат</span><span class="pill dk"><svg><use href="#bag"/></svg>Провести покупку</span></div>
+</div>
+
+<!-- amount -->
+<div class="phone" id="k3"><div class="wrap">
+  <div class="tb"><div class="back glass"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>Покупка<span style="margin-left:auto;color:var(--soft);font-size:13px">1 / 2</span></div>
+  <div class="who glass"><div class="av">МА</div><div class="t"><b>Мадина Ахметова</b><span>Серебро · IST 1234 5678</span></div><b>62 000</b></div>
+  <div class="glass card amt"><small>Сумма чека</small><div class="big">48 000<em>₸</em></div><span class="chip g" style="margin-top:8px">Кешбэк 5% · +2 400</span></div>
+  <div style="flex:1"></div>
+  <span class="pill dk" style="height:56px;justify-content:center">Далее</span>
+  <div class="keys"><span class="glass">1</span><span class="glass">2</span><span class="glass">3</span><span class="glass">4</span><span class="glass">5</span><span class="glass">6</span><span class="glass">7</span><span class="glass">8</span><span class="glass">9</span><span class="glass">00</span><span class="glass">0</span><span class="glass"><svg viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m16 9-6 6M10 9l6 6"/></svg></span></div>
+</div></div>
+</body></html>
