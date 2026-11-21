@@ -134,9 +134,11 @@ def test_not_enough_money_topup_with_receipt_then_buy(app, config, conn, supplie
     bot.handle(conn, msg("5123456789"))
     assert "Не хватает" in api.last_text()
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(api.button("Ал")))
+    assert "Шаг 1 из 3" in api.last_text()
     bot.handle(conn, press("ta:100"))
-    assert "+992" in api.last_text() and "фото чека" in api.last_text()
+    assert "Шаг 2 из 3" in api.last_text() and "100 с." in api.last_text()
+    bot.handle(conn, press(api.button("Ал")))
+    assert "+992" in api.last_text() and "фото чека" in api.last_text() and "Шаг 3 из 3" in api.last_text()
     bot.handle(conn, {"update_id": 2, "message": {"chat": {"id": TG, "type": "private"}, "from": {"id": TG},
                                                   "photo": [{"file_id": "f1"}]}})
     assert "Проверяем чек" in api.last_text() and "отправится на ваш аккаунт автоматически" in api.last_text()
@@ -165,10 +167,10 @@ def test_topup_offers_exact_missing_amount_and_failed_auto_buy_asks(app, config,
     bot.handle(conn, press(f"p:{rid}"))
     bot.handle(conn, msg("5123456789"))
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(api.button("Ал")))
     exact = api.last_buttons()[0]
     assert exact["text"].startswith("✅") and exact["callback_data"].startswith("ta:")   # ровно недостающее
     bot.handle(conn, press("ta:1"))                                 # заплатил слишком мало
+    bot.handle(conn, press(api.button("Ал")))
     bot.handle(conn, {"update_id": 2, "message": {"chat": {"id": TG, "type": "private"}, "from": {"id": TG},
                                                   "photo": [{"file_id": "f1"}]}})
     p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
@@ -333,8 +335,8 @@ def test_receipt_sent_before_request_is_not_lost(app, config, conn, supplier, mo
     su = _start(bot, conn)
     bot.handle(conn, _photo())                                     # сначала перевёл и сразу прислал чек
     assert "Чек получил" in api.last_text()
-    bot.handle(conn, press(api.button("Ал")))
     bot.handle(conn, msg("100"))
+    bot.handle(conn, press(api.button("Ал")))
     assert "Проверяем чек" in api.last_text()
     p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
     assert p["receipt_file"] and p["pay_amount"] == "100.00"
@@ -347,10 +349,10 @@ def test_receipt_instead_of_amount(app, config, conn, supplier, monkeypatch):
     bot = _bot(config, supplier, api)
     su = _start(bot, conn)
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(api.button("Ал")))
     bot.handle(conn, _photo())                                     # прислал чек вместо суммы
     assert "сколько сомони" in api.last_text()
     bot.handle(conn, msg("50"))
+    bot.handle(conn, press(api.button("Ал")))
     p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
     assert p["receipt_file"] and p["pay_amount"] == "50.00"
 
@@ -599,8 +601,50 @@ def test_admin_topup_amount_button_is_not_tournament(app, config, conn, supplier
     bot = _bot(config, supplier, api)
     _start(bot, conn)
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(api.button("Ал")))
     bot.handle(conn, press("ta:100"))
+    bot.handle(conn, press(api.button("Ал")))
     assert "+992" in api.last_text() and "Турнир" not in api.last_text()
     bot.handle(conn, press("ta"))                                   # кнопка турнира в админ-панели работает
     assert "Турнир друзей — настройки" in api.last_text()
+
+
+def test_topup_steps_min_amount(app, config, conn, supplier):
+    """Пополнение по шагам: 1 сумма → 2 банк → 3 чек. Меньше минимума — дальше не пускает."""
+    from donatix import db
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00", "dc": "Карта 4444 5555 6666 7777"}
+    db.set_setting(conn, "pay.min_tjs", "5")
+    api = FakeApi()
+    bot = _bot(config, supplier, api)
+    su = _start(bot, conn)
+    bot.handle(conn, press("t"))
+    assert "Шаг 1 из 3" in api.last_text() and "Минимальная сумма: <b>5 с.</b>" in api.last_text()
+    bot.handle(conn, msg("2"))                                     # меньше минимума
+    assert "меньше минимума" in api.last_text() and "Шаг 1 из 3" in api.last_text()
+    bot.handle(conn, msg("abc"))                                   # не число
+    assert "числом" in api.last_text()
+    assert conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()[0] == 0
+    bot.handle(conn, msg("10"))
+    assert "Шаг 2 из 3" in api.last_text() and "10 с." in api.last_text()
+    texts = [b["text"] for b in api.last_buttons()]
+    assert any("Ал" in t for t in texts) and any("Изменить сумму" in t for t in texts)
+    bot.handle(conn, press("t"))                                   # «Изменить сумму» — назад на шаг 1
+    assert "Шаг 1 из 3" in api.last_text()
+    bot.handle(conn, msg("7,5"))
+    bot.handle(conn, press(api.button("Ал")))
+    assert "Шаг 3 из 3" in api.last_text()
+    p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
+    assert p["pay_amount"] == "7.50"
+
+
+def test_topup_amount_buttons_below_min_hidden(app, config, conn, supplier):
+    from donatix import db
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    db.set_setting(conn, "pay.min_tjs", "50")
+    api = FakeApi()
+    bot = _bot(config, supplier, api)
+    _start(bot, conn)
+    bot.handle(conn, press("t"))
+    amounts = [b["callback_data"] for b in api.last_buttons() if b.get("callback_data", "").startswith("ta:")]
+    assert "ta:20" not in amounts and "ta:50" in amounts
+    bot.handle(conn, press("ta:20"))                               # старая кнопка тоже не пройдёт
+    assert "меньше минимума" in api.last_text()

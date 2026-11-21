@@ -165,16 +165,26 @@ T: dict[str, tuple[str, str]] = {
                     "➕ <b>Пур кардан</b>\nУсули пардохтро интихоб кунед:"),
     "no_methods": ("Пополнение временно недоступно. Напишите в поддержку.",
                    "Пур кардан муваққатан дастрас нест. Ба дастгирӣ нависед."),
-    "ask_amount": ("<b>{method}</b>\nСколько сомони пополнить? Нажмите или напишите сумму.",
-                   "<b>{method}</b>\nЧанд сомонӣ пур кунем? Пахш кунед ё маблағро нависед."),
-    "pay_details": ("🧾 <b>Заявка #{id}</b>\n\nПереведите <b>{amount}</b>\n{method}:\n<code>{details}</code>\n\n"
+    "ask_amount": ("<b>Шаг 1 из 3 · Сумма</b>\n➕ Сколько сомони пополнить? Нажмите или напишите сумму.{min_line}",
+                   "<b>Қадами 1 аз 3 · Маблағ</b>\n➕ Чанд сомонӣ пур кунем? Пахш кунед ё маблағро нависед.{min_line}"),
+    "min_line": ("\nМинимальная сумма: <b>{min} с.</b>", "\nМаблағи ҳадди ақал: <b>{min} с.</b>"),
+    "amount_low": ("❌ <b>{v} с. — меньше минимума.</b>\nМинимальная сумма пополнения — <b>{min} с.</b> "
+                   "Напишите сумму не меньше.",
+                   "❌ <b>{v} с. — аз ҳадди ақал кам.</b>\nМаблағи ҳадди ақал — <b>{min} с.</b> "
+                   "Маблағи на камтар нависед."),
+    "amount_bad": ("❌ Напишите сумму числом, например <b>50</b>.", "❌ Маблағро бо рақам нависед, масалан <b>50</b>."),
+    "pick_bank": ("<b>Шаг 2 из 3 · Банк</b>\nСумма: <b>{amount} с.</b> ✅\n\nВыберите банк, куда будете переводить:",
+                  "<b>Қадами 2 аз 3 · Бонк</b>\nМаблағ: <b>{amount} с.</b> ✅\n\nБонкеро интихоб кунед, ки ба он "
+                  "пул мегузаронед:"),
+    "change_amount": ("✏️ Изменить сумму", "✏️ Маблағро иваз кунед"),
+    "pay_details": ("<b>Шаг 3 из 3 · Чек</b>\n🧾 <b>Заявка #{id}</b>\n\nПереведите <b>{amount}</b>\n{method}:\n<code>{details}</code>\n\n"
                     "📸 Потом отправьте сюда <b>фото чека</b>.",
-                    "🧾 <b>Дархост #{id}</b>\n\n<b>{amount}</b> гузаронед\n{method}:\n<code>{details}</code>\n\n"
+                    "<b>Қадами 3 аз 3 · Чек</b>\n🧾 <b>Дархост #{id}</b>\n\n<b>{amount}</b> гузаронед\n{method}:\n<code>{details}</code>\n\n"
                     "📸 Баъд <b>акси чек</b>-ро ба ин ҷо фиристед."),
     "pay_auto": ("🧾 <b>Заявка #{id}</b>\n\nПереведите ровно <b>{amount}</b>\n<code>{address}</code>\n\n{note}",
                  "🧾 <b>Дархост #{id}</b>\n\nМаҳз <b>{amount}</b> гузаронед\n<code>{address}</code>\n\n{note}"),
-    "photo_kept_method": ("📸 Чек получил! Куда вы переводили? Выберите способ — потом сумму.",
-                          "📸 Чек гирифтам! Ба куҷо пул гузарондед? Усулро интихоб кунед — баъд маблағ."),
+    "photo_kept_method": ("📸 Чек получил! Куда вы переводили? Выберите банк.",
+                          "📸 Чек гирифтам! Ба куҷо пул гузарондед? Бонкро интихоб кунед."),
     "photo_kept_amount": ("📸 Чек получил! Теперь напишите, сколько сомони вы перевели, например <b>100</b>.",
                           "📸 Чек гирифтам! Акнун нависед, чанд сомонӣ гузарондед, масалан <b>100</b>."),
     "receipt_failed": ("⚠️ Не получилось получить фото. Отправьте чек ещё раз — как фото или файл (JPG, PNG, PDF).",
@@ -356,6 +366,12 @@ def money(micro: int, rate: Decimal) -> str:
     tjs = (Decimal(micro) / 10_000 * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     text = f"{tjs:f}".rstrip("0").rstrip(".") if "." in f"{tjs:f}" else f"{tjs:f}"
     return f"{text} с."
+
+
+def _num(v: Any) -> str:
+    """Сумма в сомони для текста: 5 → «5», 5.50 → «5.5»."""
+    d = Decimal(str(v)).quantize(Decimal("0.01"))
+    return f"{d:f}".rstrip("0").rstrip(".") if "." in f"{d:f}" else f"{d:f}"
 
 
 def unit_price_micro(config: Config, user: sqlite3.Row, product: dict[str, Any]) -> int:
@@ -2069,8 +2085,7 @@ class ShopBot:
                 st["qty"], st["qty_set"], st["msg"] = int(text), True, None
             self.next_step(conn, su)
         elif step == "amount":
-            st["msg"] = None
-            self.create_topup(conn, su, text)
+            self.got_amount(conn, su, text, None)
         elif step == "spa" and self.is_admin(tg_id):
             self.add_sponsor(conn, su, text)
         elif step in ("tach", "tapz", "tban") and self.is_admin(tg_id):
@@ -2219,8 +2234,7 @@ class ShopBot:
         elif head == "dv" and len(parts) == 2 and parts[1] == "show":
             self.send_dc_video(conn, su, None)
         elif head == "ta" and len(parts) == 2 and st and st.get("step") == "amount":
-            st["msg"] = mid
-            self.create_topup(conn, su, parts[1])
+            self.got_amount(conn, su, parts[1], mid)
         elif head == "my" and len(parts) == 2 and parts[1].isdigit():
             self.screen_orders(conn, su, int(parts[1]), mid)
         elif head == "od" and len(parts) == 2:
@@ -2338,6 +2352,7 @@ class ShopBot:
         self.show(su["tg_id"], "\n".join(lines), [[(tr(lang, "balance"), "b"), (tr(lang, "home"), "h")]], edit=edit)
 
     def screen_methods(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        """Пополнение по шагам: 1 сумма → 2 банк → 3 реквизиты и чек."""
         tg_id, lang = su["tg_id"], su["lang"]
         waiting = payments.open_request(conn, su["user_id"])
         if waiting is not None:   # уже есть заявка — сразу дать её отменить, а не тупик
@@ -2346,45 +2361,88 @@ class ShopBot:
                       [[(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")], [(tr(lang, "home"), "h")]],
                       edit=edit)
             return
-        methods = payments.offered(conn, self.config)
-        if len(methods) == 1 and methods[0]["auto"] == "smartpay":   # выбирать нечего — сразу сумма
-            prev = self.state.get(tg_id) or {}
-            self.state[tg_id] = {"step": "method", "resume": prev if prev.get("resume") else None, "photo": prev.get("photo")}
-            self.pick_method(conn, su, methods[0]["code"], edit)
-            return
-        if not methods:
+        if not payments.offered(conn, self.config):
             self.show(tg_id, tr(lang, "no_methods"), [[(tr(lang, "home"), "h")]], edit=edit)
             return
         prev = self.state.get(tg_id) or {}
-        resume = prev if prev.get("resume") else None
-        self.state[tg_id] = {"step": "method", "resume": resume, "photo": prev.get("photo")}
+        r = prev.get("resume")   # пополняет ради покупки: экран покупки (resume=True) или уже сохранённый
+        resume = prev if r is True else (r if isinstance(r, dict) else None)
+        self.state[tg_id] = {"step": "amount", "msg": edit, "resume": resume, "photo": prev.get("photo")}
+        self.ask_amount(conn, su, edit)
+
+    def ask_amount(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None, warn: str = "") -> None:
+        """Шаг 1 — сумма. Кнопки меньше минимума не показываем; написал меньше — не пускаем дальше."""
+        import math
+        tg_id, lang = su["tg_id"], su["lang"]
+        st = self.state.get(tg_id) or {}
+        conf = payments.settings(conn, self.config)
+        low = conf["min_tjs"] or Decimal(0)
+        vals = [v for v in (20, 50, 100, 200, 500, 1000) if v >= low]
+        rows = [[(f"{v} с.", f"ta:{v}") for v in vals[i:i + 3]] for i in range(0, len(vals), 3)]
+        resume = st.get("resume")
+        need = resume.get("need") if isinstance(resume, dict) else None
+        if need:   # ради покупки — первой кнопкой ровно то, чего не хватает (не меньше минимума)
+            tjs = max(math.ceil(Decimal(need) / 10_000 * conf["tjs_rate"]), math.ceil(low), 1)
+            rows.insert(0, [(f"✅ {tjs} с.", f"ta:{tjs}", "success")])
+        rows.append([(tr(lang, "cancel"), "x", "danger")])
+        min_line = tr(lang, "min_line", min=_num(low)) if low > 0 else ""
+        text = tr(lang, "ask_amount", min_line=min_line)
+        if st.get("photo"):
+            text = tr(lang, "photo_kept_amount") + min_line
+        if warn:
+            text = warn + "\n\n" + text
+        st["msg"] = self.show(tg_id, text, rows, edit=edit)
+
+    def got_amount(self, conn: sqlite3.Connection, su: sqlite3.Row, raw: str, edit: int | None) -> None:
+        """Сумму нажали или написали. Меньше минимума — остаёмся на шаге 1; иначе — шаг 2, банк."""
+        tg_id, lang = su["tg_id"], su["lang"]
+        st = self.state.get(tg_id) or {}
+        try:
+            v = Decimal((raw or "").replace(" ", "").replace(",", ".").replace("с.", "").replace("c.", ""))
+            ok = v.is_finite() and v > 0
+        except Exception:  # noqa: BLE001 — не число
+            ok = False
+        if not ok:
+            self.ask_amount(conn, su, None, tr(lang, "amount_bad"))
+            return
+        low = payments.settings(conn, self.config)["min_tjs"] or Decimal(0)
+        if low > 0 and v < low:
+            self.ask_amount(conn, su, None, tr(lang, "amount_low", v=_e(_num(v)), min=_num(low)))
+            return
+        st["amount"], st["step"] = _num(v.quantize(Decimal("0.01"))), "method"
+        methods = payments.offered(conn, self.config)
+        if len(methods) == 1 and methods[0]["auto"] == "smartpay":   # банк выберут на странице SmartPay
+            self.pick_method(conn, su, methods[0]["code"], edit)
+            return
+        self.screen_banks(conn, su, edit)
+
+    def screen_banks(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None) -> None:
+        """Шаг 2 — банк."""
+        tg_id, lang = su["tg_id"], su["lang"]
+        st = self.state.get(tg_id) or {}
+        methods = payments.offered(conn, self.config)
         rows = [[(m["title"][:40], f"tm:{m['code']}")] for m in methods]
-        rows.append([(tr(lang, "home"), "h")])
-        text = tr(lang, "photo_kept_method") if prev.get("photo") else tr(lang, "pick_method")
-        self.show(tg_id, text, rows, edit=edit)
+        rows.append([(tr(lang, "change_amount"), "t")])
+        rows.append([(tr(lang, "cancel"), "x", "danger")])
+        text = tr(lang, "pick_bank", amount=_e(st.get("amount", "")))
+        if st.get("photo"):
+            text = tr(lang, "photo_kept_method") + "\n" + text
+        st["msg"] = self.show(tg_id, text, rows, edit=edit)
 
     def pick_method(self, conn: sqlite3.Connection, su: sqlite3.Row, code: str, edit: int | None) -> None:
-        tg_id, lang = su["tg_id"], su["lang"]
+        """Банк выбран — шаг 3: заявка, реквизиты и чек."""
+        tg_id = su["tg_id"]
+        st = self.state.get(tg_id) or {}
         method = next((m for m in payments.methods(conn, self.config) if m["code"] == code), None)
-        if method is None:
-            self.screen_methods(conn, su, edit)
+        if method is None or st.get("step") != "method" or not st.get("amount"):
+            self.screen_methods(conn, su, edit)   # старая кнопка или бот перезапускался — начнём с суммы
             return
         from . import dcvideo
         if method.get("auto") == "dcbank" and dcvideo.needed(conn, su["user_id"], "bot"):
-            self.send_dc_video(conn, su, code)   # сначала видео и согласие, потом сумма
+            self.send_dc_video(conn, su, code)   # сначала видео и согласие, потом заявка
             return
-        prev = self.state.get(tg_id) or {}
-        self.state[tg_id] = {"step": "amount", "method": code, "msg": edit, "resume": prev.get("resume"),
-                             "photo": prev.get("photo")}
-        rows = [[(f"{v} с.", f"ta:{v}") for v in (20, 50, 100)], [(f"{v} с.", f"ta:{v}") for v in (200, 500, 1000)],
-                [(tr(lang, "cancel"), "x", "danger")]]
-        need = (prev.get("resume") or {}).get("need") if isinstance(prev.get("resume"), dict) else None
-        if need:   # пополняет ради покупки — первой кнопкой ровно то, чего не хватает (не меньше минимума)
-            import math
-            conf = payments.settings(conn, self.config)
-            tjs = max(math.ceil(Decimal(need) / 10_000 * conf["tjs_rate"]), math.ceil(conf["min_tjs"] or 0), 1)
-            rows.insert(0, [(f"✅ {tjs} с.", f"ta:{tjs}", "success")])
-        self.show(tg_id, tr(lang, "ask_amount", method=_e(method["title"])), rows, edit=edit)
+        st["method"], st["msg"] = code, edit
+        self.create_topup(conn, su, st["amount"])
 
     def send_dc_video(self, conn: sqlite3.Connection, su: sqlite3.Row, code: str | None) -> None:
         """Видео-инструкция «Душанбе Сити». code — способ, к которому вернуться после «Посмотрел»;
@@ -2489,9 +2547,12 @@ class ShopBot:
         if pid is None:
             # Чек прислали без заявки (сначала перевели, потом пришли в бот) или вместо суммы.
             # Не теряем его: запоминаем и спрашиваем, чего не хватает — способ и сумму.
-            if st.get("step") == "amount" and st.get("method"):
-                st["photo"], st["msg"] = file_id, None
-                self.show(tg_id, tr(lang, "photo_kept_amount"), [[(tr(lang, "cancel"), "x", "danger")]])
+            if st.get("step") in ("amount", "method"):   # уже пополняет — чек запомнили, продолжаем с того же шага
+                st["photo"] = file_id
+                if st["step"] == "amount":
+                    self.ask_amount(conn, su, None)
+                else:
+                    self.screen_banks(conn, su, None)
                 return
             waiting = payments.open_request(conn, su["user_id"])
             if waiting is not None:
