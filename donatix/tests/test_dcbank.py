@@ -204,8 +204,8 @@ def test_shop_bot_replaces_requisites_with_paid(app, dc, conn, supplier):
     bot = _bot(dc, supplier)
     _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("1"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
     shown = next(p for m, p in reversed(bot.api.calls) if "1.00" in (p.get("text") or ""))
     req_mid = bot.api.mid if "message_id" not in shown else shown["message_id"]
     p = conn.execute("SELECT * FROM payments").fetchone()
@@ -275,15 +275,14 @@ def test_video_required_in_shop_bot(app, dc, conn, supplier):
     bot.api.upload = lambda method, field, path, **p: (sent.append((method, p)) or {"video": {"file_id": "FID1"}})
     su = _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("1"))                                             # шаг 1 — сумма
+    bot.handle(conn, press(bot.api.button("Душанбе")))                     # шаг 2 — банк: сначала видео
     assert sent and sent[0][0] == "sendVideo" and "отвечаете сами" in sent[0][1]["caption"]
     ok = sent[0][1]["reply_markup"]["inline_keyboard"][0][0]
     assert ok["callback_data"] == "dv:ok:dc"
-    bot.handle(conn, msg("1"))                                             # сумму без видео не принимаем
-    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0   # без видео заявки нет
     bot.handle(conn, press("dv:ok:dc"))
     assert dcvideo.needed(conn, su["user_id"], "bot") is None
-    bot.handle(conn, msg("1"))
     assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
     assert any(b.get("callback_data") == "dv:show" for b in bot.api.last_buttons())
     bot.handle(conn, press("dv:show"))                                     # повтор — по file_id, без загрузки
@@ -309,8 +308,8 @@ def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monke
     bot = _bot(dc, supplier)
     _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("1"))
+    bot.handle(conn, press(bot.api.button("Душанбе"), bot.api.mid))   # нажали кнопку в сообщении «Шаг 2»
     req_mid = bot.api.mid
     p = conn.execute("SELECT * FROM payments").fetchone()
 
@@ -324,8 +323,8 @@ def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monke
 
     # отклонение кассиром — тоже сразу
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("2"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
     p2 = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     payments.reject(conn, dc, p2["id"], 1, "перевод не найден")
     assert "перевод не найден" in pushed.last_text()
@@ -333,7 +332,7 @@ def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monke
 
 def test_builtin_animated_guide_by_default(app, dc, conn, supplier):
     """Своё видео не загружено — клиент смотрит встроенную анимацию; бот шлёт встроенный MP4."""
-    from test_shopbot import _bot, _start, press
+    from test_shopbot import _bot, _start, msg, press
 
     from donatix import db, dcvideo
     for kind in ("site", "bot"):
@@ -354,6 +353,7 @@ def test_builtin_animated_guide_by_default(app, dc, conn, supplier):
     bot.api.upload = lambda method, field, path, **p: (sent.append(path) or {"video": {"file_id": "B1"}})
     _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
+    bot.handle(conn, msg("1"))
     bot.handle(conn, press(bot.api.button("Душанбе")))
     assert sent == [dcvideo.BUILTIN_FILE]
 
@@ -365,13 +365,18 @@ def test_builtin_animated_guide_by_default(app, dc, conn, supplier):
 
 
 def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
-    """Заявку в ожидании можно отменить — и на сайте (даже с чеком), и кнопкой в боте."""
+    """Заявку без чека можно отменить — и на сайте, и кнопкой в боте. С чеком — нельзя: решает только админ."""
     from test_shopbot import _bot, _start, msg, press
 
     uid, c, token = _client(app, conn)
     r = _pay(c, token, "40")
     pid = int(r.headers["location"].split("/")[-2])
     conn.execute("UPDATE payments SET receipt_file = 'r.png' WHERE id = ?", (pid,))
+    c.post(f"/panel/balance/{pid}/cancel", data={"csrf": token})                    # чек отправлен — отменить нельзя
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (pid,)).fetchone()[0] == "pending"
+    page = c.get("/panel/balance").text
+    assert "решает администратор" in page and f"/panel/balance/{pid}/cancel" not in page
+    conn.execute("UPDATE payments SET receipt_file = NULL WHERE id = ?", (pid,))   # без чека — можно
     c.post(f"/panel/balance/{pid}/cancel", data={"csrf": token})
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (pid,)).fetchone()[0] == "cancelled"
     assert _handle(conn, dc, notice("40.01", "7001"), 70)["status"] == "unknown"   # отменённую не зачисляем
@@ -379,8 +384,8 @@ def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
     bot = _bot(dc, supplier)
     _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("3"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
     bot.handle(conn, press(f"pc:{p['id']}"))
@@ -389,6 +394,20 @@ def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
     assert conn.execute("SELECT COUNT(*) FROM shop_watch WHERE obj_id = ?", (p["id"],)).fetchone()[0] == 0
     bot.handle(conn, press(f"pc:{p['id']}"))                                        # второй раз — уже нельзя
     assert "отменить нельзя" in bot.api.last_text()
+    # заявка с чеком: в боте ни кнопки «Отменить», ни отмены старой кнопкой
+    bot.handle(conn, press("t"))
+    bot.handle(conn, msg("5"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    q = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    conn.execute("UPDATE payments SET receipt_file = 'r.png' WHERE id = ?", (q["id"],))
+    bot.handle(conn, press("b"))
+    assert "Отменить нельзя" in bot.api.last_text()
+    assert not any((b.get("callback_data") or "").startswith("pc:") for b in bot.api.last_buttons())
+    bot.handle(conn, press("t"))
+    assert "Отменить нельзя" in bot.api.last_text()
+    assert not any((b.get("callback_data") or "").startswith("pc:") for b in bot.api.last_buttons())
+    bot.handle(conn, press(f"pc:{q['id']}"))
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (q["id"],)).fetchone()[0] == "pending"
 
 
 def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
@@ -398,8 +417,8 @@ def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
     bot = _bot(dc, supplier)
     _start(bot, conn, "tj")
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("4"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     bot.handle(conn, press("h"))
     bot.handle(conn, press("t"))                                   # снова «Пополнить» — заявка уже есть
@@ -442,8 +461,8 @@ def test_dc_receipt_accepted_right_away_in_bot(app, dc, conn, supplier, monkeypa
     bot = _bot(dc, supplier, FakeApi(photo=RECEIPT_PNG))
     _start(bot, conn)
     bot.handle(conn, press("t"))
-    bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("1"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
     assert "прислать сюда фото чека" in bot.api.last_text()
     bot.handle(conn, {"update_id": 3, "message": {"chat": {"id": 700001, "type": "private"}, "from": {"id": 700001},
                                                   "photo": [{"file_id": "f1"}]}})

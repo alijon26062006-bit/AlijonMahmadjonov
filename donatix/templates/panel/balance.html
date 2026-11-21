@@ -67,9 +67,9 @@
     <div class="card reveal wait-card" id="wait" data-id="{{ waiting.id }}" role="status" aria-live="polite">
       <div class="wait-spin" aria-hidden="true"><span class="ring"></span><span class="clock">{{ icon('clock', 22) }}</span></div>
       <div class="grow">
-        <h3>{% if waiting.auto_kind %}Заявка #{{ waiting.id }} ждёт оплаты{% else %}Заявка #{{ waiting.id }} на проверке{% endif %}</h3>
+        <h3>{% if waiting.auto_kind and not waiting.receipt_file %}Заявка #{{ waiting.id }} ждёт оплаты{% else %}Заявка #{{ waiting.id }} на проверке{% endif %}</h3>
         <p class="muted small">{{ money(waiting.amount_micro) }} · {{ waiting.pay_amount }} {{ waiting.pay_currency }} · {{ pay_titles.get(waiting.method, waiting.method) }} · {{ waiting.created_at | dt }}</p>
-        {% if waiting.auto_kind %}
+        {% if waiting.auto_kind and not waiting.receipt_file %}
         <p>Переведите точную сумму — баланс пополнится сам. Новую заявку можно создать после оплаты или отмены этой.</p>
         <div class="row-actions">
           <a class="btn primary" href="/panel/balance/{{ waiting.id }}/pay">Открыть оплату</a>
@@ -77,10 +77,8 @@
         </div>
         {% else %}
         <p>Чек получен ✅ Администратор проверяет поступление — обычно до 1 часа. Как только проверит, баланс пополнится и придёт уведомление 🔔.</p>
-        <p class="hint">Новую заявку можно отправить сразу после проверки этой. Страница обновится сама.</p>
-        <form class="inline" method="post" action="/panel/balance/{{ waiting.id }}/cancel"
-              onsubmit="return confirm('Отменить заявку #{{ waiting.id }}? Если вы уже перевели деньги — не отменяйте, дождитесь проверки.')">
-          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">❌ Отменить заявку</button></form>
+        <p class="hint">🔒 Чек отправлен — отменить заявку нельзя, решает администратор: подтвердит или отклонит.
+          Новую заявку можно отправить сразу после его решения. Страница обновится сама.</p>
         {% endif %}
       </div>
     </div>
@@ -260,10 +258,10 @@
           <div class="meta">
             <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': '', 'fake': 'bad'}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': 'Перевод не поступил'}.get(p.status, p.status) }}</span>
             {% if p.status == 'pending' %}
-            {% if p.receipt_file %}<span class="spin-dot" aria-hidden="true"></span>{% endif %}
-            <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"
+            {% if p.receipt_file %}<span class="spin-dot" aria-hidden="true"></span><span class="muted small">🔒 решает админ</span>
+            {% else %}<form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"
                   onsubmit="return confirm('Отменить заявку #{{ p.id }}?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
-            {% endif %}
+            {% endif %}{% endif %}
           </div>
         </div>
       </div>

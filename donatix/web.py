@@ -1892,7 +1892,9 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
                          config: Config = Depends(get_config)):
     from . import payments
     wait = payments.cancel_wait(conn, payment_id)
-    if wait > 0:
+    if payments.has_receipt(conn, payment_id):   # чек отправлен — решает только админ
+        flash(request, payments.LOCKED_TEXT, "error")
+    elif wait > 0:
         flash(request, f"Отменить можно через {wait // 60 + 1} мин. Не оплатите за 30 минут — заявка отменится сама.", "error")
     elif payments.cancel(conn, user["id"], payment_id, config):
         flash(request, "Заявка отменена.")

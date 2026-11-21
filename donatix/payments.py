@@ -431,7 +431,7 @@ def open_request(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
 
 
 def waiting_text(p: sqlite3.Row) -> str:
-    if p["auto_kind"]:
+    if p["auto_kind"] and not p["receipt_file"]:
         return (f"Заявка #{p['id']} ждёт оплаты. Оплатите её или отмените — потом можно создать новую.")
     return (f"Заявка #{p['id']} на проверке — дождитесь решения администратора. "
             "Новую заявку можно отправить сразу после проверки.")
@@ -662,11 +662,21 @@ def cancel_wait(conn: sqlite3.Connection, payment_id: int) -> int:
     return max(0, int(CANCEL_AFTER_MIN * 60 - age))
 
 
+LOCKED_TEXT = ("Чек уже отправлен — заявку проверяет администратор. Отменить её нельзя: дождитесь решения "
+               "(подтвердит или отклонит), потом можно создать новую.")
+
+
+def has_receipt(conn: sqlite3.Connection, payment_id: int) -> bool:
+    """Чек отправлен — заявку решает только админ (подтвердить или отклонить), клиент отменить не может."""
+    row = conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    return bool(row and row["receipt_file"])
+
+
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Config | None = None) -> bool:
     if cancel_wait(conn, payment_id) > 0:
         return False
     done = conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'клиент' "
-                        "WHERE id = ? AND user_id = ? AND status = 'pending'",
+                        "WHERE id = ? AND user_id = ? AND status = 'pending' AND receipt_file IS NULL",
                         (db.now(), payment_id, user_id)).rowcount > 0
     if done and config is not None:
         notify(conn, config, user_id, f"Заявка на пополнение #{payment_id} отменена.", "/panel/balance")

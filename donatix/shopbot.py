@@ -142,6 +142,10 @@ T: dict[str, tuple[str, str]] = {
                  "⏳ <b>Дархост #{id}</b> ба {amount} интизори пардохт ё санҷиш аст.\nФикратон дигар шуд — бо тугмаи поён бекор кунед."),
     "pay_cancelled": ("❌ <b>Заявка #{id} отменена</b>\nМожно создать новую.",
                       "❌ <b>Дархост #{id} бекор шуд</b>\nМетавонед дархости нав созед."),
+    "pay_review": ("⏳ <b>Заявка #{id}</b> на {amount} — чек на проверке у администратора.\n🔒 Отменить нельзя: "
+                   "дождитесь решения (подтвердит или отклонит) — потом можно создать новую.",
+                   "⏳ <b>Дархост #{id}</b> ба {amount} — чек дар санҷиши маъмур аст.\n🔒 Бекор кардан мумкин нест: "
+                   "қарорро интизор шавед (тасдиқ ё рад мекунад) — баъд дархости нав сохтан мумкин."),
     "pay_cancel_late": ("Заявка уже проверена — отменить нельзя.", "Дархост аллакай санҷида шуд — бекор кардан мумкин нест."),
     "no_money": ("\n\n⚠️ Не хватает <b>{need}</b>. Пополните баланс — и заказ в одно нажатие.",
                  "\n\n⚠️ <b>{need}</b> намерасад. Балансро пур кунед — фармоиш бо як пахш."),
@@ -2205,6 +2209,11 @@ class ShopBot:
         elif head == "pc" and len(parts) == 2 and parts[1].isdigit():   # отменить свою заявку на пополнение
             pid = int(parts[1])
             wait = payments.cancel_wait(conn, pid)
+            p = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (pid, su["user_id"])).fetchone()
+            if p is not None and p["status"] == "pending" and p["receipt_file"]:
+                self.show(tg_id, tr(lang, "pay_review", id=pid, amount=_e(f"{p['pay_amount']} {p['pay_currency']}")),
+                          [[(tr(lang, "home"), "h")]], edit=mid)
+                return
             if wait > 0:
                 self.show(tg_id, f"⏳ Отменить заявку можно через {wait // 60 + 1} мин. Не оплатите за 30 минут — "
                                  "она отменится сама.", [[(tr(lang, "home"), "h")]], edit=mid)
@@ -2329,10 +2338,13 @@ class ShopBot:
         rows = [[(tr(lang, "topup"), "t", "success")], [(tr(lang, "history"), "hist")], [(tr(lang, "home"), "h")]]
         waiting = conn.execute("SELECT * FROM payments WHERE user_id = ? AND status = 'pending' ORDER BY id DESC "
                                "LIMIT 1", (su["user_id"],)).fetchone()
-        if waiting is not None:   # заявка ждёт — видно здесь же, и отменить можно в одно нажатие
-            text += "\n\n" + tr(lang, "pay_open", id=waiting["id"],
-                                  amount=_e(f"{waiting['pay_amount']} {waiting['pay_currency']}"))
-            rows.insert(0, [(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")])
+        if waiting is not None:   # заявка ждёт — видно здесь же; без чека — отменить в одно нажатие
+            amount = _e(f"{waiting['pay_amount']} {waiting['pay_currency']}")
+            if waiting["receipt_file"]:
+                text += "\n\n" + tr(lang, "pay_review", id=waiting["id"], amount=amount)
+            else:
+                text += "\n\n" + tr(lang, "pay_open", id=waiting["id"], amount=amount)
+                rows.insert(0, [(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")])
         self.show(su["tg_id"], text, rows, edit=edit)
         if waiting is None:   # идёт оплата — рекламой не мешаем
             self.maybe_ad(conn, su["tg_id"])
@@ -2355,11 +2367,15 @@ class ShopBot:
         """Пополнение по шагам: 1 сумма → 2 банк → 3 реквизиты и чек."""
         tg_id, lang = su["tg_id"], su["lang"]
         waiting = payments.open_request(conn, su["user_id"])
-        if waiting is not None:   # уже есть заявка — сразу дать её отменить, а не тупик
-            self.show(tg_id, tr(lang, "pay_open", id=waiting["id"],
-                                amount=_e(f"{waiting['pay_amount']} {waiting['pay_currency']}")),
-                      [[(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")], [(tr(lang, "home"), "h")]],
-                      edit=edit)
+        if waiting is not None:   # уже есть заявка: без чека — можно отменить; с чеком — ждём решения админа
+            amount = _e(f"{waiting['pay_amount']} {waiting['pay_currency']}")
+            if waiting["receipt_file"]:
+                self.show(tg_id, tr(lang, "pay_review", id=waiting["id"], amount=amount), [[(tr(lang, "home"), "h")]],
+                          edit=edit)
+            else:
+                self.show(tg_id, tr(lang, "pay_open", id=waiting["id"], amount=amount),
+                          [[(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")], [(tr(lang, "home"), "h")]],
+                          edit=edit)
             return
         if not payments.offered(conn, self.config):
             self.show(tg_id, tr(lang, "no_methods"), [[(tr(lang, "home"), "h")]], edit=edit)
@@ -2585,7 +2601,7 @@ class ShopBot:
             log.exception("бот-магазин: чек %s админу", pid)
         self.state.pop(tg_id, None)
         intent = self.intent(conn, resume)
-        cancel_row = [[(tr(lang, "home"), "h")], [(tr(lang, "pay_cancel"), f"pc:{pid}", "danger")]]
+        cancel_row = [[(tr(lang, "home"), "h")]]   # чек отправлен — отменить нельзя, решает админ
         if intent:   # заказ сохраняем в базе: оформим сами, как только пополнение подтвердят
             self.show(tg_id, tr(lang, "checking") + tr(lang, "will_buy", product=_e(intent["name"])),
                       cancel_row, edit=mid)

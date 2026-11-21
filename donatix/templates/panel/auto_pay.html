@@ -45,8 +45,8 @@
 {% if dc and p.status == 'pending' %}
 <div class="dcp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
   <div class="dcp-top">
-    <form method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="dcp-back">{{ icon('arrow-left', 16) }}Иваз кардани усул</button></form>
+    {% if not p.receipt_file %}<form method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="dcp-back">{{ icon('arrow-left', 16) }}Иваз кардани усул</button></form>{% else %}<span></span>{% endif %}
     <span class="dcp-id">Дархост #{{ p.id }}</span>
   </div>
   {% if buy %}<div class="dcp-buy">🛒 {{ buy.title }}</div>{% endif %}
