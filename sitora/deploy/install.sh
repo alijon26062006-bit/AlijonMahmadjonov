@@ -15,12 +15,17 @@ APP_DIR=/home/$APP_USER/app
 ENV_FILE=$APP_DIR/sitora/.env
 PORT=8020
 BRANCH="${SITORA_BRANCH:-claude/website-api-sales-96wxcs}"
+trap 'echo "❌ Ошибка (строка $LINENO): $BASH_COMMAND"' ERR
+get_code() {  # код берём через копию Donatix (у неё доступ к GitHub уже настроен); Donatix не меняется
+  sudo -u donatix git -C /home/donatix/app fetch -q origin "$BRANCH"
+  mkdir -p "$APP_DIR"
+  sudo -u donatix git -C /home/donatix/app archive FETCH_HEAD sitora | tar -x -C "$APP_DIR"
+  chown -R $APP_USER:$APP_USER "$APP_DIR"
+  echo "   версия: $(sudo -u donatix git -C /home/donatix/app log -1 --format='%h %s' FETCH_HEAD)"
+}
 say() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "Запустите через sudo (под root)."; exit 1; }
 
-REPO="${SITORA_REPO:-}"
-if [ -z "$REPO" ] && [ -d /home/donatix/app/.git ]; then REPO=$(git -C /home/donatix/app remote get-url origin); fi
-REPO="${REPO:-https://github.com/alijon26062006-bit/AlijonMahmadjonov.git}"
 
 say "Пакеты"
 apt-get install -y -qq python3 python3-venv git >/dev/null
@@ -29,11 +34,7 @@ id "$APP_USER" >/dev/null 2>&1 || useradd -m -s /bin/bash "$APP_USER"
 chmod 750 /home/$APP_USER
 
 say "Код ($BRANCH)"
-if [ -d "$APP_DIR/.git" ]; then
-  sudo -u $APP_USER git -C "$APP_DIR" fetch -q origin "$BRANCH" && sudo -u $APP_USER git -C "$APP_DIR" reset -q --hard FETCH_HEAD
-else
-  sudo -u $APP_USER git clone -q --depth 50 -b "$BRANCH" "$REPO" "$APP_DIR"
-fi
+get_code
 sudo -u $APP_USER python3 -m venv "$APP_DIR/sitora/.venv"
 sudo -u $APP_USER "$APP_DIR/sitora/.venv/bin/pip" install -q -r "$APP_DIR/sitora/requirements.txt"
 
