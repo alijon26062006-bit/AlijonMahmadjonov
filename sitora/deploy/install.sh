@@ -51,7 +51,7 @@ env_get() { grep -oP "^$1=\K.*" "$ENV_FILE" 2>/dev/null || true; }
 
 if [ ! -f "$ENV_FILE" ]; then
   DOMAIN=$(cat /home/donatix/.donatix_domain 2>/dev/null || echo donatix.tj)
-  SECRET="_$(tr -dc 'a-z0-9' </dev/urandom | head -c 10)"     # скрытый адрес: случайный, никто не угадает
+  SECRET="_$(python3 -c 'import secrets,string; print("".join(secrets.choice(string.ascii_lowercase+string.digits) for _ in range(10)))')"     # скрытый адрес: случайный, никто не угадает
   umask 077
   cat > "$ENV_FILE" <<ENV
 SITORA_NAME=${SITORA_NAME:-Sitora}
