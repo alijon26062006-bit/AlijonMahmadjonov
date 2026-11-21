@@ -6,8 +6,9 @@
 #
 #   sudo bash install.sh
 #
-# Спросит токен бота, ваш Telegram ID и ключи. Токен и ключи вводятся скрыто (на экране не видно)
-# и сохраняются только в /home/sitora/app/sitora/.env (доступ только у пользователя sitora).
+# Спросит только токен бота (вводится скрыто), потом ждёт, пока вы нажмёте /start в боте, —
+# так берёт ваш Telegram ID и делает вас админом. Ключ поставщика вписывается позже: deploy/set-key.sh.
+# Всё хранится только в /home/sitora/app/sitora/.env (доступ только у пользователя sitora).
 set -euo pipefail
 APP_USER=sitora
 APP_DIR=/home/$APP_USER/app
@@ -36,30 +37,59 @@ fi
 sudo -u $APP_USER python3 -m venv "$APP_DIR/sitora/.venv"
 sudo -u $APP_USER "$APP_DIR/sitora/.venv/bin/pip" install -q -r "$APP_DIR/sitora/requirements.txt"
 
+set_env() {  # set_env KEY VALUE — заменить/добавить строку в .env (значение не попадает в аргументы процессов)
+  KEY="$1" VAL="$2" python3 - "$ENV_FILE" <<'PY2'
+import os, sys
+p, k, v = sys.argv[1], os.environ["KEY"], os.environ["VAL"]
+lines = open(p, encoding="utf-8").read().splitlines()
+lines = [l for l in lines if not l.startswith(k + "=")] + [f"{k}={v}"]
+open(p, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+PY2
+}
+env_get() { grep -oP "^$1=\K.*" "$ENV_FILE" 2>/dev/null || true; }
+
 if [ ! -f "$ENV_FILE" ]; then
-  say "Настройки (токен и ключи на экране не видно — это нормально)"
   DOMAIN=$(cat /home/donatix/.donatix_domain 2>/dev/null || echo donatix.tj)
   SECRET="_$(tr -dc 'a-z0-9' </dev/urandom | head -c 10)"     # скрытый адрес: случайный, никто не угадает
-  read -rp  "Название бота [Sitora]: " NAME; NAME=${NAME:-Sitora}
-  read -rsp "Токен бота от @BotFather: " TOKEN; echo
-  read -rp  "Ваш Telegram ID (админ; несколько — через запятую): " ADMINS
-  read -rsp "API-ключ поставщика для ЭТОГО бота (можно пусто и вписать позже): " FKEY; echo
-  read -rsp "Ключ OpenAI для проверки чеков (можно пусто): " OKEY; echo
-  read -rp  "Контакт поддержки, например @my_support (можно пусто): " SUP
   umask 077
   cat > "$ENV_FILE" <<ENV
-SITORA_NAME=$NAME
-SITORA_BOT_TOKEN=$TOKEN
-SITORA_ADMIN_IDS=$ADMINS
+SITORA_NAME=${SITORA_NAME:-Sitora}
+SITORA_BOT_TOKEN=
+SITORA_ADMIN_IDS=
 SITORA_BASE_URL=https://$DOMAIN/$SECRET
 SITORA_DB=data/sitora.db
-SITORA_FAZER_KEY=$FKEY
+SITORA_FAZER_KEY=
 SITORA_FAZER_URL=https://reseller.fazercards.com/api/v2
-SITORA_OPENAI_KEY=$OKEY
-SITORA_SUPPORT=$SUP
+SITORA_OPENAI_KEY=
+SITORA_SUPPORT=
 ENV
   chown $APP_USER:$APP_USER "$ENV_FILE"; chmod 600 "$ENV_FILE"
-  unset TOKEN FKEY OKEY
+fi
+
+# 1) токен бота — вводится скрыто, проверяется сразу
+if [ -z "$(env_get SITORA_BOT_TOKEN)" ]; then
+  say "Токен бота"
+  while :; do
+    read -rsp "Вставьте токен бота от @BotFather (на экране не видно) и нажмите Enter: " TOKEN; echo
+    TOKEN=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
+    [ -n "$TOKEN" ] && TG_TOKEN="$TOKEN" python3 - <<'PY2' && break
+import json, os, sys, urllib.request
+try:
+    r = json.load(urllib.request.urlopen(f"https://api.telegram.org/bot{os.environ['TG_TOKEN']}/getMe", timeout=15))
+    print("✅ Бот:", "@" + r["result"]["username"])
+except Exception:
+    print("❌ Токен не подошёл, попробуйте ещё раз."); sys.exit(1)
+PY2
+  done
+  set_env SITORA_BOT_TOKEN "$TOKEN"; unset TOKEN
+fi
+
+# 2) админ — ваш ID берётся сам, когда вы нажмёте /start в боте
+if [ -z "$(env_get SITORA_ADMIN_IDS)" ]; then
+  say "Ваш Telegram ID"
+  systemctl stop sitora 2>/dev/null || true        # чтобы бот не перехватил ваше нажатие
+  ADMIN=$(TG_TOKEN="$(env_get SITORA_BOT_TOKEN)" python3 "$APP_DIR/sitora/deploy/wait_start.py")
+  set_env SITORA_ADMIN_IDS "$ADMIN"
 fi
 BASE=$(grep -oP '^SITORA_BASE_URL=\K.*' "$ENV_FILE")
 
@@ -93,5 +123,5 @@ say "Скрытый адрес на домене Donatix"
 bash "$APP_DIR/sitora/deploy/nginx-path.sh"
 
 sleep 2
-systemctl is-active --quiet sitora && echo "✅ Готово. Откройте бота и нажмите /start. Адрес мини-приложения (для @BotFather): $BASE/app" \
+systemctl is-active --quiet sitora && printf '\n✅ Готово. В боте нажмите /start, потом /admin.\n   Адрес мини-приложения (для @BotFather): %s/app\n   Ключ поставщика потом: sudo bash %s/sitora/deploy/set-key.sh\n' "$BASE" "$APP_DIR" \
   || { echo "❌ Служба не запустилась:"; journalctl -u sitora -n 30 --no-pager; }
