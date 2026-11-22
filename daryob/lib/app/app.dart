@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/notifications/local_alerts.dart';
-import '../features/conversations/application/chat_alerts.dart';
+import '../features/notifications/application/server_alerts.dart';
 import '../features/settings/application/settings_controller.dart';
 import '../features/settings/domain/app_settings.dart';
 import '../shared/providers/core_providers.dart';
@@ -23,8 +23,9 @@ class DaryobApp extends ConsumerWidget {
     final settings = ref.watch(settingsControllerProvider);
     final config = ref.watch(appConfigProvider);
     final router = ref.watch(routerProvider);
-    // System notifications for new chat messages; tapping one opens the chat.
-    ref.watch(chatAlertsProvider);
+    // Phone notifications for messages, moderation results and support
+    // replies; tapping one opens the related screen.
+    ref.watch(serverAlertsProvider);
     LocalAlerts.instance.onOpen = router.push;
 
     return MaterialApp.router(

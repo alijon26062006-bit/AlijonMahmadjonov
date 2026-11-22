@@ -1710,4 +1710,99 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get showOnMap => 'На карте';
+
+  @override
+  String get placeSearchLabel => 'Город, посёлок или кишлак';
+
+  @override
+  String get placeSearchHint => 'Начните вводить название';
+
+  @override
+  String get placeSearchFailed => 'Не удалось найти — проверьте интернет.';
+
+  @override
+  String get placeNotFound =>
+      'Ничего не найдено. Выберите город или область ниже.';
+
+  @override
+  String get placeCity => 'город';
+
+  @override
+  String get placeTown => 'посёлок';
+
+  @override
+  String get placeVillage => 'кишлак';
+
+  @override
+  String get placeQuarter => 'район города';
+
+  @override
+  String get placeDistrict => 'район';
+
+  @override
+  String get supportContacts => 'Контакты';
+
+  @override
+  String get supportNewTicket => 'Новое обращение';
+
+  @override
+  String get supportSignInBody =>
+      'Войдите, чтобы написать в поддержку и видеть ответы.';
+
+  @override
+  String get supportEmptyTitle => 'Обращений пока нет';
+
+  @override
+  String get supportEmptyBody =>
+      'Опишите проблему — команда DARYOB ответит здесь, и вам придёт уведомление.';
+
+  @override
+  String get supportFillBoth => 'Заполните тему и сообщение';
+
+  @override
+  String get supportSubject => 'Тема';
+
+  @override
+  String get supportMessage => 'Сообщение';
+
+  @override
+  String get supportTeam => 'Поддержка DARYOB';
+
+  @override
+  String get supportReplyTitle => 'Ответ поддержки';
+
+  @override
+  String get ticketOpen => 'Ожидает ответа';
+
+  @override
+  String get ticketAnswered => 'Есть ответ';
+
+  @override
+  String get ticketClosed => 'Закрыто';
+
+  @override
+  String get chatSafetyNote =>
+      'Сообщения автоматически проверяются на мошенничество. Не переводите предоплату и не сообщайте коды из SMS.';
+
+  @override
+  String get publishedPendingTitle => 'Объявление отправлено на проверку';
+
+  @override
+  String get publishedPendingBody =>
+      'Обычно проверка занимает несколько минут. Мы пришлём уведомление, когда объявление появится в поиске.';
+
+  @override
+  String get adminPanel => 'Админ-панель';
+
+  @override
+  String get adminCodeTitle => 'Код администратора';
+
+  @override
+  String get adminCodeHint => 'Введите одноразовый код';
+
+  @override
+  String get adminCodeOk => 'Вы назначены администратором';
+
+  @override
+  String get adminCodeWrong => 'Код неверный или уже использован';
 }

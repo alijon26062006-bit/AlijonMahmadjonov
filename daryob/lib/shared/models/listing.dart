@@ -105,6 +105,10 @@ class Listing {
     this.viewCount,
     this.promotion,
     this.rejectionReason,
+    this.rejectionReasonTg,
+    this.placeId,
+    this.placeName,
+    this.moderation,
     this.schemaId = 'generic.basic',
     this.schemaVersion = 1,
     this.isDemo = false,
@@ -141,6 +145,23 @@ class Listing {
   final int? viewCount;
   final ListingPromotion? promotion;
   final String? rejectionReason;
+
+  /// The rejection reason in Tajik, when the moderator gave one.
+  final String? rejectionReasonTg;
+
+  /// Settlement chosen from the places directory (city, town, village).
+  final int? placeId;
+  final String? placeName;
+
+  /// Moderation verdict (AI or staff). Visible to staff only.
+  final Map<String, Object?>? moderation;
+
+  /// The rejection reason in the user's language.
+  String? rejectionReasonFor(String languageCode) =>
+      languageCode == 'tg' && (rejectionReasonTg ?? '').isNotEmpty
+      ? rejectionReasonTg
+      : rejectionReason;
+
   final String schemaId;
   final int schemaVersion;
 
@@ -208,6 +229,10 @@ class Listing {
       viewCount: viewCount,
       promotion: clearPromotion ? null : (promotion ?? this.promotion),
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectionReasonTg: rejectionReasonTg,
+      placeId: placeId,
+      placeName: placeName,
+      moderation: moderation,
       schemaId: schemaId ?? this.schemaId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
       isDemo: isDemo,
@@ -236,6 +261,10 @@ class Listing {
     'viewCount': viewCount,
     'promotion': promotion?.toJson(),
     'rejectionReason': rejectionReason,
+    'rejectionReasonTg': rejectionReasonTg,
+    'placeId': placeId,
+    'placeName': placeName,
+    'moderation': moderation,
     'schemaId': schemaId,
     'schemaVersion': schemaVersion,
     'isDemo': isDemo,
@@ -280,6 +309,12 @@ class Listing {
               Map<String, dynamic>.from(json['promotion'] as Map),
             ),
       rejectionReason: json['rejectionReason'] as String?,
+      rejectionReasonTg: json['rejectionReasonTg'] as String?,
+      placeId: (json['placeId'] as num?)?.toInt(),
+      placeName: json['placeName'] as String?,
+      moderation: json['moderation'] == null
+          ? null
+          : Map<String, Object?>.from(json['moderation'] as Map),
       schemaId: json['schemaId'] as String? ?? 'generic.basic',
       schemaVersion: (json['schemaVersion'] as num?)?.toInt() ?? 1,
       isDemo: json['isDemo'] as bool? ?? false,

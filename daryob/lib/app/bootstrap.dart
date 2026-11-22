@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../core/backend/backend.dart';
+import '../core/notifications/alerts.dart';
 import '../core/notifications/local_alerts.dart';
 import '../core/security/session_storage.dart';
 import '../features/catalog/application/catalog_providers.dart';
@@ -27,6 +28,7 @@ Future<void> bootstrap() async {
   final database = await HiveLocalDatabase.open();
   final catalog = await _loadCatalog(database);
   await LocalAlerts.instance.initialize();
+  await Alerts.initializeBackground();
   final sessionStorage = SecureSessionStorage();
   final backend = config.isProduction && config.hasServer
       ? await connectBackend(

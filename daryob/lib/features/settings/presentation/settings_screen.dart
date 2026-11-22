@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -8,6 +10,9 @@ import '../../../app/theme/tokens.dart';
 import '../../../shared/providers/core_providers.dart';
 import '../../../shared/widgets/language_selector.dart';
 import '../../../shared/widgets/location_selector.dart';
+import '../../../shared/widgets/toast.dart';
+import '../../admin/admin_repository.dart';
+import '../../authentication/application/session_controller.dart';
 import '../../notifications/domain/app_notification.dart';
 import '../application/settings_controller.dart';
 import '../domain/app_settings.dart';
@@ -96,13 +101,22 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.support_agent_rounded),
             title: Text(l10n.support),
-            onTap: () => context.push(Routes.info('support')),
+            onTap: () => context.push(Routes.support),
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: Text(l10n.terms),
             onTap: () => context.push(Routes.info('terms')),
           ),
+          // The DARYOB team enters a one-time code here once.
+          if (ref.watch(adminRepositoryProvider) != null &&
+              ref.watch(sessionControllerProvider) != null &&
+              ref.watch(staffRoleProvider).value == null)
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: Text(l10n.adminCodeTitle),
+              onTap: () => _enterAdminCode(context, ref),
+            ),
           if (config.isDevelopment)
             ListTile(
               leading: const Icon(Icons.science_outlined),
@@ -130,4 +144,34 @@ class _Header extends StatelessWidget {
     ),
     child: Text(title, style: context.text.titleMedium),
   );
+}
+
+Future<void> _enterAdminCode(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
+  final controller = TextEditingController();
+  final code = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.adminCodeTitle),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        textCapitalization: TextCapitalization.characters,
+        decoration: InputDecoration(hintText: l10n.adminCodeHint),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(l10n.ok)),
+      ],
+    ),
+  );
+  if (code == null || code.trim().isEmpty || !context.mounted) return;
+  try {
+    final ok = await ref.read(adminRepositoryProvider)!.claimAdmin(code);
+    ref.invalidate(staffRoleProvider);
+    if (context.mounted) DaryobToast.show(context, ok ? l10n.adminCodeOk : l10n.adminCodeWrong);
+    if (ok && context.mounted) unawaited(context.push(Routes.admin));
+  } catch (e) {
+    if (context.mounted) DaryobToast.show(context, failureMessage(l10n, e));
+  }
 }

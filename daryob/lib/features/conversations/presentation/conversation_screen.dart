@@ -17,7 +17,7 @@ import '../../../shared/widgets/listing_image.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/toast.dart';
 import '../../authentication/application/session_controller.dart';
-import '../application/chat_alerts.dart';
+import '../../../core/notifications/alerts.dart';
 import '../domain/conversation.dart';
 import 'chats_screen.dart';
 
@@ -58,7 +58,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void initState() {
     super.initState();
-    openConversationId = widget.conversationId;
+    Alerts.openConversationId = widget.conversationId;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref
           .read(conversationRepositoryProvider)
@@ -69,7 +69,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   @override
   void dispose() {
-    if (openConversationId == widget.conversationId) openConversationId = null;
+    if (Alerts.openConversationId == widget.conversationId) Alerts.openConversationId = null;
     _input.dispose();
     super.dispose();
   }
@@ -261,6 +261,17 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 ),
               ),
               const Divider(),
+              if (delivers)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(DaryobSpacing.md, DaryobSpacing.sm, DaryobSpacing.md, 0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.shield_outlined, size: 14, color: context.palette.textSecondary),
+                      const SizedBox(width: DaryobSpacing.xs),
+                      Expanded(child: Text(l10n.chatSafetyNote, style: context.text.labelSmall)),
+                    ],
+                  ),
+                ),
               if (!delivers)
                 Padding(
                   padding: const EdgeInsets.all(DaryobSpacing.sm),
@@ -288,6 +299,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                           itemCount: list.length,
                           itemBuilder: (_, i) {
                             final m = list[list.length - 1 - i];
+                            if (m.isSystem) return _SystemNotice(message: m);
                             return _Bubble(
                               message: m,
                               mine: m.senderId == user?.id,
@@ -430,6 +442,37 @@ class _Composer extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A safety notice from DARYOB, centred between the messages.
+class _SystemNotice extends StatelessWidget {
+  const _SystemNotice({required this.message});
+  final ChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.languageCode == 'tg' && (message.textTg ?? '').isNotEmpty
+        ? message.textTg!
+        : message.text;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DaryobSpacing.sm, horizontal: DaryobSpacing.lg),
+      child: Container(
+        padding: const EdgeInsets.all(DaryobSpacing.md),
+        decoration: BoxDecoration(
+          color: context.palette.warning.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.shield_outlined, size: 18, color: context.palette.warning),
+            const SizedBox(width: DaryobSpacing.sm),
+            Expanded(child: Text(text, style: context.text.bodySmall?.copyWith(color: context.colors.onSurface))),
+          ],
         ),
       ),
     );

@@ -35,6 +35,8 @@ class ListingDraft {
     this.attributes = const {},
     this.photos = const [],
     this.regionId,
+    this.placeId,
+    this.placeName,
     this.addressNote = '',
     this.contactName = '',
     this.contactPhone = '',
@@ -58,6 +60,10 @@ class ListingDraft {
   final Map<String, Object?> attributes;
   final List<String> photos;
   final String? regionId;
+
+  /// Settlement picked from the places directory, if any.
+  final int? placeId;
+  final String? placeName;
   final String addressNote;
   final String contactName;
   final String contactPhone;
@@ -91,6 +97,8 @@ class ListingDraft {
       attributes: Map.of(listing.attributes),
       photos: List.of(listing.photos),
       regionId: listing.regionId,
+      placeId: listing.placeId,
+      placeName: listing.placeName,
       addressNote: listing.addressNote ?? '',
       contactName: listing.contact.name,
       contactPhone: listing.contact.phone,
@@ -111,6 +119,9 @@ class ListingDraft {
     Map<String, Object?>? attributes,
     List<String>? photos,
     String? regionId,
+    int? placeId,
+    String? placeName,
+    bool clearPlace = false,
     String? addressNote,
     String? contactName,
     String? contactPhone,
@@ -131,6 +142,8 @@ class ListingDraft {
       attributes: attributes ?? this.attributes,
       photos: photos ?? this.photos,
       regionId: regionId ?? this.regionId,
+      placeId: clearPlace ? null : (placeId ?? this.placeId),
+      placeName: clearPlace ? null : (placeName ?? this.placeName),
       addressNote: addressNote ?? this.addressNote,
       contactName: contactName ?? this.contactName,
       contactPhone: contactPhone ?? this.contactPhone,
@@ -153,6 +166,8 @@ class ListingDraft {
     'attributes': attributes,
     'photos': photos,
     'regionId': regionId,
+    'placeId': placeId,
+    'placeName': placeName,
     'addressNote': addressNote,
     'contactName': contactName,
     'contactPhone': contactPhone,
@@ -176,6 +191,8 @@ class ListingDraft {
     ),
     photos: List<String>.from(json['photos'] as List? ?? const []),
     regionId: json['regionId'] as String?,
+    placeId: (json['placeId'] as num?)?.toInt(),
+    placeName: json['placeName'] as String?,
     addressNote: json['addressNote'] as String? ?? '',
     contactName: json['contactName'] as String? ?? '',
     contactPhone: json['contactPhone'] as String? ?? '',

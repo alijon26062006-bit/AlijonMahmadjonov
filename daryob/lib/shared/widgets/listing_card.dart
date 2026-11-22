@@ -151,7 +151,10 @@ class DaryobListingCard extends ConsumerWidget {
                     ),
                     Text(
                       [
-                        if (region != null) region.name.of(context),
+                        if (listing.placeName != null)
+                          listing.placeName!
+                        else if (region != null)
+                          region.name.of(context),
                         ageLabel(l10n, listing.sortDate, now),
                       ].join(' · '),
                       maxLines: 1,

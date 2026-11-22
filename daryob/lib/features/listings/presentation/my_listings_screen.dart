@@ -232,7 +232,7 @@ class _MyListingTile extends ConsumerWidget {
                   listing.rejectionReason != null) ...[
                 const SizedBox(height: DaryobSpacing.sm),
                 DaryobNotice(
-                  message: l10n.rejectedReason(listing.rejectionReason!),
+                  message: l10n.rejectedReason(listing.rejectionReasonFor(context.languageCode)!),
                   tone: NoticeTone.warning,
                 ),
               ],

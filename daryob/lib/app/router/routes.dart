@@ -31,6 +31,13 @@ abstract final class Routes {
   static const safety = '/safety';
   static String info(String page) => '/info/$page';
   static const devTools = '/dev';
+  static const support = '/support';
+  static String supportTicket(String id) => '/support/$id';
+  static const admin = '/admin';
+  static String adminListing(String id) => '/admin/listing/$id';
+  static String adminUser(String id) => '/admin/user/$id';
+  static String adminTicket(String id) => '/admin/ticket/$id';
+  static String adminConversation(String id) => '/admin/chat/$id';
 }
 
 /// Static information pages.

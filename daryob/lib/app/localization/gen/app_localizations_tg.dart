@@ -1697,4 +1697,99 @@ class AppLocalizationsTg extends AppLocalizations {
 
   @override
   String get showOnMap => 'Дар харита';
+
+  @override
+  String get placeSearchLabel => 'Шаҳр, шаҳрак ё деҳа';
+
+  @override
+  String get placeSearchHint => 'Номро нависед';
+
+  @override
+  String get placeSearchFailed => 'Ёфтан нашуд — интернетро санҷед.';
+
+  @override
+  String get placeNotFound =>
+      'Чизе ёфт нашуд. Шаҳр ё вилоятро дар поён интихоб кунед.';
+
+  @override
+  String get placeCity => 'шаҳр';
+
+  @override
+  String get placeTown => 'шаҳрак';
+
+  @override
+  String get placeVillage => 'деҳа';
+
+  @override
+  String get placeQuarter => 'маҳалла';
+
+  @override
+  String get placeDistrict => 'ноҳия';
+
+  @override
+  String get supportContacts => 'Тамос';
+
+  @override
+  String get supportNewTicket => 'Муроҷиати нав';
+
+  @override
+  String get supportSignInBody =>
+      'Ворид шавед, то ба дастгирӣ нависед ва ҷавобҳоро бинед.';
+
+  @override
+  String get supportEmptyTitle => 'Ҳоло муроҷиат нест';
+
+  @override
+  String get supportEmptyBody =>
+      'Мушкилотро нависед — дастаи DARYOB дар ин ҷо ҷавоб медиҳад ва ба шумо огоҳинома меояд.';
+
+  @override
+  String get supportFillBoth => 'Мавзӯъ ва паёмро пур кунед';
+
+  @override
+  String get supportSubject => 'Мавзӯъ';
+
+  @override
+  String get supportMessage => 'Паём';
+
+  @override
+  String get supportTeam => 'Дастгирии DARYOB';
+
+  @override
+  String get supportReplyTitle => 'Ҷавоби дастгирӣ';
+
+  @override
+  String get ticketOpen => 'Интизори ҷавоб';
+
+  @override
+  String get ticketAnswered => 'Ҷавоб ҳаст';
+
+  @override
+  String get ticketClosed => 'Пӯшида';
+
+  @override
+  String get chatSafetyNote =>
+      'Паёмҳо ба таври худкор барои қаллобӣ санҷида мешаванд. Пешпардохт накунед ва рамзҳои SMS-ро нагӯед.';
+
+  @override
+  String get publishedPendingTitle => 'Эълон барои санҷиш фиристода шуд';
+
+  @override
+  String get publishedPendingBody =>
+      'Одатан санҷиш чанд дақиқа мегирад. Вақте ки эълон дар ҷустуҷӯ пайдо шавад, огоҳинома мефиристем.';
+
+  @override
+  String get adminPanel => 'Панели идоракунӣ';
+
+  @override
+  String get adminCodeTitle => 'Рамзи администратор';
+
+  @override
+  String get adminCodeHint => 'Рамзи якдафъаинаро ворид кунед';
+
+  @override
+  String get adminCodeOk => 'Шумо администратор таъин шудед';
+
+  @override
+  String get adminCodeWrong => 'Рамз нодуруст аст ё аллакай истифода шудааст';
 }

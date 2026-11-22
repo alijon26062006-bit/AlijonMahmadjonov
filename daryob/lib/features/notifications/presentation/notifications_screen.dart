@@ -109,7 +109,14 @@ class NotificationsScreen extends ConsumerWidget {
                             .read(notificationRepositoryProvider)
                             .markRead(n.id);
                         ref.invalidate(notificationsProvider);
-                        if (n.listingId != null && context.mounted) {
+                        if (!context.mounted) return;
+                        final chat = n.params['conversationId'];
+                        final ticket = n.params['ticketId'];
+                        if (chat != null) {
+                          context.push(Routes.conversation(chat));
+                        } else if (ticket != null) {
+                          context.push(Routes.supportTicket(ticket));
+                        } else if (n.listingId != null) {
                           context.push(Routes.listing(n.listingId!));
                         }
                       },

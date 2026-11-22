@@ -297,6 +297,10 @@ class ServerListingRepository implements ListingRepository {
     'viewCount': row['view_count'],
     'promotion': row['promotion'],
     'rejectionReason': row['rejection_reason'],
+    'rejectionReasonTg': row['rejection_reason_tg'],
+    'placeId': row['place_id'],
+    'placeName': row['place_name'],
+    'moderation': row['moderation'],
     'schemaId': row['schema_id'],
     'schemaVersion': row['schema_version'],
     'isDemo': false,
@@ -323,6 +327,8 @@ class ServerListingRepository implements ListingRepository {
       'photos': photos,
       'region_id': draft.regionId,
       'address_note': note.isEmpty ? null : note,
+      'place_id': draft.placeId,
+      'place_name': draft.placeName,
       // A hidden number is not stored in the public row at all.
       'contact': {
         'name': draft.contactName.trim(),

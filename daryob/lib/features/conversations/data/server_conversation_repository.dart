@@ -57,14 +57,35 @@ class ServerConversationRepository implements ConversationRepository {
   Future<List<ChatMessage>> messages(String conversationId) {
     if (!isServerId(conversationId)) return Future.value(const []);
     return backendCall(() async {
-      // The latest 300 messages, shown oldest first.
+      // The latest 300 messages, shown oldest first, with DARYOB's safety
+      // notices in between.
       final rows = await _client
           .from('messages')
           .select()
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: false)
           .limit(300);
-      return [for (final row in rows.reversed) _message(row)];
+      final notices = await _client
+          .from('chat_notices')
+          .select()
+          .eq('conversation_id', conversationId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      final all = [
+        for (final row in rows) _message(row),
+        for (final n in notices)
+          ChatMessage(
+            id: n['id'] as String,
+            conversationId: conversationId,
+            senderId: '',
+            text: n['text_ru'] as String? ?? '',
+            textTg: n['text_tg'] as String?,
+            sentAt: DateTime.parse(n['created_at'] as String).toLocal(),
+            state: DeliveryState.delivered,
+            isSystem: true,
+          ),
+      ]..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      return all;
     });
   }
 
@@ -150,6 +171,17 @@ class ServerConversationRepository implements ConversationRepository {
         channel = _client.channel('chat-${conversationId ?? ownerId}-${uuidV4()}');
         if (conversationId != null) {
           channel.onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'chat_notices',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'conversation_id',
+              value: conversationId,
+            ),
+            callback: ping,
+          );
+          channel.onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'messages',
@@ -204,6 +236,11 @@ class ServerConversationRepository implements ConversationRepository {
     senderId: row['sender_id'] as String,
     text: row['text'] as String? ?? '',
     sentAt: DateTime.parse(row['created_at'] as String).toLocal(),
-    state: row['read_at'] != null ? DeliveryState.read : DeliveryState.sent,
+    // A message hidden by the safety check never reached the other person.
+    state: row['hidden'] == true
+        ? DeliveryState.failed
+        : row['read_at'] != null
+        ? DeliveryState.read
+        : DeliveryState.sent,
   );
 }

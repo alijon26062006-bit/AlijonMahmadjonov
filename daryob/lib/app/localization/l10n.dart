@@ -182,7 +182,12 @@ String notificationKindLabel(AppLocalizations l10n, NotificationKind kind) =>
     ),
     NotificationKind.listingRejected => (
       l10n.notifRejectedTitle,
-      l10n.notifRejectedBody(title),
+      [
+        l10n.notifRejectedBody(title),
+        ?(l10n.localeName == 'tg' && (n.params['reason_tg'] ?? '').isNotEmpty
+            ? n.params['reason_tg']
+            : n.params['reason']),
+      ].join('\n'),
     ),
     NotificationKind.listingExpiring => (
       l10n.notifExpiringTitle,
@@ -202,6 +207,7 @@ String notificationKindLabel(AppLocalizations l10n, NotificationKind kind) =>
         l10n.notifSavedLocallyBody(title),
       ),
       'status_changed' => (l10n.notifStatusTitle, l10n.notifStatusBody(title)),
+      'support_reply' => (l10n.supportReplyTitle, n.params['body'] ?? ''),
       // A message written by the platform arrives with its own text.
       _ when title.isNotEmpty && n.params['body'] != null => (title, n.params['body']!),
       _ => (l10n.notifWelcomeTitle, l10n.notifWelcomeBody),

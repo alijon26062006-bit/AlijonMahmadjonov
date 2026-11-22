@@ -18,6 +18,7 @@ import '../../../../shared/widgets/location_selector.dart';
 import '../../../../shared/widgets/photo_picker.dart';
 import '../../../../shared/widgets/states.dart';
 import '../../../catalog/presentation/catalog_ui.dart';
+import '../../../places/places.dart';
 import '../../domain/draft_validator.dart';
 import '../../domain/listing_draft.dart';
 import 'schema_field_input.dart';
@@ -477,6 +478,36 @@ class _LocationStepState extends ConsumerState<LocationStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (ref.watch(placeRepositoryProvider) != null) ...[
+          Text(l10n.placeSearchLabel, style: context.text.labelMedium),
+          const SizedBox(height: DaryobSpacing.sm),
+          PlaceSearchField(
+            onPicked: (place) => widget.update((d) {
+              final attrs = Map<String, Object?>.of(d.attributes);
+              for (final f in schema?.locationFields ?? const <FieldSchema>[]) {
+                attrs.remove(f.key);
+              }
+              return d.copyWith(
+                regionId: place.directoryId,
+                placeId: place.id,
+                placeName: place.name.of(context),
+                attributes: attrs,
+              );
+            }),
+          ),
+          if (draft.placeName != null) ...[
+            const SizedBox(height: DaryobSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: InputChip(
+                avatar: const Icon(Icons.place_rounded, size: 18),
+                label: Text(draft.placeName!),
+                onDeleted: () => widget.update((d) => d.copyWith(clearPlace: true)),
+              ),
+            ),
+          ],
+          const SizedBox(height: DaryobSpacing.lg),
+        ],
         Text('${l10n.location} *', style: context.text.labelMedium),
         const SizedBox(height: DaryobSpacing.sm),
         Material(
@@ -499,7 +530,7 @@ class _LocationStepState extends ConsumerState<LocationStep> {
                   for (final f in schema?.locationFields ?? const <FieldSchema>[]) {
                     attrs.remove(f.key);
                   }
-                  return d.copyWith(regionId: picked, attributes: attrs);
+                  return d.copyWith(regionId: picked, attributes: attrs, clearPlace: true);
                 });
               }
             },

@@ -199,6 +199,7 @@ class _DetailView extends ConsumerWidget {
                 _InfoLine(
                   icon: Icons.place_outlined,
                   text: [
+                    ?listing.placeName,
                     regionPathLabel(context, regions, listing.regionId),
                     if ((listing.addressNote ?? '').isNotEmpty)
                       listing.addressNote!,

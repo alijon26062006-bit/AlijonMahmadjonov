@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/backend/backend.dart';
+import '../../../core/notifications/alerts.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/security/session_storage.dart';
 import '../../../core/utils/formatters.dart';
@@ -157,6 +158,14 @@ class ServerAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() async {
     await _storage.delete(_userCacheKey);
+    // This phone stops receiving the account's notifications.
+    final device = await Alerts.read(Alerts.kDeviceId);
+    if (device != null) {
+      try {
+        await _client.rpc<void>('unregister_device', params: {'p_device': device});
+      } catch (_) {}
+    }
+    await Alerts.cancel();
     try {
       await _client.auth.signOut(scope: SignOutScope.local);
     } catch (_) {

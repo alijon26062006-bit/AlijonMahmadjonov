@@ -593,13 +593,17 @@ class _PublishedView extends StatelessWidget {
                 const DaryobBadgeLogo(size: 88),
                 const SizedBox(height: DaryobSpacing.xl),
                 Text(
-                  l10n.publishedTitle,
+                  listing.status == ListingStatus.pending
+                      ? l10n.publishedPendingTitle
+                      : l10n.publishedTitle,
                   textAlign: TextAlign.center,
                   style: context.text.headlineSmall,
                 ),
                 const SizedBox(height: DaryobSpacing.sm),
                 Text(
-                  listing.isLocalOnly
+                  listing.status == ListingStatus.pending
+                      ? l10n.publishedPendingBody
+                      : listing.isLocalOnly
                       ? l10n.publishedLocalBody
                       : l10n.publishedBody,
                   textAlign: TextAlign.center,

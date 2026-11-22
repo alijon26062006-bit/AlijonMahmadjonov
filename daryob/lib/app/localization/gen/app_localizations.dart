@@ -3127,6 +3127,186 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'На карте'**
   String get showOnMap;
+
+  /// No description provided for @placeSearchLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Город, посёлок или кишлак'**
+  String get placeSearchLabel;
+
+  /// No description provided for @placeSearchHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Начните вводить название'**
+  String get placeSearchHint;
+
+  /// No description provided for @placeSearchFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось найти — проверьте интернет.'**
+  String get placeSearchFailed;
+
+  /// No description provided for @placeNotFound.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ничего не найдено. Выберите город или область ниже.'**
+  String get placeNotFound;
+
+  /// No description provided for @placeCity.
+  ///
+  /// In ru, this message translates to:
+  /// **'город'**
+  String get placeCity;
+
+  /// No description provided for @placeTown.
+  ///
+  /// In ru, this message translates to:
+  /// **'посёлок'**
+  String get placeTown;
+
+  /// No description provided for @placeVillage.
+  ///
+  /// In ru, this message translates to:
+  /// **'кишлак'**
+  String get placeVillage;
+
+  /// No description provided for @placeQuarter.
+  ///
+  /// In ru, this message translates to:
+  /// **'район города'**
+  String get placeQuarter;
+
+  /// No description provided for @placeDistrict.
+  ///
+  /// In ru, this message translates to:
+  /// **'район'**
+  String get placeDistrict;
+
+  /// No description provided for @supportContacts.
+  ///
+  /// In ru, this message translates to:
+  /// **'Контакты'**
+  String get supportContacts;
+
+  /// No description provided for @supportNewTicket.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новое обращение'**
+  String get supportNewTicket;
+
+  /// No description provided for @supportSignInBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Войдите, чтобы написать в поддержку и видеть ответы.'**
+  String get supportSignInBody;
+
+  /// No description provided for @supportEmptyTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обращений пока нет'**
+  String get supportEmptyTitle;
+
+  /// No description provided for @supportEmptyBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Опишите проблему — команда DARYOB ответит здесь, и вам придёт уведомление.'**
+  String get supportEmptyBody;
+
+  /// No description provided for @supportFillBoth.
+  ///
+  /// In ru, this message translates to:
+  /// **'Заполните тему и сообщение'**
+  String get supportFillBoth;
+
+  /// No description provided for @supportSubject.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тема'**
+  String get supportSubject;
+
+  /// No description provided for @supportMessage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сообщение'**
+  String get supportMessage;
+
+  /// No description provided for @supportTeam.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поддержка DARYOB'**
+  String get supportTeam;
+
+  /// No description provided for @supportReplyTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ответ поддержки'**
+  String get supportReplyTitle;
+
+  /// No description provided for @ticketOpen.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ожидает ответа'**
+  String get ticketOpen;
+
+  /// No description provided for @ticketAnswered.
+  ///
+  /// In ru, this message translates to:
+  /// **'Есть ответ'**
+  String get ticketAnswered;
+
+  /// No description provided for @ticketClosed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Закрыто'**
+  String get ticketClosed;
+
+  /// No description provided for @chatSafetyNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сообщения автоматически проверяются на мошенничество. Не переводите предоплату и не сообщайте коды из SMS.'**
+  String get chatSafetyNote;
+
+  /// No description provided for @publishedPendingTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Объявление отправлено на проверку'**
+  String get publishedPendingTitle;
+
+  /// No description provided for @publishedPendingBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обычно проверка занимает несколько минут. Мы пришлём уведомление, когда объявление появится в поиске.'**
+  String get publishedPendingBody;
+
+  /// No description provided for @adminPanel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Админ-панель'**
+  String get adminPanel;
+
+  /// No description provided for @adminCodeTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Код администратора'**
+  String get adminCodeTitle;
+
+  /// No description provided for @adminCodeHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите одноразовый код'**
+  String get adminCodeHint;
+
+  /// No description provided for @adminCodeOk.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы назначены администратором'**
+  String get adminCodeOk;
+
+  /// No description provided for @adminCodeWrong.
+  ///
+  /// In ru, this message translates to:
+  /// **'Код неверный или уже использован'**
+  String get adminCodeWrong;
 }
 
 class _AppLocalizationsDelegate

@@ -13,6 +13,8 @@ class ChatMessage {
     required this.text,
     required this.sentAt,
     required this.state,
+    this.isSystem = false,
+    this.textTg,
   });
 
   final String id;
@@ -21,6 +23,12 @@ class ChatMessage {
   final String text;
   final DateTime sentAt;
   final DeliveryState state;
+
+  /// A safety notice from DARYOB inside the chat (not written by a person).
+  final bool isSystem;
+
+  /// Tajik text of a system notice.
+  final String? textTg;
 
   Map<String, dynamic> toJson() => {
     'id': id,

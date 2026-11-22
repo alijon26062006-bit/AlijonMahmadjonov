@@ -15,6 +15,7 @@ import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/language_selector.dart';
 import '../../../shared/widgets/require_sign_in.dart';
 import '../../../shared/widgets/seller_tile.dart';
+import '../../admin/admin_repository.dart';
 import '../../authentication/application/session_controller.dart';
 import '../../settings/application/settings_controller.dart';
 import '../../settings/domain/app_settings.dart';
@@ -83,6 +84,12 @@ class ProfileScreen extends ConsumerWidget {
               () => context.go(Routes.favorites),
             ),
           ],
+          if (ref.watch(staffRoleProvider).value != null)
+            _Item(
+              Icons.admin_panel_settings_outlined,
+              l10n.adminPanel,
+              () => context.push(Routes.admin),
+            ),
           _Section(l10n.sectionApp),
           _Item(
             Icons.notifications_none_rounded,
@@ -115,7 +122,7 @@ class ProfileScreen extends ConsumerWidget {
           _Item(
             Icons.support_agent_rounded,
             l10n.support,
-            () => context.push(Routes.info('support')),
+            () => context.push(Routes.support),
           ),
           _Item(
             Icons.description_outlined,

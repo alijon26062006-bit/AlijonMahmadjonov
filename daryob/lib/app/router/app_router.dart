@@ -28,7 +28,9 @@ import '../../features/sellers/presentation/business_screen.dart';
 import '../../features/sellers/presentation/seller_profile_screen.dart';
 import '../../features/sellers/presentation/subscription_screen.dart';
 import '../../features/settings/application/settings_controller.dart';
+import '../../features/admin/admin_screens.dart';
 import '../../features/settings/presentation/dev_tools_screen.dart';
+import '../../features/support/support.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../shared/providers/core_providers.dart';
 import '../../shared/widgets/main_shell.dart';
@@ -187,6 +189,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => InfoScreen(page: state.pathParameters['page']!),
       ),
       GoRoute(path: Routes.devTools, builder: (_, _) => const DevToolsScreen()),
+      GoRoute(path: Routes.support, builder: (_, _) => const SupportScreen()),
+      GoRoute(
+        path: '/support/:id',
+        builder: (_, state) => SupportTicketScreen(ticketId: state.pathParameters['id']!),
+      ),
+      GoRoute(path: Routes.admin, builder: (_, _) => const AdminHomeScreen()),
+      GoRoute(
+        path: '/admin/listing/:id',
+        builder: (_, state) => AdminListingScreen(listingId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/admin/user/:id',
+        builder: (_, state) => AdminUserScreen(userId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/admin/ticket/:id',
+        builder: (_, state) => AdminTicketScreen(ticketId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/admin/chat/:id',
+        builder: (_, state) => AdminConversationScreen(conversationId: state.pathParameters['id']!),
+      ),
     ],
   );
 });
