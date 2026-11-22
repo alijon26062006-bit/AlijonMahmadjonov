@@ -16,6 +16,7 @@ abstract final class Collections {
   static const businesses = 'businesses';
   static const reports = 'reports';
   static const meta = 'meta';
+  static const catalog = 'catalog';
 
   static const all = [
     settings,
@@ -30,6 +31,7 @@ abstract final class Collections {
     businesses,
     reports,
     meta,
+    catalog,
   ];
 }
 

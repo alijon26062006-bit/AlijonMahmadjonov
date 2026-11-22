@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../shared/models/listing.dart';
+import 'attribute_filter.dart';
+
+export 'attribute_filter.dart';
 
 enum ListingSort { relevance, newest, priceAsc, priceDesc }
 
@@ -34,8 +37,9 @@ class ListingQuery {
   final int? maxPrice;
   final ListingSort sort;
 
-  /// Schema field key → required value (e.g. {'condition': 'new'}).
-  final Map<String, String> attributeFilters;
+  /// Schema field key → filter (e.g. {'condition': EqualsFilter('new'),
+  /// 'year': RangeFilter(min: 2015)}).
+  final Map<String, AttributeFilter> attributeFilters;
   final bool onlyPromoted;
   final Set<ListingStatus> statuses;
   final Set<String> excludeIds;
@@ -66,7 +70,7 @@ class ListingQuery {
     int? maxPrice,
     bool clearMaxPrice = false,
     ListingSort? sort,
-    Map<String, String>? attributeFilters,
+    Map<String, AttributeFilter>? attributeFilters,
     bool? onlyPromoted,
     Set<String>? excludeIds,
     int? pageSize,
@@ -115,7 +119,7 @@ class ListingQuery {
     maxPrice,
     sort,
     Object.hashAllUnordered(
-      attributeFilters.entries.map((e) => '${e.key}=${e.value}'),
+      attributeFilters.entries.map((e) => Object.hash(e.key, e.value)),
     ),
     onlyPromoted,
     Object.hashAllUnordered(statuses),

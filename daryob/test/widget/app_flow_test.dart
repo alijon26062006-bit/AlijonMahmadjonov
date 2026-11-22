@@ -71,7 +71,7 @@ void main() {
     await tester.tap(find.text('Подать'));
     await pumpFor(tester, const Duration(milliseconds: 500));
     expect(find.byType(CreateListingScreen), findsOneWidget);
-    expect(find.textContaining('Шаг 1 из 6'), findsOneWidget);
+    expect(find.textContaining('Шаг 1 из 8'), findsOneWidget);
   });
 
   testWidgets('browse a category, open a listing, save it to favourites', (
@@ -99,7 +99,9 @@ void main() {
     expect((saved['ids'] as List), hasLength(1));
   });
 
-  testWidgets('create listing: validation blocks empty basics', (tester) async {
+  testWidgets('create listing: category → subcategory → catalog form validation', (
+    tester,
+  ) async {
     final db = MemoryLocalDatabase();
     await seedSettings(db);
     await startApp(tester, db);
@@ -108,19 +110,24 @@ void main() {
     await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('Телефоны и электроника'));
     await pumpFor(tester, const Duration(milliseconds: 500));
-    expect(find.textContaining('Шаг 2 из 6'), findsOneWidget);
+    expect(find.textContaining('Шаг 2 из'), findsOneWidget);
 
+    // Subcategories come from the catalog.
+    expect(find.text('Кнопочные телефоны'), findsOneWidget);
+    await tester.tap(find.text('Смартфоны'));
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(find.textContaining('Шаг 3 из'), findsOneWidget);
+
+    // Brand, model, storage and condition are required by the schema.
     await tester.tap(find.text('Далее'));
     await pumpFor(tester, const Duration(milliseconds: 500));
     expect(find.text('Обязательное поле'), findsWidgets);
-    // Still on the same step.
-    expect(find.textContaining('Шаг 2 из 6'), findsOneWidget);
+    expect(find.textContaining('Шаг 3 из'), findsOneWidget);
 
-    await tester.enterText(find.byType(EditableText).at(0), 'Смартфон 128 ГБ');
+    // The draft is saved automatically with the subcategory.
     await pumpFor(tester, const Duration(milliseconds: 600));
-    // The draft is saved automatically.
     final drafts = db.collection(Collections.drafts).values().toList();
-    expect(drafts.single['title'], 'Смартфон 128 ГБ');
+    expect(drafts.single['categoryId'], 'electronics.smartphones');
   });
 
   testWidgets(

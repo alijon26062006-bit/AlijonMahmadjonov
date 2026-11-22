@@ -10,7 +10,7 @@ import '../../../../app/theme/tokens.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/ids.dart';
 import '../../../../shared/models/category.dart';
-import '../../../../shared/models/category_schema.dart';
+import '../../../catalog/presentation/catalog_ui.dart';
 import '../../../../shared/models/listing.dart';
 import '../../../../shared/models/localized_text.dart';
 import '../../../../shared/models/user.dart';
@@ -91,14 +91,14 @@ class _DetailView extends ConsumerWidget {
       420.0,
     );
 
+    final priceText = listingPriceText(context, ref, listing);
     final characteristics = <(String, String)>[
-      if (category != null) (l10n.category, category.name.of(context)),
-      for (final field in schema.fields)
-        if (field.showInDetails && listing.attributes[field.key] != null)
-          (
-            field.label.of(context),
-            _attributeText(context, field, listing.attributes[field.key]),
-          ),
+      if (category != null)
+        (
+          l10n.category,
+          categories.pathTo(category.id).map((c) => c.name.of(context)).join(' › '),
+        ),
+      ...attributeFormatter(context, ref).characteristics(schema, listing.attributes),
     ];
 
     return Scaffold(
@@ -122,7 +122,7 @@ class _DetailView extends ConsumerWidget {
                 onPressed: () => SharePlus.instance.share(
                   ShareParams(
                     subject: listing.title,
-                    text: _shareText(context, listing, isFree),
+                    text: '${listing.title}\n$priceText\n${l10n.sharedFromDaryob}',
                   ),
                 ),
               ),
@@ -189,16 +189,7 @@ class _DetailView extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: DaryobSpacing.xs),
-                Text(
-                  priceLabel(
-                    l10n,
-                    context.languageCode,
-                    price: listing.price,
-                    currency: listing.currency,
-                    isFreeCategory: isFree,
-                  ),
-                  style: context.text.headlineMedium,
-                ),
+                Text(priceText, style: context.text.headlineMedium),
                 const SizedBox(height: DaryobSpacing.sm),
                 Text(listing.title, style: context.text.titleLarge),
                 const SizedBox(height: DaryobSpacing.md),
@@ -329,44 +320,6 @@ class _DetailView extends ConsumerWidget {
     );
   }
 
-  String _attributeText(
-    BuildContext context,
-    FieldSchema field,
-    Object? value,
-  ) {
-    final l10n = context.l10n;
-    switch (field.type) {
-      case FieldType.singleSelect:
-        return field.optionLabel(value)?.of(context) ?? '$value';
-      case FieldType.multiSelect:
-        final list = value is List ? value : const [];
-        return list
-            .map((v) => field.optionLabel(v)?.of(context) ?? '$v')
-            .join(', ');
-      case FieldType.boolean:
-        return value == true ? l10n.yes : l10n.no;
-      case FieldType.number:
-        final unit = field.unit?.of(context);
-        return unit == null ? '$value' : '$value $unit';
-      case FieldType.text:
-      case FieldType.multilineText:
-      case FieldType.numberRange:
-        return '$value';
-    }
-  }
-
-  String _shareText(BuildContext context, Listing listing, bool isFree) {
-    final l10n = context.l10n;
-    final price = priceLabel(
-      l10n,
-      context.languageCode,
-      price: listing.price,
-      currency: listing.currency,
-      isFreeCategory: isFree,
-    );
-    // No link: public listing URLs exist only once a web domain is set up.
-    return '${listing.title}\n$price\n${l10n.sharedFromDaryob}';
-  }
 }
 
 class _InfoLine extends StatelessWidget {

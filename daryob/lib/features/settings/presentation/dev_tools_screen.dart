@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -11,6 +14,7 @@ import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/toast.dart';
 import '../../authentication/application/session_controller.dart';
+import '../../catalog/application/catalog_providers.dart';
 import '../../listings/application/listing_providers.dart';
 import '../application/settings_controller.dart';
 
@@ -65,6 +69,8 @@ class DevToolsScreen extends ConsumerWidget {
             ),
           ),
           const Divider(),
+          const _CatalogSection(),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.replay_rounded),
             title: Text(l10n.devResetOnboarding),
@@ -110,6 +116,87 @@ class DevToolsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Catalog version, authorized imports and rollback.
+class _CatalogSection extends ConsumerWidget {
+  const _CatalogSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final catalog = ref.watch(catalogProvider);
+    final repo = ref.watch(catalogRepositoryProvider);
+    final installed = repo.installed;
+
+    Future<void> importFromClipboard() async {
+      final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+      Map<String, dynamic>? batch;
+      try {
+        final decoded = text == null ? null : jsonDecode(text);
+        if (decoded is Map<String, dynamic>) batch = decoded;
+      } on FormatException {
+        batch = null;
+      }
+      if (!context.mounted) return;
+      if (batch == null) {
+        DaryobToast.show(context, l10n.devCatalogImportInvalid);
+        return;
+      }
+      final report = await repo.importBatch(batch);
+      ref.read(catalogProvider.notifier).reload();
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.devCatalogImport),
+          content: SingleChildScrollView(
+            child: Text(
+              [
+                l10n.devCatalogImportResult(report.accepted.length, report.rejected.length),
+                ...report.rejected.take(20).map((r) => '$r'),
+              ].join('\n'),
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.ok))],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.category_outlined),
+          title: Text(l10n.devCatalog),
+          subtitle: Text(
+            l10n.devCatalogInfo(
+              catalog.version,
+              catalog.topLevelCount,
+              catalog.subcategoryCount,
+              catalog.appliedImportBatches.length,
+            ),
+          ),
+          trailing: Text(installed?.source ?? '—'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.content_paste_go_outlined),
+          title: Text(l10n.devCatalogImport),
+          subtitle: Text(l10n.devCatalogImportHint),
+          onTap: importFromClipboard,
+        ),
+        ListTile(
+          leading: const Icon(Icons.history_rounded),
+          title: Text(l10n.devCatalogRollback),
+          enabled: repo.previous != null,
+          onTap: () async {
+            final ok = await repo.rollback();
+            ref.read(catalogProvider.notifier).reload();
+            if (context.mounted) DaryobToast.show(context, ok ? l10n.done : l10n.devCatalogNoPrevious);
+          },
+        ),
+      ],
     );
   }
 }

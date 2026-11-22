@@ -3,9 +3,20 @@ import 'package:flutter/foundation.dart';
 import '../../../shared/models/listing.dart';
 import '../../../shared/models/money.dart';
 
-/// Wizard steps in order. Category-specific steps from the schema are shown
-/// between [basics] and [photos].
-enum DraftStep { category, basics, photos, location, contact, preview }
+/// Wizard steps in order (catalog `global_workflow.steps`): category →
+/// subcategory → characteristics (deal type and conditional fields) →
+/// title/description/price → photos → location → contact → preview.
+/// Category-specific steps from a schema's `extraSteps` follow [details].
+enum DraftStep {
+  category,
+  subcategory,
+  details,
+  basics,
+  photos,
+  location,
+  contact,
+  preview,
+}
 
 /// Everything the create/edit wizard collects. Saved after every change so
 /// nothing is lost when the user leaves the screen.
@@ -85,7 +96,7 @@ class ListingDraft {
       contactPhone: listing.contact.phone,
       phoneVisibility: listing.contact.phoneVisibility,
       chatEnabled: listing.contact.chatEnabled,
-      step: DraftStep.basics,
+      step: DraftStep.details,
       updatedAt: now,
     );
   }
@@ -172,9 +183,9 @@ class ListingDraft {
       json['phoneVisibility'] as String? ?? PhoneVisibility.visible.name,
     ),
     chatEnabled: json['chatEnabled'] as bool? ?? true,
-    step: DraftStep.values.byName(
-      json['step'] as String? ?? DraftStep.category.name,
-    ),
+    step:
+        DraftStep.values.asNameMap()[json['step'] as String?] ??
+        DraftStep.category,
     updatedAt:
         DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
   );

@@ -55,6 +55,7 @@ String? validationMessage(
   String? code, {
   int? min,
   int? max,
+  String? other,
 }) {
   if (code == null) return null;
   return switch (code) {
@@ -68,8 +69,11 @@ String? validationMessage(
     ValidationCode.invalidPhone => l10n.valInvalidPhone,
     ValidationCode.invalidCode => l10n.valInvalidCode,
     ValidationCode.tooManyPhotos => l10n.valTooManyPhotos(
-      ListingLimits.photosMax,
+      max ?? ListingLimits.photosMax,
     ),
+    ValidationCode.tooFewPhotos => l10n.photosRequired(min ?? 1),
+    ValidationCode.notAboveOther =>
+      other == null ? l10n.valOutOfRange : l10n.valNotAboveOther(other),
     _ => l10n.valRequired,
   };
 }

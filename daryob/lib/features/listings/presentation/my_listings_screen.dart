@@ -16,6 +16,7 @@ import '../../../shared/widgets/listing_image.dart';
 import '../../../shared/widgets/require_sign_in.dart';
 import '../../../shared/widgets/states.dart';
 import '../../authentication/application/session_controller.dart';
+import '../../catalog/presentation/catalog_ui.dart';
 import '../application/listing_actions.dart';
 import '../application/listing_providers.dart';
 import 'drafts_screen.dart';
@@ -195,14 +196,7 @@ class _MyListingTile extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          priceLabel(
-                            l10n,
-                            context.languageCode,
-                            price: listing.price,
-                            currency: listing.currency,
-                            isFreeCategory:
-                                category?.priceMode == PriceMode.free,
-                          ),
+                          listingPriceText(context, ref, listing),
                           style: context.text.titleMedium,
                         ),
                         const SizedBox(height: DaryobSpacing.xs),

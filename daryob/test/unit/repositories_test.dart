@@ -97,7 +97,11 @@ void main() {
     test('free category stores price 0 and ignores typed price', () async {
       final repo = listingRepo(db);
       final listing = await repo.publish(
-        validDraft(categoryId: 'free', price: ''),
+        validDraft(
+          categoryId: 'free.books',
+          price: '',
+          attributes: const {'condition': 'used', 'pickup': true},
+        ),
         ownerId: 'o',
       );
       expect(listing.price, 0);
@@ -117,7 +121,8 @@ void main() {
         validDraft(
           id: 'c',
           title: 'Диван для гостиной',
-          categoryId: 'home-furniture',
+          categoryId: 'home-furniture.sofas',
+          attributes: const {'type': 'sofa', 'condition': 'new'},
           price: '3000',
           regionId: 'kulob',
         ),
@@ -146,9 +151,32 @@ void main() {
       expect(text.items.single.price, 9000);
 
       final condition = await repo.search(
-        const ListingQuery(attributeFilters: {'condition': 'new'}),
+        const ListingQuery(attributeFilters: {'condition': EqualsFilter('new')}),
       );
-      expect(condition.items, isEmpty);
+      expect(condition.items.single.title, 'Диван для гостиной');
+
+      final anyCondition = await repo.search(
+        const ListingQuery(
+          attributeFilters: {'condition': AnyOfFilter({'used', 'like_new'})},
+        ),
+      );
+      expect(anyCondition.total, 2);
+
+      final iphones = await repo.search(
+        const ListingQuery(
+          categoryId: 'electronics.smartphones',
+          attributeFilters: {
+            'brand_id': EqualsFilter('apple'),
+            'storage_gb': RangeFilter(min: 64, max: 256),
+          },
+        ),
+      );
+      expect(iphones.total, 2);
+
+      final bigStorage = await repo.search(
+        const ListingQuery(attributeFilters: {'storage_gb': RangeFilter(min: 256)}),
+      );
+      expect(bigStorage.items, isEmpty);
     });
 
     test('paginates', () async {
@@ -178,6 +206,23 @@ void main() {
       expect(all.items.first.isVipAt(fixedNow), isTrue);
       await seeder.removeDemoData();
       expect((await repo.search(const ListingQuery())).items, isEmpty);
+    });
+
+    test('demo seed uses catalog subcategories and valid attributes', () async {
+      await DemoSeeder(db, () => fixedNow).seed();
+      final schemas = testSchemas();
+      final categories = testCategories();
+      final all = await listingRepo(db).search(const ListingQuery(pageSize: 100));
+      expect(all.items, hasLength(16));
+      for (final l in all.items) {
+        expect(categories.byId(l.categoryId)?.parentId, isNotNull, reason: l.categoryId);
+        final schema = schemas.schemaFor(l.schemaId);
+        expect(schema.id, l.categoryId, reason: l.title);
+        final keys = schema.fields.map((f) => f.key).toSet();
+        expect(keys, containsAll(l.attributes.keys), reason: l.categoryId);
+        expect(schemas.validate(l.schemaId, l.attributes, now: fixedNow), isEmpty, reason: l.categoryId);
+        expect(l.currency.code, 'TJS');
+      }
     });
   });
 

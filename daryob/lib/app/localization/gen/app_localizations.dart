@@ -2785,6 +2785,240 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'{count} дн. назад'**
   String ageDays(int count);
+
+  /// No description provided for @salaryNotSpecified.
+  ///
+  /// In ru, this message translates to:
+  /// **'Зарплата не указана'**
+  String get salaryNotSpecified;
+
+  /// No description provided for @perMonth.
+  ///
+  /// In ru, this message translates to:
+  /// **'/мес'**
+  String get perMonth;
+
+  /// No description provided for @perDay.
+  ///
+  /// In ru, this message translates to:
+  /// **'/сутки'**
+  String get perDay;
+
+  /// No description provided for @pickerSearchHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поиск'**
+  String get pickerSearchHint;
+
+  /// No description provided for @pickerOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет в списке — ввести вручную'**
+  String get pickerOther;
+
+  /// No description provided for @pickerOtherHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите название'**
+  String get pickerOtherHint;
+
+  /// No description provided for @pickerOtherNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Значение сохранится как текст продавца и не будет отмечено как проверенное.'**
+  String get pickerOtherNote;
+
+  /// No description provided for @catalogNotLoaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Справочник для этого поля ещё не загружен — введите значение вручную.'**
+  String get catalogNotLoaded;
+
+  /// No description provided for @stepSubcategory.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подкатегория'**
+  String get stepSubcategory;
+
+  /// No description provided for @stepDetails.
+  ///
+  /// In ru, this message translates to:
+  /// **'Характеристики'**
+  String get stepDetails;
+
+  /// No description provided for @tagsHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Через запятую'**
+  String get tagsHint;
+
+  /// No description provided for @mapPinComingSoon.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отметка на карте появится после подключения карт. Укажите город и район.'**
+  String get mapPinComingSoon;
+
+  /// No description provided for @atLeast.
+  ///
+  /// In ru, this message translates to:
+  /// **'от {value}'**
+  String atLeast(String value);
+
+  /// No description provided for @modelsUnverifiedNote.
+  ///
+  /// In ru, this message translates to:
+  /// **'Список моделей — стартовый и не проверен производителем. Если модели нет, введите её вручную.'**
+  String get modelsUnverifiedNote;
+
+  /// No description provided for @verifiedSource.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверено: {source}'**
+  String verifiedSource(String source);
+
+  /// No description provided for @variantNotVerified.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверенных вариантов для этой модели пока нет — укажите значение вручную.'**
+  String get variantNotVerified;
+
+  /// No description provided for @modelFreeText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сначала выберите марку или введите модель вручную'**
+  String get modelFreeText;
+
+  /// No description provided for @choose.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выбрать'**
+  String get choose;
+
+  /// No description provided for @notInCatalog.
+  ///
+  /// In ru, this message translates to:
+  /// **'введено вручную'**
+  String get notInCatalog;
+
+  /// No description provided for @chooseSubcategoryError.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите подкатегорию'**
+  String get chooseSubcategoryError;
+
+  /// No description provided for @noCharacteristics.
+  ///
+  /// In ru, this message translates to:
+  /// **'Для этой подкатегории дополнительных характеристик нет.'**
+  String get noCharacteristics;
+
+  /// No description provided for @catalogStarterNotice.
+  ///
+  /// In ru, this message translates to:
+  /// **'Справочники брендов и моделей пока стартовые. Если чего-то нет — введите вручную.'**
+  String get catalogStarterNotice;
+
+  /// No description provided for @useTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Использовать: {title}'**
+  String useTitle(String title);
+
+  /// No description provided for @salaryInCharacteristics.
+  ///
+  /// In ru, this message translates to:
+  /// **'Зарплата указывается в характеристиках вакансии.'**
+  String get salaryInCharacteristics;
+
+  /// No description provided for @photosRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нужно минимум {count} фото'**
+  String photosRequired(int count);
+
+  /// No description provided for @vehiclePhotoTips.
+  ///
+  /// In ru, this message translates to:
+  /// **'Снимите машину спереди, сзади, сбоку, салон и приборную панель.'**
+  String get vehiclePhotoTips;
+
+  /// No description provided for @subcategory.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подкатегория'**
+  String get subcategory;
+
+  /// No description provided for @chooseCategoryForFilters.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите категорию, чтобы увидеть её фильтры.'**
+  String get chooseCategoryForFilters;
+
+  /// No description provided for @any.
+  ///
+  /// In ru, this message translates to:
+  /// **'Любой'**
+  String get any;
+
+  /// No description provided for @containsHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Содержит текст'**
+  String get containsHint;
+
+  /// No description provided for @valNotAboveOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не больше, чем «{other}»'**
+  String valNotAboveOther(String other);
+
+  /// No description provided for @devCatalog.
+  ///
+  /// In ru, this message translates to:
+  /// **'Каталог категорий'**
+  String get devCatalog;
+
+  /// No description provided for @devCatalogInfo.
+  ///
+  /// In ru, this message translates to:
+  /// **'Версия {version} · {top} категорий, {sub} подкатегорий · импортов: {batches}'**
+  String devCatalogInfo(String version, int top, int sub, int batches);
+
+  /// No description provided for @devCatalogImport.
+  ///
+  /// In ru, this message translates to:
+  /// **'Импорт проверенных данных'**
+  String get devCatalogImport;
+
+  /// No description provided for @devCatalogImportHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'JSON-пакет из буфера обмена. Записи без источника, даты проверки и лицензии отклоняются.'**
+  String get devCatalogImportHint;
+
+  /// No description provided for @devCatalogImportInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'В буфере нет JSON-пакета импорта'**
+  String get devCatalogImportInvalid;
+
+  /// No description provided for @devCatalogImportResult.
+  ///
+  /// In ru, this message translates to:
+  /// **'Принято: {accepted}. Отклонено: {rejected}.'**
+  String devCatalogImportResult(int accepted, int rejected);
+
+  /// No description provided for @devCatalogRollback.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вернуть предыдущую версию каталога'**
+  String get devCatalogRollback;
+
+  /// No description provided for @devCatalogNoPrevious.
+  ///
+  /// In ru, this message translates to:
+  /// **'Предыдущей версии нет'**
+  String get devCatalogNoPrevious;
 }
 
 class _AppLocalizationsDelegate

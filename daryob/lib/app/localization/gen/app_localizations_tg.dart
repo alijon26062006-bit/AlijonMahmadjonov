@@ -1485,4 +1485,147 @@ class AppLocalizationsTg extends AppLocalizations {
   String ageDays(int count) {
     return '$count рӯз пеш';
   }
+
+  @override
+  String get salaryNotSpecified => 'Музд нишон дода нашудааст';
+
+  @override
+  String get perMonth => '/моҳ';
+
+  @override
+  String get perDay => '/шабонарӯз';
+
+  @override
+  String get pickerSearchHint => 'Ҷустуҷӯ';
+
+  @override
+  String get pickerOther => 'Дар рӯйхат нест — дастӣ ворид кардан';
+
+  @override
+  String get pickerOtherHint => 'Номро ворид кунед';
+
+  @override
+  String get pickerOtherNote =>
+      'Қимат ҳамчун матни фурӯшанда нигоҳ дошта мешавад ва тасдиқшуда ҳисоб намеёбад.';
+
+  @override
+  String get catalogNotLoaded =>
+      'Феҳрист барои ин майдон ҳоло бор нашудааст — қиматро дастӣ ворид кунед.';
+
+  @override
+  String get stepSubcategory => 'Зеркатегория';
+
+  @override
+  String get stepDetails => 'Хусусиятҳо';
+
+  @override
+  String get tagsHint => 'Бо вергул ҷудо кунед';
+
+  @override
+  String get mapPinComingSoon =>
+      'Нишона дар харита пас аз пайвасти харита пайдо мешавад. Шаҳр ва ноҳияро нишон диҳед.';
+
+  @override
+  String atLeast(String value) {
+    return 'аз $value';
+  }
+
+  @override
+  String get modelsUnverifiedNote =>
+      'Рӯйхати моделҳо ибтидоӣ аст ва аз ҷониби истеҳсолкунанда тасдиқ нашудааст. Агар модел набошад, дастӣ ворид кунед.';
+
+  @override
+  String verifiedSource(String source) {
+    return 'Тасдиқшуда: $source';
+  }
+
+  @override
+  String get variantNotVerified =>
+      'Барои ин модел вариантҳои тасдиқшуда ҳоло нест — қиматро дастӣ нишон диҳед.';
+
+  @override
+  String get modelFreeText =>
+      'Аввал брендро интихоб кунед ё моделро дастӣ ворид кунед';
+
+  @override
+  String get choose => 'Интихоб';
+
+  @override
+  String get notInCatalog => 'дастӣ ворид шудааст';
+
+  @override
+  String get chooseSubcategoryError => 'Зеркатегорияро интихоб кунед';
+
+  @override
+  String get noCharacteristics =>
+      'Барои ин зеркатегория хусусиятҳои иловагӣ нест.';
+
+  @override
+  String get catalogStarterNotice =>
+      'Феҳристи брендҳо ва моделҳо ҳоло ибтидоӣ аст. Агар чизе набошад — дастӣ ворид кунед.';
+
+  @override
+  String useTitle(String title) {
+    return 'Истифода бурдан: $title';
+  }
+
+  @override
+  String get salaryInCharacteristics =>
+      'Музд дар хусусиятҳои ҷои корӣ нишон дода мешавад.';
+
+  @override
+  String photosRequired(int count) {
+    return 'Ақаллан $count сурат лозим аст';
+  }
+
+  @override
+  String get vehiclePhotoTips =>
+      'Мошинро аз пеш, қафо, паҳлӯ, салон ва панели асбобҳо акс гиред.';
+
+  @override
+  String get subcategory => 'Зеркатегория';
+
+  @override
+  String get chooseCategoryForFilters =>
+      'Барои дидани филтрҳо категорияро интихоб кунед.';
+
+  @override
+  String get any => 'Ҳар кадом';
+
+  @override
+  String get containsHint => 'Матнро дар бар мегирад';
+
+  @override
+  String valNotAboveOther(String other) {
+    return 'На зиёд аз «$other»';
+  }
+
+  @override
+  String get devCatalog => 'Феҳристи категорияҳо';
+
+  @override
+  String devCatalogInfo(String version, int top, int sub, int batches) {
+    return 'Версияи $version · $top категория, $sub зеркатегория · воридот: $batches';
+  }
+
+  @override
+  String get devCatalogImport => 'Воридоти маълумоти тасдиқшуда';
+
+  @override
+  String get devCatalogImportHint =>
+      'Бастаи JSON аз буфер. Сабтҳо бе манбаъ, санаи санҷиш ва иҷозатнома рад мешаванд.';
+
+  @override
+  String get devCatalogImportInvalid => 'Дар буфер бастаи JSON нест';
+
+  @override
+  String devCatalogImportResult(int accepted, int rejected) {
+    return 'Қабул шуд: $accepted. Рад шуд: $rejected.';
+  }
+
+  @override
+  String get devCatalogRollback => 'Баргардонидани версияи қаблии феҳрист';
+
+  @override
+  String get devCatalogNoPrevious => 'Версияи қаблӣ нест';
 }

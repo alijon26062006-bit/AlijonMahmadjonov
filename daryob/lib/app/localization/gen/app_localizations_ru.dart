@@ -1500,4 +1500,147 @@ class AppLocalizationsRu extends AppLocalizations {
   String ageDays(int count) {
     return '$count дн. назад';
   }
+
+  @override
+  String get salaryNotSpecified => 'Зарплата не указана';
+
+  @override
+  String get perMonth => '/мес';
+
+  @override
+  String get perDay => '/сутки';
+
+  @override
+  String get pickerSearchHint => 'Поиск';
+
+  @override
+  String get pickerOther => 'Нет в списке — ввести вручную';
+
+  @override
+  String get pickerOtherHint => 'Введите название';
+
+  @override
+  String get pickerOtherNote =>
+      'Значение сохранится как текст продавца и не будет отмечено как проверенное.';
+
+  @override
+  String get catalogNotLoaded =>
+      'Справочник для этого поля ещё не загружен — введите значение вручную.';
+
+  @override
+  String get stepSubcategory => 'Подкатегория';
+
+  @override
+  String get stepDetails => 'Характеристики';
+
+  @override
+  String get tagsHint => 'Через запятую';
+
+  @override
+  String get mapPinComingSoon =>
+      'Отметка на карте появится после подключения карт. Укажите город и район.';
+
+  @override
+  String atLeast(String value) {
+    return 'от $value';
+  }
+
+  @override
+  String get modelsUnverifiedNote =>
+      'Список моделей — стартовый и не проверен производителем. Если модели нет, введите её вручную.';
+
+  @override
+  String verifiedSource(String source) {
+    return 'Проверено: $source';
+  }
+
+  @override
+  String get variantNotVerified =>
+      'Проверенных вариантов для этой модели пока нет — укажите значение вручную.';
+
+  @override
+  String get modelFreeText =>
+      'Сначала выберите марку или введите модель вручную';
+
+  @override
+  String get choose => 'Выбрать';
+
+  @override
+  String get notInCatalog => 'введено вручную';
+
+  @override
+  String get chooseSubcategoryError => 'Выберите подкатегорию';
+
+  @override
+  String get noCharacteristics =>
+      'Для этой подкатегории дополнительных характеристик нет.';
+
+  @override
+  String get catalogStarterNotice =>
+      'Справочники брендов и моделей пока стартовые. Если чего-то нет — введите вручную.';
+
+  @override
+  String useTitle(String title) {
+    return 'Использовать: $title';
+  }
+
+  @override
+  String get salaryInCharacteristics =>
+      'Зарплата указывается в характеристиках вакансии.';
+
+  @override
+  String photosRequired(int count) {
+    return 'Нужно минимум $count фото';
+  }
+
+  @override
+  String get vehiclePhotoTips =>
+      'Снимите машину спереди, сзади, сбоку, салон и приборную панель.';
+
+  @override
+  String get subcategory => 'Подкатегория';
+
+  @override
+  String get chooseCategoryForFilters =>
+      'Выберите категорию, чтобы увидеть её фильтры.';
+
+  @override
+  String get any => 'Любой';
+
+  @override
+  String get containsHint => 'Содержит текст';
+
+  @override
+  String valNotAboveOther(String other) {
+    return 'Не больше, чем «$other»';
+  }
+
+  @override
+  String get devCatalog => 'Каталог категорий';
+
+  @override
+  String devCatalogInfo(String version, int top, int sub, int batches) {
+    return 'Версия $version · $top категорий, $sub подкатегорий · импортов: $batches';
+  }
+
+  @override
+  String get devCatalogImport => 'Импорт проверенных данных';
+
+  @override
+  String get devCatalogImportHint =>
+      'JSON-пакет из буфера обмена. Записи без источника, даты проверки и лицензии отклоняются.';
+
+  @override
+  String get devCatalogImportInvalid => 'В буфере нет JSON-пакета импорта';
+
+  @override
+  String devCatalogImportResult(int accepted, int rejected) {
+    return 'Принято: $accepted. Отклонено: $rejected.';
+  }
+
+  @override
+  String get devCatalogRollback => 'Вернуть предыдущую версию каталога';
+
+  @override
+  String get devCatalogNoPrevious => 'Предыдущей версии нет';
 }

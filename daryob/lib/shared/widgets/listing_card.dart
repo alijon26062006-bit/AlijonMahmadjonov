@@ -6,6 +6,7 @@ import '../../app/localization/l10n.dart';
 import '../../app/router/routes.dart';
 import '../../app/theme/tokens.dart';
 import '../../features/favorites/application/favorites_controller.dart';
+import '../../features/catalog/presentation/catalog_ui.dart';
 import '../../features/listings/application/listing_providers.dart';
 import '../../shared/models/category.dart';
 import '../../shared/models/listing.dart';
@@ -39,13 +40,7 @@ class DaryobListingCard extends ConsumerWidget {
     final palette = context.palette;
     final dpr = MediaQuery.devicePixelRatioOf(context);
 
-    final price = priceLabel(
-      l10n,
-      context.languageCode,
-      price: listing.price,
-      currency: listing.currency,
-      isFreeCategory: category?.priceMode == PriceMode.free,
-    );
+    final price = listingPriceText(context, ref, listing);
 
     final card = Material(
       color: context.colors.surface,

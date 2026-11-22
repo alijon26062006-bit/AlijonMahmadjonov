@@ -176,9 +176,11 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     final schema = ref.read(draftValidatorProvider).schemaOf(draft);
     return [
       const _CorePage(DraftStep.category),
-      const _CorePage(DraftStep.basics),
+      const _CorePage(DraftStep.subcategory),
+      const _CorePage(DraftStep.details),
       for (final s in schema?.extraSteps ?? const <FormStepSchema>[])
         _ExtraPage(s),
+      const _CorePage(DraftStep.basics),
       const _CorePage(DraftStep.photos),
       const _CorePage(DraftStep.location),
       const _CorePage(DraftStep.contact),
@@ -455,8 +457,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           label: l10n.next,
                           onPressed:
                               page is _CorePage &&
-                                  page.step == DraftStep.category &&
-                                  draft.categoryId == null
+                                  ((page.step == DraftStep.category &&
+                                          draft.categoryId == null) ||
+                                      (page.step == DraftStep.subcategory &&
+                                          ref
+                                              .read(draftValidatorProvider)
+                                              .needsSubcategory(draft)))
                               ? null
                               : _next,
                         ),
@@ -477,6 +483,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
       ),
       _CorePage(:final step) => switch (step) {
         DraftStep.category => l10n.stepCategory,
+        DraftStep.subcategory => l10n.stepSubcategory,
+        DraftStep.details => l10n.stepDetails,
         DraftStep.basics => l10n.stepBasics,
         DraftStep.photos => l10n.stepPhotos,
         DraftStep.location => l10n.stepLocation,
@@ -489,11 +497,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   Widget _buildPage(ListingDraft draft, _Page page) {
     // Keys make each step rebuild its text fields from the draft.
     return switch (page) {
-      _ExtraPage(:final step) => ExtraSchemaStep(
+      _ExtraPage(:final step) => DetailsStep(
         key: ValueKey('extra-${step.id}-${draft.id}'),
         draft: draft,
-        step: step,
-        schema: ref.read(draftValidatorProvider).schemaOf(draft)!,
+        fieldKeys: step.fieldKeys,
         update: _update,
         errors: _errors,
       ),
@@ -502,16 +509,37 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
           draft: draft,
           errors: _errors,
           onPick: (id) {
-            final changed = id != draft.categoryId;
-            _update(
-              (d) => d.copyWith(
-                categoryId: id,
-                // Attributes belong to the old category's schema.
-                attributes: changed ? const {} : d.attributes,
-              ),
-            );
+            final registry = ref.read(categoryRegistryProvider);
+            final currentTop = registry.pathTo(draft.categoryId ?? '').firstOrNull?.id;
+            if (currentTop != id) {
+              // Attributes belong to the old category's schema.
+              _update((d) => d.copyWith(categoryId: id, attributes: const {}));
+            }
             _next();
           },
+        ),
+        DraftStep.subcategory => SubcategoryStep(
+          draft: draft,
+          errors: _errors,
+          onPick: (id) {
+            if (id != draft.categoryId) {
+              final schema = ref
+                  .read(schemaRegistryProvider)
+                  .schemaFor(ref.read(categoryRegistryProvider).byId(id)!.formSchemaId);
+              _update(
+                (d) => d.copyWith(
+                  categoryId: id,
+                  attributes: withPresets(schema, const {}),
+                ),
+              );
+            }
+            _next();
+          },
+        ),
+        DraftStep.details => DetailsStep(
+          draft: draft,
+          update: _update,
+          errors: _errors,
         ),
         DraftStep.basics => BasicsStep(
           key: ValueKey('basics-${draft.id}-${draft.categoryId}'),

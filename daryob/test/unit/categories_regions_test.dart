@@ -1,5 +1,4 @@
 import 'package:daryob/core/utils/validators.dart';
-import 'package:daryob/features/categories/data/initial_categories.dart';
 import 'package:daryob/features/categories/data/tajikistan_regions.dart';
 import 'package:daryob/features/categories/domain/category_registry.dart';
 import 'package:daryob/features/categories/domain/region_directory.dart';
@@ -9,12 +8,15 @@ import 'package:daryob/shared/models/category_schema.dart';
 import 'package:daryob/shared/models/localized_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers.dart';
+
 void main() {
   group('category registry', () {
-    final registry = CategoryRegistry(initialCategories);
+    final registry = testCategories();
+    final initialCategories = testCatalog.categories;
 
-    test('has the 14 Phase 1 categories with stable slugs', () {
-      expect(registry.topLevel.map((c) => c.slug).toList(), [
+    test('has the 14 catalog categories with stable slugs', () {
+      expect(registry.topLevel.map((c) => c.slug).toSet(), {
         'real-estate',
         'vehicles',
         'electronics',
@@ -29,13 +31,15 @@ void main() {
         'agriculture',
         'animals-plants',
         'free',
-      ]);
+      });
     });
 
     test('every category is named in both languages', () {
       for (final c in registry.all) {
         expect(c.name.ru, isNotEmpty, reason: c.slug);
         expect(c.name.tg, isNotEmpty, reason: c.slug);
+      }
+      for (final c in registry.topLevel) {
         expect(c.description.tg, isNotEmpty, reason: c.slug);
       }
     });
@@ -65,8 +69,8 @@ void main() {
         description: LocalizedText(ru: '', tg: ''),
       );
       final extended = CategoryRegistry([...initialCategories, phones]);
-      expect(extended.childrenOf('electronics').single.slug, 'phones');
-      expect(extended.subtreeIds('electronics'), {'electronics', 'phones'});
+      expect(extended.childrenOf('electronics').map((c) => c.slug), contains('phones'));
+      expect(extended.subtreeIds('electronics'), containsAll({'electronics', 'phones'}));
       expect(extended.pathTo('phones').map((c) => c.id), [
         'electronics',
         'phones',
@@ -103,7 +107,7 @@ void main() {
           fields: [
             FieldSchema(
               key: 'year',
-              type: FieldType.number,
+              type: FieldType.integer,
               label: LocalizedText(ru: 'Год', tg: 'Сол'),
               required: true,
               min: 1950,

@@ -10,6 +10,8 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  language:
+    strict-inference: true
   exclude:
     - build/**
     - lib/app/localization/gen/**

@@ -4,7 +4,7 @@ import '../../app/configuration/app_config.dart';
 import '../../core/networking/api_client.dart';
 import '../../core/security/session_storage.dart';
 import '../../core/storage/local_database.dart';
-import '../../features/categories/data/initial_categories.dart';
+import '../../features/catalog/application/catalog_providers.dart';
 import '../../features/categories/data/tajikistan_regions.dart';
 import '../../features/categories/domain/category_registry.dart';
 import '../../features/categories/domain/region_directory.dart';
@@ -38,12 +38,13 @@ final apiClientProvider = Provider<ApiClient?>((ref) {
   );
 });
 
+/// Categories and field schemas come from the versioned catalog.
 final categoryRegistryProvider = Provider<CategoryRegistry>(
-  (ref) => CategoryRegistry(initialCategories),
+  (ref) => CategoryRegistry(ref.watch(catalogProvider).categories),
 );
 
 final schemaRegistryProvider = Provider<SchemaRegistry>(
-  (ref) => SchemaRegistry(),
+  (ref) => SchemaRegistry(ref.watch(catalogProvider).schemas),
 );
 
 final regionDirectoryProvider = Provider<RegionDirectory>(
@@ -54,5 +55,6 @@ final draftValidatorProvider = Provider<DraftValidator>(
   (ref) => DraftValidator(
     ref.watch(categoryRegistryProvider),
     ref.watch(schemaRegistryProvider),
+    clock: ref.watch(clockProvider),
   ),
 );

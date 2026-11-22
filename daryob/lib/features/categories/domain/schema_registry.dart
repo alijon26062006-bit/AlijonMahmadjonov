@@ -2,22 +2,18 @@ import '../../../core/utils/validators.dart';
 import '../../../shared/models/category_schema.dart';
 import '../../../shared/models/localized_text.dart';
 
-/// Ids of the schemas shipped in Phase 1.
+/// Ids of the generic schemas kept for listings created before the catalog
+/// existed (Phase 1). New listings use catalog schemas.
 abstract final class SchemaIds {
-  /// No extra fields. Used by jobs, services, real estate until their own
-  /// modules are written.
   static const basic = 'generic.basic';
-
-  /// Adds "condition: new / used" for physical goods.
   static const goods = 'generic.goods';
 }
 
-/// Holds every category schema. Future category modules call [register]
-/// with their own schema (e.g. `vehicles.v1`) and point their category's
-/// schema ids at it — no screen needs to change.
+/// Holds every field schema: the catalog's (one per category and
+/// subcategory) plus the two legacy generic ones.
 class SchemaRegistry {
   SchemaRegistry([Iterable<CategorySchema> schemas = const []]) {
-    for (final s in [...builtInSchemas, ...schemas]) {
+    for (final s in [...legacySchemas, ...schemas]) {
       register(s);
     }
   }
@@ -27,10 +23,11 @@ class SchemaRegistry {
   void register(CategorySchema schema) => _schemas[schema.id] = schema;
 
   /// Falls back to the basic schema so an unknown id never crashes a screen.
-  CategorySchema schemaFor(String id) =>
-      _schemas[id] ?? _schemas[SchemaIds.basic]!;
+  CategorySchema schemaFor(String id) => _schemas[id] ?? _schemas[SchemaIds.basic]!;
 
   bool contains(String id) => _schemas.containsKey(id);
+
+  Iterable<CategorySchema> get all => _schemas.values;
 
   /// Validates attribute values against a schema.
   /// Returns field key → [ValidationCode].
@@ -40,50 +37,85 @@ class SchemaRegistry {
     String schemaId,
     Map<String, Object?> values, {
     Set<String>? onlyKeys,
+    DateTime? now,
   }) {
     final schema = schemaFor(schemaId);
+    final today = now ?? DateTime.now();
     final errors = <String, String>{};
     for (final field in schema.fields) {
       if (onlyKeys != null && !onlyKeys.contains(field.key)) continue;
       if (!field.isVisible(values)) continue;
       final value = values[field.key];
-      final empty =
-          value == null ||
-          (value is String && value.trim().isEmpty) ||
-          (value is List && value.isEmpty);
-      if (empty) {
+      if (_isEmpty(value)) {
         if (field.required) errors[field.key] = ValidationCode.required;
         continue;
       }
-      switch (field.type) {
-        case FieldType.number:
-          final n = value is num ? value : num.tryParse('$value');
-          if (n == null) {
-            errors[field.key] = ValidationCode.invalidNumber;
-          } else if ((field.min != null && n < field.min!) ||
-              (field.max != null && n > field.max!)) {
-            errors[field.key] = ValidationCode.outOfRange;
-          }
-        case FieldType.singleSelect:
-          if (field.optionLabel(value) == null) {
-            errors[field.key] = ValidationCode.required;
-          }
-        case FieldType.multiSelect:
-          final list = value is List ? value : const [];
-          if (list.any((v) => field.optionLabel(v) == null)) {
-            errors[field.key] = ValidationCode.required;
-          }
-        case FieldType.text:
-        case FieldType.multilineText:
-        case FieldType.boolean:
-        case FieldType.numberRange:
-          break;
-      }
+      final code = _check(schema, field, value!, today);
+      if (code != null) errors[field.key] = code;
+    }
+    for (final rule in schema.crossRules) {
+      if (onlyKeys != null && !onlyKeys.contains(rule.field)) continue;
+      if (errors.containsKey(rule.field)) continue;
+      if (!rule.holds(values)) errors[rule.field] = ValidationCode.notAboveOther;
     }
     return errors;
   }
 
-  static const List<CategorySchema> builtInSchemas = [
+  static bool _isEmpty(Object? value) =>
+      value == null ||
+      (value is String && value.trim().isEmpty) ||
+      (value is List && value.isEmpty);
+
+  static String? _check(CategorySchema schema, FieldSchema field, Object value, DateTime now) {
+    switch (field.type) {
+      case FieldType.integer:
+      case FieldType.number:
+      case FieldType.money:
+        final n = value is num ? value : num.tryParse('$value');
+        if (n == null) return ValidationCode.invalidNumber;
+        if (field.type == FieldType.integer && n != n.roundToDouble()) {
+          return ValidationCode.invalidNumber;
+        }
+        final max = field.maxFor(now);
+        if ((field.min != null && n < field.min!) ||
+            (field.minExclusive != null && n <= field.minExclusive!) ||
+            (max != null && n > max)) {
+          return ValidationCode.outOfRange;
+        }
+        return null;
+      case FieldType.singleSelect:
+      case FieldType.color:
+        final allowed = schema.optionsFor(field).map((o) => o.value);
+        return allowed.contains(value) ? null : ValidationCode.required;
+      case FieldType.multiSelect:
+        final allowed = schema.optionsFor(field).map((o) => o.value).toSet();
+        final list = value is List ? value : const <Object?>[];
+        return list.every(allowed.contains) ? null : ValidationCode.required;
+      case FieldType.boolean:
+        return value is bool ? null : ValidationCode.required;
+      case FieldType.tags:
+        return value is List ? null : ValidationCode.required;
+      case FieldType.text:
+      case FieldType.multilineText:
+      case FieldType.size:
+      case FieldType.brand:
+      case FieldType.model:
+      case FieldType.variant:
+      case FieldType.family:
+      case FieldType.occupation:
+      case FieldType.species:
+      case FieldType.locationChild:
+        final text = '$value'.trim();
+        return text.length > 2000 ? ValidationCode.tooLong : null;
+      case FieldType.geoPoint:
+      case FieldType.numberRange:
+        return null;
+    }
+  }
+
+  /// Schemas for listings created before the catalog. Kept so old listings
+  /// still display and edit.
+  static const List<CategorySchema> legacySchemas = [
     CategorySchema(id: SchemaIds.basic, version: 1),
     CategorySchema(
       id: SchemaIds.goods,

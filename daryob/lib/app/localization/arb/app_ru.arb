@@ -1126,5 +1126,137 @@
         "type": "int"
       }
     }
-  }
+  },
+  "salaryNotSpecified": "Зарплата не указана",
+  "@salaryNotSpecified": {},
+  "perMonth": "/мес",
+  "@perMonth": {},
+  "perDay": "/сутки",
+  "@perDay": {},
+  "pickerSearchHint": "Поиск",
+  "@pickerSearchHint": {},
+  "pickerOther": "Нет в списке — ввести вручную",
+  "@pickerOther": {},
+  "pickerOtherHint": "Введите название",
+  "@pickerOtherHint": {},
+  "pickerOtherNote": "Значение сохранится как текст продавца и не будет отмечено как проверенное.",
+  "@pickerOtherNote": {},
+  "catalogNotLoaded": "Справочник для этого поля ещё не загружен — введите значение вручную.",
+  "@catalogNotLoaded": {},
+  "stepSubcategory": "Подкатегория",
+  "@stepSubcategory": {},
+  "stepDetails": "Характеристики",
+  "@stepDetails": {},
+  "tagsHint": "Через запятую",
+  "@tagsHint": {},
+  "mapPinComingSoon": "Отметка на карте появится после подключения карт. Укажите город и район.",
+  "@mapPinComingSoon": {},
+  "atLeast": "от {value}",
+  "@atLeast": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "modelsUnverifiedNote": "Список моделей — стартовый и не проверен производителем. Если модели нет, введите её вручную.",
+  "@modelsUnverifiedNote": {},
+  "verifiedSource": "Проверено: {source}",
+  "@verifiedSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "variantNotVerified": "Проверенных вариантов для этой модели пока нет — укажите значение вручную.",
+  "@variantNotVerified": {},
+  "modelFreeText": "Сначала выберите марку или введите модель вручную",
+  "@modelFreeText": {},
+  "choose": "Выбрать",
+  "@choose": {},
+  "notInCatalog": "введено вручную",
+  "@notInCatalog": {},
+  "chooseSubcategoryError": "Выберите подкатегорию",
+  "@chooseSubcategoryError": {},
+  "noCharacteristics": "Для этой подкатегории дополнительных характеристик нет.",
+  "@noCharacteristics": {},
+  "catalogStarterNotice": "Справочники брендов и моделей пока стартовые. Если чего-то нет — введите вручную.",
+  "@catalogStarterNotice": {},
+  "useTitle": "Использовать: {title}",
+  "@useTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "salaryInCharacteristics": "Зарплата указывается в характеристиках вакансии.",
+  "@salaryInCharacteristics": {},
+  "photosRequired": "Нужно минимум {count} фото",
+  "@photosRequired": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vehiclePhotoTips": "Снимите машину спереди, сзади, сбоку, салон и приборную панель.",
+  "@vehiclePhotoTips": {},
+  "subcategory": "Подкатегория",
+  "@subcategory": {},
+  "chooseCategoryForFilters": "Выберите категорию, чтобы увидеть её фильтры.",
+  "@chooseCategoryForFilters": {},
+  "any": "Любой",
+  "@any": {},
+  "containsHint": "Содержит текст",
+  "@containsHint": {},
+  "valNotAboveOther": "Не больше, чем «{other}»",
+  "@valNotAboveOther": {
+    "placeholders": {
+      "other": {
+        "type": "String"
+      }
+    }
+  },
+  "devCatalog": "Каталог категорий",
+  "@devCatalog": {},
+  "devCatalogInfo": "Версия {version} · {top} категорий, {sub} подкатегорий · импортов: {batches}",
+  "@devCatalogInfo": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "top": {
+        "type": "int"
+      },
+      "sub": {
+        "type": "int"
+      },
+      "batches": {
+        "type": "int"
+      }
+    }
+  },
+  "devCatalogImport": "Импорт проверенных данных",
+  "@devCatalogImport": {},
+  "devCatalogImportHint": "JSON-пакет из буфера обмена. Записи без источника, даты проверки и лицензии отклоняются.",
+  "@devCatalogImportHint": {},
+  "devCatalogImportInvalid": "В буфере нет JSON-пакета импорта",
+  "@devCatalogImportInvalid": {},
+  "devCatalogImportResult": "Принято: {accepted}. Отклонено: {rejected}.",
+  "@devCatalogImportResult": {
+    "placeholders": {
+      "accepted": {
+        "type": "int"
+      },
+      "rejected": {
+        "type": "int"
+      }
+    }
+  },
+  "devCatalogRollback": "Вернуть предыдущую версию каталога",
+  "@devCatalogRollback": {},
+  "devCatalogNoPrevious": "Предыдущей версии нет",
+  "@devCatalogNoPrevious": {}
 }

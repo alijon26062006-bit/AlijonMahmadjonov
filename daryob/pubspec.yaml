@@ -20,6 +20,7 @@ dependencies:
   flutter_riverpod: ^3.5.0
   go_router: ^18.1.4
   dio: ^5.11.1
+  crypto: ^3.0.6
 
   hive_ce: ^2.24.0
   hive_ce_flutter: ^2.6.0
@@ -41,6 +42,7 @@ flutter:
   generate: true
   assets:
     - assets/config/
+    - assets/catalog/
   fonts:
     - family: Inter
       fonts:

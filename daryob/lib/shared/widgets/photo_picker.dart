@@ -17,6 +17,7 @@ class DaryobPhotoPicker extends StatefulWidget {
     required this.onChanged,
     this.icon = CategoryIcon.generic,
     this.picker,
+    this.max = ListingLimits.photosMax,
   });
 
   final List<String> photos;
@@ -26,6 +27,9 @@ class DaryobPhotoPicker extends StatefulWidget {
   /// Injectable for tests.
   final ImagePicker? picker;
 
+  /// Most photos allowed (from the category schema).
+  final int max;
+
   @override
   State<DaryobPhotoPicker> createState() => _DaryobPhotoPickerState();
 }
@@ -34,7 +38,7 @@ class _DaryobPhotoPickerState extends State<DaryobPhotoPicker> {
   late final ImagePicker _picker = widget.picker ?? ImagePicker();
   bool _busy = false;
 
-  int get _remaining => ListingLimits.photosMax - widget.photos.length;
+  int get _remaining => widget.max - widget.photos.length;
 
   Future<void> _pick(ImageSource source) async {
     if (_remaining <= 0 || _busy) return;
@@ -62,7 +66,7 @@ class _DaryobPhotoPickerState extends State<DaryobPhotoPicker> {
         [
           ...widget.photos,
           ...files.map((f) => f.path),
-        ].take(ListingLimits.photosMax).toList(),
+        ].take(widget.max).toList(),
       );
     } catch (_) {
       if (mounted) {
@@ -113,7 +117,7 @@ class _DaryobPhotoPickerState extends State<DaryobPhotoPicker> {
         ),
         const SizedBox(height: DaryobSpacing.sm),
         Text(
-          l10n.photosCounter(photos.length, ListingLimits.photosMax),
+          l10n.photosCounter(photos.length, widget.max),
           style: context.text.bodySmall,
         ),
         if (photos.isNotEmpty) ...[

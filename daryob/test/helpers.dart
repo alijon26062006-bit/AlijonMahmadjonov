@@ -1,8 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:daryob/app/app.dart';
 import 'package:daryob/app/configuration/app_config.dart';
 import 'package:daryob/core/security/session_storage.dart';
 import 'package:daryob/core/storage/local_database.dart';
-import 'package:daryob/features/categories/data/initial_categories.dart';
+import 'package:daryob/features/catalog/application/catalog_providers.dart';
+import 'package:daryob/features/catalog/data/catalog_parser.dart';
+import 'package:daryob/features/catalog/domain/catalog.dart';
 import 'package:daryob/features/categories/data/tajikistan_regions.dart';
 import 'package:daryob/features/categories/domain/category_registry.dart';
 import 'package:daryob/features/categories/domain/region_directory.dart';
@@ -28,14 +33,24 @@ const prodConfig = AppConfig(
 
 final fixedNow = DateTime(2026, 11, 20, 12);
 
+/// The bundled master catalog, parsed once per test file.
+final CatalogSnapshot testCatalog = const CatalogParser().parse(
+  jsonDecode(File('assets/catalog/daryob_catalog_master_2026.json').readAsStringSync())
+      as Map<String, dynamic>,
+);
+
+CategoryRegistry testCategories() => CategoryRegistry(testCatalog.categories);
+
+SchemaRegistry testSchemas() => SchemaRegistry(testCatalog.schemas);
+
 LocalListingRepository listingRepo(
   LocalDatabase db, {
   DateTime Function()? clock,
 }) {
   return LocalListingRepository(
     database: db,
-    categories: CategoryRegistry(initialCategories),
-    schemas: SchemaRegistry(),
+    categories: testCategories(),
+    schemas: testSchemas(),
     regions: RegionDirectory(tajikistanRegions),
     clock: clock ?? () => fixedNow,
   );
@@ -44,10 +59,16 @@ LocalListingRepository listingRepo(
 /// A draft that passes every validation step.
 ListingDraft validDraft({
   String id = 'd1',
-  String categoryId = 'electronics',
+  String categoryId = 'electronics.smartphones',
   String title = 'Смартфон в отличном состоянии',
   String price = '2500',
   String regionId = 'khujand',
+  Map<String, Object?> attributes = const {
+    'brand_id': 'apple',
+    'model_id': 'apple/iphone-13',
+    'storage_gb': 128,
+    'condition': 'used',
+  },
 }) {
   return ListingDraft(
     id: id,
@@ -56,7 +77,8 @@ ListingDraft validDraft({
     title: title,
     description: 'Полный комплект, коробка и зарядка, без царапин.',
     priceText: price,
-    attributes: const {'condition': 'used'},
+    attributes: attributes,
+    photos: const ['test/photo-1.jpg'],
     regionId: regionId,
     contactName: 'Фарид',
     contactPhone: '93 123 45 67',
@@ -89,6 +111,7 @@ Widget testApp(
     overrides: [
       appConfigProvider.overrideWithValue(config),
       localDatabaseProvider.overrideWithValue(db),
+      initialCatalogProvider.overrideWithValue(testCatalog),
       sessionStorageProvider.overrideWithValue(
         session ?? MemorySessionStorage(),
       ),

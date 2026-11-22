@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# The repository root ignores data/ (bot secrets). Flutter source folders named
+# data/ are code and must be tracked.
+!lib/**/data/
+!test/**/data/

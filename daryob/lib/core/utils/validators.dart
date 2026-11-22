@@ -11,6 +11,10 @@ abstract final class ValidationCode {
   static const invalidPhone = 'invalid_phone';
   static const invalidCode = 'invalid_code';
   static const tooManyPhotos = 'too_many_photos';
+  static const tooFewPhotos = 'too_few_photos';
+
+  /// A value larger than the field it must not exceed (floor > floors).
+  static const notAboveOther = 'not_above_other';
 }
 
 abstract final class ListingLimits {
@@ -19,7 +23,7 @@ abstract final class ListingLimits {
   static const descriptionMin = 20;
   static const descriptionMax = 4000;
   static const priceMax = 999999999;
-  static const photosMax = 10;
+  static const photosMax = 16;
   static const nameMin = 2;
   static const nameMax = 50;
 }
