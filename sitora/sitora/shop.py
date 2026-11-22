@@ -72,24 +72,93 @@ def markup(conn) -> Decimal:
     return Decimal(db.get_setting(conn, "markup", "10"))
 
 
-def catalog(conn: sqlite3.Connection) -> dict[str, Any]:
-    """Что показывать в мини-приложении. Закупочные цены кладёт воркер (refresh_prices)."""
+# ── ручные цены, скрытые и свои пакеты (ставит админ в боте) ──
+# Ключ товара: "stars:500", "premium:3", "gift:<id>". Ручная цена — в дирамах; нет — цена по формуле.
+
+def _json(conn, key: str, default):
+    try:
+        return json.loads(db.get_setting(conn, key, "") or "null") or default
+    except ValueError:
+        return default
+
+
+def fixed_prices(conn) -> dict[str, int]:
+    return {k: int(v) for k, v in _json(conn, "price_fix", {}).items()}
+
+
+def set_fixed(conn, key: str, diram: int | None) -> None:
+    fix = fixed_prices(conn)
+    if diram is None:
+        fix.pop(key, None)
+    else:
+        fix[key] = int(diram)
+    db.set_setting(conn, "price_fix", json.dumps(fix))
+
+
+def hidden(conn) -> set[str]:
+    return set(_json(conn, "hidden", []))
+
+
+def toggle_hidden(conn, key: str) -> bool:
+    h = hidden(conn)
+    h.symmetric_difference_update({key})
+    db.set_setting(conn, "hidden", json.dumps(sorted(h)))
+    return key in h
+
+
+def star_packs(conn) -> list[int]:
+    return sorted({int(q) for q in _json(conn, "star_packs", list(STAR_PACKS))})
+
+
+def set_star_packs(conn, packs) -> None:
+    db.set_setting(conn, "star_packs", json.dumps(sorted({int(q) for q in packs})))
+
+
+def paused(conn) -> bool:
+    return db.get_setting(conn, "paused") == "1"
+
+
+def catalog(conn: sqlite3.Connection, everything: bool = False) -> dict[str, Any]:
+    """Что продаём и почём. Закупочные цены кладёт воркер; админ может поставить свою цену на любой пакет.
+    everything=True — для админа: со скрытыми пакетами и ценой по формуле (auto)."""
     r, m = rate(conn), markup(conn)
+    fix, hide = fixed_prices(conn), hidden(conn)
     out: dict[str, Any] = {"stars": None, "premium": [], "gifts": []}
+
+    def item(key: str, auto: int, **kw) -> dict[str, Any] | None:
+        if key in hide and not everything:
+            return None
+        return {**kw, "key": key, "price": fix.get(key, auto), "auto": auto, "fixed": key in fix, "hidden": key in hide}
+
     star_usd = db.get_setting(conn, "star_usd")
     if star_usd:
         lo, hi = int(db.get_setting(conn, "star_min", "50")), int(db.get_setting(conn, "star_max", "10000"))
         per = Decimal(star_usd)
+        packs = [item(f"stars:{q}", price(per * q, r, m), qty=q, cost_usd=str(per * q)) for q in star_packs(conn) if lo <= q <= hi]
         out["stars"] = {"min": lo, "max": hi, "per_star_diram": float(per * r * (1 + m / 100) * 100),
-                        "packs": [{"qty": q, "price": price(per * q, r, m)} for q in STAR_PACKS if lo <= q <= hi]}
-    for p in json.loads(db.get_setting(conn, "premium", "[]")):
-        out["premium"].append({"months": p["months"], "price": price(Decimal(p["price_usd"]), r, m)})
+                        "packs": [p for p in packs if p]}
+    for p in _json(conn, "premium", []):
+        it = item(f"premium:{p['months']}", price(Decimal(p["price_usd"]), r, m), months=p["months"], cost_usd=str(p["price_usd"]))
+        if it:
+            out["premium"].append(it)
     gift_star = gift_star_price(conn)
-    for g in json.loads(db.get_setting(conn, "gifts", "[]")):
-        out["gifts"].append({"id": g["id"], "stars": g["stars"], "emoji": g.get("emoji", ""),
-                             "anim": g.get("fmt", "") if g.get("file") else "",
-                             "price": int(gift_star * g["stars"])})
+    for g in _json(conn, "gifts", []):
+        it = item(f"gift:{g['id']}", int(gift_star * g["stars"]), id=g["id"], stars=g["stars"], emoji=g.get("emoji", ""),
+                  anim=g.get("fmt", "") if g.get("file") else "")
+        if it:
+            out["gifts"].append(it)
     return out
+
+
+def public_catalog(conn) -> dict[str, Any]:
+    """Для клиентов: без закупочных цен и служебных пометок."""
+    cut = lambda it: {k: v for k, v in it.items() if k not in ("cost_usd", "auto", "fixed", "hidden", "key")}  # noqa: E731
+    c = catalog(conn)
+    if c["stars"]:
+        c["stars"] = {**c["stars"], "packs": [cut(p) for p in c["stars"]["packs"]]}
+    c["premium"] = [cut(p) for p in c["premium"]]
+    c["gifts"] = [cut(g) for g in c["gifts"]]
+    return c
 
 
 def gift_star_price(conn) -> Decimal:
@@ -108,6 +177,9 @@ def stars_price(conn, qty: int) -> int:
     lo, hi = int(db.get_setting(conn, "star_min", "50")), int(db.get_setting(conn, "star_max", "10000"))
     if not lo <= qty <= hi:
         raise ShopError(f"Количество — от {lo} до {hi}. / Миқдор — аз {lo} то {hi}.")
+    key = f"stars:{qty}"
+    if qty in star_packs(conn) and key not in hidden(conn) and key in fixed_prices(conn):
+        return fixed_prices(conn)[key]   # ручная цена пакета
     return price(Decimal(star_usd) * qty, rate(conn), markup(conn))
 
 
@@ -125,13 +197,15 @@ def quote(conn: sqlite3.Connection, item: dict[str, Any]) -> dict[str, Any]:
     kind = item.get("kind")
     if kind == "stars":
         qty = int(item.get("qty") or 0)
-        return {"kind": "stars", "qty": qty, "title": f"{qty} Stars", "price": stars_price(conn, qty)}
+        cost = Decimal(db.get_setting(conn, "star_usd") or 0) * qty
+        return {"kind": "stars", "qty": qty, "title": f"{qty} Stars", "price": stars_price(conn, qty), "cost_usd": str(cost)}
     if kind == "premium":
         months = int(item.get("months") or 0)
         plan = next((p for p in catalog(conn)["premium"] if p["months"] == months), None)
         if not plan:
             raise ShopError("Такого тарифа Premium нет. / Чунин тарифи Premium нест.")
-        return {"kind": "premium", "months": months, "title": f"Premium · {months} мес.", "price": plan["price"]}
+        return {"kind": "premium", "months": months, "title": f"Premium · {months} мес.", "price": plan["price"],
+                "cost_usd": plan["cost_usd"]}
     if kind == "gift":
         g = next((g for g in catalog(conn)["gifts"] if g["id"] == str(item.get("gift_id"))), None)
         if not g:
@@ -143,6 +217,8 @@ def quote(conn: sqlite3.Connection, item: dict[str, Any]) -> dict[str, Any]:
 
 def place_order(conn: sqlite3.Connection, user_id: int, item: dict[str, Any]) -> sqlite3.Row:
     """Списать с баланса и создать заказ. Поставщику его отправит воркер."""
+    if paused(conn):
+        raise ShopError("Магазин на короткой паузе — попробуйте чуть позже. / Мағоза муваққатан таваққуф кардааст.")
     q = quote(conn, item)
     to_self = item.get("kind") == "gift" and not (item.get("to") or "").strip()
     recipient = "" if to_self else clean_username(item.get("to") or "")
@@ -157,10 +233,10 @@ def place_order(conn: sqlite3.Connection, user_id: int, item: dict[str, Any]) ->
             token = None if recipient_id else secrets.token_urlsafe(9)
         cur = conn.execute(
             "INSERT INTO orders (user_id, kind, title, qty, months, gift_id, gift_stars, gift_text, recipient, "
-            "recipient_id, gift_token, price, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "recipient_id, gift_token, price, cost_usd, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (user_id, q["kind"], q["title"], q.get("qty", 1), q.get("months", 0), q.get("gift_id", ""),
              q.get("gift_stars", 0), str(item.get("text") or "")[:120], recipient or (user["username"] or ""),
-             recipient_id, token, q["price"], status, db.now(), db.now()))
+             recipient_id, token, q["price"], q.get("cost_usd", ""), status, db.now(), db.now()))
         oid = cur.lastrowid
         move(conn, user_id, -q["price"], f"Заказ № {oid}: {q['title']}", f"order:{oid}")
     return conn.execute("SELECT * FROM orders WHERE id = ?", (oid,)).fetchone()

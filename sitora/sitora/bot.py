@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import db, shop
+from .botui import Ui
 from .config import ROOT, Config
 from .money import fmt, to_diram
 from .supplier import Supplier
@@ -40,6 +41,8 @@ class Handler:
         self.config, self.bot, self.supplier = config, bot, supplier
         self.conn = db.connect(config.db_path)
         self.username = ""
+        self.ui = Ui(config, bot, self.conn, supplier)
+        config.support = db.get_setting(self.conn, "support") or config.support   # поддержку можно сменить в панели
 
     # ── запуск ──
     def setup(self) -> None:
@@ -49,8 +52,10 @@ class Handler:
         app = self.config.base_url + "/app"
         self.bot.safe("setChatMenuButton", menu_button={"type": "web_app", "text": "Магазин",
                                                           "web_app": {"url": app}})
-        self.bot.safe("setMyCommands", commands=[{"command": "start", "description": "Магазин · Открыть магазин"},
-                                                 {"command": "help", "description": "Ёрӣ · Помощь"}])
+        self.bot.safe("setMyCommands", commands=[{"command": "start", "description": "Меню · Мағоза"},
+                                                 {"command": "orders", "description": "Мои заказы · Фармоишҳо"},
+                                                 {"command": "topup", "description": "Пополнить · Пур кардан"},
+                                                 {"command": "help", "description": "Помощь · Ёрӣ"}])
 
     def open_button(self, text: str = "Открыть магазин · Магазинро кушоед") -> list:
         return [[{"text": text, "web_app": {"url": self.config.base_url + "/app"}}]]
@@ -75,21 +80,54 @@ class Handler:
             sp = msg["successful_payment"]
             self.bot.send(user["id"], f"⭐ Баланс бота пополнен на {sp.get('total_amount')} Stars — подарки можно отправлять.")
             return
+        uid = user["id"]
+        state, data = self.ui.state(uid)
+        if msg.get("photo") or msg.get("document"):
+            return self.on_file(uid, msg, state)
         text = (msg.get("text") or "").strip()
         cmd, _, arg = text.partition(" ")
         cmd = cmd.split("@")[0].lower()
         if cmd == "/start":
+            self.ui.set_state(uid)
             return self.start(user, arg.strip())
-        admin = shop.is_admin(self.conn, self.config, user["id"])
+        admin = shop.is_admin(self.conn, self.config, uid)
+        if not cmd.startswith("/") and state:
+            if admin and self.ui.admin_text(uid, text, state, data):
+                return
+            if self.ui.client_text(uid, text, state, data):
+                return
+        if cmd.startswith("/"):
+            self.ui.set_state(uid)
         if admin and cmd in ("/panel", "/admin"):
-            return self.bot.send(user["id"], "⚙️ Админ-панель: чеки, заказы, карты, цены, клиенты.", self.admin_button())
-        if admin and cmd.startswith("/"):
-            return self.admin(user["id"], cmd, arg.strip())
+            return self.ui.a_home(uid, None)
+        if admin and cmd.startswith("/") and cmd not in ("/help", "/orders", "/topup", "/menu"):
+            return self.admin(uid, cmd, arg.strip())
+        if cmd == "/orders":
+            return self.ui.orders(uid, None)
+        if cmd == "/topup":
+            return self.ui.client(uid, 0, "c:top")
         if cmd == "/help":
-            return self.bot.send(user["id"], "Магазин работает в мини-приложении — кнопка ниже."
-                                 + (f"\nПоддержка: {self.config.support}" if self.config.support else ""),
-                                 self.open_button())
-        self.bot.send(user["id"], "Покупки — в мини-приложении 👇 / Харид — дар мини-барнома 👇", self.open_button())
+            return self.ui.client(uid, 0, "c:help")
+        self.ui.home(uid)
+
+    def on_file(self, uid: int, msg: dict, state: str) -> None:
+        """Фото или PDF чека прямо в чат бота."""
+        if state != "receipt":
+            t = self.ui.t(uid)
+            return self.bot.send(uid, "Чтобы пополнить баланс, нажмите «Пополнить» — потом пришлите чек.",
+                                 [[{"text": t["topup"], "callback_data": "c:top"}]])
+        if msg.get("photo"):
+            file_id = msg["photo"][-1]["file_id"]
+        else:
+            file_id = msg["document"]["file_id"]
+        try:
+            data = self.bot.download(file_id, limit=10 * 1024 * 1024)
+        except TgError:
+            return self.bot.send(uid, "Не удалось получить файл — пришлите чек ещё раз (фото или PDF до 10 МБ).")
+        ext = sniff(data)
+        if not ext:
+            return self.bot.send(uid, "Чек — фото (JPG, PNG, WEBP) или PDF.")
+        self.ui.receipt(uid, data, ext)
 
     def start(self, user: dict, payload: str) -> None:
         got = []
@@ -109,7 +147,11 @@ class Handler:
             self.bot.send(user["id"], "🎁 Вам подарок! Он придёт через несколько секунд.\nБа шумо тӯҳфа! Пас аз чанд сония мерасад.")
             self.bot.safe("sendMessage", chat_id=o["user_id"], text=f"🎁 @{o['recipient']} зашёл в бота — подарок № {o['id']} отправляется.")
         caption = WELCOME.format(name=self.config.name)
-        markup = {"inline_keyboard": self.open_button() + (self.admin_button() if shop.is_admin(self.conn, self.config, user["id"]) else [])}
+        t = self.ui.t(user["id"])
+        markup = {"inline_keyboard": [[{"text": t["stars"], "callback_data": "c:stars"}, {"text": t["premium"], "callback_data": "c:prem"}],
+                                      [{"text": t["gifts"], "callback_data": "c:gifts"}, {"text": t["topup"], "callback_data": "c:top"}],
+                                      [{"text": t["menu"], "callback_data": "c:home"}]] + self.open_button()
+                  + ([[{"text": "⚙️ Админ-панель", "callback_data": "a:home"}]] if shop.is_admin(self.conn, self.config, user["id"]) else [])}
         file_id = db.get_setting(self.conn, "start_photo")
         try:
             if file_id:
@@ -131,6 +173,14 @@ class Handler:
     def on_button(self, cq: dict) -> None:
         who = cq.get("from") or {}
         data = cq.get("data") or ""
+        mid = ((cq.get("message") or {}).get("message_id")) or None
+        if data.startswith("c:") and who.get("id"):
+            self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"])
+            shop.touch_user(self.conn, who)
+            return self.ui.client(who["id"], mid, data)
+        if data.startswith("a:") and shop.is_admin(self.conn, self.config, who.get("id")):
+            self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"])
+            return self.ui.admin(who["id"], mid, data)
         if not shop.is_admin(self.conn, self.config, who.get("id")) or not data.startswith("tp:"):
             self.bot.safe("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
             return
@@ -240,6 +290,50 @@ def finish_topup(config: Config, bot: Bot | None, conn, topup_id: int, ok: bool,
             "❌ Пополнение не подтверждено" + (f": {note}" if note else ": перевод не найден")
             + ". Если это ошибка — напишите в поддержку.\nПардохт тасдиқ нашуд."))
     return t
+
+
+def sniff(data: bytes) -> str | None:
+    if data[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    if data[:5] == b"%PDF-":
+        return "pdf"
+    return None
+
+
+def submit_receipt(config: Config, bot: Bot | None, conn, user_id: int, tid: int, data: bytes, ext: str) -> str:
+    """Чек от клиента (из бота или мини-приложения): проверить, сохранить, отправить админам. Ошибка — ShopError."""
+    import hashlib
+    import secrets
+    from . import receipt
+    t = conn.execute("SELECT * FROM topups WHERE id = ? AND user_id = ?", (tid, user_id)).fetchone()
+    if t is None or t["status"] != "waiting":
+        raise shop.ShopError("Заявка не найдена или уже на проверке.")
+    digest = hashlib.sha256(data).hexdigest()
+    if conn.execute("SELECT 1 FROM topups WHERE receipt_hash = ? AND status IN ('pending','paid')", (digest,)).fetchone():
+        raise shop.ShopError("Этот чек уже присылали. / Ин чек аллакай фиристода шудааст.")
+    ours = "\n".join(r["details"] for r in shop.cards(conn))   # все наши карты: клиент мог перевести на другую нашу
+    seen = receipt.read(config.openai_key, config.receipt_model, data, ext, ours)
+    bad = receipt.refuse(seen, ours)
+    if bad:
+        raise shop.ShopError(bad)
+    folder = Path(config.receipts_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{tid}-{secrets.token_hex(6)}.{ext}"
+    (folder / name).write_bytes(data)
+    note = f"получатель «{seen['recipient']}», сумма {seen.get('amount')} {seen.get('currency')}" if seen else ""
+    done = conn.execute("UPDATE topups SET status = 'pending', receipt_file = ?, receipt_hash = ?, ai_note = ? "
+                        "WHERE id = ? AND status = 'waiting'", (name, digest, note, tid)).rowcount
+    if not done:
+        raise shop.ShopError("Заявка уже на проверке.")
+    if bot is not None:
+        threading.Thread(target=notify_receipt, args=(config, bot, db.connect(config.db_path), tid, data, ext),
+                         daemon=True).start()
+    return (f"Чек получен — проверим и пополним баланс на {fmt(t['amount'])} с. "
+            "/ Чек гирифта шуд — санҷида баланс пур мекунем.")
 
 
 def notify_receipt(config: Config, bot: Bot, conn, topup_id: int, data: bytes, ext: str) -> None:

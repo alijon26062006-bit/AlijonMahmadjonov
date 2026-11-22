@@ -125,7 +125,7 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None, vps=None, 
         return {"ok": True, "name": config.name, "bot": db.get_setting(c, "bot_username"),
                 "user": {"id": u["id"], "first_name": u["first_name"], "username": u["username"], "lang": u["lang"],
                          "balance": c.execute("SELECT balance FROM users WHERE id = ?", (u["id"],)).fetchone()[0]},
-                "catalog": shop.catalog(c), "methods": shop.methods(c), "min_topup": shop.min_topup(c), "support": config.support,
+                "catalog": shop.public_catalog(c), "methods": shop.methods(c), "min_topup": shop.min_topup(c), "support": config.support,
                 "orders": [shop.public_order(o) for o in orders],
                 "admin": shop.is_admin(c, config, u["id"]), "vps": v.enabled(c),
                 "topup": shop.topup_view(c, waiting) if waiting else None}
@@ -184,36 +184,9 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None, vps=None, 
         ext = _sniff(data)
         if not ext:
             raise shop.ShopError("Чек — фото (JPG, PNG, WEBP) или PDF.")
-        c = conn()
-        t = c.execute("SELECT * FROM topups WHERE id = ? AND user_id = ?", (tid, u["id"])).fetchone()
-        if t is None or t["status"] != "waiting":
-            raise shop.ShopError("Заявка не найдена или уже на проверке.")
-        digest = hashlib.sha256(data).hexdigest()
-        if c.execute("SELECT 1 FROM topups WHERE receipt_hash = ? AND status IN ('pending','paid')", (digest,)).fetchone():
-            raise shop.ShopError("Этот чек уже присылали. / Ин чек аллакай фиристода шудааст.")
-        card = c.execute("SELECT details FROM cards WHERE id = ?", (t["card_id"],)).fetchone()
-        ours = "\n".join(r["details"] for r in shop.cards(c))   # все наши карты: клиент мог перевести на другую нашу
-        seen = await _in_thread(receipt.read, config.openai_key, config.receipt_model, data, ext, ours)
-        bad = receipt.refuse(seen, ours)
-        if bad:
-            raise shop.ShopError(bad)
-        folder = Path(config.receipts_dir)
-        folder.mkdir(parents=True, exist_ok=True)
-        name = f"{tid}-{secrets.token_hex(6)}.{ext}"
-        (folder / name).write_bytes(data)
-        note = ""
-        if seen:
-            note = f"получатель «{seen['recipient']}», сумма {seen.get('amount')} {seen.get('currency')}"
-        done = c.execute("UPDATE topups SET status = 'pending', receipt_file = ?, receipt_hash = ?, ai_note = ? "
-                         "WHERE id = ? AND status = 'waiting'", (name, digest, note, tid)).rowcount
-        if not done:
-            raise shop.ShopError("Заявка уже на проверке.")
-        if bot is not None:
-            from .bot import notify_receipt
-            threading.Thread(target=notify_receipt, args=(config, bot, db.connect(config.db_path), tid, data, ext),
-                             daemon=True).start()
-        return {"ok": True, "message": f"Чек получен — проверим и пополним баланс на {fmt(t['amount'])} с. "
-                                       "/ Чек гирифта шуд — санҷида баланс пур мекунем."}
+        from .bot import submit_receipt
+        msg = await _in_thread(submit_receipt, config, bot, db.connect(config.db_path), u["id"], tid, data, ext)
+        return {"ok": True, "message": msg}
 
     # ── админ-панель (только для админов из SITORA_ADMIN_IDS) ──
     def admin(u=Depends(user)) -> dict[str, Any]:

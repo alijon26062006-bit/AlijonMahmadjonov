@@ -33,7 +33,7 @@ def test_init_data_signature():
 
 
 def test_catalog_and_quote(conn):
-    cat = shop.catalog(conn)
+    cat = shop.public_catalog(conn)
     assert [p["qty"] for p in cat["stars"]["packs"]] == [50, 100, 250, 500, 1000, 2500]
     assert cat["premium"][0] == {"months": 3, "price": price(__import__("decimal").Decimal("12"), 11, 10)}
     assert shop.quote(conn, {"kind": "stars", "qty": 100})["price"] == price(__import__("decimal").Decimal("1.5"), 11, 10)
