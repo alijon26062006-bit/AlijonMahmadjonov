@@ -319,7 +319,7 @@ class _CategoryGrid extends ConsumerWidget {
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: MediaQuery.sizeOf(context).width < 340 ? 3 : 4,
-          mainAxisExtent: 76 + 36 * MediaQuery.textScalerOf(context).scale(1),
+          mainAxisExtent: 84 + 36 * MediaQuery.textScalerOf(context).scale(1),
         ),
         delegate: SliverChildBuilderDelegate(
           (context, i) => DaryobCategoryTile(

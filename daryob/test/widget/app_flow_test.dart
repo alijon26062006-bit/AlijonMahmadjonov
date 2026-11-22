@@ -137,6 +137,9 @@ void main() {
       await seedSettings(db);
       await startApp(tester, db, config: prodConfig);
       await pumpFor(tester, const Duration(milliseconds: 500));
+      // The notice sits below the category grid.
+      await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -300));
+      await pumpFor(tester, const Duration(milliseconds: 300));
       expect(
         find.text('Сервер DARYOB ещё не подключён в этой сборке.'),
         findsWidgets,

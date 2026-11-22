@@ -43,6 +43,7 @@ flutter:
   assets:
     - assets/config/
     - assets/catalog/
+    - assets/categories/
   fonts:
     - family: Inter
       fonts:

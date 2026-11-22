@@ -60,6 +60,42 @@ DaryobTint categoryTint(CategoryIcon icon) => switch (icon) {
   return (background: tint.soft, foreground: tint.strong);
 }
 
+/// 3D picture of a top-level category (assets/categories), or null when
+/// the category has none.
+String? categoryArtAsset(CategoryIcon icon) =>
+    icon == CategoryIcon.generic ? null : 'assets/categories/${icon.name}.png';
+
+/// The category's 3D picture; falls back to the line icon when there is no
+/// picture for it.
+class DaryobCategoryArt extends StatelessWidget {
+  const DaryobCategoryArt({super.key, required this.icon, required this.size});
+
+  final CategoryIcon icon;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Icon(
+      categoryIconData(icon),
+      size: size * 0.62,
+      color: categoryColors(context, icon).foreground,
+    );
+    final asset = categoryArtAsset(icon);
+    if (asset == null) return SizedBox.square(dimension: size, child: Center(child: fallback));
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      cacheWidth: (size * dpr).round().clamp(48, 288),
+      excludeFromSemantics: true,
+      errorBuilder: (_, _, _) => SizedBox.square(dimension: size, child: Center(child: fallback)),
+    );
+  }
+}
+
 class DaryobCategoryIcon extends StatelessWidget {
   const DaryobCategoryIcon({super.key, required this.icon, this.size = 52});
 
@@ -68,20 +104,15 @@ class DaryobCategoryIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = categoryColors(context, icon);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: colors.background,
+        color: categoryColors(context, icon).background,
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
       alignment: Alignment.center,
-      child: Icon(
-        categoryIconData(icon),
-        size: size * 0.5,
-        color: colors.foreground,
-      ),
+      child: DaryobCategoryArt(icon: icon, size: size * 0.8),
     );
   }
 }
@@ -115,7 +146,7 @@ class DaryobCategoryTile extends StatelessWidget {
           ),
           child: Column(
             children: [
-              DaryobCategoryIcon(icon: category.icon),
+              DaryobCategoryIcon(icon: category.icon, size: 60),
               const SizedBox(height: DaryobSpacing.sm),
               Flexible(child: _TileLabel(name)),
             ],

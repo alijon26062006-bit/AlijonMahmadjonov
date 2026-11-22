@@ -65,16 +65,20 @@ class _Placeholder extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final side = constraints.biggest.shortestSide;
-        // Thumbnails (chat rows, drafts) only fit the icon itself.
+        final art = broken
+            ? null
+            : (double size) => DaryobCategoryArt(icon: icon, size: size);
+        // Thumbnails (chat rows, drafts) only fit the picture itself.
         if (!side.isFinite || side < 96) {
+          final size = side.isFinite ? side * 0.7 : 28.0;
           return ColoredBox(
             color: colors.background,
             child: Center(
-              child: Icon(glyph, size: side.isFinite ? side * 0.45 : 24, color: colors.foreground),
+              child: art?.call(size) ?? Icon(glyph, size: size * 0.7, color: colors.foreground),
             ),
           );
         }
-        final badge = (side * 0.4).clamp(48.0, 84.0);
+        final picture = (side * 0.56).clamp(64.0, 150.0);
         return ClipRect(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -83,34 +87,26 @@ class _Placeholder extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: [
                   colors.background,
-                  Color.lerp(colors.background, colors.foreground, 0.16)!,
+                  Color.lerp(colors.background, colors.foreground, 0.22)!,
                 ],
               ),
             ),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Oversized echo of the icon, bleeding off the corner.
-                Positioned(
-                  right: -side * 0.18,
-                  bottom: -side * 0.22,
-                  child: Icon(
-                    glyph,
-                    size: side * 0.95,
-                    color: colors.foreground.withValues(alpha: 0.08),
+                // Soft light spot behind the picture so white objects stand out.
+                Center(
+                  child: Container(
+                    width: picture * 1.35,
+                    height: picture * 1.35,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.foreground.withValues(alpha: 0.10),
+                    ),
                   ),
                 ),
                 Center(
-                  child: Container(
-                    width: badge,
-                    height: badge,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(glyph, size: badge * 0.5, color: colors.foreground),
-                  ),
+                  child: art?.call(picture) ?? Icon(glyph, size: picture * 0.6, color: colors.foreground),
                 ),
               ],
             ),
