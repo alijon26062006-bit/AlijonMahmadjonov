@@ -3031,6 +3031,102 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.'**
   String get authNoCodeNotice;
+
+  /// No description provided for @authPhoneBodyTelegram.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мы пришлём код подтверждения в Telegram на этот номер.'**
+  String get authPhoneBodyTelegram;
+
+  /// No description provided for @authCodeTelegramBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Код отправлен в Telegram на {phone}. Откройте чат «Verification Codes».'**
+  String authCodeTelegramBody(String phone);
+
+  /// No description provided for @authTelegramUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось отправить код в Telegram — номер сохранён без подтверждения.'**
+  String get authTelegramUnavailable;
+
+  /// No description provided for @valCodeExpired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Код устарел. Запросите новый.'**
+  String get valCodeExpired;
+
+  /// No description provided for @valCodeTooManyAttempts.
+  ///
+  /// In ru, this message translates to:
+  /// **'Слишком много попыток. Запросите новый код.'**
+  String get valCodeTooManyAttempts;
+
+  /// No description provided for @locateMe.
+  ///
+  /// In ru, this message translates to:
+  /// **'Определить моё местоположение'**
+  String get locateMe;
+
+  /// No description provided for @locateMeHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'По GPS телефона — выберем ближайший город'**
+  String get locateMeHint;
+
+  /// No description provided for @locationServiceOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Геолокация выключена. Включите её в настройках телефона.'**
+  String get locationServiceOff;
+
+  /// No description provided for @locationDenied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступа к местоположению. Выберите город вручную.'**
+  String get locationDenied;
+
+  /// No description provided for @locationDeniedForever.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступ к местоположению запрещён. Разрешите его в настройках приложения.'**
+  String get locationDeniedForever;
+
+  /// No description provided for @locationOutside.
+  ///
+  /// In ru, this message translates to:
+  /// **'Похоже, вы не в Таджикистане. Выберите город вручную.'**
+  String get locationOutside;
+
+  /// No description provided for @locationFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось определить местоположение. Попробуйте ещё раз.'**
+  String get locationFailed;
+
+  /// No description provided for @mapPinHere.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отметить, где я сейчас'**
+  String get mapPinHere;
+
+  /// No description provided for @mapPinSaved.
+  ///
+  /// In ru, this message translates to:
+  /// **'Точка на карте сохранена'**
+  String get mapPinSaved;
+
+  /// No description provided for @mapPinHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Встаньте у объекта и нажмите кнопку — покупатели увидят его на карте.'**
+  String get mapPinHint;
+
+  /// No description provided for @showOnMap.
+  ///
+  /// In ru, this message translates to:
+  /// **'На карте'**
+  String get showOnMap;
 }
 
 class _AppLocalizationsDelegate

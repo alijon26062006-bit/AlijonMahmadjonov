@@ -2,11 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/localization/l10n.dart';
 import '../../../../app/router/routes.dart';
 import '../../../../app/theme/tokens.dart';
+import '../../../../core/location/device_location.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/ids.dart';
 import '../../../../shared/models/category.dart';
@@ -202,6 +204,18 @@ class _DetailView extends ConsumerWidget {
                       listing.addressNote!,
                   ].join(' · '),
                 ),
+                if (_mapPoint(listing) case final point?)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => launchUrl(
+                        mapLink(point),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      label: Text(l10n.showOnMap),
+                    ),
+                  ),
                 _InfoLine(
                   icon: Icons.schedule_rounded,
                   text: l10n.publishedOn(Formatters.date(listing.sortDate)),
@@ -523,27 +537,22 @@ class _HorizontalListings extends ConsumerWidget {
     if (items.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
-    const width = 190.0;
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(child: DaryobSectionHeader(title: title)),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: SliverListingGrid.extentFor(context, width),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: DaryobSpacing.page,
-              ),
-              itemCount: items.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(width: DaryobSpacing.md),
-              itemBuilder: (_, i) =>
-                  DaryobListingCard(listing: items[i], width: width),
-            ),
-          ),
-        ),
+        SliverToBoxAdapter(child: ListingCarousel(listings: items)),
       ],
     );
   }
+}
+
+/// The listing's map point, if the seller marked one.
+(double, double)? _mapPoint(Listing listing) {
+  for (final value in listing.attributes.values) {
+    if (value is String) {
+      final point = parseGeoPoint(value);
+      if (point != null) return point;
+    }
+  }
+  return null;
 }

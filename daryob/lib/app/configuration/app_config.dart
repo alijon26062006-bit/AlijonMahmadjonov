@@ -24,8 +24,8 @@ enum AppEnvironment {
 
 /// Version shown in Settings → About. Keep in sync with `version:` in
 /// pubspec.yaml (a test checks this).
-const String kAppVersion = '0.2.0';
-const int kAppBuildNumber = 2;
+const String kAppVersion = '0.3.0';
+const int kAppBuildNumber = 3;
 
 class AppConfig {
   const AppConfig({

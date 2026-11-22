@@ -1,3 +1,4 @@
+import '../../../core/location/device_location.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/models/category_schema.dart';
 import '../../../shared/models/localized_text.dart';
@@ -108,6 +109,7 @@ class SchemaRegistry {
         final text = '$value'.trim();
         return text.length > 2000 ? ValidationCode.tooLong : null;
       case FieldType.geoPoint:
+        return parseGeoPoint(value) == null ? ValidationCode.outOfRange : null;
       case FieldType.numberRange:
         return null;
     }

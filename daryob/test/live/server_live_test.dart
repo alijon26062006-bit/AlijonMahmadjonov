@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:daryob/core/errors/failure.dart';
 import 'package:daryob/core/security/session_storage.dart';
 import 'package:daryob/features/authentication/data/server_auth_repository.dart';
+import 'package:daryob/features/authentication/domain/auth_repository.dart';
 import 'package:daryob/features/categories/data/tajikistan_regions.dart';
 import 'package:daryob/features/categories/domain/region_directory.dart';
 import 'package:daryob/features/conversations/data/server_conversation_repository.dart';
@@ -58,10 +59,17 @@ class _Device {
   late final ServerSellerRepository sellers;
   late AppUser user;
 
+  // Uses the "no Telegram" path so the test never sends a real code to a
+  // real number.
+  OtpChallenge unverified(String phone) => OtpChallenge(
+    phone: phone.replaceAll(' ', ''),
+    codeLength: 0,
+    resendAvailableAt: DateTime.now(),
+    requiresCode: false,
+  );
+
   Future<void> signIn(String phone, String name) async {
-    final challenge = await auth.requestCode(phone);
-    expect(challenge.requiresCode, isFalse);
-    user = await auth.verifyCode(challenge, '');
+    user = await auth.verifyCode(unverified(phone), '');
     user = await auth.updateProfile(user.copyWith(name: name, regionId: 'khujand'));
   }
 }
@@ -93,7 +101,7 @@ void main() {
     // The same device signs back into the same account.
     await seller.auth.signOut();
     expect(await seller.auth.restoreSession(), isNull);
-    final again = await seller.auth.verifyCode(await seller.auth.requestCode('931234567'), '');
+    final again = await seller.auth.verifyCode(seller.unverified('931234567'), '');
     expect(again.id, seller.user.id);
 
     // ── Publish with a photo and a hidden phone ─────────────────────────

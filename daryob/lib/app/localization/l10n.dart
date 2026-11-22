@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/errors/failure.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/location/device_location.dart';
 import '../../core/utils/validators.dart';
 import '../../features/listings/domain/listing_query.dart';
 import '../../features/notifications/domain/app_notification.dart';
@@ -68,6 +69,8 @@ String? validationMessage(
     ValidationCode.outOfRange => l10n.valOutOfRange,
     ValidationCode.invalidPhone => l10n.valInvalidPhone,
     ValidationCode.invalidCode => l10n.valInvalidCode,
+    ValidationCode.codeExpired => l10n.valCodeExpired,
+    ValidationCode.codeTooManyAttempts => l10n.valCodeTooManyAttempts,
     ValidationCode.tooManyPhotos => l10n.valTooManyPhotos(
       max ?? ListingLimits.photosMax,
     ),
@@ -205,3 +208,12 @@ String notificationKindLabel(AppLocalizations l10n, NotificationKind kind) =>
     },
   };
 }
+
+String locationProblemText(AppLocalizations l10n, LocationProblem problem) =>
+    switch (problem) {
+      LocationProblem.serviceOff => l10n.locationServiceOff,
+      LocationProblem.denied => l10n.locationDenied,
+      LocationProblem.deniedForever => l10n.locationDeniedForever,
+      LocationProblem.outsideTajikistan => l10n.locationOutside,
+      LocationProblem.failed => l10n.locationFailed,
+    };

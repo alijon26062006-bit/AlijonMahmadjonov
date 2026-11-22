@@ -12,6 +12,8 @@ class OtpChallenge {
     this.isDemo = false,
     this.demoCode,
     this.requiresCode = true,
+    this.viaTelegram = false,
+    this.fallbackReason,
   });
 
   /// National digits (9).
@@ -26,6 +28,13 @@ class OtpChallenge {
   /// False while phone verification is not connected on the server: the
   /// number is saved unverified and no code is asked for.
   final bool requiresCode;
+
+  /// The code was sent to the user's Telegram (Telegram Gateway).
+  final bool viaTelegram;
+
+  /// Set when a code could not be sent and the number is saved unverified
+  /// instead (for example, the number has no Telegram account).
+  final String? fallbackReason;
 }
 
 /// Phone + one-time code sign-in. Real SMS delivery happens on the server;

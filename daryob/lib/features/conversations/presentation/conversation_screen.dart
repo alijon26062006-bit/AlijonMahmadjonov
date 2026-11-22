@@ -17,6 +17,7 @@ import '../../../shared/widgets/listing_image.dart';
 import '../../../shared/widgets/states.dart';
 import '../../../shared/widgets/toast.dart';
 import '../../authentication/application/session_controller.dart';
+import '../application/chat_alerts.dart';
 import '../domain/conversation.dart';
 import 'chats_screen.dart';
 
@@ -57,6 +58,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    openConversationId = widget.conversationId;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref
           .read(conversationRepositoryProvider)
@@ -67,6 +69,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   @override
   void dispose() {
+    if (openConversationId == widget.conversationId) openConversationId = null;
     _input.dispose();
     super.dispose();
   }

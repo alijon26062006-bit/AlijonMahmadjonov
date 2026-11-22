@@ -1,14 +1,17 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/localization/l10n.dart';
 import '../../../../app/theme/tokens.dart';
+import '../../../../core/location/device_location.dart';
 import '../../../../shared/models/category_schema.dart';
 import '../../../../shared/models/localized_text.dart';
 import '../../../../shared/models/region.dart';
 import '../../../../shared/providers/core_providers.dart';
 import '../../../../shared/widgets/daryob_text_field.dart';
+import '../../../../shared/widgets/toast.dart';
 import '../../../catalog/application/catalog_providers.dart';
 import '../../../catalog/presentation/catalog_ui.dart';
 
@@ -194,10 +197,7 @@ class _SchemaFieldInputState extends ConsumerState<SchemaFieldInput> {
       case FieldType.locationChild:
         return _districtField(field);
       case FieldType.geoPoint:
-        return _Labeled(
-          label: field.label.of(context),
-          child: Text(l10n.mapPinComingSoon, style: context.text.bodySmall),
-        );
+        return _geoPointField(field);
       case FieldType.numberRange:
         return const SizedBox.shrink();
     }
@@ -346,6 +346,66 @@ class _SchemaFieldInputState extends ConsumerState<SchemaFieldInput> {
         ),
       ),
     );
+  }
+
+  /// A point on the map from the phone's position (no map view yet).
+  Widget _geoPointField(FieldSchema field) {
+    final l10n = context.l10n;
+    final point = parseGeoPoint(widget.attributes[field.key]);
+    return _Labeled(
+      label: _label,
+      error: widget.errorText,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (point != null)
+            Row(
+              children: [
+                Icon(Icons.place_rounded, size: 18, color: context.colors.primary),
+                const SizedBox(width: DaryobSpacing.xs),
+                Expanded(child: Text(l10n.mapPinSaved, style: context.text.bodyMedium)),
+                TextButton(
+                  onPressed: () => launchUrl(mapLink(point), mode: LaunchMode.externalApplication),
+                  child: Text(l10n.showOnMap),
+                ),
+                IconButton(
+                  tooltip: l10n.delete,
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => widget.onChanged(null),
+                ),
+              ],
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: _pinBusy ? null : () => _pinHere(field),
+              icon: _pinBusy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location_rounded),
+              label: Text(l10n.mapPinHere),
+            ),
+          const SizedBox(height: DaryobSpacing.xs),
+          Text(l10n.mapPinHint, style: context.text.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  bool _pinBusy = false;
+
+  Future<void> _pinHere(FieldSchema field) async {
+    final l10n = context.l10n;
+    setState(() => _pinBusy = true);
+    try {
+      final point = await DeviceLocation.current(precise: true);
+      widget.onChanged(formatGeoPoint(point));
+    } on LocationException catch (e) {
+      if (mounted) DaryobToast.show(context, locationProblemText(l10n, e.problem));
+    } finally {
+      if (mounted) setState(() => _pinBusy = false);
+    }
   }
 
   Widget _districtField(FieldSchema field) {

@@ -4,10 +4,12 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/localization/l10n.dart';
 import '../../app/theme/tokens.dart';
 import '../../features/categories/data/tajikistan_regions.dart';
+import '../../core/location/device_location.dart';
 import '../../features/categories/domain/region_directory.dart';
 import '../models/localized_text.dart';
 import '../models/region.dart';
 import '../providers/core_providers.dart';
+import 'toast.dart';
 
 /// Opens the two-level picker (region → city/district). Returns the chosen
 /// id, or null when dismissed.
@@ -50,6 +52,23 @@ class _LocationPicker extends ConsumerStatefulWidget {
 
 class _LocationPickerState extends ConsumerState<_LocationPicker> {
   Region? _openRegion;
+  bool _locating = false;
+
+  Future<void> _locate() async {
+    final l10n = context.l10n;
+    setState(() => _locating = true);
+    try {
+      final id = await DeviceLocation.nearestCity();
+      if (mounted) Navigator.of(context).pop(id);
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      DaryobToast.show(context, locationProblemText(l10n, e.problem));
+      if (e.problem == LocationProblem.deniedForever) {
+        await DeviceLocation.openSettings();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +112,18 @@ class _LocationPickerState extends ConsumerState<_LocationPicker> {
           child: ListView(
             controller: widget.scrollController,
             children: [
+              if (open == null)
+                ListTile(
+                  leading: _locating
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : Icon(Icons.my_location_rounded, color: context.colors.primary),
+                  title: Text(l10n.locateMe, style: context.text.titleSmall),
+                  subtitle: Text(l10n.locateMeHint),
+                  onTap: _locating ? null : _locate,
+                ),
               if (open == null && widget.allowWholeCountry)
                 _tile(context, directory.country, directory, bold: true),
               if (open != null)

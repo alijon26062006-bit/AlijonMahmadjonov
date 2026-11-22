@@ -1,4 +1,5 @@
 import '../../../shared/models/category.dart';
+import '../../../core/utils/validators.dart';
 import '../../../shared/models/category_schema.dart';
 import '../../../shared/models/localized_text.dart';
 import '../domain/catalog.dart';
@@ -305,7 +306,7 @@ class CatalogParser {
       ],
       priceMode: priceMode,
       photosMin: photosMin,
-      photosMax: photosMax,
+      photosMax: photosMax.clamp(1, ListingLimits.photosMax),
       contactMethods: contactMethods,
       categoryChildKey: categoryChildKey,
       presetAttributes: presets,

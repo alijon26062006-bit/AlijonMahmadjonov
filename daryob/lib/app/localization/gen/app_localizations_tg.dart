@@ -1636,4 +1636,65 @@ class AppLocalizationsTg extends AppLocalizations {
   @override
   String get authNoCodeNotice =>
       'Тасдиқи рақам бо рамз ҳоло пайваст нест. Ҳисоб ба ҳамин телефон вобаста аст: ҳангоми иваз кардани телефон ё нест кардани барнома ба он даромадан имкон надорад.';
+
+  @override
+  String get authPhoneBodyTelegram =>
+      'Рамзи тасдиқро ба Telegram-и ҳамин рақам мефиристем.';
+
+  @override
+  String authCodeTelegramBody(String phone) {
+    return 'Рамз ба Telegram ба $phone фиристода шуд. Чати «Verification Codes»-ро кушоед.';
+  }
+
+  @override
+  String get authTelegramUnavailable =>
+      'Рамзро ба Telegram фиристодан нашуд — рақам бе тасдиқ нигоҳ дошта шуд.';
+
+  @override
+  String get valCodeExpired =>
+      'Мӯҳлати рамз гузашт. Рамзи навро дархост кунед.';
+
+  @override
+  String get valCodeTooManyAttempts =>
+      'Кӯшишҳо зиёд шуданд. Рамзи навро дархост кунед.';
+
+  @override
+  String get locateMe => 'Муайян кардани ҷойгиршавии ман';
+
+  @override
+  String get locateMeHint =>
+      'Бо GPS-и телефон — шаҳри наздиктаринро интихоб мекунем';
+
+  @override
+  String get locationServiceOff =>
+      'Геолокатсия хомӯш аст. Онро дар танзимоти телефон фаъол кунед.';
+
+  @override
+  String get locationDenied =>
+      'Дастрасӣ ба ҷойгиршавӣ нест. Шаҳрро дастӣ интихоб кунед.';
+
+  @override
+  String get locationDeniedForever =>
+      'Дастрасӣ ба ҷойгиршавӣ манъ аст. Онро дар танзимоти барнома иҷозат диҳед.';
+
+  @override
+  String get locationOutside =>
+      'Шояд шумо дар Тоҷикистон нестед. Шаҳрро дастӣ интихоб кунед.';
+
+  @override
+  String get locationFailed =>
+      'Ҷойгиршавиро муайян кардан нашуд. Боз кӯшиш кунед.';
+
+  @override
+  String get mapPinHere => 'Ҷои ҳозираамро қайд кардан';
+
+  @override
+  String get mapPinSaved => 'Нуқта дар харита нигоҳ дошта шуд';
+
+  @override
+  String get mapPinHint =>
+      'Дар назди объект истода тугмаро пахш кунед — харидорон онро дар харита мебинанд.';
+
+  @override
+  String get showOnMap => 'Дар харита';
 }

@@ -17,6 +17,7 @@ import '../../../shared/widgets/daryob_logo.dart';
 import '../../../shared/widgets/daryob_text_field.dart';
 import '../../../shared/widgets/location_selector.dart';
 import '../../../shared/widgets/states.dart';
+import '../../../shared/widgets/toast.dart';
 import '../../settings/application/settings_controller.dart';
 import '../../../shared/providers/repository_providers.dart';
 import '../application/session_controller.dart';
@@ -84,7 +85,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       if (!mounted) return;
       _code.clear();
       if (!challenge.requiresCode) {
-        // Phone verification is not connected: the number is saved as is.
+        // No code could be sent: the number is saved unverified.
+        if (challenge.fallbackReason != null) {
+          DaryobToast.show(context, l10n.authTelegramUnavailable);
+        }
         final user = await ref
             .read(sessionControllerProvider.notifier)
             .verify(challenge, '');
@@ -137,7 +141,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       final failure = asFailure(e);
       setState(
         () => _error = failure is ValidationFailure
-            ? validationMessage(l10n, ValidationCode.invalidCode)
+            ? validationMessage(
+                l10n,
+                failure.fieldErrors['code'] ?? ValidationCode.invalidCode,
+              )
             : failureMessage(l10n, e),
       );
     } finally {
@@ -213,7 +220,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       Text(l10n.authPhoneTitle, style: context.text.headlineSmall),
       const SizedBox(height: DaryobSpacing.sm),
       Text(
-        verifiesPhone ? l10n.authPhoneBody : l10n.authPhoneBodyNoCode,
+        isDevelopment
+            ? l10n.authPhoneBody
+            : (verifiesPhone ? l10n.authPhoneBodyTelegram : l10n.authPhoneBodyNoCode),
         style: context.text.bodyMedium,
       ),
       const SizedBox(height: DaryobSpacing.xl),
@@ -267,6 +276,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       Text(
         challenge.isDemo
             ? l10n.authCodeDemoBody(Formatters.phone(challenge.phone))
+            : challenge.viaTelegram
+            ? l10n.authCodeTelegramBody(Formatters.phone(challenge.phone))
             : l10n.authCodeBody(Formatters.phone(challenge.phone)),
         style: context.text.bodyMedium,
       ),

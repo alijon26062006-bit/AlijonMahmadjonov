@@ -62,7 +62,7 @@ void main() {
       expect(cars.field('photos'), isNull);
       expect(cars.priceMode, PriceMode.required);
       expect(cars.photosMin, 1);
-      expect(cars.photosMax, 16);
+      expect(cars.photosMax, 15);
       expect(schemas.schemaFor('jobs.vacancy').priceMode, PriceMode.none);
       expect(schemas.schemaFor('jobs.vacancy').photosMin, 0);
       expect(schemas.schemaFor('free.books').priceMode, PriceMode.free);

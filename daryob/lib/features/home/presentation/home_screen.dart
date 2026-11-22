@@ -56,6 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.invalidate(homeVipProvider);
     ref.invalidate(homeRecommendedProvider);
     ref.invalidate(homeNearbyProvider);
+    ref.invalidate(homeCategoryRowsProvider);
     ref.invalidate(categoryCountsProvider);
     await ref.read(pagedListingsProvider(homeRecentQuery).notifier).refresh();
   }
@@ -109,13 +110,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _ListingSection(
                 provider: homeRecommendedProvider,
                 title: l10n.recommended,
+                horizontal: true,
               ),
               if (regionId != RegionIds.country && region != null)
                 _ListingSection(
                   provider: homeNearbyProvider,
                   title: l10n.nearbyIn(region.name.of(context)),
                   onSeeAll: () => context.push(Routes.search),
+                  horizontal: true,
                 ),
+              const _CategoryRows(),
               DaryobSectionHeader(title: l10n.newListings).sliver,
               ...recent.when(
                 loading: () => const [SliverListingGridSkeleton()],
@@ -392,21 +396,7 @@ class _Carousel extends StatelessWidget {
   final List<Listing> items;
 
   @override
-  Widget build(BuildContext context) {
-    const width = 210.0;
-    final height = SliverListingGrid.extentFor(context, width);
-    return SizedBox(
-      height: height,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: DaryobSpacing.page),
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: DaryobSpacing.md),
-        itemBuilder: (_, i) =>
-            DaryobListingCard(listing: items[i], width: width),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ListingCarousel(listings: items);
 }
 
 class _CarouselSkeleton extends StatelessWidget {
@@ -414,18 +404,43 @@ class _CarouselSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const width = 210.0;
+    final width = SliverListingGrid.carouselCardWidth(MediaQuery.sizeOf(context).width);
     return SizedBox(
       height: SliverListingGrid.extentFor(context, width),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: DaryobSpacing.page),
-        itemCount: 3,
-        separatorBuilder: (_, _) => const SizedBox(width: DaryobSpacing.md),
+        itemCount: 4,
+        separatorBuilder: (_, _) => const SizedBox(width: SliverListingGrid.gap),
         itemBuilder: (_, _) =>
-            const SizedBox(width: width, child: ListingCardSkeleton()),
+            SizedBox(width: width, child: const ListingCardSkeleton()),
       ),
+    );
+  }
+}
+
+/// A swipeable row for every category that has listings.
+class _CategoryRows extends ConsumerWidget {
+  const _CategoryRows();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rows = ref.watch(homeCategoryRowsProvider).value ?? const [];
+    if (rows.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    return SliverMainAxisGroup(
+      slivers: [
+        for (final (category, items) in rows) ...[
+          SliverToBoxAdapter(
+            child: DaryobSectionHeader(
+              title: category.name.of(context),
+              leading: DaryobCategoryArt(icon: category.icon, size: 26),
+              onSeeAll: () => context.push(Routes.category(category.slug)),
+            ),
+          ),
+          SliverToBoxAdapter(child: ListingCarousel(listings: items)),
+        ],
+      ],
     );
   }
 }

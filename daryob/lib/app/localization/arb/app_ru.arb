@@ -1262,5 +1262,43 @@
   "authPhoneBodyNoCode": "Укажите номер, по которому с вами свяжутся покупатели.",
   "@authPhoneBodyNoCode": {},
   "authNoCodeNotice": "Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.",
-  "@authNoCodeNotice": {}
+  "@authNoCodeNotice": {},
+  "authPhoneBodyTelegram": "Мы пришлём код подтверждения в Telegram на этот номер.",
+  "@authPhoneBodyTelegram": {},
+  "authCodeTelegramBody": "Код отправлен в Telegram на {phone}. Откройте чат «Verification Codes».",
+  "@authCodeTelegramBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "authTelegramUnavailable": "Не удалось отправить код в Telegram — номер сохранён без подтверждения.",
+  "@authTelegramUnavailable": {},
+  "valCodeExpired": "Код устарел. Запросите новый.",
+  "@valCodeExpired": {},
+  "valCodeTooManyAttempts": "Слишком много попыток. Запросите новый код.",
+  "@valCodeTooManyAttempts": {},
+  "locateMe": "Определить моё местоположение",
+  "@locateMe": {},
+  "locateMeHint": "По GPS телефона — выберем ближайший город",
+  "@locateMeHint": {},
+  "locationServiceOff": "Геолокация выключена. Включите её в настройках телефона.",
+  "@locationServiceOff": {},
+  "locationDenied": "Нет доступа к местоположению. Выберите город вручную.",
+  "@locationDenied": {},
+  "locationDeniedForever": "Доступ к местоположению запрещён. Разрешите его в настройках приложения.",
+  "@locationDeniedForever": {},
+  "locationOutside": "Похоже, вы не в Таджикистане. Выберите город вручную.",
+  "@locationOutside": {},
+  "locationFailed": "Не удалось определить местоположение. Попробуйте ещё раз.",
+  "@locationFailed": {},
+  "mapPinHere": "Отметить, где я сейчас",
+  "@mapPinHere": {},
+  "mapPinSaved": "Точка на карте сохранена",
+  "@mapPinSaved": {},
+  "mapPinHint": "Встаньте у объекта и нажмите кнопку — покупатели увидят его на карте.",
+  "@mapPinHint": {},
+  "showOnMap": "На карте",
+  "@showOnMap": {}
 }

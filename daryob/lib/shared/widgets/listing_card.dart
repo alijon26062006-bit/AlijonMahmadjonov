@@ -42,10 +42,11 @@ class DaryobListingCard extends ConsumerWidget {
 
     final price = listingPriceText(context, ref, listing);
 
+    // Compact card: three fit across a phone screen.
     final card = Material(
       color: context.colors.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: DaryobRadius.cardAll,
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: isVip ? DaryobColors.lime : palette.border,
           width: isVip ? 1.6 : 1,
@@ -58,7 +59,7 @@ class DaryobListingCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AspectRatio(
-              aspectRatio: 4 / 3,
+              aspectRatio: 1,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -67,22 +68,31 @@ class DaryobListingCard extends ConsumerWidget {
                         ? null
                         : listing.photos.first,
                     icon: category?.icon ?? CategoryIcon.generic,
-                    cacheWidth: ((width ?? 200) * dpr).round(),
+                    cacheWidth: ((width ?? 140) * dpr).round(),
                   ),
-                  Positioned(
-                    left: DaryobSpacing.sm,
-                    top: DaryobSpacing.sm,
-                    right: 48,
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        if (listing.isPromotedAt(now))
-                          PromotionBadge(type: listing.promotion!.type),
-                        if (listing.isDemo) const DemoBadge(),
-                      ],
+                  if (listing.isPromotedAt(now) || listing.isDemo)
+                    Positioned(
+                      left: 4,
+                      top: 4,
+                      right: 30,
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.topLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (listing.isPromotedAt(now))
+                                PromotionBadge(type: listing.promotion!.type),
+                              if (listing.isPromotedAt(now) && listing.isDemo)
+                                const SizedBox(width: 3),
+                              if (listing.isDemo) const DemoBadge(),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
                   Positioned(
                     right: 0,
                     top: 0,
@@ -103,8 +113,8 @@ class DaryobListingCard extends ConsumerWidget {
                   ),
                   if (listing.photos.length > 1)
                     Positioned(
-                      right: DaryobSpacing.sm,
-                      bottom: DaryobSpacing.sm,
+                      right: 4,
+                      bottom: 4,
                       child: _PhotoCount(count: listing.photos.length),
                     ),
                 ],
@@ -112,12 +122,7 @@ class DaryobListingCard extends ConsumerWidget {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  DaryobSpacing.md,
-                  DaryobSpacing.sm + 2,
-                  DaryobSpacing.md,
-                  DaryobSpacing.sm,
-                ),
+                padding: const EdgeInsets.fromLTRB(7, 6, 7, 6),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -125,29 +130,25 @@ class DaryobListingCard extends ConsumerWidget {
                       price,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: context.text.titleMedium?.copyWith(
+                      style: context.text.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        height: 1.25,
                       ),
                     ),
-                    if (listing.isNegotiable &&
-                        listing.price != null &&
-                        listing.price! > 0)
-                      Text(
-                        l10n.negotiable,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.labelSmall,
-                      ),
-                    const SizedBox(height: 2),
-                    Flexible(
+                    const SizedBox(height: 1),
+                    Expanded(
                       child: Text(
                         listing.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: context.text.bodyMedium?.copyWith(height: 1.3),
+                        style: context.text.bodySmall?.copyWith(
+                          fontSize: 12,
+                          height: 1.25,
+                          color: context.colors.onSurface,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: DaryobSpacing.xs),
                     Text(
                       [
                         if (region != null) region.name.of(context),
@@ -155,7 +156,7 @@ class DaryobListingCard extends ConsumerWidget {
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: context.text.bodySmall,
+                      style: context.text.bodySmall?.copyWith(fontSize: 10.5, height: 1.2),
                     ),
                   ],
                 ),
@@ -187,11 +188,11 @@ class _FavoriteButton extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onPressed,
         child: SizedBox.square(
-          dimension: DaryobSizes.touch,
+          dimension: 40,
           child: Center(
             child: Container(
-              width: 34,
-              height: 34,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.92),
                 shape: BoxShape.circle,
@@ -200,7 +201,7 @@ class _FavoriteButton extends StatelessWidget {
                 isFavorite
                     ? Icons.favorite_rounded
                     : Icons.favorite_border_rounded,
-                size: 19,
+                size: 16,
                 color: isFavorite ? DaryobColors.error : DaryobColors.navy,
               ),
             ),
@@ -218,7 +219,7 @@ class _PhotoCount extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(6),
@@ -228,7 +229,7 @@ class _PhotoCount extends StatelessWidget {
         children: [
           const Icon(
             Icons.photo_camera_outlined,
-            size: 12,
+            size: 10,
             color: Colors.white,
           ),
           const SizedBox(width: 3),
@@ -242,23 +243,33 @@ class _PhotoCount extends StatelessWidget {
   }
 }
 
-/// Responsive grid of listing cards: 2 columns on phones, 1 on very narrow
-/// screens, 3+ on tablets.
+/// Responsive grid of compact listing cards: 3 columns on phones (2 on very
+/// narrow screens), more on tablets.
 class SliverListingGrid extends StatelessWidget {
   const SliverListingGrid({super.key, required this.listings});
   final List<Listing> listings;
 
+  static const double gap = DaryobSpacing.sm;
+
   static int columnsFor(double width) {
-    if (width < 330) return 1;
-    if (width < 640) return 2;
-    if (width < 960) return 3;
-    return 4;
+    if (width < 300) return 2;
+    if (width < 560) return 3;
+    if (width < 800) return 4;
+    if (width < 1040) return 5;
+    return 6;
   }
 
   static double extentFor(BuildContext context, double cellWidth) {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    // Image (4:3) + price, "negotiable", two title lines, location, paddings.
-    return cellWidth * 0.75 + 128 * textScale;
+    // Square image + price, two title lines, location, paddings.
+    return cellWidth + 80 * textScale;
+  }
+
+  /// Width of a carousel card so that exactly three fit across [screenWidth].
+  static double carouselCardWidth(double screenWidth) {
+    final width = screenWidth - DaryobSpacing.page * 2;
+    final columns = columnsFor(width);
+    return (width - gap * (columns - 1)) / columns;
   }
 
   @override
@@ -267,7 +278,6 @@ class SliverListingGrid extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.crossAxisExtent - DaryobSpacing.page * 2;
         final columns = columnsFor(width);
-        const gap = DaryobSpacing.md;
         final cell = (width - gap * (columns - 1)) / columns;
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: DaryobSpacing.page),
@@ -279,9 +289,36 @@ class SliverListingGrid extends StatelessWidget {
               mainAxisExtent: extentFor(context, cell),
             ),
             delegate: SliverChildBuilderDelegate(
-              (context, index) => DaryobListingCard(listing: listings[index]),
+              (context, index) =>
+                  DaryobListingCard(listing: listings[index], width: cell),
               childCount: listings.length,
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Horizontal, swipeable row of compact cards — three visible at a time.
+class ListingCarousel extends StatelessWidget {
+  const ListingCarousel({super.key, required this.listings});
+  final List<Listing> listings;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = SliverListingGrid.carouselCardWidth(constraints.maxWidth);
+        return SizedBox(
+          height: SliverListingGrid.extentFor(context, cardWidth),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: DaryobSpacing.page),
+            itemCount: listings.length,
+            separatorBuilder: (_, _) => const SizedBox(width: SliverListingGrid.gap),
+            itemBuilder: (_, i) =>
+                DaryobListingCard(listing: listings[i], width: cardWidth),
           ),
         );
       },

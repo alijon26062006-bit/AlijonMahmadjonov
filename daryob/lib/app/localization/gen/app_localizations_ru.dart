@@ -1651,4 +1651,63 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authNoCodeNotice =>
       'Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.';
+
+  @override
+  String get authPhoneBodyTelegram =>
+      'Мы пришлём код подтверждения в Telegram на этот номер.';
+
+  @override
+  String authCodeTelegramBody(String phone) {
+    return 'Код отправлен в Telegram на $phone. Откройте чат «Verification Codes».';
+  }
+
+  @override
+  String get authTelegramUnavailable =>
+      'Не удалось отправить код в Telegram — номер сохранён без подтверждения.';
+
+  @override
+  String get valCodeExpired => 'Код устарел. Запросите новый.';
+
+  @override
+  String get valCodeTooManyAttempts =>
+      'Слишком много попыток. Запросите новый код.';
+
+  @override
+  String get locateMe => 'Определить моё местоположение';
+
+  @override
+  String get locateMeHint => 'По GPS телефона — выберем ближайший город';
+
+  @override
+  String get locationServiceOff =>
+      'Геолокация выключена. Включите её в настройках телефона.';
+
+  @override
+  String get locationDenied =>
+      'Нет доступа к местоположению. Выберите город вручную.';
+
+  @override
+  String get locationDeniedForever =>
+      'Доступ к местоположению запрещён. Разрешите его в настройках приложения.';
+
+  @override
+  String get locationOutside =>
+      'Похоже, вы не в Таджикистане. Выберите город вручную.';
+
+  @override
+  String get locationFailed =>
+      'Не удалось определить местоположение. Попробуйте ещё раз.';
+
+  @override
+  String get mapPinHere => 'Отметить, где я сейчас';
+
+  @override
+  String get mapPinSaved => 'Точка на карте сохранена';
+
+  @override
+  String get mapPinHint =>
+      'Встаньте у объекта и нажмите кнопку — покупатели увидят его на карте.';
+
+  @override
+  String get showOnMap => 'На карте';
 }

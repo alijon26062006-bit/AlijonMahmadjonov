@@ -58,7 +58,7 @@ class ListingCardSkeleton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: context.colors.surface,
-        borderRadius: DaryobRadius.cardAll,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.palette.border),
       ),
       clipBehavior: Clip.antiAlias,
@@ -66,19 +66,19 @@ class ListingCardSkeleton extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: 1,
             child: DaryobLoadingSkeleton(radius: 0, height: double.infinity),
           ),
           Padding(
-            padding: EdgeInsets.all(DaryobSpacing.md),
+            padding: EdgeInsets.all(7),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DaryobLoadingSkeleton(width: 90, height: 18),
-                SizedBox(height: DaryobSpacing.sm),
-                DaryobLoadingSkeleton(height: 12),
+                DaryobLoadingSkeleton(width: 60, height: 13),
                 SizedBox(height: 6),
-                DaryobLoadingSkeleton(width: 110, height: 12),
+                DaryobLoadingSkeleton(height: 10),
+                SizedBox(height: 4),
+                DaryobLoadingSkeleton(width: 50, height: 10),
               ],
             ),
           ),
@@ -89,7 +89,7 @@ class ListingCardSkeleton extends StatelessWidget {
 }
 
 class SliverListingGridSkeleton extends StatelessWidget {
-  const SliverListingGridSkeleton({super.key, this.count = 4});
+  const SliverListingGridSkeleton({super.key, this.count = 6});
   final int count;
 
   @override
@@ -98,7 +98,7 @@ class SliverListingGridSkeleton extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.crossAxisExtent - DaryobSpacing.page * 2;
         final columns = SliverListingGrid.columnsFor(width);
-        const gap = DaryobSpacing.md;
+        const gap = SliverListingGrid.gap;
         final cell = (width - gap * (columns - 1)) / columns;
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: DaryobSpacing.page),

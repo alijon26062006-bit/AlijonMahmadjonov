@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/models/category.dart';
 import '../../../shared/models/listing.dart';
 import '../../../shared/providers/core_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
@@ -23,8 +24,26 @@ final homeRecommendedProvider = FutureProvider.autoDispose<List<Listing>>((
 ) async {
   final result = await ref
       .watch(listingRepositoryProvider)
-      .search(const ListingQuery(pageSize: 6));
+      .search(const ListingQuery(pageSize: 12));
   return result.items;
+});
+
+/// One swipeable row per top-level category that has listings, in catalog
+/// order: the newest listings of that category (promoted first).
+final homeCategoryRowsProvider = FutureProvider.autoDispose<
+  List<(CategoryDefinition, List<Listing>)>
+>((ref) async {
+  final repo = ref.watch(listingRepositoryProvider);
+  final categories = ref.watch(categoryRegistryProvider).topLevel;
+  final counts = await repo.countByCategory();
+  final withListings = categories.where((c) => (counts[c.id] ?? 0) > 0).toList();
+  final rows = await Future.wait([
+    for (final c in withListings)
+      repo
+          .search(ListingQuery(categoryId: c.id, pageSize: 12))
+          .then((r) => (c, r.items)),
+  ]);
+  return [for (final r in rows) if (r.$2.isNotEmpty) r];
 });
 
 /// Listings in the user's chosen region (region matching, not GPS).

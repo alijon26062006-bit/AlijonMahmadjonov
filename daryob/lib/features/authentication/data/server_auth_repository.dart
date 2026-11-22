@@ -12,12 +12,15 @@ import '../domain/auth_repository.dart';
 
 /// Accounts on the DARYOB server.
 ///
-/// Phone verification is not connected yet, so an account is tied to this
-/// device: a random id and secret kept in secure storage. The phone number
-/// the user enters is stored as unverified contact data and never used to
+/// Sign-in is by a code sent to the user's Telegram (Telegram Gateway). A
+/// verified number finds its account on any phone.
+///
+/// When Telegram cannot deliver a code (the number has no Telegram account,
+/// the gateway is down), the user can still continue: the account is then
+/// tied to this device by a random id and secret kept in secure storage, and
+/// the number is stored unverified. An unverified number is never used to
 /// find an account — otherwise anyone could open someone else's account by
-/// typing their number. When verification by code is connected, verified
-/// numbers will be able to restore an account on a new phone.
+/// typing their number.
 class ServerAuthRepository implements AuthRepository {
   ServerAuthRepository({
     required this._client,
@@ -36,7 +39,7 @@ class ServerAuthRepository implements AuthRepository {
   static String emailFor(String deviceId) => '$deviceId@device.daryob.tj';
 
   @override
-  bool get verifiesPhone => false;
+  bool get verifiesPhone => true;
 
   @override
   Future<AppUser?> restoreSession() async {
@@ -57,16 +60,75 @@ class ServerAuthRepository implements AuthRepository {
   Future<OtpChallenge> requestCode(String phone) async {
     final error = Validators.tajikPhone(phone);
     if (error != null) throw ValidationFailure({'phone': error});
-    return OtpChallenge(
-      phone: Formatters.nationalDigits(phone),
-      codeLength: 0,
-      resendAvailableAt: _clock(),
-      requiresCode: false,
+    final digits = Formatters.nationalDigits(phone);
+    final response = await backendCall(
+      () => _client.functions.invoke('phone-send-code', body: {'phone': digits}),
     );
+    final data = Map<String, dynamic>.from(response.data as Map? ?? const {});
+    switch (data['status']) {
+      case 'sent':
+        return OtpChallenge(
+          phone: digits,
+          codeLength: (data['code_length'] as num?)?.toInt() ?? 6,
+          resendAvailableAt: _clock().add(
+            Duration(seconds: (data['resend_in'] as num?)?.toInt() ?? 60),
+          ),
+          viaTelegram: true,
+        );
+      case 'wait':
+        // A code was sent less than a minute ago: it is still valid.
+        return OtpChallenge(
+          phone: digits,
+          codeLength: 6,
+          resendAvailableAt: _clock().add(
+            Duration(seconds: (data['resend_in'] as num?)?.toInt() ?? 60),
+          ),
+          viaTelegram: true,
+        );
+      case 'limit':
+        throw const RateLimitedFailure();
+      default:
+        return OtpChallenge(
+          phone: digits,
+          codeLength: 0,
+          resendAvailableAt: _clock(),
+          requiresCode: false,
+          fallbackReason: data['reason'] as String? ?? 'unavailable',
+        );
+    }
   }
 
   @override
   Future<AppUser> verifyCode(OtpChallenge challenge, String code) {
+    if (!challenge.requiresCode) return _continueUnverified(challenge);
+    return backendCall(() async {
+      final response = await _client.functions.invoke(
+        'phone-verify-code',
+        body: {'phone': challenge.phone, 'code': code.trim()},
+      );
+      final data = Map<String, dynamic>.from(response.data as Map? ?? const {});
+      switch (data['status']) {
+        case 'ok':
+          final res = await _client.auth.verifyOTP(
+            type: OtpType.magiclink,
+            tokenHash: data['token_hash'] as String,
+          );
+          final user = res.user;
+          if (user == null) throw const UnauthorizedFailure();
+          return _loadUser(user.id);
+        case 'invalid':
+          throw const ValidationFailure({'code': ValidationCode.invalidCode});
+        case 'too_many_attempts':
+          throw const ValidationFailure({'code': ValidationCode.codeTooManyAttempts});
+        default:
+          throw const ValidationFailure({'code': ValidationCode.codeExpired});
+      }
+    });
+  }
+
+  /// Telegram could not deliver a code: account tied to this device, the
+  /// number saved unverified.
+  Future<AppUser> _continueUnverified(OtpChallenge challenge) {
     return backendCall(() async {
       final userId = await _signInDevice();
       await _client
