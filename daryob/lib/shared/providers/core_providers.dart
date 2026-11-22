@@ -31,7 +31,7 @@ final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 /// Null when no API URL is configured.
 final apiClientProvider = Provider<ApiClient?>((ref) {
   final config = ref.watch(appConfigProvider);
-  if (!config.hasBackend) return null;
+  if (config.apiBaseUrl.isEmpty) return null;
   return ApiClient(
     baseUrl: config.apiBaseUrl,
     sessionStorage: ref.watch(sessionStorageProvider),

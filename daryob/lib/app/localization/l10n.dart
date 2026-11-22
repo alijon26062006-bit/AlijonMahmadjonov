@@ -199,6 +199,8 @@ String notificationKindLabel(AppLocalizations l10n, NotificationKind kind) =>
         l10n.notifSavedLocallyBody(title),
       ),
       'status_changed' => (l10n.notifStatusTitle, l10n.notifStatusBody(title)),
+      // A message written by the platform arrives with its own text.
+      _ when title.isNotEmpty && n.params['body'] != null => (title, n.params['body']!),
       _ => (l10n.notifWelcomeTitle, l10n.notifWelcomeBody),
     },
   };

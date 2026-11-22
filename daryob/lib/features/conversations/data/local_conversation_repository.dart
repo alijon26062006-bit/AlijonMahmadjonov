@@ -125,9 +125,12 @@ class LocalConversationRepository implements ConversationRepository {
     }
     await _conversations.delete(conversationId);
   }
+
+  @override
+  Stream<void> watch(String ownerId, {String? conversationId}) =>
+      const Stream.empty();
 }
 
-/// Production without a chat backend.
 class UnavailableConversationRepository implements ConversationRepository {
   const UnavailableConversationRepository();
 
@@ -167,4 +170,8 @@ class UnavailableConversationRepository implements ConversationRepository {
       Future.error(_failure);
   @override
   Future<void> delete(String conversationId) => Future.error(_failure);
+
+  @override
+  Stream<void> watch(String ownerId, {String? conversationId}) =>
+      const Stream.empty();
 }

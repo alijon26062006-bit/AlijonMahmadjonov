@@ -18,6 +18,7 @@ import '../../../shared/widgets/daryob_text_field.dart';
 import '../../../shared/widgets/location_selector.dart';
 import '../../../shared/widgets/states.dart';
 import '../../settings/application/settings_controller.dart';
+import '../../../shared/providers/repository_providers.dart';
 import '../application/session_controller.dart';
 import '../domain/auth_repository.dart';
 
@@ -82,6 +83,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           .requestCode(_phone.text);
       if (!mounted) return;
       _code.clear();
+      if (!challenge.requiresCode) {
+        // Phone verification is not connected: the number is saved as is.
+        final user = await ref
+            .read(sessionControllerProvider.notifier)
+            .verify(challenge, '');
+        if (!mounted) return;
+        if (user.hasProfile) {
+          context.pop(true);
+        } else {
+          _regionId = ref.read(settingsControllerProvider).regionId;
+          setState(() => _step = _AuthStep.profile);
+        }
+        return;
+      }
       setState(() {
         _challenge = challenge;
         _step = _AuthStep.code;
@@ -193,10 +208,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   List<Widget> _phoneStep(BuildContext context, bool isDevelopment) {
     final l10n = context.l10n;
+    final verifiesPhone = ref.watch(authRepositoryProvider).verifiesPhone;
     return [
       Text(l10n.authPhoneTitle, style: context.text.headlineSmall),
       const SizedBox(height: DaryobSpacing.sm),
-      Text(l10n.authPhoneBody, style: context.text.bodyMedium),
+      Text(
+        verifiesPhone ? l10n.authPhoneBody : l10n.authPhoneBodyNoCode,
+        style: context.text.bodyMedium,
+      ),
       const SizedBox(height: DaryobSpacing.xl),
       DaryobTextField(
         controller: _phone,
@@ -212,10 +231,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       if (isDevelopment) ...[
         const SizedBox(height: DaryobSpacing.md),
         DaryobNotice(message: l10n.demoAuthNotice, tone: NoticeTone.warning),
+      ] else if (!verifiesPhone) ...[
+        const SizedBox(height: DaryobSpacing.md),
+        DaryobNotice(message: l10n.authNoCodeNotice),
       ],
       const SizedBox(height: DaryobSpacing.xl),
       DaryobPrimaryButton(
-        label: l10n.getCode,
+        label: verifiesPhone ? l10n.getCode : l10n.continueAction,
         isLoading: _busy,
         onPressed: _requestCode,
       ),

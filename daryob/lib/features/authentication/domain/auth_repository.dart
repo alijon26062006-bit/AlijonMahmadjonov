@@ -11,6 +11,7 @@ class OtpChallenge {
     required this.resendAvailableAt,
     this.isDemo = false,
     this.demoCode,
+    this.requiresCode = true,
   });
 
   /// National digits (9).
@@ -21,11 +22,18 @@ class OtpChallenge {
   /// Development flow: no SMS is sent and the code is shown on screen.
   final bool isDemo;
   final String? demoCode;
+
+  /// False while phone verification is not connected on the server: the
+  /// number is saved unverified and no code is asked for.
+  final bool requiresCode;
 }
 
 /// Phone + one-time code sign-in. Real SMS delivery happens on the server;
 /// the app never holds SMS provider credentials.
 abstract interface class AuthRepository {
+  /// Whether sign-in proves that the phone number belongs to the user.
+  bool get verifiesPhone;
+
   /// Restores the session saved on this device, if any.
   Future<AppUser?> restoreSession();
 

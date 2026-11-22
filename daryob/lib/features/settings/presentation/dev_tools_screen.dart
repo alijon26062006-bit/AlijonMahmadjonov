@@ -65,7 +65,9 @@ class DevToolsScreen extends ConsumerWidget {
           ListTile(
             title: Text(l10n.apiUrl),
             subtitle: Text(
-              config.hasBackend ? config.apiBaseUrl : l10n.notConfigured,
+              config.hasServer
+                  ? config.serverUrl
+                  : (config.apiBaseUrl.isNotEmpty ? config.apiBaseUrl : l10n.notConfigured),
             ),
           ),
           const Divider(),

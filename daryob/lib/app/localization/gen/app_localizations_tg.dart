@@ -1628,4 +1628,12 @@ class AppLocalizationsTg extends AppLocalizations {
 
   @override
   String get devCatalogNoPrevious => 'Версияи қаблӣ нест';
+
+  @override
+  String get authPhoneBodyNoCode =>
+      'Рақамеро нишон диҳед, ки харидорон бо шумо тамос мегиранд.';
+
+  @override
+  String get authNoCodeNotice =>
+      'Тасдиқи рақам бо рамз ҳоло пайваст нест. Ҳисоб ба ҳамин телефон вобаста аст: ҳангоми иваз кардани телефон ё нест кардани барнома ба он даромадан имкон надорад.';
 }

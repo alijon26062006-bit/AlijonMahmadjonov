@@ -1643,4 +1643,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get devCatalogNoPrevious => 'Предыдущей версии нет';
+
+  @override
+  String get authPhoneBodyNoCode =>
+      'Укажите номер, по которому с вами свяжутся покупатели.';
+
+  @override
+  String get authNoCodeNotice =>
+      'Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.';
 }

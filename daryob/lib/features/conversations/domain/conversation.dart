@@ -150,4 +150,9 @@ abstract interface class ConversationRepository {
   Future<void> markRead(String conversationId);
   Future<void> setBlocked(String conversationId, bool blocked);
   Future<void> delete(String conversationId);
+
+  /// Fires when something changed in the user's chats (a new message, a
+  /// read receipt). With [conversationId], also for messages of that chat.
+  /// Local storage has nothing to announce and returns an empty stream.
+  Stream<void> watch(String ownerId, {String? conversationId});
 }

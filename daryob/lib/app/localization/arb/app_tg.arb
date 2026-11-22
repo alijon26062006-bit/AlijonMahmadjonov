@@ -486,5 +486,7 @@
   "devCatalogImportInvalid": "Дар буфер бастаи JSON нест",
   "devCatalogImportResult": "Қабул шуд: {accepted}. Рад шуд: {rejected}.",
   "devCatalogRollback": "Баргардонидани версияи қаблии феҳрист",
-  "devCatalogNoPrevious": "Версияи қаблӣ нест"
+  "devCatalogNoPrevious": "Версияи қаблӣ нест",
+  "authPhoneBodyNoCode": "Рақамеро нишон диҳед, ки харидорон бо шумо тамос мегиранд.",
+  "authNoCodeNotice": "Тасдиқи рақам бо рамз ҳоло пайваст нест. Ҳисоб ба ҳамин телефон вобаста аст: ҳангоми иваз кардани телефон ё нест кардани барнома ба он даромадан имкон надорад."
 }

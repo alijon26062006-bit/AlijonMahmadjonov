@@ -26,6 +26,9 @@ class DemoAuthRepository implements AuthRepository {
   static String userIdFor(String phone) => 'demo-user-$phone';
 
   @override
+  bool get verifiesPhone => true;
+
+  @override
   Future<AppUser?> restoreSession() async {
     final id = await _session.read(SessionKeys.userId);
     if (id == null) return null;
@@ -99,6 +102,9 @@ class UnconfiguredAuthRepository implements AuthRepository {
   const UnconfiguredAuthRepository();
 
   static const _failure = FeatureUnavailableFailure(UnavailableFeature.sms);
+
+  @override
+  bool get verifiesPhone => true;
 
   @override
   Future<AppUser?> restoreSession() async => null;

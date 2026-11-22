@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -24,8 +26,20 @@ final _conversationProvider = FutureProvider.autoDispose
     });
 
 final _messagesProvider = FutureProvider.autoDispose
-    .family<List<ChatMessage>, String>((ref, id) {
-      return ref.watch(conversationRepositoryProvider).messages(id);
+    .family<List<ChatMessage>, String>((ref, id) async {
+      final repo = ref.watch(conversationRepositoryProvider);
+      final me = ref.watch(sessionControllerProvider)?.id;
+      // New messages and read receipts arrive over the realtime channel.
+      ref.watch(chatChangesProvider(id));
+      final messages = await repo.messages(id);
+      // The chat is open, so what the other person wrote is now read.
+      final hasUnread = messages.any(
+        (m) => m.senderId != me && m.state == DeliveryState.sent,
+      );
+      if (me != null && hasUnread && repo.deliversMessages) {
+        unawaited(repo.markRead(id).catchError((Object _) {}));
+      }
+      return messages;
     });
 
 class ConversationScreen extends ConsumerStatefulWidget {

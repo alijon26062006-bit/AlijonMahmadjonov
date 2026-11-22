@@ -3019,6 +3019,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Предыдущей версии нет'**
   String get devCatalogNoPrevious;
+
+  /// No description provided for @authPhoneBodyNoCode.
+  ///
+  /// In ru, this message translates to:
+  /// **'Укажите номер, по которому с вами свяжутся покупатели.'**
+  String get authPhoneBodyNoCode;
+
+  /// No description provided for @authNoCodeNotice.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.'**
+  String get authNoCodeNotice;
 }
 
 class _AppLocalizationsDelegate

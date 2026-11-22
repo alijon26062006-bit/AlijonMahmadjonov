@@ -1258,5 +1258,9 @@
   "devCatalogRollback": "Вернуть предыдущую версию каталога",
   "@devCatalogRollback": {},
   "devCatalogNoPrevious": "Предыдущей версии нет",
-  "@devCatalogNoPrevious": {}
+  "@devCatalogNoPrevious": {},
+  "authPhoneBodyNoCode": "Укажите номер, по которому с вами свяжутся покупатели.",
+  "@authPhoneBodyNoCode": {},
+  "authNoCodeNotice": "Подтверждение номера кодом пока не подключено. Аккаунт привязан к этому телефону: при смене телефона или удалении приложения войти в него не получится.",
+  "@authNoCodeNotice": {}
 }

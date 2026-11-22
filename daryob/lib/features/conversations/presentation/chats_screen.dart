@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,7 +21,37 @@ final conversationsProvider = FutureProvider.autoDispose<List<Conversation>>((
 ) async {
   final user = ref.watch(sessionControllerProvider);
   if (user == null) return const [];
+  // Reload when the server reports a new message or a read receipt.
+  ref.watch(chatChangesProvider(null));
   return ref.watch(conversationRepositoryProvider).list(user.id);
+});
+
+/// Counts change signals for the user's chats (or for one conversation).
+/// Watching it keeps a single realtime channel open; data providers that
+/// watch it reload on every tick without reopening the channel. A slow
+/// timer covers anything missed while the connection was down.
+final chatChangesProvider = StreamProvider.autoDispose.family<int, String?>((
+  ref,
+  conversationId,
+) {
+  final user = ref.watch(sessionControllerProvider);
+  final repo = ref.watch(conversationRepositoryProvider);
+  if (user == null || !repo.deliversMessages) return const Stream.empty();
+  final controller = StreamController<int>();
+  var ticks = 0;
+  final changes = repo
+      .watch(user.id, conversationId: conversationId)
+      .listen((_) => controller.add(++ticks));
+  final timer = Timer.periodic(
+    const Duration(seconds: 30),
+    (_) => controller.add(++ticks),
+  );
+  ref.onDispose(() {
+    timer.cancel();
+    changes.cancel();
+    controller.close();
+  });
+  return controller.stream;
 });
 
 class ChatsScreen extends ConsumerWidget {
