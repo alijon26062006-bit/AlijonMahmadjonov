@@ -8,8 +8,8 @@ import '../models/category.dart';
 import 'category_visuals.dart';
 
 /// Shows a listing photo from a URL (cached) or a local file. Without a
-/// photo, shows the category icon on a soft background — never a stock
-/// picture that could look like the real item.
+/// photo, shows the category icon on the category's own colour — never a
+/// stock picture that could look like the real item.
 class DaryobListingImage extends StatelessWidget {
   const DaryobListingImage({
     super.key,
@@ -51,6 +51,8 @@ class DaryobListingImage extends StatelessWidget {
   }
 }
 
+/// No photo: the category's own hue with its icon, so a feed of listings
+/// without pictures still reads as different kinds of things.
 class _Placeholder extends StatelessWidget {
   const _Placeholder({required this.icon, this.broken = false});
   final CategoryIcon icon;
@@ -58,15 +60,63 @@ class _Placeholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.palette.surfaceMuted,
-      child: Center(
-        child: Icon(
-          broken ? Icons.broken_image_outlined : categoryIconData(icon),
-          size: 40,
-          color: context.palette.textSecondary.withValues(alpha: 0.7),
-        ),
-      ),
+    final colors = categoryColors(context, icon);
+    final glyph = broken ? Icons.broken_image_outlined : categoryIconData(icon);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = constraints.biggest.shortestSide;
+        // Thumbnails (chat rows, drafts) only fit the icon itself.
+        if (!side.isFinite || side < 96) {
+          return ColoredBox(
+            color: colors.background,
+            child: Center(
+              child: Icon(glyph, size: side.isFinite ? side * 0.45 : 24, color: colors.foreground),
+            ),
+          );
+        }
+        final badge = (side * 0.4).clamp(48.0, 84.0);
+        return ClipRect(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colors.background,
+                  Color.lerp(colors.background, colors.foreground, 0.16)!,
+                ],
+              ),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Oversized echo of the icon, bleeding off the corner.
+                Positioned(
+                  right: -side * 0.18,
+                  bottom: -side * 0.22,
+                  child: Icon(
+                    glyph,
+                    size: side * 0.95,
+                    color: colors.foreground.withValues(alpha: 0.08),
+                  ),
+                ),
+                Center(
+                  child: Container(
+                    width: badge,
+                    height: badge,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(glyph, size: badge * 0.5, color: colors.foreground),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

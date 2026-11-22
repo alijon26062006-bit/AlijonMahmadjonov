@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/localization/l10n.dart';
 import '../../app/theme/tokens.dart';
 import '../models/category.dart';
+import 'category_visuals.dart';
 import 'listing_image.dart';
 
 /// Swipeable photo gallery with a counter. Tap opens full screen.
@@ -49,7 +50,10 @@ class _DaryobPhotoGalleryState extends State<DaryobPhotoGallery> {
               child: Text(
                 context.l10n.noPhotos,
                 textAlign: TextAlign.center,
-                style: context.text.bodySmall,
+                style: context.text.bodySmall?.copyWith(
+                  color: categoryColors(context, widget.icon).foreground,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

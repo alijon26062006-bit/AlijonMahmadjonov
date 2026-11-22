@@ -27,6 +27,35 @@ abstract final class DaryobColors {
   static const navySoft = Color(0xFFE8ECF4);
 }
 
+/// A soft background and a strong foreground of one hue.
+@immutable
+class DaryobTint {
+  const DaryobTint(this.soft, this.strong);
+  final Color soft;
+  final Color strong;
+}
+
+/// Category accents: each category keeps one hue on its icon tile and on the
+/// placeholder shown when a listing has no photo. Navy and lime stay the
+/// brand colours for navigation and actions.
+abstract final class DaryobTints {
+  static const blue = DaryobTint(Color(0xFFE3EEFF), Color(0xFF2457C5));
+  static const violet = DaryobTint(Color(0xFFEBE7FF), Color(0xFF5B45C9));
+  static const cyan = DaryobTint(Color(0xFFDDF4F8), Color(0xFF0E7C91));
+  static const amber = DaryobTint(Color(0xFFFFF0D1), Color(0xFFA86400));
+  static const pink = DaryobTint(Color(0xFFFFE4EE), Color(0xFFC2327A));
+  static const orange = DaryobTint(Color(0xFFFFE8DA), Color(0xFFC2541B));
+  static const slate = DaryobTint(Color(0xFFE6EBF2), Color(0xFF41506B));
+  static const yellow = DaryobTint(Color(0xFFFFF4C2), Color(0xFF8A6A00));
+  static const coral = DaryobTint(Color(0xFFFFE6E0), Color(0xFFC0483A));
+  static const teal = DaryobTint(Color(0xFFD9F4EC), Color(0xFF0F7A5E));
+  static const red = DaryobTint(Color(0xFFFFE3E3), Color(0xFFC23A3A));
+  static const green = DaryobTint(Color(0xFFE1F5D8), Color(0xFF3B7D1E));
+  static const brown = DaryobTint(Color(0xFFF3E7DA), Color(0xFF8A5A2B));
+  static const lime = DaryobTint(DaryobColors.limeSoft, Color(0xFF4F6B00));
+  static const neutral = DaryobTint(DaryobColors.navySoft, DaryobColors.textSecondary);
+}
+
 abstract final class DaryobSpacing {
   static const double xxs = 2;
   static const double xs = 4;

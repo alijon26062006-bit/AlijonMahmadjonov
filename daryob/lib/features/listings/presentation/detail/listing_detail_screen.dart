@@ -86,10 +86,11 @@ class _DetailView extends ConsumerWidget {
     final seller = ref.watch(sellerProvider(listing.ownerId)).value;
     final actions = ListingActions(context, ref);
     final isFree = category?.priceMode == PriceMode.free;
-    final galleryHeight = (MediaQuery.sizeOf(context).width * 0.8).clamp(
-      240.0,
-      420.0,
-    );
+    // Without photos the header is only a category placeholder: keep it
+    // short so the price and title are visible without scrolling.
+    final galleryHeight = listing.photos.isEmpty
+        ? (MediaQuery.sizeOf(context).width * 0.5).clamp(180.0, 260.0)
+        : (MediaQuery.sizeOf(context).width * 0.8).clamp(240.0, 420.0);
 
     final priceText = listingPriceText(context, ref, listing);
     final characteristics = <(String, String)>[

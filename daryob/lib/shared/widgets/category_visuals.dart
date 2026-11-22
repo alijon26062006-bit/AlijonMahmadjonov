@@ -22,6 +22,44 @@ IconData categoryIconData(CategoryIcon icon) => switch (icon) {
   CategoryIcon.generic => Icons.category_outlined,
 };
 
+DaryobTint categoryTint(CategoryIcon icon) => switch (icon) {
+  CategoryIcon.house => DaryobTints.blue,
+  CategoryIcon.car => DaryobTints.violet,
+  CategoryIcon.smartphone => DaryobTints.cyan,
+  CategoryIcon.briefcase => DaryobTints.amber,
+  CategoryIcon.shirt => DaryobTints.pink,
+  CategoryIcon.sofa => DaryobTints.orange,
+  CategoryIcon.wrench => DaryobTints.slate,
+  CategoryIcon.hardHat => DaryobTints.yellow,
+  CategoryIcon.baby => DaryobTints.coral,
+  CategoryIcon.building => DaryobTints.teal,
+  CategoryIcon.dumbbell => DaryobTints.red,
+  CategoryIcon.sprout => DaryobTints.green,
+  CategoryIcon.pawPrint => DaryobTints.brown,
+  CategoryIcon.gift => DaryobTints.lime,
+  CategoryIcon.generic => DaryobTints.neutral,
+};
+
+/// Background and foreground of a category accent in the current theme.
+/// In dark mode the hue is laid thinly over the dark surface and the
+/// foreground is lightened so it stays readable.
+({Color background, Color foreground}) categoryColors(
+  BuildContext context,
+  CategoryIcon icon,
+) {
+  final tint = categoryTint(icon);
+  if (Theme.of(context).brightness == Brightness.dark) {
+    return (
+      background: Color.alphaBlend(
+        tint.strong.withValues(alpha: 0.26),
+        DaryobColors.darkSurface,
+      ),
+      foreground: Color.lerp(tint.strong, Colors.white, 0.6)!,
+    );
+  }
+  return (background: tint.soft, foreground: tint.strong);
+}
+
 class DaryobCategoryIcon extends StatelessWidget {
   const DaryobCategoryIcon({super.key, required this.icon, this.size = 52});
 
@@ -30,20 +68,19 @@ class DaryobCategoryIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = categoryColors(context, icon);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: context.palette.limeSoft,
+        color: colors.background,
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
       alignment: Alignment.center,
       child: Icon(
         categoryIconData(icon),
         size: size * 0.5,
-        color: Theme.of(context).brightness == Brightness.dark
-            ? DaryobColors.lime
-            : DaryobColors.navy,
+        color: colors.foreground,
       ),
     );
   }
