@@ -7,7 +7,7 @@
 <title>Магазин</title>
 <link rel="preload" href="static/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="static/fonts/unbounded-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="static/app.css?v=4">
+<link rel="stylesheet" href="static/app.css?v=5">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -27,6 +27,14 @@
 <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></symbol>
 <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
 <symbol id="share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
+<symbol id="server" viewBox="0 0 24 24"><rect x="4" y="4.5" width="16" height="6" rx="2"/><rect x="4" y="13.5" width="16" height="6" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01M11 7.5h5M11 16.5h5"/></symbol>
+<symbol id="back" viewBox="0 0 24 24"><path d="M15 5.5 8.5 12l6.5 6.5"/></symbol>
+<symbol id="next" viewBox="0 0 24 24"><path d="M9 5.5 15.5 12 9 18.5"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="power" viewBox="0 0 24 24"><path d="M12 4v7M7.5 7a7 7 0 1 0 9 0"/></symbol>
+<symbol id="reboot" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5M19 4.5V9h-4.5"/></symbol>
+<symbol id="key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5 19 4M15.5 7.5l2 2M17.5 5.5l2 2"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/></symbol>
 </svg>
 
 <!-- МАГАЗИН -->
@@ -38,6 +46,9 @@
       <div style="display:flex;justify-content:space-between;align-items:center"><span class="cap" data-t="balance">Баланс</span><span class="pill" id="myId">ID</span></div>
       <div style="margin-top:8px"><span class="num" data-balance>0</span> <b data-t="somoni">сомони</b></div>
     </div>
+    <button class="card" id="vpsEntry" hidden data-vgo="vps"><span class="ico"><svg class="i"><use href="#server"/></svg></span>
+      <span style="text-align:left"><span class="tt" style="display:block" data-t="vpsTitle">VPS-серверы</span><span class="ss" data-t="vpsSub">Свой сервер за минуту</span></span>
+      <span class="r"><svg class="i"><use href="#next"/></svg></span></button>
     <div class="seg" id="seg" role="tablist"><span class="thumb"></span>
       <button role="tab" aria-selected="true" data-tab="stars"><svg class="i"><use href="#star"/></svg>Stars</button>
       <button role="tab" aria-selected="false" data-tab="premium"><svg class="i"><use href="#dia"/></svg>Premium</button>
@@ -125,11 +136,53 @@
       <div class="chips" id="aMethod"></div>
       <input class="field" id="aDetails" placeholder="+992 90 000 00 00 · Имя Фамилия" autocomplete="off">
       <button class="btn ghost" id="aAddCard">Добавить карту</button></div>
+    <div id="aVps"></div>
     <h2 class="h1" style="font-size:15px">Клиент</h2>
     <div style="display:flex;gap:8px"><input class="field" id="aFind" placeholder="ID или @username" autocapitalize="none" autocomplete="off">
       <button class="chip" id="aFindGo" style="height:56px;border-radius:18px">Найти</button></div>
     <div id="aUser"></div>
   </div>
+</section>
+
+<!-- VPS: мои серверы -->
+<section class="page" data-page="vps">
+  <div class="rise" style="display:flex;flex-direction:column;gap:13px">
+    <div><button class="back" data-vback="shop"><svg class="i"><use href="#back"/></svg><span data-t="shop">Магазин</span></button>
+      <h1 class="h1" style="margin-top:8px" data-t="vpsTitle">VPS-серверы</h1></div>
+    <div class="list" id="vList"></div>
+    <button class="btn" id="vNew"><svg class="i"><use href="#plus"/></svg><span data-t="vNew">Новый сервер</span></button>
+    <p class="muted" data-t="vNote">Оплата с баланса раз в 30 дней. Root-доступ, IPv4 и IPv6.</p>
+  </div>
+</section>
+
+<!-- VPS: заказ -->
+<section class="page" data-page="vpsnew">
+  <div class="rise" style="display:flex;flex-direction:column;gap:13px">
+    <div><button class="back" data-vback="vps"><svg class="i"><use href="#back"/></svg><span data-t="vpsTitle">VPS-серверы</span></button>
+      <h1 class="h1" style="margin-top:8px" data-t="vNew">Новый сервер</h1></div>
+    <div id="vWait" class="empty" data-t="vLoading">Загружаем тарифы…</div>
+    <div id="vForm" hidden style="display:flex;flex-direction:column;gap:13px">
+      <div class="cap"><span class="vn">1</span><span data-t="vLoc">Страна</span></div><div class="chips" id="vLoc"></div>
+      <div class="cap"><span class="vn">2</span><span data-t="vPlan">Тариф</span></div><div class="list" id="vPlans"></div>
+      <div class="cap"><span class="vn">3</span><span data-t="vImg">Система</span></div><div class="chips" id="vImg"></div>
+      <div class="cap"><span class="vn">4</span><span data-t="vNamePw">Имя и пароль</span></div>
+      <label class="cap" style="text-transform:none;letter-spacing:0;font-size:12px"><span data-t="vName">Имя сервера</span>
+        <input class="field" id="vName" maxlength="41" autocomplete="off" autocapitalize="none" spellcheck="false" style="margin-top:6px"></label>
+      <div class="card"><div><div class="tt" data-t="vGen">Сгенерировать пароль root</div><div class="ss" data-t="vGenSub">Покажем один раз — мы его не храним</div></div>
+        <button class="switch r" id="vGenSw" role="switch" aria-checked="true" aria-label="Сгенерировать пароль"></button></div>
+      <input class="field" id="vPw" type="password" hidden autocomplete="new-password" data-ph="vPwPh">
+      <div class="main"><div style="display:flex;justify-content:space-between;align-items:center"><span class="cap" data-t="vMonth">За 30 дней</span><span class="pill" id="vUsd">$0</span></div>
+        <div style="margin-top:8px"><span class="num" id="vSum">0</span> <b data-t="somoni">сомони</b></div>
+        <div class="muted" style="color:rgba(255,255,255,.6);margin-top:6px" id="vSpec"></div></div>
+      <button class="btn" id="vBuy"><svg class="i"><use href="#server"/></svg><span data-t="vBuy">Создать сервер</span></button>
+      <p class="hint" id="vBuyHint" role="status"></p>
+    </div>
+  </div>
+</section>
+
+<!-- VPS: карточка сервера -->
+<section class="page" data-page="vpssrv">
+  <div class="rise" style="display:flex;flex-direction:column;gap:13px" id="vSrv"></div>
 </section>
 
 <!-- УСПЕХ -->
@@ -164,6 +217,8 @@
 </div>
 
 <script src="static/motion.js?v=1"></script>
-<script src="static/app.js?v=4"></script>
+<script src="static/app.js?v=5"></script>
+<script src="static/charts.js?v=1"></script>
+<script src="static/vps.js?v=1"></script>
 </body>
 </html>

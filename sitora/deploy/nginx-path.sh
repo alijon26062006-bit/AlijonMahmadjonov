@@ -22,6 +22,26 @@ location ^~ /$SECRET/ {
     proxy_read_timeout 60s;
     client_max_body_size 12m;
 }
+# VPS: живые графики (WebSocket) — агент на сервере клиента и мини-приложение
+location = /$SECRET/agent {
+    proxy_pass http://127.0.0.1:$PORT/agent;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \$host;
+    proxy_set_header Authorization \$http_authorization;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
+location = /$SECRET/ws/live {
+    proxy_pass http://127.0.0.1:$PORT/ws/live;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \$host;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
 NGINX
 [ -f "$SITE" ] || { echo "Не найден $SITE — пришлите вывод: ls /etc/nginx/sites-enabled"; exit 1; }
 if grep -q "include $SNIP;" "$SITE"; then

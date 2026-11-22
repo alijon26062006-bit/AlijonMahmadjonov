@@ -70,6 +70,7 @@
     document.documentElement.lang = S.lang === "tj" ? "tg" : "ru";
     if (S.me) checkSum();
     items();
+    if (window.SitoraVps) SitoraVps.texts();
   }
 
   // ── каталог ──
@@ -166,6 +167,7 @@
 
   // ── баланс ──
   function setMe(d) {
+    var vb = $("#vpsEntry"); if (vb) vb.hidden = !d.vps;
     var old = S.me ? S.me.user.balance : null; S.me = d;
     $$("[data-name]").forEach(function (el) { el.textContent = d.name; });
     document.title = d.name;
@@ -365,11 +367,15 @@
     var off = e.target.closest("[data-coff]"); if (off) api("api/admin/cards/" + off.dataset.coff + "/off", {}).then(admin).catch(fail);
     var am = e.target.closest("[data-am]"); if (am) { A.method = am.dataset.am; $$("#aMethod .chip").forEach(function (x) { x.classList.toggle("sel", x === am); }); }
   });
-  $("#aRefresh").onclick = admin;
+  $("#aRefresh").onclick = function () { admin(); if (window.SitoraVps) SitoraVps.admin(); };
   $("#aSave").onclick = function () { api("api/admin/settings", { rate: $("#aRate").value, markup: $("#aMarkup").value, gift_star: $("#aGift").value, min_topup: $("#aMin").value }).then(function () { M.toast("Цены сохранены"); refresh(); }).catch(fail); };
   $("#aAddCard").onclick = function () { api("api/admin/cards", { method: A.method, details: $("#aDetails").value }).then(function () { $("#aDetails").value = ""; M.toast("Карта добавлена"); admin(); refresh(); }).catch(function (e) { M.shake($("#aDetails")); fail(e); }); };
   $("#aFindGo").onclick = function () { var q = $("#aFind").value.trim(); if (q) adminUser(q); else M.shake($("#aFind")); };
-  $('.page[data-page="admin"]')._enter = admin;
+  $('.page[data-page="admin"]')._enter = function () { admin(); if (window.SitoraVps) SitoraVps.admin(); };
+
+  // общие помощники — для раздела VPS (vps.js)
+  window.Sitora = { api: api, T: T, t: t, esc: esc, som: som, fail: fail, haptic: haptic, refresh: refresh, sheet: sheet,
+    closeSheet: function () { if (close && !$("#pay").hidden) close(); }, me: function () { return S.me; }, lang: function () { return S.lang; } };
 
   // ── запуск ──
   if (TG) { try { TG.ready(); TG.expand(); TG.setHeaderColor("#FFFFFF"); TG.setBackgroundColor("#FFFFFF"); TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {} }

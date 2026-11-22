@@ -32,6 +32,8 @@ class Config:
     receipt_model: str = "gpt-4o-mini"
     support: str = ""
     receipts_dir: str = str(ROOT / "data" / "receipts")
+    hetzner_token: str = ""
+    hetzner_url: str = "https://api.hetzner.cloud/v1"
 
     @classmethod
     def load(cls) -> "Config":
@@ -51,6 +53,8 @@ class Config:
             receipt_model=e("SITORA_RECEIPT_MODEL", "gpt-4o-mini"),
             support=e("SITORA_SUPPORT", ""),
             receipts_dir=str(Path(db).parent / "receipts"),
+            hetzner_token=e("SITORA_HETZNER_TOKEN", ""),
+            hetzner_url=e("SITORA_HETZNER_URL", "https://api.hetzner.cloud/v1").rstrip("/"),
         )
 
     def is_admin(self, tg_id: int | None) -> bool:

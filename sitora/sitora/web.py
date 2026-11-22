@@ -1,8 +1,10 @@
 """Веб: мини-приложение /app и его API. Каждый запрос подписан Telegram (initData) — чужой не пройдёт."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import secrets
+from contextlib import asynccontextmanager
 import threading
 from pathlib import Path
 from typing import Any
@@ -33,9 +35,22 @@ def _sniff(data: bytes) -> str | None:
     return None
 
 
-def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI:
+def create_app(config: Config, bot: Bot | None = None, supplier=None, vps=None, background: bool = True) -> FastAPI:
     db.init(config.db_path)
-    app = FastAPI(title=config.name, docs_url=None, redoc_url=None, openapi_url=None)
+    from .vps import api as vps_api, live as vps_live
+    from .vps.store import Vps
+    v = vps if vps is not None else Vps(config, bot)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        tasks = [asyncio.create_task(c) for c in vps_api.background(v)] if background else []
+        yield
+        for t in tasks:
+            t.cancel()
+        vps_live.hub.flush(v)
+
+    app = FastAPI(title=config.name, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.state.vps = v
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def conn():
@@ -112,7 +127,7 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
                          "balance": c.execute("SELECT balance FROM users WHERE id = ?", (u["id"],)).fetchone()[0]},
                 "catalog": shop.catalog(c), "methods": shop.methods(c), "min_topup": shop.min_topup(c), "support": config.support,
                 "orders": [shop.public_order(o) for o in orders],
-                "admin": shop.is_admin(c, config, u["id"]),
+                "admin": shop.is_admin(c, config, u["id"]), "vps": v.enabled(c),
                 "topup": shop.topup_view(c, waiting) if waiting else None}
 
     @app.get("/api/me")
@@ -351,6 +366,7 @@ def create_app(config: Config, bot: Bot | None = None, supplier=None) -> FastAPI
             c.execute("UPDATE users SET banned = ? WHERE id = ?", (1 if body["banned"] else 0, uid))
         return {"ok": True}
 
+    app.include_router(vps_api.router(v, user, admin))   # раздел VPS (Hetzner)
     return app
 
 

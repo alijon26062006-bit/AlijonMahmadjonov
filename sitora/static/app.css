@@ -216,3 +216,37 @@ label.cap{display:block}
 .steps .done{background:none;border:1.5px solid var(--ink);color:var(--ink)}
 .steps .done i{background:var(--ink);color:#fff}
 .btn{transition:opacity .2s var(--ease),transform .15s var(--ease)}
+
+/* ── VPS ── */
+.back{display:inline-flex;align-items:center;gap:4px;height:32px;margin-left:-6px;padding:0 10px 0 4px;border-radius:99px;font-weight:700;font-size:13px;color:var(--mute-2)}
+.back svg.i{width:18px;height:18px}
+.vn{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;letter-spacing:0;margin-right:8px;vertical-align:1px}
+.plan{width:100%;text-align:left}
+.plan .spec{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.plan .spec span{height:24px;padding:0 9px;border-radius:99px;background:var(--tile);font-size:11px;font-weight:800;display:inline-flex;align-items:center}
+.plan.sel .spec span{background:var(--ink);color:#fff}
+.plan .pr{font:700 16px "Unbounded","Onest";white-space:nowrap}
+.plan .pr small{display:block;font:600 11px "Onest";color:var(--mute);text-align:right}
+.chip:disabled{opacity:.35;pointer-events:none}
+.srv .dot.off{background:var(--mute)}.srv .dot.off::after{display:none}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;letter-spacing:0}
+.ipbox{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;background:rgba(255,255,255,.08);border-radius:14px;padding:10px 12px;font-size:16px}
+.ipbox button{color:#fff;opacity:.75}
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.meter{background:var(--tile);border-radius:18px;padding:12px}
+.meter b{display:block;font:700 22px "Unbounded","Onest";margin:4px 0 8px;font-variant-numeric:tabular-nums}
+.meter .progress{background:#fff}
+.meter .progress i{animation:none;transition:transform .6s var(--ease)}
+.chart{display:block;width:100%;height:150px}
+.legend{display:flex;gap:14px;font-size:11px;font-weight:700;color:var(--mute-2);margin-top:8px}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid var(--ink);vertical-align:middle;margin-right:6px}
+.legend i.dash{border-top:2px dashed var(--mute)}
+.live{display:inline-flex;align-items:center;gap:8px}
+.procs{display:grid;gap:6px;font-size:12px;font-weight:600}
+.procs div{display:flex;justify-content:space-between;gap:10px}
+.procs span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.danger{color:#E5484D!important;border-color:rgba(229,72,77,.35)!important}
+.pw{font-size:18px;word-break:break-all;background:var(--tile);border-radius:18px;padding:16px;text-align:center}
+.main .dot,.main .dot::after{background:#fff}
+.page{overflow-x:clip}   /* въезд страницы сбоку не раздвигает экран телефона */
+html,body{overflow-x:clip}   /* ничего не раздвигает экран телефона вбок; прокрутка остаётся у окна */
