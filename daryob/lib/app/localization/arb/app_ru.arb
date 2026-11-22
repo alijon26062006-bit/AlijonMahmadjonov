@@ -1,0 +1,1130 @@
+{
+  "@@locale": "ru",
+  "appName": "DARYOB",
+  "@appName": {},
+  "brandSlogan": "Ищи. Находи. Покупай.",
+  "@brandSlogan": {},
+  "retry": "Повторить",
+  "@retry": {},
+  "cancel": "Отмена",
+  "@cancel": {},
+  "save": "Сохранить",
+  "@save": {},
+  "saveChanges": "Сохранить изменения",
+  "@saveChanges": {},
+  "delete": "Удалить",
+  "@delete": {},
+  "edit": "Изменить",
+  "@edit": {},
+  "close": "Закрыть",
+  "@close": {},
+  "next": "Далее",
+  "@next": {},
+  "back": "Назад",
+  "@back": {},
+  "continueAction": "Продолжить",
+  "@continueAction": {},
+  "done": "Готово",
+  "@done": {},
+  "ok": "Понятно",
+  "@ok": {},
+  "yes": "Да",
+  "@yes": {},
+  "no": "Нет",
+  "@no": {},
+  "seeAll": "Все",
+  "@seeAll": {},
+  "all": "Все",
+  "@all": {},
+  "clear": "Очистить",
+  "@clear": {},
+  "reset": "Сбросить",
+  "@reset": {},
+  "confirm": "Подтвердить",
+  "@confirm": {},
+  "more": "Ещё",
+  "@more": {},
+  "share": "Поделиться",
+  "@share": {},
+  "skip": "Пропустить",
+  "@skip": {},
+  "search": "Поиск",
+  "@search": {},
+  "send": "Отправить",
+  "@send": {},
+  "publish": "Опубликовать",
+  "@publish": {},
+  "switchLanguage": "Сменить язык",
+  "@switchLanguage": {},
+  "tabHome": "Главная",
+  "@tabHome": {},
+  "tabFavorites": "Избранное",
+  "@tabFavorites": {},
+  "tabCreate": "Подать",
+  "@tabCreate": {},
+  "tabChats": "Чаты",
+  "@tabChats": {},
+  "tabProfile": "Профиль",
+  "@tabProfile": {},
+  "onboardingWelcomeTitle": "Всё, что нужно, рядом",
+  "@onboardingWelcomeTitle": {},
+  "onboardingWelcomeBody": "Покупайте и продавайте по всему Таджикистану.",
+  "@onboardingWelcomeBody": {},
+  "onboardingSellTitle": "Продавайте легко",
+  "@onboardingSellTitle": {},
+  "onboardingSellBody": "Сфотографируйте вещь, добавьте цену и опубликуйте объявление за пару минут.",
+  "@onboardingSellBody": {},
+  "onboardingNearbyTitle": "Находите предложения рядом",
+  "@onboardingNearbyTitle": {},
+  "onboardingNearbyBody": "Выберите свой город — мы покажем объявления поблизости.",
+  "@onboardingNearbyBody": {},
+  "languageChangeLater": "Язык можно изменить в любой момент в профиле.",
+  "@languageChangeLater": {},
+  "onboardingCityTitle": "Где вы находитесь?",
+  "@onboardingCityTitle": {},
+  "onboardingCityBody": "Город нужен, чтобы показывать объявления рядом. Местоположение телефона не запрашивается.",
+  "@onboardingCityBody": {},
+  "otherCity": "Другой город или район",
+  "@otherCity": {},
+  "startUsing": "Начать",
+  "@startUsing": {},
+  "searchHint": "Что вы ищете?",
+  "@searchHint": {},
+  "heroTitle": "Находите лучшее рядом",
+  "@heroTitle": {},
+  "heroSubtitle": "Объявления по всему Таджикистану",
+  "@heroSubtitle": {},
+  "createListing": "Подать объявление",
+  "@createListing": {},
+  "categories": "Категории",
+  "@categories": {},
+  "allCategories": "Все категории",
+  "@allCategories": {},
+  "vipListings": "VIP объявления",
+  "@vipListings": {},
+  "recommended": "Рекомендуем вам",
+  "@recommended": {},
+  "newListings": "Новые объявления",
+  "@newListings": {},
+  "nearbyIn": "Рядом: {name}",
+  "@nearbyIn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noListingsYet": "Объявлений пока нет",
+  "@noListingsYet": {},
+  "noListingsYetBody": "Станьте первым — подайте объявление.",
+  "@noListingsYetBody": {},
+  "loadMore": "Показать ещё",
+  "@loadMore": {},
+  "loadMoreFailed": "Не удалось загрузить. Повторить",
+  "@loadMoreFailed": {},
+  "endOfList": "Это все объявления",
+  "@endOfList": {},
+  "notifications": "Уведомления",
+  "@notifications": {},
+  "priceFree": "Бесплатно",
+  "@priceFree": {},
+  "priceOnRequest": "Цена договорная",
+  "@priceOnRequest": {},
+  "negotiable": "Торг уместен",
+  "@negotiable": {},
+  "favoriteAdd": "Добавить в избранное",
+  "@favoriteAdd": {},
+  "favoriteRemove": "Убрать из избранного",
+  "@favoriteRemove": {},
+  "favoriteAdded": "Добавлено в избранное",
+  "@favoriteAdded": {},
+  "favoriteRemoved": "Убрано из избранного",
+  "@favoriteRemoved": {},
+  "demoBadgeDescription": "Демонстрационные данные",
+  "@demoBadgeDescription": {},
+  "noPhotos": "Фото не добавлены",
+  "@noPhotos": {},
+  "photoOf": "Фото {index} из {total}",
+  "@photoOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "listingNotFound": "Объявление не найдено",
+  "@listingNotFound": {},
+  "listingNotFoundBody": "Возможно, его удалили или сняли с публикации.",
+  "@listingNotFoundBody": {},
+  "demoListingNotice": "Это демонстрационное объявление для проверки приложения. Это не реальное предложение.",
+  "@demoListingNotice": {},
+  "localListingNotice": "Объявление сохранено только на этом телефоне: сервер ещё не подключён, другие люди его не видят.",
+  "@localListingNotice": {},
+  "publishedOn": "Опубликовано {date}",
+  "@publishedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listingNumber": "Объявление № {number}",
+  "@listingNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "views": "Просмотров: {count}",
+  "@views": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewsLabel": "Просмотры",
+  "@viewsLabel": {},
+  "description": "Описание",
+  "@description": {},
+  "characteristics": "Характеристики",
+  "@characteristics": {},
+  "category": "Категория",
+  "@category": {},
+  "seller": "Продавец",
+  "@seller": {},
+  "memberSince": "На DARYOB с {date}",
+  "@memberSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "verifiedSeller": "Проверенный продавец",
+  "@verifiedSeller": {},
+  "sellerBusiness": "Компания",
+  "@sellerBusiness": {},
+  "sellerPrivate": "Частное лицо",
+  "@sellerPrivate": {},
+  "safetyTipShort": "Не переводите предоплату незнакомым людям. Проверяйте товар при встрече.",
+  "@safetyTipShort": {},
+  "reportListing": "Пожаловаться",
+  "@reportListing": {},
+  "moreFromSeller": "Другие объявления продавца",
+  "@moreFromSeller": {},
+  "similarListings": "Похожие объявления",
+  "@similarListings": {},
+  "sharedFromDaryob": "Найдено в DARYOB",
+  "@sharedFromDaryob": {},
+  "yourListing": "Ваше объявление",
+  "@yourListing": {},
+  "promote": "Продвинуть",
+  "@promote": {},
+  "markSold": "Продано",
+  "@markSold": {},
+  "archive": "В архив",
+  "@archive": {},
+  "republish": "Опубликовать снова",
+  "@republish": {},
+  "phoneHidden": "Номер скрыт",
+  "@phoneHidden": {},
+  "showPhone": "Показать номер",
+  "@showPhone": {},
+  "call": "Позвонить",
+  "@call": {},
+  "callFailed": "Не удалось открыть звонилку",
+  "@callFailed": {},
+  "writeMessage": "Написать",
+  "@writeMessage": {},
+  "listingNotAvailable": "Объявление сейчас неактивно",
+  "@listingNotAvailable": {},
+  "chatOwnListing": "Это ваше объявление",
+  "@chatOwnListing": {},
+  "statusChangedTo": "Статус: {status}",
+  "@statusChangedTo": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteListingTitle": "Удалить объявление?",
+  "@deleteListingTitle": {},
+  "deleteListingBody": "Объявление будет удалено без возможности восстановления.",
+  "@deleteListingBody": {},
+  "listingDeleted": "Объявление удалено",
+  "@listingDeleted": {},
+  "reportTitle": "Жалоба на объявление",
+  "@reportTitle": {},
+  "reportBody": "Выберите причину. Модераторы проверят объявление.",
+  "@reportBody": {},
+  "reportFraud": "Мошенничество",
+  "@reportFraud": {},
+  "reportProhibited": "Запрещённый товар",
+  "@reportProhibited": {},
+  "reportWrongCategory": "Неверная категория",
+  "@reportWrongCategory": {},
+  "reportDuplicate": "Повторное объявление",
+  "@reportDuplicate": {},
+  "reportSold": "Уже продано",
+  "@reportSold": {},
+  "reportOffensive": "Оскорбительное содержание",
+  "@reportOffensive": {},
+  "reportOther": "Другое",
+  "@reportOther": {},
+  "reportCommentHint": "Комментарий (необязательно)",
+  "@reportCommentHint": {},
+  "reportSend": "Отправить жалобу",
+  "@reportSend": {},
+  "reportSent": "Жалоба отправлена",
+  "@reportSent": {},
+  "reportSavedLocally": "Жалоба сохранена на телефоне — сервер модерации ещё не подключён",
+  "@reportSavedLocally": {},
+  "reportUser": "Пожаловаться на пользователя",
+  "@reportUser": {},
+  "reportUserBody": "Сообщить модераторам о подозрительном поведении собеседника?",
+  "@reportUserBody": {},
+  "listingsCount": "{count, plural, one{{count} объявление} few{{count} объявления} many{{count} объявлений} other{{count} объявления}}",
+  "@listingsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categoryNotFound": "Категория не найдена",
+  "@categoryNotFound": {},
+  "nothingFound": "Ничего не найдено",
+  "@nothingFound": {},
+  "nothingFoundBody": "Попробуйте изменить запрос, город или фильтры.",
+  "@nothingFoundBody": {},
+  "resetFilters": "Сбросить фильтры",
+  "@resetFilters": {},
+  "filters": "Фильтры",
+  "@filters": {},
+  "location": "Местоположение",
+  "@location": {},
+  "chooseLocation": "Выберите город или район",
+  "@chooseLocation": {},
+  "wholeRegion": "Весь регион: {name}",
+  "@wholeRegion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "priceRange": "Цена, сомони",
+  "@priceRange": {},
+  "priceFrom": "от",
+  "@priceFrom": {},
+  "priceTo": "до",
+  "@priceTo": {},
+  "sortBy": "Сортировка",
+  "@sortBy": {},
+  "sortRelevance": "Сначала подходящие",
+  "@sortRelevance": {},
+  "sortNewest": "Сначала новые",
+  "@sortNewest": {},
+  "sortPriceAsc": "Сначала дешёвые",
+  "@sortPriceAsc": {},
+  "sortPriceDesc": "Сначала дорогие",
+  "@sortPriceDesc": {},
+  "showResults": "Показать",
+  "@showResults": {},
+  "recentSearches": "Недавние запросы",
+  "@recentSearches": {},
+  "clearHistory": "Очистить",
+  "@clearHistory": {},
+  "searchByCategory": "Искать в категории",
+  "@searchByCategory": {},
+  "priceFilterChip": "Цена: {from} – {to}",
+  "@priceFilterChip": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsCount": "Найдено: {count}",
+  "@resultsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "favoritesEmpty": "В избранном пусто",
+  "@favoritesEmpty": {},
+  "favoritesEmptyBody": "Нажмите ♡ на объявлении, чтобы сохранить его здесь.",
+  "@favoritesEmptyBody": {},
+  "browseListings": "Смотреть объявления",
+  "@browseListings": {},
+  "favoritesGuestNotice": "Избранное хранится на этом телефоне. Войдите, чтобы привязать его к аккаунту.",
+  "@favoritesGuestNotice": {},
+  "editListing": "Редактирование",
+  "@editListing": {},
+  "stepOf": "Шаг {current} из {total}: {title}",
+  "@stepOf": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "stepCategory": "Категория",
+  "@stepCategory": {},
+  "stepBasics": "Основное",
+  "@stepBasics": {},
+  "stepPhotos": "Фото",
+  "@stepPhotos": {},
+  "stepLocation": "Место",
+  "@stepLocation": {},
+  "stepContact": "Контакты",
+  "@stepContact": {},
+  "stepPreview": "Проверка",
+  "@stepPreview": {},
+  "chooseCategoryError": "Выберите категорию объявления",
+  "@chooseCategoryError": {},
+  "fieldTitle": "Заголовок",
+  "@fieldTitle": {},
+  "fieldTitleHint": "Например: диван раскладной, почти новый",
+  "@fieldTitleHint": {},
+  "fieldDescriptionHint": "Состояние, особенности, причина продажи",
+  "@fieldDescriptionHint": {},
+  "price": "Цена",
+  "@price": {},
+  "priceOptionalHint": "Можно не указывать",
+  "@priceOptionalHint": {},
+  "negotiableHint": "Покупатели увидят, что цену можно обсудить",
+  "@negotiableHint": {},
+  "freeCategoryNotice": "В этой категории вещи отдают бесплатно — цена не нужна.",
+  "@freeCategoryNotice": {},
+  "photos": "Фото",
+  "@photos": {},
+  "photosTip": "Объявления с хорошими фото находят покупателя быстрее. Первое фото станет обложкой.",
+  "@photosTip": {},
+  "photoFromGallery": "Из галереи",
+  "@photoFromGallery": {},
+  "photoFromCamera": "Сделать фото",
+  "@photoFromCamera": {},
+  "photosCounter": "Фото: {count} из {max}",
+  "@photosCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "photosReorderHint": "Порядок можно менять стрелками",
+  "@photosReorderHint": {},
+  "photoCover": "Обложка",
+  "@photoCover": {},
+  "photoNumber": "Фото {n}",
+  "@photoNumber": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "photoPickFailed": "Не удалось добавить фото. Проверьте разрешения.",
+  "@photoPickFailed": {},
+  "moveUp": "Выше",
+  "@moveUp": {},
+  "moveDown": "Ниже",
+  "@moveDown": {},
+  "addressNote": "Уточнение адреса",
+  "@addressNote": {},
+  "addressNoteHint": "Например: рядом с рынком «Корвон»",
+  "@addressNoteHint": {},
+  "addressPrivacyNote": "Не указывайте номер квартиры — точный адрес лучше сообщить в переписке.",
+  "@addressPrivacyNote": {},
+  "contactName": "Имя",
+  "@contactName": {},
+  "contactPhone": "Номер телефона",
+  "@contactPhone": {},
+  "phoneVisibility": "Номер в объявлении",
+  "@phoneVisibility": {},
+  "phoneVisible": "Показывать номер",
+  "@phoneVisible": {},
+  "phoneVisibleHint": "Номер откроется после нажатия «Показать номер»",
+  "@phoneVisibleHint": {},
+  "phoneHiddenOption": "Скрыть номер",
+  "@phoneHiddenOption": {},
+  "phoneHiddenHint": "Связь только через чат",
+  "@phoneHiddenHint": {},
+  "chatEnabled": "Сообщения в чате",
+  "@chatEnabled": {},
+  "chatEnabledHint": "Покупатели смогут написать вам в приложении",
+  "@chatEnabledHint": {},
+  "contactMethodError": "Оставьте хотя бы один способ связи: номер или чат.",
+  "@contactMethodError": {},
+  "contacts": "Контакты",
+  "@contacts": {},
+  "previewNotice": "Так покупатели увидят ваше объявление. Проверьте всё перед публикацией.",
+  "@previewNotice": {},
+  "localPublishNotice": "Демо-режим: объявление сохранится только на этом телефоне.",
+  "@localPublishNotice": {},
+  "draftResumed": "Продолжаем ваш черновик — он сохраняется автоматически.",
+  "@draftResumed": {},
+  "fixErrors": "Проверьте отмеченные поля",
+  "@fixErrors": {},
+  "changesSaved": "Изменения сохранены",
+  "@changesSaved": {},
+  "startNew": "Новое объявление",
+  "@startNew": {},
+  "startNewTitle": "Начать новое объявление?",
+  "@startNewTitle": {},
+  "startNewBody": "Текущий черновик останется в «Моих черновиках».",
+  "@startNewBody": {},
+  "myDrafts": "Мои черновики",
+  "@myDrafts": {},
+  "publishedTitle": "Объявление опубликовано!",
+  "@publishedTitle": {},
+  "publishedBody": "Покупатели уже могут его найти.",
+  "@publishedBody": {},
+  "publishedLocalBody": "Демо-режим: объявление сохранено на этом телефоне и видно только вам.",
+  "@publishedLocalBody": {},
+  "openListing": "Открыть объявление",
+  "@openListing": {},
+  "myListings": "Мои объявления",
+  "@myListings": {},
+  "createAnother": "Подать ещё одно",
+  "@createAnother": {},
+  "draftsEmpty": "Черновиков нет",
+  "@draftsEmpty": {},
+  "draftsEmptyBody": "Незаконченные объявления сохраняются здесь автоматически.",
+  "@draftsEmptyBody": {},
+  "untitledDraft": "Без названия",
+  "@untitledDraft": {},
+  "editingDraft": "Правка объявления",
+  "@editingDraft": {},
+  "savedAt": "сохранено {date}",
+  "@savedAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteDraftTitle": "Удалить черновик?",
+  "@deleteDraftTitle": {},
+  "deleteDraftBody": "Введённые данные будут потеряны.",
+  "@deleteDraftBody": {},
+  "signInRequired": "Нужно войти",
+  "@signInRequired": {},
+  "signInToManage": "Войдите, чтобы управлять своими объявлениями.",
+  "@signInToManage": {},
+  "noListingsInStatus": "Здесь пока пусто",
+  "@noListingsInStatus": {},
+  "localOnlyBadge": "На телефоне",
+  "@localOnlyBadge": {},
+  "rejectedReason": "Причина отклонения: {reason}",
+  "@rejectedReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "statusDraft": "Черновики",
+  "@statusDraft": {},
+  "statusPending": "На проверке",
+  "@statusPending": {},
+  "statusActive": "Активные",
+  "@statusActive": {},
+  "statusSold": "Проданные",
+  "@statusSold": {},
+  "statusArchived": "Архив",
+  "@statusArchived": {},
+  "statusRejected": "Отклонено",
+  "@statusRejected": {},
+  "promoFree": "Бесплатно",
+  "@promoFree": {},
+  "promoBoost": "Поднятие",
+  "@promoBoost": {},
+  "promoTop": "ТОП",
+  "@promoTop": {},
+  "promoVip": "VIP",
+  "@promoVip": {},
+  "promoVipPlus": "VIP+",
+  "@promoVipPlus": {},
+  "promoBusiness": "Бизнес",
+  "@promoBusiness": {},
+  "signIn": "Войти",
+  "@signIn": {},
+  "signOut": "Выйти",
+  "@signOut": {},
+  "signOutTitle": "Выйти из аккаунта?",
+  "@signOutTitle": {},
+  "signOutBody": "Объявления и избранное останутся в аккаунте.",
+  "@signOutBody": {},
+  "authPhoneTitle": "Вход по номеру телефона",
+  "@authPhoneTitle": {},
+  "authPhoneBody": "Мы отправим код подтверждения по SMS.",
+  "@authPhoneBody": {},
+  "demoAuthNotice": "Демо-режим: SMS не отправляется, код будет показан на экране. Номер не считается подтверждённым.",
+  "@demoAuthNotice": {},
+  "getCode": "Получить код",
+  "@getCode": {},
+  "authTermsNote": "Продолжая, вы соглашаетесь с правилами и политикой конфиденциальности.",
+  "@authTermsNote": {},
+  "authCodeTitle": "Введите код",
+  "@authCodeTitle": {},
+  "authCodeBody": "Код отправлен на {phone}",
+  "@authCodeBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "authCodeDemoBody": "Демо-вход для {phone}. SMS не отправлялось.",
+  "@authCodeDemoBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "demoCodeIs": "Демо-код: {code}",
+  "@demoCodeIs": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "authCodeLabel": "Код из SMS",
+  "@authCodeLabel": {},
+  "changeNumber": "Изменить номер",
+  "@changeNumber": {},
+  "resendCode": "Отправить ещё раз",
+  "@resendCode": {},
+  "resendIn": "Повторно через {seconds} с",
+  "@resendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "authProfileTitle": "Как вас зовут?",
+  "@authProfileTitle": {},
+  "authProfileBody": "Имя увидят покупатели и продавцы.",
+  "@authProfileBody": {},
+  "yourName": "Ваше имя",
+  "@yourName": {},
+  "guestTitle": "Добро пожаловать в DARYOB",
+  "@guestTitle": {},
+  "guestBody": "Войдите, чтобы подавать объявления, писать продавцам и сохранять избранное в аккаунте.",
+  "@guestBody": {},
+  "noName": "Без имени",
+  "@noName": {},
+  "phoneNotVerified": "не подтверждён",
+  "@phoneNotVerified": {},
+  "editProfile": "Профиль",
+  "@editProfile": {},
+  "phoneChangeNote": "Номер используется для входа и не меняется здесь.",
+  "@phoneChangeNote": {},
+  "sectionListings": "Объявления",
+  "@sectionListings": {},
+  "sectionMoney": "Продвижение и оплата",
+  "@sectionMoney": {},
+  "sectionApp": "Приложение",
+  "@sectionApp": {},
+  "sectionHelp": "Помощь",
+  "@sectionHelp": {},
+  "myPromotions": "Мои продвижения",
+  "@myPromotions": {},
+  "wallet": "Кошелёк",
+  "@wallet": {},
+  "businessAccount": "Бизнес-аккаунт",
+  "@businessAccount": {},
+  "language": "Язык",
+  "@language": {},
+  "theme": "Тема",
+  "@theme": {},
+  "themeSystem": "Как в системе",
+  "@themeSystem": {},
+  "themeLight": "Светлая",
+  "@themeLight": {},
+  "themeDark": "Тёмная",
+  "@themeDark": {},
+  "settings": "Настройки",
+  "@settings": {},
+  "support": "Поддержка",
+  "@support": {},
+  "terms": "Правила использования",
+  "@terms": {},
+  "privacyPolicy": "Политика конфиденциальности",
+  "@privacyPolicy": {},
+  "aboutApp": "О приложении",
+  "@aboutApp": {},
+  "devTools": "Инструменты разработчика",
+  "@devTools": {},
+  "deleteAccount": "Удалить аккаунт",
+  "@deleteAccount": {},
+  "aboutBody": "DARYOB — площадка объявлений для Таджикистана: покупайте, продавайте, ищите работу и услуги рядом с домом.",
+  "@aboutBody": {},
+  "appVersion": "Версия",
+  "@appVersion": {},
+  "environment": "Режим",
+  "@environment": {},
+  "envDevelopment": "Разработка (демо)",
+  "@envDevelopment": {},
+  "envProduction": "Рабочий",
+  "@envProduction": {},
+  "licenses": "Лицензии",
+  "@licenses": {},
+  "legalDraftNotice": "Черновик. Окончательный текст подготовит и утвердит юрист перед запуском.",
+  "@legalDraftNotice": {},
+  "termsBody": "Размещая объявление, вы подтверждаете, что вправе продавать товар или оказывать услугу, а информация в объявлении достоверна. Запрещены мошенничество, запрещённые законом товары и оскорбительный контент. DARYOB может снять объявление, нарушающее правила.",
+  "@termsBody": {},
+  "privacyBody": "DARYOB хранит номер телефона, имя и данные объявлений, чтобы работали вход, публикация и связь с покупателями. Номер показывается в объявлении только если вы это разрешили. Вы можете запросить удаление аккаунта и данных в профиле.",
+  "@privacyBody": {},
+  "supportBody": "Если что-то не работает или вы столкнулись с мошенничеством, сообщите нам.",
+  "@supportBody": {},
+  "supportNotConfigured": "Контакты службы поддержки появятся после запуска сервиса.",
+  "@supportNotConfigured": {},
+  "deletionBody": "Будут удалены ваш аккаунт, объявления и переписка. Действие нельзя отменить.",
+  "@deletionBody": {},
+  "deletionDevNotice": "Демо-режим: удаляются данные на этом телефоне.",
+  "@deletionDevNotice": {},
+  "deleteAccountConfirmTitle": "Удалить аккаунт навсегда?",
+  "@deleteAccountConfirmTitle": {},
+  "deleteAccountConfirmBody": "Все ваши объявления будут удалены.",
+  "@deleteAccountConfirmBody": {},
+  "accountDeleted": "Аккаунт удалён",
+  "@accountDeleted": {},
+  "safetyTitle": "Безопасные сделки",
+  "@safetyTitle": {},
+  "safetyIntro": "Большинство людей на DARYOB честные, но мошенники бывают везде. Несколько простых правил защитят ваши деньги.",
+  "@safetyIntro": {},
+  "safetyForBuyers": "Покупателям",
+  "@safetyForBuyers": {},
+  "safetyBuyer1": "Осматривайте товар лично, до оплаты.",
+  "@safetyBuyer1": {},
+  "safetyBuyer2": "Не переводите предоплату незнакомым продавцам.",
+  "@safetyBuyer2": {},
+  "safetyBuyer3": "Встречайтесь в людных местах днём.",
+  "@safetyBuyer3": {},
+  "safetyBuyer4": "Для дорогих покупок проверяйте документы.",
+  "@safetyBuyer4": {},
+  "safetyForSellers": "Продавцам",
+  "@safetyForSellers": {},
+  "safetySeller1": "Никому не сообщайте коды из SMS.",
+  "@safetySeller1": {},
+  "safetySeller2": "Не сообщайте данные карты — для перевода нужен только номер.",
+  "@safetySeller2": {},
+  "safetySeller3": "Не переходите по ссылкам «для получения оплаты».",
+  "@safetySeller3": {},
+  "safetyReport": "Заметили подозрительное объявление — нажмите «Пожаловаться».",
+  "@safetyReport": {},
+  "chatsSignInTitle": "Переписка с продавцами",
+  "@chatsSignInTitle": {},
+  "chatsSignInBody": "Войдите, чтобы писать продавцам и получать ответы.",
+  "@chatsSignInBody": {},
+  "chatLocalNotice": "Чат-сервер ещё не подключён: сообщения сохраняются на телефоне и не доходят до собеседника.",
+  "@chatLocalNotice": {},
+  "chatLocalShort": "Сообщения не отправляются (демо)",
+  "@chatLocalShort": {},
+  "chatOnline": "Чат",
+  "@chatOnline": {},
+  "chatsEmpty": "Пока нет переписок",
+  "@chatsEmpty": {},
+  "chatsEmptyBody": "Откройте объявление и нажмите «Написать».",
+  "@chatsEmptyBody": {},
+  "blocked": "Заблокирован",
+  "@blocked": {},
+  "noMessagesYet": "Нет сообщений",
+  "@noMessagesYet": {},
+  "block": "Заблокировать",
+  "@block": {},
+  "unblock": "Разблокировать",
+  "@unblock": {},
+  "blockUserTitle": "Заблокировать пользователя?",
+  "@blockUserTitle": {},
+  "blockUserBody": "Вы не сможете переписываться в этом чате, пока не разблокируете.",
+  "@blockUserBody": {},
+  "deleteChat": "Удалить чат",
+  "@deleteChat": {},
+  "deleteChatTitle": "Удалить чат?",
+  "@deleteChatTitle": {},
+  "deleteChatBody": "Переписка будет удалена с этого телефона.",
+  "@deleteChatBody": {},
+  "sellerProfile": "Профиль продавца",
+  "@sellerProfile": {},
+  "chatStartTitle": "Начните разговор",
+  "@chatStartTitle": {},
+  "chatStartBody": "Спросите о состоянии, цене или месте встречи.",
+  "@chatStartBody": {},
+  "chatBlockedNotice": "Пользователь заблокирован",
+  "@chatBlockedNotice": {},
+  "messageHint": "Сообщение",
+  "@messageHint": {},
+  "msgLocalOnly": "не отправлено",
+  "@msgLocalOnly": {},
+  "msgSending": "отправляется",
+  "@msgSending": {},
+  "msgSent": "отправлено",
+  "@msgSent": {},
+  "msgDelivered": "доставлено",
+  "@msgDelivered": {},
+  "msgRead": "прочитано",
+  "@msgRead": {},
+  "msgFailed": "ошибка",
+  "@msgFailed": {},
+  "markAllRead": "Прочитать все",
+  "@markAllRead": {},
+  "notificationsEmpty": "Уведомлений пока нет",
+  "@notificationsEmpty": {},
+  "pushNotConfigured": "Push-уведомления ещё не подключены — новые события видны здесь, в приложении.",
+  "@pushNotConfigured": {},
+  "notifKindMessages": "Новые сообщения",
+  "@notifKindMessages": {},
+  "notifKindApproved": "Объявление одобрено",
+  "@notifKindApproved": {},
+  "notifKindRejected": "Объявление отклонено",
+  "@notifKindRejected": {},
+  "notifKindExpiring": "Срок объявления истекает",
+  "@notifKindExpiring": {},
+  "notifKindPromotion": "Окончание продвижения",
+  "@notifKindPromotion": {},
+  "notifKindMatching": "Новые подходящие объявления",
+  "@notifKindMatching": {},
+  "notifKindSystem": "Системные сообщения",
+  "@notifKindSystem": {},
+  "notifMessageTitle": "Новое сообщение",
+  "@notifMessageTitle": {},
+  "notifMessageBody": "По объявлению «{title}»",
+  "@notifMessageBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifApprovedTitle": "Объявление одобрено",
+  "@notifApprovedTitle": {},
+  "notifApprovedBody": "«{title}» опубликовано",
+  "@notifApprovedBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifRejectedTitle": "Объявление отклонено",
+  "@notifRejectedTitle": {},
+  "notifRejectedBody": "Проверьте причину для «{title}»",
+  "@notifRejectedBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifExpiringTitle": "Срок истекает",
+  "@notifExpiringTitle": {},
+  "notifExpiringBody": "Продлите «{title}», чтобы его видели",
+  "@notifExpiringBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifPromotionTitle": "Продвижение заканчивается",
+  "@notifPromotionTitle": {},
+  "notifPromotionBody": "Для «{title}»",
+  "@notifPromotionBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifMatchingTitle": "Новые объявления",
+  "@notifMatchingTitle": {},
+  "notifMatchingBody": "По вашему запросу «{title}»",
+  "@notifMatchingBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifWelcomeTitle": "Добро пожаловать в DARYOB!",
+  "@notifWelcomeTitle": {},
+  "notifWelcomeBody": "Ищите, находите и продавайте по всему Таджикистану.",
+  "@notifWelcomeBody": {},
+  "notifSavedLocallyTitle": "Объявление сохранено",
+  "@notifSavedLocallyTitle": {},
+  "notifSavedLocallyBody": "«{title}» сохранено на телефоне (демо-режим)",
+  "@notifSavedLocallyBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notifStatusTitle": "Статус изменён",
+  "@notifStatusTitle": {},
+  "notifStatusBody": "Объявление «{title}» обновлено",
+  "@notifStatusBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "sellerNotFound": "Продавец не найден",
+  "@sellerNotFound": {},
+  "sellerListings": "Объявления продавца",
+  "@sellerListings": {},
+  "noActiveListings": "Нет активных объявлений",
+  "@noActiveListings": {},
+  "statistics": "Статистика",
+  "@statistics": {},
+  "statsNotTracked": "Просмотры и звонки будут считаться после подключения сервера.",
+  "@statsNotTracked": {},
+  "businessListings": "Объявления компании",
+  "@businessListings": {},
+  "subscription": "Подписка",
+  "@subscription": {},
+  "subscriptionNone": "Не оформлена",
+  "@subscriptionNone": {},
+  "editBusiness": "Данные компании",
+  "@editBusiness": {},
+  "businessComingSoon": "Сотрудники, массовая загрузка и витрина магазина появятся в следующих версиях.",
+  "@businessComingSoon": {},
+  "requestVerification": "Запросить проверку компании",
+  "@requestVerification": {},
+  "businessIntroTitle": "Продаёте как компания?",
+  "@businessIntroTitle": {},
+  "businessIntroBody": "Создайте бизнес-профиль: название компании будет видно на объявлениях.",
+  "@businessIntroBody": {},
+  "businessName": "Название компании",
+  "@businessName": {},
+  "businessDescription": "О компании",
+  "@businessDescription": {},
+  "businessAddress": "Адрес",
+  "@businessAddress": {},
+  "createBusiness": "Создать бизнес-профиль",
+  "@createBusiness": {},
+  "verNotSubmitted": "Не проверена",
+  "@verNotSubmitted": {},
+  "verPending": "На проверке",
+  "@verPending": {},
+  "verVerified": "Проверена",
+  "@verVerified": {},
+  "verRejected": "Проверка не пройдена",
+  "@verRejected": {},
+  "planStart": "Старт",
+  "@planStart": {},
+  "planStartPerk1": "Страница компании",
+  "@planStartPerk1": {},
+  "planStartPerk2": "Больше активных объявлений",
+  "@planStartPerk2": {},
+  "planPro": "Про",
+  "@planPro": {},
+  "planProPerk1": "Всё из «Старт»",
+  "@planProPerk1": {},
+  "planProPerk2": "Подробная статистика",
+  "@planProPerk2": {},
+  "planProPerk3": "Пакет продвижений каждый месяц",
+  "@planProPerk3": {},
+  "choosePlan": "Выбрать",
+  "@choosePlan": {},
+  "priceNotSet": "Цена будет объявлена",
+  "@priceNotSet": {},
+  "durationDays": "{days, plural, one{{days} день} few{{days} дня} many{{days} дней} other{{days} дня}}",
+  "@durationDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "samplePriceNote": "Цена-пример из демо-настроек, не реальный тариф.",
+  "@samplePriceNote": {},
+  "payAndPromote": "Оплатить и продвинуть",
+  "@payAndPromote": {},
+  "paymentUnavailableTitle": "Оплата недоступна",
+  "@paymentUnavailableTitle": {},
+  "devActivate": "Включить без оплаты (только DEV)",
+  "@devActivate": {},
+  "devActivateTitle": "Тестовое продвижение",
+  "@devActivateTitle": {},
+  "devActivateBody": "Продвижение включится без оплаты только в демо-сборке, чтобы проверить отображение VIP и ТОП.",
+  "@devActivateBody": {},
+  "devActivated": "Тестовое продвижение включено",
+  "@devActivated": {},
+  "walletBalance": "Баланс",
+  "@walletBalance": {},
+  "topUp": "Пополнить",
+  "@topUp": {},
+  "transactionHistory": "История операций",
+  "@transactionHistory": {},
+  "noTransactions": "Операций пока нет",
+  "@noTransactions": {},
+  "noPromotions": "Нет продвижений",
+  "@noPromotions": {},
+  "noPromotionsBody": "Продвигайте объявления, чтобы их видели больше покупателей.",
+  "@noPromotionsBody": {},
+  "until": "до {date}",
+  "@until": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "promotionActive": "Активно",
+  "@promotionActive": {},
+  "promotionEnded": "Завершено",
+  "@promotionEnded": {},
+  "defaultRegionHint": "Для раздела «Рядом» и поиска",
+  "@defaultRegionHint": {},
+  "privacy": "Приватность",
+  "@privacy": {},
+  "hidePhoneByDefault": "Скрывать номер в новых объявлениях",
+  "@hidePhoneByDefault": {},
+  "hidePhoneByDefaultHint": "Покупатели смогут писать только в чат",
+  "@hidePhoneByDefaultHint": {},
+  "dataDeletion": "Удаление данных",
+  "@dataDeletion": {},
+  "devToolsNotice": "Только для сборки разработчика. В рабочей версии этого экрана нет.",
+  "@devToolsNotice": {},
+  "devConfirm": "Действие изменит локальные данные на этом телефоне.",
+  "@devConfirm": {},
+  "apiUrl": "Адрес API",
+  "@apiUrl": {},
+  "notConfigured": "Не настроен",
+  "@notConfigured": {},
+  "devResetOnboarding": "Показать онбординг заново",
+  "@devResetOnboarding": {},
+  "devReseed": "Пересоздать демо-объявления",
+  "@devReseed": {},
+  "devRemoveDemo": "Удалить демо-объявления",
+  "@devRemoveDemo": {},
+  "devWipe": "Стереть все локальные данные",
+  "@devWipe": {},
+  "errTitle": "Что-то пошло не так",
+  "@errTitle": {},
+  "errNetwork": "Нет подключения к интернету. Проверьте сеть и попробуйте снова.",
+  "@errNetwork": {},
+  "errTimeout": "Сервер долго не отвечает. Попробуйте ещё раз.",
+  "@errTimeout": {},
+  "errUnauthorized": "Нужно войти заново.",
+  "@errUnauthorized": {},
+  "errSessionExpired": "Сессия истекла. Войдите снова.",
+  "@errSessionExpired": {},
+  "errForbidden": "У вас нет прав на это действие.",
+  "@errForbidden": {},
+  "errRateLimited": "Слишком много попыток. Подождите немного.",
+  "@errRateLimited": {},
+  "errNotFound": "Не найдено",
+  "@errNotFound": {},
+  "errValidation": "Проверьте введённые данные.",
+  "@errValidation": {},
+  "errServer": "Ошибка на сервере. Мы уже разбираемся.",
+  "@errServer": {},
+  "errUnknown": "Неизвестная ошибка. Попробуйте ещё раз.",
+  "@errUnknown": {},
+  "unavailableTitle": "Пока недоступно",
+  "@unavailableTitle": {},
+  "unavailableBackend": "Сервер DARYOB ещё не подключён в этой сборке.",
+  "@unavailableBackend": {},
+  "unavailableSms": "Вход по SMS станет доступен после подключения SMS-сервиса.",
+  "@unavailableSms": {},
+  "unavailablePayments": "Оплата ещё не подключена. Платёжный сервис будет добавлен позже.",
+  "@unavailablePayments": {},
+  "unavailablePush": "Push-уведомления ещё не подключены.",
+  "@unavailablePush": {},
+  "unavailableChat": "Чат станет доступен после подключения чат-сервера.",
+  "@unavailableChat": {},
+  "valRequired": "Обязательное поле",
+  "@valRequired": {},
+  "valTooShort": "Минимум {count} символов",
+  "@valTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "valTooLong": "Максимум {count} символов",
+  "@valTooLong": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "valTooShortGeneric": "Слишком коротко",
+  "@valTooShortGeneric": {},
+  "valTooLongGeneric": "Слишком длинно",
+  "@valTooLongGeneric": {},
+  "valInvalidNumber": "Введите число",
+  "@valInvalidNumber": {},
+  "valOutOfRange": "Недопустимое значение",
+  "@valOutOfRange": {},
+  "valInvalidPhone": "Введите 9 цифр номера после +992",
+  "@valInvalidPhone": {},
+  "valInvalidCode": "Неверный код",
+  "@valInvalidCode": {},
+  "valTooManyPhotos": "Не больше {count} фото",
+  "@valTooManyPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ageJustNow": "только что",
+  "@ageJustNow": {},
+  "ageMinutes": "{count} мин назад",
+  "@ageMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ageHours": "{count} ч назад",
+  "@ageHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ageDays": "{count} дн. назад",
+  "@ageDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

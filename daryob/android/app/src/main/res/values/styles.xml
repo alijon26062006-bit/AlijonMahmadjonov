@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Visible while the Flutter engine starts: navy + lime mark. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:statusBarColor">@color/daryob_navy</item>
+        <item name="android:navigationBarColor">@color/daryob_navy</item>
+    </style>
+    <!-- Window behind the Flutter UI while it runs. Navy, so a slow first
+         frame never shows white. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/daryob_navy</item>
+    </style>
+</resources>
