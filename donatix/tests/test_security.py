@@ -200,3 +200,32 @@ def test_app_ready_manifest_service_worker_offline_assetlinks(client, config):
     assert target["package_name"] == "tj.donatix.app" and target["sha256_cert_fingerprints"] == ["AA:BB"]
     page = client.get("/panel/catalog").text
     assert 'rel="manifest"' in page and 'class="tabbar"' in page
+
+
+def test_2fa_code_goes_to_logging_admin_telegram(app, config, conn, monkeypatch):
+    """Второй админ (кассир с полными правами) получает свой код входа сам; владельцу — уведомление без кода."""
+    from donatix import db
+    config.alert_telegram_token, config.alert_telegram_chat_id = "t", "777"
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda cfg, text, *a, **k: sent.append((text, k.get("to"))))
+    monkeypatch.setattr("donatix.sitecfg.admin_2fa_active", lambda *a: True)
+    u = accounts.create_user(conn, email="amiri@example.com", login="amiri", password="amiripass123", status="active")
+    uid = u if isinstance(u, int) else u["id"]
+    conn.execute("UPDATE users SET role = 'admin' WHERE id = ?", (uid,))
+    cashiers.add(conn, 555001, "Амири")
+    cashiers.set_full(conn, 555001, True)
+    db.set_setting(conn, f"admin_tg.{uid}", "555001")
+    c = TestClient(app)
+    c.post("/login", data={"csrf": csrf_of(c.get("/login").text), "email": "amiri@example.com", "password": "amiripass123"})
+    code_msgs = [s for s in sent if re.search(r"\b\d{6}\b", s[0])]
+    assert code_msgs and code_msgs[0][1] == [555001] and "amiri" in code_msgs[0][0]
+    assert any(s[1] is None and "входит" in s[0] and not re.search(r"\b\d{6}\b", s[0]) for s in sent)
+    code = re.search(r"\b(\d{6})\b", code_msgs[0][0]).group(1)
+    r = c.post("/login/code", data={"csrf": csrf_of(c.get("/login/code").text), "code": code}, follow_redirects=False)
+    assert r.headers["location"] == "/admin"
+    # без полных прав — код, как раньше, владельцу
+    cashiers.set_full(conn, 555001, False)
+    sent.clear()
+    c2 = TestClient(app)
+    c2.post("/login", data={"csrf": csrf_of(c2.get("/login").text), "email": "amiri@example.com", "password": "amiripass123"})
+    assert sent[0][1] is None and re.search(r"\b\d{6}\b", sent[0][0])

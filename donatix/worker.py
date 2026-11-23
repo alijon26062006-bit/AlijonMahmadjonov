@@ -18,19 +18,20 @@ log = logging.getLogger(__name__)
 
 
 def notify_admin(config: Config, text: str, buttons: list | None = None, *, html: bool = False,
-                 secret: bool = False) -> None:
+                 secret: bool = False, to: list[int] | None = None) -> None:
     """Сообщение админу в Telegram, если настроено (с кнопками — ответ прямо из чата). Иначе — только в лог.
     secret — в сообщении код входа: в журнал сервера его не пишем."""
     log.warning("ADMIN: %s", "(код входа — только в Telegram)" if secret else text)
     if not (config.alert_telegram_token and config.alert_telegram_chat_id):
         return
     from . import later
-    if later.defer(lambda c: _send_admin(config, text, buttons, html, secret)):   # быстрый ответ (webhook) — после
+    if later.defer(lambda c: _send_admin(config, text, buttons, html, secret, to)):   # быстрый ответ (webhook) — после
         return
-    _send_admin(config, text, buttons, html, secret)
+    _send_admin(config, text, buttons, html, secret, to)
 
 
-def _send_admin(config: Config, text: str, buttons: list | None, html: bool, secret: bool) -> None:
+def _send_admin(config: Config, text: str, buttons: list | None, html: bool, secret: bool,
+                to: list[int] | None = None) -> None:
     from .tgbot import keyboard
     payload = {"chat_id": config.alert_telegram_chat_id, "text": text if html else f"{config.site_name}: {text}",
                "disable_web_page_preview": True}
@@ -39,7 +40,7 @@ def _send_admin(config: Config, text: str, buttons: list | None, html: bool, sec
     if buttons:
         payload["reply_markup"] = keyboard(buttons)
     # Кассирам с полными правами — те же уведомления, кроме кода входа на сайт (он только владельцу)
-    chats = [config.alert_telegram_chat_id] + ([] if secret else _full_admins(config))
+    chats = list(to) if to else [config.alert_telegram_chat_id] + ([] if secret else _full_admins(config))
     for chat in chats:
         try:
             httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/sendMessage",

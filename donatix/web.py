@@ -477,8 +477,13 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
         db.set_setting(conn, f"2fa.{nonce}", json.dumps(
             {"uid": user["id"], "exp": _time.time() + 300, "tries": 0, "hash": _code_hash(config, nonce, code)}))
         request.session["pending_2fa"] = nonce
-        notify_admin(config, f"🔐 Код входа в админку: {code}\nДействует 5 минут. IP: {_ip(request)}. "
-                             "Если это не вы — смените пароль.", secret=True)
+        text = (f"🔐 Код входа в админку ({user['login']}): {code}\nДействует 5 минут. IP: {_ip(request)}. "
+                "Если это не вы — смените пароль.")
+        mine = _admin_code_chats(conn, config, user)
+        notify_admin(config, text, secret=True, to=mine or None)
+        if mine and str(config.alert_telegram_chat_id).strip() not in {str(x) for x in mine}:
+            notify_admin(config, f"🔐 {user['login']} входит в админку. IP: {_ip(request)}. "   # владельцу — без кода
+                                 "Код отправлен ему в Telegram.", secret=True)
         return _redirect("/login/code")
     request.session["user_id"] = user["id"]
     _record_login(conn, request, user["id"])
@@ -488,6 +493,20 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
             request.session["next"] = nxt
         return _redirect("/panel/verify-email")   # «Подтвердите почту»: подтвердить или пропустить
     return _redirect("/admin" if user["role"] == "admin" else (nxt or "/panel"))
+
+
+def _admin_code_chats(conn, config: Config, user) -> list[int]:
+    """Куда слать код входа этому админу: его Telegram (привязан к аккаунту на сайте), если он — кассир с полными
+    правами в админ-боте. Иначе — пусто: код уходит владельцу, как раньше."""
+    from .cashiers import full_admins
+    try:
+        linked = {int(r[0]) for r in conn.execute("SELECT tg_id FROM shop_users WHERE user_id = ?", (user["id"],))}
+    except Exception:  # noqa: BLE001 — нет таблицы в старой базе
+        linked = set()
+    own = db.get_setting(conn, f"admin_tg.{user['id']}")   # задаётся командой deploy/admin-telegram.sh
+    if own and own.strip().isdigit():
+        linked.add(int(own))
+    return sorted(linked & set(full_admins(conn)))
 
 
 @router.get("/login/code")
