@@ -213,7 +213,31 @@ async def cb_card(call: CallbackQuery, state: FSMContext,
         texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
         reply_markup=keyboards.cancel(),
     )
-    await state.update_data(**_where(call.message))
+    await state.update_data(pay_method_id=None, **_where(call.message))
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("dep:m:"))
+async def cb_own_method(call: CallbackQuery, state: FSMContext,
+                        conn: aiosqlite.Connection) -> None:
+    """Свои реквизиты из панели: любой банк, номер карты, счёта или телефона."""
+    from app.services import paymethods
+
+    if await _blocked_by_open(call, conn, state):
+        return
+    method = paymethods.get(call.data.rsplit(":", 1)[1])
+    if method is None or not method.get("enabled"):
+        await state.clear()
+        await call.answer("Ин тарз дигар дастрас нест.", show_alert=True)
+        await call.message.edit_text(texts.DEPOSIT_METHODS,
+                                     reply_markup=keyboards.deposit_methods())
+        return
+    await state.set_state(Deposit.amount)
+    await call.message.edit_text(
+        texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
+        reply_markup=keyboards.cancel(),
+    )
+    await state.update_data(pay_method_id=method["id"], **_where(call.message))
     await call.answer()
 
 
@@ -252,10 +276,16 @@ async def on_amount(
     # приходилось подтверждать руками, ровно то, от чего мы уходим.
     #
     # Теперь порядок обратный: заявка ждёт денег, а не деньги ждут заявку.
+    from app.services import paymethods
+
+    method = paymethods.get((await state.get_data()).get("pay_method_id"))
     deposit = await db.create_deposit(
         conn, user_id=message.from_user.id, amount=amount,
-        method="Перевод на карту", receipt_file_id="", reference=reference,
+        method=(method["bank"] if method else "Перевод на карту"),
+        receipt_file_id="", reference=reference,
     )
+    if method is not None:
+        await db.set_deposit_method(conn, deposit.id, method["id"])
     await state.update_data(amount=amount, reference=reference,
                             deposit_id=deposit.id)
     await state.set_state(Deposit.receipt)
@@ -265,7 +295,7 @@ async def on_amount(
     if bot is not None:
         await _drop_buttons(bot, await state.get_data())
 
-    body, markup = _requisites(amount, reference)
+    body, markup = _requisites(amount, reference, method)
     shown = await message.answer(body, reply_markup=markup)
 
     # Запоминаем, где показаны реквизиты: когда деньги придут, номер
@@ -304,18 +334,25 @@ async def _remember_screen(conn, deposit_id: int, shown) -> None:
         await db.set_deposit_screen(conn, deposit_id, chat, msg_id)
 
 
-def _requisites(amount: int, reference: str) -> tuple[str, object]:
+def _requisites(amount: int, reference: str, method: dict | None = None) -> tuple[str, object]:
     """Экран реквизитов: один, короткий, с кнопками под рукой.
 
     Раньше на нём же просили прислать чек. Клиент этого ещё не сделал —
     и просьба тонула в длинном тексте. Теперь про чек говорим отдельным
     шагом, после нажатия «Я оплатил».
+
+    method — свои реквизиты из панели (любой банк). Без него — основная
+    карта и кнопка «Душанбе Сити».
     """
-    card = runtime.get("pay_card_number") or "— реквизиты не заданы —"
-    holder = runtime.get("pay_card_holder")
-    bank = runtime.get("pay_card_bank")
-    city = runtime.get("pay_city")
-    note = runtime.get("pay_extra")
+    if method is not None:
+        card, holder, bank = method["number"], method["holder"], method["bank"]
+        city, note = "", method["note"]
+    else:
+        card = runtime.get("pay_card_number") or "— реквизиты не заданы —"
+        holder = runtime.get("pay_card_holder")
+        bank = runtime.get("pay_card_bank")
+        city = runtime.get("pay_city")
+        note = runtime.get("pay_extra")
 
     where = " · ".join(part for part in (bank, city) if part)
     body = texts.DEPOSIT_REQUISITES.format(
@@ -328,7 +365,7 @@ def _requisites(amount: int, reference: str) -> tuple[str, object]:
     )
 
     link = ""
-    if dcpay.is_ready():
+    if method is None and dcpay.is_ready():
         link = dcpay.build_link(
             dcpay.account(), amount,
             dcpay.build_comment(dcpay.comment_prefix(), reference),
@@ -355,7 +392,8 @@ async def _restore(state: FSMContext, conn, user_id: int) -> dict:
         return {}
     await state.set_state(Deposit.receipt)
     await state.update_data(amount=open_one.amount, deposit_id=open_one.id,
-                            reference=open_one.reference or "")
+                            reference=open_one.reference or "",
+                            pay_method_id=open_one.pay_method_id)
     return await state.get_data()
 
 
@@ -413,7 +451,9 @@ async def cb_back_to_requisites(
         await state.clear()
         await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
         return
-    body, markup = _requisites(amount, reference)
+    from app.services import paymethods
+
+    body, markup = _requisites(amount, reference, paymethods.get(data.get("pay_method_id")))
     await call.message.edit_text(body, reply_markup=markup)
     if data.get("deposit_id"):
         await _remember_screen(conn, data["deposit_id"], call.message)

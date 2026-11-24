@@ -406,9 +406,14 @@ def sponsor_gate(channels: list[str]) -> InlineKeyboardMarkup:
 
 
 def deposit_methods() -> InlineKeyboardMarkup:
+    from app.services import paymethods
+
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("dcity", "Душанбе Сити"), "dep:card",
                style=SUCCESS, icon="dcity"))
+    # Свои реквизиты из панели — каждый банк отдельной кнопкой.
+    for method in paymethods.enabled():
+        kb.row(btn(f"🏦 {method['bank']}"[:60], f"dep:m:{method['id']}", style=SUCCESS))
     kb.row(btn("🇷🇺 Аз Русия — Сбербанк, Тинькофф", "dep:ru"))
     kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()

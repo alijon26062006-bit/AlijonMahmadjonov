@@ -158,6 +158,18 @@ CREATE TABLE IF NOT EXISTS glory_runs (
     updated_at   TEXT NOT NULL
 );
 
+-- Свои реквизиты: любой банк, номер карты, счёта или телефона. У
+-- клиента в «Пополнить» каждый — отдельной кнопкой.
+CREATE TABLE IF NOT EXISTS pay_methods (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank       TEXT NOT NULL,              -- название банка (кнопка)
+    number     TEXT NOT NULL,              -- карта, счёт или телефон
+    holder     TEXT NOT NULL DEFAULT '',   -- получатель
+    note       TEXT NOT NULL DEFAULT '',   -- примечание под реквизитами
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
 -- Копии заявки, разосланные админам с кнопками. Когда один решил,
 -- кнопки снимаются у всех остальных — иначе второй нажмёт следом.
 CREATE TABLE IF NOT EXISTS admin_notices (
@@ -652,6 +664,7 @@ class Deposit:
     pay_chat: int | None = None
     pay_msg: int | None = None
     client_paid_at: str | None = None
+    pay_method_id: int | None = None
 
     @property
     def status_title(self) -> str:
@@ -807,6 +820,9 @@ MIGRATIONS: dict[str, dict[str, str]] = {
         # Когда клиент сам сказал «я оплатил» (кнопкой или чеком). Без
         # этого совпавшая сумма деньги не зачисляет — только придерживает.
         "client_paid_at": "TEXT",
+        # Каким из своих реквизитов платят (pay_methods.id). Пусто —
+        # основная карта из «Реквизитов».
+        "pay_method_id": "INTEGER",
     },
     "users": {"source": "TEXT"},
     # Приписка банка. У переводов из России там написано «Сбербанк» —
@@ -2138,6 +2154,45 @@ async def save_glory_run(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (order_id, ext_id, user_id, region, region_title, clan_id, status, now, now),
     )
+    await conn.commit()
+
+
+PAY_METHOD_FIELDS = ("bank", "number", "holder", "note", "enabled")
+
+
+async def list_pay_methods(conn: aiosqlite.Connection) -> list:
+    async with conn.execute("SELECT * FROM pay_methods ORDER BY id") as cur:
+        return [dict(row) for row in await cur.fetchall()]
+
+
+async def add_pay_method(conn: aiosqlite.Connection, *, bank: str, number: str,
+                         holder: str = "", note: str = "") -> int:
+    cur = await conn.execute(
+        "INSERT INTO pay_methods (bank, number, holder, note, created_at) "
+        "VALUES (?, ?, ?, ?, ?)", (bank, number, holder, note, _now()))
+    await conn.commit()
+    return cur.lastrowid
+
+
+async def update_pay_method(conn: aiosqlite.Connection, method_id: int, **fields) -> None:
+    fields = {k: v for k, v in fields.items() if k in PAY_METHOD_FIELDS}
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    await conn.execute(f"UPDATE pay_methods SET {sets} WHERE id = ?",
+                       (*fields.values(), method_id))
+    await conn.commit()
+
+
+async def delete_pay_method(conn: aiosqlite.Connection, method_id: int) -> None:
+    await conn.execute("DELETE FROM pay_methods WHERE id = ?", (method_id,))
+    await conn.commit()
+
+
+async def set_deposit_method(conn: aiosqlite.Connection, deposit_id: int,
+                             method_id: int | None) -> None:
+    await conn.execute("UPDATE deposits SET pay_method_id = ? WHERE id = ?",
+                       (method_id, deposit_id))
     await conn.commit()
 
 

@@ -67,6 +67,17 @@ class Panel(StatesGroup):
     image = State()       # ждём картинку для экрана (главный, игры, игра)
 
 
+class PayMethodNew(StatesGroup):
+    bank = State()        # название банка
+    number = State()      # карта, счёт или телефон
+    holder = State()      # получатель (или «-»)
+    note = State()        # примечание (или «-»)
+
+
+class PayMethodEdit(StatesGroup):
+    value = State()       # новое значение одного поля
+
+
 class Review(StatesGroup):
     text = State()        # ждём текст отзыва после оценки
 
