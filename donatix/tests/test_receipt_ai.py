@@ -40,7 +40,8 @@ def test_same_transfer_cannot_be_used_twice(app, config, conn, monkeypatch):
     assert row["receipt_txn"] == "AB1234567" and row["receipt_fp"] and json.loads(row["receipt_ai"])["bank"] == "Алиф"
     b, tb = _client(app, config, conn, 2)
     r = _send(b, tb, RECEIPT_PNG + b"other-screenshot")                 # другой файл, тот же перевод
-    assert "создана" in r.text and _flags(conn)["dup_of"] == 1           # не отклонён — помечен для админа
+    assert "уже прислан к заявке #1" in r.text                            # первая ещё ждёт проверки — отказ
+    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 1
 
 
 def test_same_amount_time_bank_without_number_is_caught(app, config, conn, monkeypatch):
@@ -50,7 +51,7 @@ def test_same_amount_time_bank_without_number_is_caught(app, config, conn, monke
     a, ta = _client(app, config, conn, 1)
     _send(a, ta, RECEIPT_PNG)
     b, tb = _client(app, config, conn, 2)
-    assert "создана" in _send(b, tb, RECEIPT_PNG + b"x").text and _flags(conn)["dup_of"] == 1
+    assert "создана" in _send(b, tb, RECEIPT_PNG + b"x").text and _flags(conn)["dup_of"] == 1   # без номера — админу
 
 
 def test_new_receipt_goes_to_admin_with_what_ai_read(app, config, conn, monkeypatch):
@@ -272,7 +273,7 @@ def test_receipt_of_fake_payment_cannot_be_reused(app, config, conn, monkeypatch
     _send(a, ta, RECEIPT_PNG)
     conn.execute("UPDATE payments SET status = 'fake' WHERE id = 1")
     b, tb = _client(app, config, conn, 2)
-    assert "создана" in _send(b, tb, RECEIPT_PNG + b"x").text and _flags(conn)["dup_of"] == 1
+    assert "уже прислан к заявке #1" in _send(b, tb, RECEIPT_PNG + b"x").text   # перевод поддельного чека — отказ
 
 
 def test_fresh_receipt_rule_and_admin_setting():
@@ -300,11 +301,11 @@ def test_accepted_receipt_never_passes_again(app, config, conn, monkeypatch):
     guest = accounts.get_user(conn, gid)
     def new_pay():
         return payments.create(conn, config, guest, "alif", "5", for_purchase=True)
-    pid = new_pay()                                       # первый ещё ждёт проверки — пускаем с кнопкой
-    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"1")
-    assert json.loads(conn.execute("SELECT receipt_ai FROM payments WHERE id = ?", (pid,)).fetchone()[0])["dup_of"] == first
-    assert tgbot.dup_buttons(conn, pid) == [[(f"🔎 Этот чек уже был — открыть заявку #{first}", f"q:show:{first}")]]
-    payments.reject(conn, config, pid, 1, "тест")       # с чеком клиент не отменяет — освобождает админ
+    pid = new_pay()                                       # первый ещё ждёт проверки — тот же перевод не пускаем
+    with pytest.raises(payments.ReceiptRejected) as err:
+        payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"1")
+    assert f"заявке #{first}" in str(err.value)
+    payments.cancel(conn, gid, pid, config)
 
     payments.confirm(conn, config, first, 1)              # приняли — теперь этот чек не пройдёт нигде
     for body in (RECEIPT_PNG, RECEIPT_PNG + b"other-screenshot"):   # тот же файл и другой скриншот того же перевода

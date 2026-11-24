@@ -282,6 +282,40 @@ def same_picture_paid(conn: sqlite3.Connection, payment_id: int, phash: str | No
     return None
 
 
+def same_transfer_as(conn: sqlite3.Connection, other_id: int, d: dict[str, Any] | None) -> bool:
+    """Тот же перевод, что в чеке заявки other_id: совпали номер операции И сумма (одного номера мало —
+    ИИ иногда читает постоянное поле чека как «номер операции»)."""
+    key = txn_key(d or {})
+    if not key:
+        return False
+    row = conn.execute("SELECT receipt_txn, receipt_ai FROM payments WHERE id = ?", (other_id,)).fetchone()
+    if row is None or row["receipt_txn"] != key:
+        return False
+    try:
+        old = json.loads(row["receipt_ai"] or "{}")
+        return abs(float(old.get("amount") or 0) - float((d or {}).get("amount") or 0)) < 0.01
+    except (TypeError, ValueError):
+        return False
+
+
+def amount_way_off(d: dict[str, Any] | None, pay_amount: Any, pay_currency: str) -> str:
+    """Сумма в чеке в разы больше заявки (например 50 000 вместо 411) — так выглядит подделанный чек."""
+    try:
+        want = float(str(pay_amount).replace(",", "."))
+        got = float((d or {}).get("amount") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if not want or not got:
+        return ""
+    if (d or {}).get("currency") and pay_currency and d["currency"] != pay_currency.upper():
+        return ""
+    ratio = got / want
+    shifted = any(abs(ratio - k) <= k * 0.01 for k in (10, 100, 1000))   # ИИ потерял запятую: 54.50 → 545
+    if ratio > 20 and got - want > 100 and not shifted:
+        return f"сумма в чеке {got:.2f} {pay_currency} в разы больше заявки ({want:.2f} {pay_currency})"
+    return ""
+
+
 def txn_key(d: dict[str, Any]) -> str:
     """Номер операции без пробелов и знаков. Короче 5 символов — не надёжен, не используем."""
     key = re.sub(r"[^0-9A-Za-z]", "", d.get("txn_id") or "").upper()

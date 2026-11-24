@@ -865,7 +865,7 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     if ext is None:
         raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
     from . import receipt_ai
-    p = conn.execute("SELECT method, created_at FROM payments WHERE id = ? AND user_id = ?",
+    p = conn.execute("SELECT method, created_at, pay_amount, pay_currency FROM payments WHERE id = ? AND user_id = ?",
                      (payment_id, user_id)).fetchone()
     from . import paycards
     details = paycards.all_details(conn, p["method"], settings(conn, config)["details"].get(p["method"], "")) if p else ""
@@ -876,9 +876,27 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         import logging
         logging.getLogger(__name__).info("чек к заявке #%s не принят: %s", payment_id, bad[1])
         raise ReceiptRefused(*bad)
-    _, warns = receipt_ai.file_marks(data, ext)
+    marks, warns = receipt_ai.file_marks(data, ext)
     if seen and warns:
         seen = {**seen, "file_marks": warns}
+    # Жёсткий отказ — сразу, без админа (владелец: «максимально проверять поддельные чеки»):
+    hard = [m for m in marks if "нейросет" in m]   # картинку сделала нейросеть — это не чек банка
+    fake = bool(hard)
+    if p and seen:
+        off = receipt_ai.amount_way_off(seen, p["pay_amount"], p["pay_currency"] or "")
+        if off:
+            hard.append(off)
+    if hard:
+        if fake:   # подделка нейросетью — как поддельный чек: счётчик, админ видит предупреждение у клиента
+            conn.execute("UPDATE users SET fraud_count = fraud_count + 1 WHERE id = ?", (user_id,))
+        _report_rejected(conn, config, user_id, payment_id, hard)
+        exc = ReceiptRejected(hard)
+        exc.args = (("Чек не принят: файл создан нейросетью — это не чек банка. Пришлите настоящий чек перевода. "
+                     "Поддельные чеки ведут к блокировке аккаунта. / Чек қабул нашуд: сохтаи нейросет аст."
+                     if fake else
+                     "Чек не принят: " + "; ".join(hard) + ". Пришлите чек именно этого перевода. "
+                     "/ Чек қабул нашуд — чеки ҳамин интиқолро фиристед."),)
+        raise exc
     try:
         max_age = int(db.get_setting(conn, "pay.receipt_max_age_h") or receipt_ai.MAX_AGE_HOURS)
     except ValueError:
@@ -932,7 +950,7 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     # «Душанбе Сити»: чек — запасной путь, когда деньги не совпали с заявкой (другая сумма, банк опоздал)
     digest = hashlib.sha256(data).hexdigest()
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
-    dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
+    dup = conn.execute("SELECT id, status FROM payments WHERE receipt_hash = ? AND id != ? "
                        f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
     # Не пускаем только ТУ ЖЕ КАРТИНКУ, которую админ уже принял (зачислил): тот же файл или пересжатая копия.
     # По одному лишь прочитанному ИИ (номер операции, сумма+минута) среди чеков не отклоняем — ИИ ошибается,
@@ -949,7 +967,19 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
         used, evidence = found(), kind
     if used:
         raise ReceiptUsed(used["id"], evidence)
+    if dup and dup["status"] in ("pending", "fake"):   # тот же ФАЙЛ уже ждёт проверки или признан поддельным
+        exc = ReceiptRejected([f"тот же файл чека уже прислан к заявке #{dup['id']} ({dup['status']})"])
+        exc.args = (f"Этот чек уже прислан к заявке #{dup['id']}. Один чек — одна заявка. "
+                    f"/ Ин чек аллакай ба дархости #{dup['id']} фиристода шудааст.",)
+        exc.old_id = dup["id"]   # админу — кнопка на ту заявку
+        raise exc
     twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
+    if twin is not None and not dup and twin["status"] in ("pending", "fake") and receipt_ai.same_transfer_as(conn, twin["id"], seen):
+        exc = ReceiptRejected([f"тот же перевод (номер операции и сумма), что в чеке к заявке #{twin['id']}"])
+        exc.args = (f"Этот перевод уже прислан к заявке #{twin['id']}. Один перевод — одна заявка. "
+                    f"/ Ин интиқол аллакай ба дархости #{twin['id']} фиристода шудааст.",)
+        exc.old_id = twin["id"]
+        raise exc
     if not twin and seen and p["auto_kind"] == "dcbank":   # та же сумма от этого клиента уже пришла автоматом
         twin = receipt_ai.auto_twin(conn, payment_id, user_id, seen)
     if twin:   # ждёт проверки или отклонён — пускаем, админ видит «ЭТОТ ЧЕК УЖЕ БЫЛ» и кнопку на старую заявку

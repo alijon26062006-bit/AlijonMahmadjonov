@@ -78,8 +78,9 @@ def test_dc_same_amount_without_txn_is_flagged(app, config, conn):
     assert ai["dup_of"] == p1
 
 
-def test_receipt_amount_never_raises_credit(app, config, conn):
-    """Сумма из чека больше заявки — заявку НЕ увеличиваем (отредактированный чек на 99 999), админ видит 🚨."""
+def test_receipt_amount_never_raises_credit(app, config, conn, monkeypatch):
+    """Сумма из чека в разы больше заявки (отредактированный чек на 99 999) — чек сразу отклоняется, заявку не трогаем."""
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
     config.pay_methods = {"alif": "Алиф: +992 90 000 00 00 (Али)"}
     uid, user = _user(conn)
     with db.tx(conn):
@@ -88,12 +89,11 @@ def test_receipt_amount_never_raises_credit(app, config, conn):
     seen = {"is_receipt": True, "bank": "Alif", "amount": 99999.0, "currency": "TJS", "datetime": "",
             "txn_id": "", "recipient": "+992 90 000 00 00", "status": "success", "recipient_ok": "unknown",
             "forgery": "suspicious", "signs": ["x"]}
-    payments.attach_receipt(conn, config, uid, pid, PNG2, seen=seen)
-    after = conn.execute("SELECT amount_micro, pay_amount FROM payments WHERE id=?", (pid,)).fetchone()
-    assert after[0] == before
-    import json
-    ai = json.loads(conn.execute("SELECT receipt_ai FROM payments WHERE id=?", (pid,)).fetchone()[0])
-    assert ai["amount_more"].startswith("99999")
+    with pytest.raises(payments.ReceiptRejected) as err:
+        payments.attach_receipt(conn, config, uid, pid, PNG2, seen=seen)
+    assert "в разы больше" in str(err.value)
+    after = conn.execute("SELECT amount_micro, receipt_file FROM payments WHERE id=?", (pid,)).fetchone()
+    assert after[0] == before and after[1] is None
 
 
 def test_rounding_gift_not_refunded(app, config, conn, supplier):

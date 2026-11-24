@@ -44,19 +44,16 @@ def test_one_request_at_a_time_with_waiting_spinner(app, config, conn, monkeypat
     assert "решил: <b>админ (сайт: admin)</b>" in admin.get("/admin/payments?status=paid").text
 
 
-def test_same_receipt_is_accepted_but_flagged(app, config, conn, monkeypatch):
-    """Тот же файл чека второй раз не отклоняется — админ видит в заявке «ЭТОТ ЧЕК УЖЕ БЫЛ»."""
-    import json
+def test_same_receipt_twice_is_rejected(app, config, conn, monkeypatch):
+    """Тот же файл чека, пока первая заявка ждёт проверки, ко второй заявке не принимается (один чек — одна заявка)."""
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
     uid, client, token = _client(app, config, conn)
     _send(client, token)
     _, other, otoken = _client(app, config, conn, "d@example.com", "client2")
     r = _send(other, otoken)                                             # тот же файл чека с другого аккаунта
-    assert "создана" in r.text
-    second = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 1").fetchone()
-    assert second["receipt_file"] and json.loads(second["receipt_ai"])["dup_of"] == 1
-    from donatix import tgbot
-    assert "ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #1" in tgbot.receipt_text(conn, config, second["id"])
+    assert "уже прислан к заявке #1" in r.text
+    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 1
 
 
 def test_draft_without_receipt_does_not_block(config, conn):
