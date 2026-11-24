@@ -865,6 +865,52 @@ def cards_save(request: Request, action: str = Form(""), card_id: int = Form(0),
     return RedirectResponse("/admin/cards", status_code=303)
 
 
+@router.get("/repeat-guard")
+def repeat_guard_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    """ИИ-модератор повторных чеков: блоки, апелляции, проверки похожих чеков, журнал."""
+    from . import repeat_guard
+    return render(request, "admin/repeat_guard.html", {"user": admin, "o": repeat_guard.overview(conn),
+                                                      "when": repeat_guard.when, "appeal_s": repeat_guard.APPEAL})
+
+
+@router.post("/repeat-guard/act", dependencies=[Depends(check_csrf)])
+def repeat_guard_act(request: Request, act: str = Form(""), id: int = Form(0), other: int = Form(0),
+                     start: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import repeat_guard
+    config = request.app.state.config
+    by = f"модератор {admin['login']}"
+    msg = "Готово."
+    if act == "lift":
+        repeat_guard.lift(conn, config, id, by)
+        msg = "Блок снят, страйк отменён, боты включены."
+    elif act == "reject_appeal":
+        repeat_guard.reject_appeal(conn, id, by)
+        msg = "Апелляция отклонена."
+    elif act == "perm":
+        msg = repeat_guard.confirm_perm(conn, config, id, by) or "Вечная блокировка подтверждена. Боты удалятся через 24 часа."
+    elif act == "no_perm":
+        repeat_guard.decline_perm(conn, id, by)
+        msg = "Вечная не подтверждена — остаётся блок на 7 дней."
+    elif act in ("review_yes", "review_no"):
+        repeat_guard.review(conn, config, id, act == "review_yes", by)
+        msg = "Повтор подтверждён — страйк поставлен." if act == "review_yes" else "Не повтор — без страйка."
+    elif act == "revoke":
+        repeat_guard.revoke(conn, id, by)
+        msg = "Страйк отменён."
+    elif act == "transfer" and id and other:
+        msg = f"Перенесено страйков: {repeat_guard.transfer(conn, other, id, by)}."
+    elif act == "start":
+        from datetime import datetime
+        try:
+            ts = int(datetime.strptime(start.strip(), "%Y-%m-%d").replace(tzinfo=repeat_guard.TZ).timestamp())
+            db.set_setting(conn, "repeat.start_ts", str(ts))
+            msg = f"Правило действует с {repeat_guard.when(ts)[:10]}."
+        except ValueError:
+            msg = "Дата — в формате 2026-12-08."
+    flash(request, msg)
+    return RedirectResponse("/admin/repeat-guard", status_code=303)
+
+
 @router.get("/refunds")
 def refunds_page(request: Request, only: str = "", fmt_: str = Query("", alias="format"), admin=Depends(admin_user),
                  conn=Depends(get_conn)):

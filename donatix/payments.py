@@ -350,9 +350,15 @@ def pay_amount(tjs_rate: Decimal, currency: str, usd: Decimal) -> tuple[str, str
 
 
 def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: str, amount: str,
-           reference: str = "", *, amount_tjs: str = "", for_purchase: bool = False) -> int:
+           reference: str = "", *, amount_tjs: str = "", for_purchase: bool = False, ext_user: str = "") -> int:
     """Заявка на пополнение. Сумма — в долларах (amount) или в сомони (amount_tjs, пересчёт по курсу).
     for_purchase — оплата конкретной покупки: минимум пополнения к ней не применяется."""
+    from . import repeat_guard
+    ext_user = (ext_user or "").strip()[:64]
+    try:   # блок за повторные чеки — новые пополнения не принимаем
+        repeat_guard.check(conn, user["id"], ext_user or None)
+    except repeat_guard.HoldError as exc:
+        raise PaymentError(str(exc)) from None
     conf = settings(conn, config)
     method = resolve(conf, method)
     if method not in conf["details"]:
@@ -413,6 +419,8 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (user["id"], method, to_micro(usd), pay, cur, reference.strip()[:200] or None, db.now()),
     )
+    if ext_user:
+        conn.execute("UPDATE payments SET ext_user = ? WHERE id = ?", (ext_user, c.lastrowid))
     if not chosen.get("auto"):   # несколько карт у банка: в заявку — та карта, что показали этому клиенту
         from . import paycards
         card = paycards.pick(conn, user["id"], method, config.tz_offset)
@@ -812,11 +820,13 @@ REJECTED_TEXT = "Чек не прошёл проверку. Если это ош
 
 
 class ReceiptUsed(ReceiptRejected):
-    """Этот чек мы уже приняли (зачислили) по другой заявке — второй раз не принимаем."""
+    """Этот чек мы уже приняли (зачислили) по другой заявке — второй раз не принимаем.
+    evidence — чем доказан повтор: sha256 / bank_code (точно) или picture / ai_transfer (решает модератор)."""
 
-    def __init__(self, old_id: int):
+    def __init__(self, old_id: int, evidence: str = "sha256"):
         super().__init__([f"этот чек уже приняли — заявка #{old_id}"])
         self.old_id = old_id
+        self.evidence = evidence
         self.args = (used_text(old_id),)
 
 
@@ -845,6 +855,12 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     """
     if not data or len(data) > MAX_RECEIPT_BYTES:
         raise PaymentError("Файл чека пустой или больше 10 МБ.")
+    from . import repeat_guard
+    row = conn.execute("SELECT ext_user FROM payments WHERE id = ? AND user_id = ?", (payment_id, user_id)).fetchone()
+    try:   # заблокирован за повторные чеки — чеки не принимаем, пока блок не снят
+        repeat_guard.check(conn, user_id, (row["ext_user"] if row else None) or None)
+    except repeat_guard.HoldError as exc:
+        raise PaymentError(str(exc)) from None
     ext = receipt_kind(data)
     if ext is None:
         raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
@@ -882,6 +898,13 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     except BaseException as exc:
         if own_tx:
             conn.execute("ROLLBACK")
+        if isinstance(exc, ReceiptUsed) and exc.old_id:   # ИИ-модератор: страйк, предупреждение или блок
+            from . import repeat_guard
+            try:
+                exc.args = (repeat_guard.on_used(conn, config, user_id, payment_id, exc.old_id, exc.evidence),)
+            except Exception:  # noqa: BLE001 — модератор не должен ломать отказ в чеке
+                import logging
+                logging.getLogger(__name__).exception("ИИ-модератор повторных чеков")
         if isinstance(exc, ReceiptRejected):
             old = getattr(exc, "old_id", 0)
             _report_rejected(conn, config, user_id, payment_id, exc.reasons,
@@ -917,11 +940,15 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     phash = receipt_ai.image_hash(data, ext)
     used = conn.execute("SELECT id, status FROM payments WHERE receipt_hash = ? AND id != ? AND status = 'paid'",
                         (digest, payment_id)).fetchone()
-    used = (used or receipt_ai.same_picture_paid(conn, payment_id, phash, seen)
-            or receipt_ai.paid_same_transfer(conn, payment_id, seen)   # номер операции + сумма + минута — все сразу
-            or receipt_ai.paid_by_bank_code(conn, payment_id, seen))   # код операции от самого банка — точно повтор
+    evidence = "sha256"
+    for kind, found in (("bank_code", lambda: receipt_ai.paid_by_bank_code(conn, payment_id, seen)),   # код от банка
+                        ("picture", lambda: receipt_ai.same_picture_paid(conn, payment_id, phash, seen)),
+                        ("ai_transfer", lambda: receipt_ai.paid_same_transfer(conn, payment_id, seen))):
+        if used:   # точные доказательства проверяем первыми: от них зависит, ставит ли ИИ-модератор страйк
+            break
+        used, evidence = found(), kind
     if used:
-        raise ReceiptUsed(used["id"])
+        raise ReceiptUsed(used["id"], evidence)
     twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
     if not twin and seen and p["auto_kind"] == "dcbank":   # та же сумма от этого клиента уже пришла автоматом
         twin = receipt_ai.auto_twin(conn, payment_id, user_id, seen)

@@ -1,0 +1,76 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Повторные чеки — админка{% endblock %}
+{% macro act(name, id, label, cls='') -%}
+<form method="post" action="/admin/repeat-guard/act" style="display:inline;margin:0"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="act" value="{{ name }}"><input type="hidden" name="id" value="{{ id }}">
+  <button class="btn sm {{ cls }}">{{ label }}</button></form>
+{%- endmacro %}
+{% block content %}
+<section class="page-hero"><h1>Повторные чеки</h1>
+  <p>ИИ-модератор по решению суда: автоматический страйк — только за тот же файл чека или код операции банка. Похожие чеки решаете вы. Лестница: отказ → предупреждение → 5 дней → 7 дней → навсегда (только вашим решением). 90 дней без нарушений — ступень вниз.</p></section>
+
+<form method="post" action="/admin/repeat-guard/act" class="card" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="act" value="start">
+  <div><label for="start">Правило действует с</label><input id="start" name="start" value="{{ when(o.start)[6:10] ~ '-' ~ when(o.start)[3:5] ~ '-' ~ when(o.start)[0:2] }}" style="max-width:160px"></div>
+  <button class="btn sm">Сохранить дату</button>
+  <span class="muted small">{{ 'Уже действует.' if o.now >= o.start else 'До этой даты повторные чеки только отклоняются, без страйков.' }}</span>
+</form>
+
+<h2>Блокировки сейчас ({{ o.holds|length }})</h2>
+<div class="list" style="margin-bottom:18px">
+{% for h in o.holds %}
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div><b>{{ h.login or ('#' ~ h.user_id) }}</b>{% if h.subject.startswith('x:') %} · покупатель {{ h.subject.split(':')[2] }}{% endif %}
+        <div class="muted small">ступень {{ h.level }} · {{ {'temp': 'временный', 'perm_pending': 'ждёт решения о вечной', 'perm': 'навсегда'}[h.kind] }} · до {{ when(h.until_ts) }}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        {{ act('lift', h.id, 'Снять блок (ошибка)') }}
+        {% if h.kind == 'perm_pending' %}{{ act('perm', h.id, 'Подтвердить навсегда', 'danger') }}{{ act('no_perm', h.id, 'Не навсегда (7 дней)') }}{% endif %}
+      </div>
+    </div>
+    {% if h.appeal_state %}
+    <div class="small" style="margin-top:8px;padding:10px;border-radius:10px;background:var(--surface-2)">
+      <b>Апелляция ({{ {'open': 'ждёт ответа', 'accepted': 'принята', 'rejected': 'отклонена'}[h.appeal_state] }})</b>{% if h.appeal_ts %} · {{ when(h.appeal_ts) }}{% endif %}
+      <div style="white-space:pre-line;overflow-wrap:anywhere">{{ h.appeal }}</div>
+      {% if h.appeal_state == 'open' %}<div style="margin-top:6px;display:flex;gap:6px">{{ act('lift', h.id, 'Принять — снять блок', 'primary') }}{{ act('reject_appeal', h.id, 'Отклонить') }}</div>{% endif %}
+    </div>{% elif o.now - h.ts < appeal_s %}<div class="muted small" style="margin-top:6px">Срок апелляции до {{ when(h.ts + appeal_s) }}.</div>{% endif %}
+  </div>
+{% else %}<p class="muted">Блокировок нет.</p>{% endfor %}
+</div>
+
+<h2>Похожие чеки — решаете вы ({{ o.reviews|length }})</h2>
+<div class="list" style="margin-bottom:18px">
+{% for r in o.reviews %}
+  <div class="card" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <div><b>{{ r.login or ('#' ~ r.user_id) }}</b> · заявка <a href="/admin/payments?q={{ r.payment_id }}">#{{ r.payment_id }}</a> похожа на зачисленную <a href="/admin/payments?q={{ r.prev_id }}">#{{ r.prev_id }}</a>
+      <div class="muted small">{{ {'picture': 'похожая картинка', 'ai_transfer': 'номер, сумма и минута, прочитанные ИИ'}.get(r.evidence, r.evidence) }} · {{ when(r.ts) }}</div></div>
+    <div style="display:flex;gap:6px">{{ act('review_yes', r.id, 'Это повтор — страйк', 'danger') }}{{ act('review_no', r.id, 'Не повтор') }}</div>
+  </div>
+{% else %}<p class="muted">Нет задач.</p>{% endfor %}
+</div>
+
+<h2>Страйки</h2>
+<div class="table-wrap" style="overflow-x:auto;margin-bottom:18px"><table>
+  <tr><th>#</th><th>Клиент</th><th>Заявка → уже зачислена</th><th>Доказательство</th><th>Когда</th><th>Статус</th><th></th></tr>
+  {% for s in o.strikes %}<tr><td>{{ s.id }}</td><td>{{ s.login or s.user_id }}{% if s.subject.startswith('x:') %} · {{ s.subject.split(':')[2] }}{% endif %}</td>
+    <td>#{{ s.payment_id or '—' }} → #{{ s.prev_id or '—' }}</td><td>{{ s.evidence }}{% if s.note %} · {{ s.note }}{% endif %}</td><td>{{ when(s.ts) }}</td>
+    <td>{{ {'active': 'действует', 'revoked': 'отменён', 'decayed': 'сгорел (90 дней)'}[s.status] }}</td>
+    <td>{% if s.status == 'active' %}{{ act('revoke', s.id, 'Отменить') }}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Страйков нет.</td></tr>{% endfor %}
+</table></div>
+
+<form method="post" action="/admin/repeat-guard/act" class="card" style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="act" value="transfer">
+  <div><label for="other">Перенести уровень с аккаунта (ID)</label><input id="other" name="other" inputmode="numeric" style="max-width:140px"></div>
+  <div><label for="tid">на новый аккаунт (ID)</label><input id="tid" name="id" inputmode="numeric" style="max-width:140px"></div>
+  <button class="btn sm">Перенести</button>
+  <span class="muted small">Только если уверены, что это тот же человек (та же карта отправителя или устройство).</span>
+</form>
+
+<h2>Журнал</h2>
+<div class="table-wrap" style="overflow-x:auto"><table>
+  <tr><th>Когда</th><th>Клиент</th><th>Действие</th><th>Подробности</th><th>Кто</th></tr>
+  {% for l in o.log %}<tr><td>{{ when(l.ts) }}</td><td>{{ l.login or l.user_id }}</td><td>{{ l.action }}</td><td style="overflow-wrap:anywhere">{{ l.details }}</td><td>{{ l.by_who }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Пока пусто.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -32,9 +32,10 @@ class ApiError(Exception):
 
 
 def api_error_response(exc: ApiError) -> JSONResponse:
-    return JSONResponse(
-        {"ok": False, "error": str(exc), "code": exc.code}, status_code=exc.http_status, headers=exc.headers
-    )
+    body = {"ok": False, "error": str(exc), "code": exc.code}
+    if "X-Blocked-Until" in exc.headers:   # блок за повторные чеки — до какой даты (UTC) или permanent
+        body["blocked_until"] = exc.headers["X-Blocked-Until"]
+    return JSONResponse(body, status_code=exc.http_status, headers=exc.headers)
 
 
 def _limit(request: Request, category: str, key: str) -> None:
@@ -78,6 +79,13 @@ def api_user(
         raise ApiError(accounts.api_key_problem(conn, key), "unauthorized", 401)
     if user["status"] == "blocked":
         raise ApiError("Аккаунт заблокирован.", "account_blocked", 403)
+    from . import repeat_guard
+    h = repeat_guard.active_hold(conn, repeat_guard.subject_for(user["id"]))
+    if h is not None:   # блок за повторные чеки: API отвечает 403 до даты разблокировки, потом включается сам
+        from datetime import datetime, timezone
+        until = "" if h["until_ts"] is None else datetime.fromtimestamp(h["until_ts"], timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        raise ApiError(repeat_guard.hold_text(h), "account_hold", 403, {"X-Blocked-Until": until or "permanent"})
     return user
 
 
@@ -332,6 +340,9 @@ class PaymentIn(BaseModel):
     amount_usd: str = ""
     amount_tjs: str = ""
     reference: str = Field(default="", max_length=200)
+    # Telegram ID (или любой ваш ID) покупателя, для которого пополнение. Передайте — и за повторные чеки
+    # отвечает этот покупатель, а не весь ваш аккаунт.
+    external_user_id: str = Field(default="", max_length=64)
 
 
 @router.get("/payments/methods")
@@ -355,7 +366,7 @@ def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), co
     try:
         with db.tx(conn):   # 10 одновременных запросов — создастся одна заявка
             pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
-                                  amount_tjs=body.amount_tjs)
+                                  amount_tjs=body.amount_tjs, ext_user=body.external_user_id)
         payments.start_auto(conn, config, pid)  # TRC20 / Binance Pay — ссылка или адрес для оплаты
     except payments.PaymentError as exc:
         raise ApiError(str(exc), "invalid_payment") from None

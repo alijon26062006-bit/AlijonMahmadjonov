@@ -1,0 +1,22 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Апелляция — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Обжаловать блокировку</h1>
+  <p>Блокировку за повторный чек проверяет живой модератор, не ИИ. Ответ — в течение 24 часов. Если система ошиблась, блок и предупреждение снимаются. / Шикоят — модератор дар 24 соат ҷавоб медиҳад.</p></section>
+{% if state and state.kind == 'hold' and state.can_appeal %}
+<form class="card" method="post" action="/panel/appeal" style="max-width:640px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+  <label for="text">Что произошло</label>
+  <textarea id="text" name="text" rows="6" minlength="10" maxlength="2000" required placeholder="Например: я по ошибке выбрал старый скриншот, вот номер новой операции…">{{ text or '' }}</textarea>
+  <p class="muted small">Подать апелляцию можно в течение 48 часов после блокировки. Приложите номер операции настоящего перевода, если он есть.</p>
+  <button class="btn primary">Отправить модератору</button>
+</form>
+{% elif state and state.kind == 'hold' and state.appeal_state %}
+<div class="card">Апелляция уже {{ {'open': 'на рассмотрении', 'accepted': 'принята', 'rejected': 'отклонена'}.get(state.appeal_state, 'подана') }}.</div>
+{% elif state and state.kind == 'hold' %}
+<div class="card">Срок апелляции (48 часов) прошёл. Если считаете, что это ошибка, напишите в поддержку.</div>
+{% else %}
+<div class="card">Блокировки нет — обжаловать нечего.</div>
+{% endif %}
+{% endblock %}

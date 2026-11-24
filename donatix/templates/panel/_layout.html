@@ -67,6 +67,15 @@
 </div>
 {% endblock %}
 {% block notice %}
+{% if repeat %}
+<div class="flash {{ 'error' if repeat.kind == 'hold' else 'warn' }}" role="status" style="flex-wrap:wrap">{{ icon('alert', 20) }}<span>{{ repeat.text }}</span>
+  {% if repeat.kind == 'warn' %}<form method="post" action="/panel/repeat-ack" style="margin:0"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <label style="font-weight:400;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" name="ok" value="1" required style="width:auto;min-height:0">Понимаю</label>
+    <button class="btn sm primary">Подтвердить</button></form>{% endif %}
+  {% if repeat.kind == 'hold' and repeat.can_appeal %}<a class="btn sm" href="/panel/appeal">Обжаловать</a>{% endif %}
+  {% if repeat.kind == 'hold' and repeat.appeal_state == 'open' %}<span class="muted small">Апелляция на рассмотрении — ответ в течение 24 часов.</span>{% endif %}
+</div>
+{% endif %}
 {% if user.status == 'pending' and not user.guest %}
 <div class="flash warn" role="status">{{ icon('clock', 20) }}<span>Аккаунт ждёт одобрения. Каталог уже можно смотреть, заказы откроются после активации — <a href="/panel/support">напишите в поддержку</a>.</span></div>
 {% endif %}

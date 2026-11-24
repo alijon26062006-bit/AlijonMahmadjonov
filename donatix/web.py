@@ -170,8 +170,10 @@ def privacy(request: Request, conn=Depends(get_conn)):
 
 @router.get("/terms")
 def terms(request: Request, conn=Depends(get_conn)):
+    from . import repeat_guard
     return render(request, "legal.html", {"user": session_user(request, conn), "page": "terms",
-                                          "bot_terms": _bot_terms(conn)})
+                                          "bot_terms": _bot_terms(conn),
+                                          "repeat_start": repeat_guard.when(repeat_guard.start_ts(conn))[:10]})
 
 
 # ── Приложение для телефона (Android APK / «Установить на экран») ──
@@ -569,6 +571,35 @@ def panel_telegram_required(request: Request, user=Depends(panel_user), conn=Dep
         return _redirect("/panel")
     return render(request, "panel/telegram_link.html", {"user": user, "bot": tglogin.bot_username(conn),
                                                         "ways": tglogin.methods(conn, request.app.state.config)})
+
+
+@router.post("/panel/repeat-ack", dependencies=[Depends(check_csrf)])
+def panel_repeat_ack(request: Request, ok: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn)):
+    """Клиент подтвердил предупреждение ИИ-модератора о повторном чеке (галочка «Понимаю»)."""
+    from . import repeat_guard
+    if ok:
+        repeat_guard.ack(conn, user["id"])
+        flash(request, "Предупреждение подтверждено. Прикладывайте к заявке новый чек перевода.")
+    return _redirect("/panel")
+
+
+@router.get("/panel/appeal")
+def panel_appeal_form(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import repeat_guard
+    return render(request, "panel/appeal.html", {"user": user, "state": repeat_guard.banner(conn, user["id"])})
+
+
+@router.post("/panel/appeal", dependencies=[Depends(check_csrf)])
+def panel_appeal(request: Request, text: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import repeat_guard
+    try:
+        repeat_guard.appeal(conn, config, user["id"], text)
+    except ValueError as exc:
+        return render(request, "panel/appeal.html", {"user": user, "state": repeat_guard.banner(conn, user["id"]),
+                                                     "error": str(exc), "text": text}, 400)
+    flash(request, "✅ Апелляция отправлена. Живой модератор ответит в течение 24 часов.")
+    return _redirect("/panel")
 
 
 @router.get("/panel/password")

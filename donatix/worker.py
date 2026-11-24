@@ -166,6 +166,11 @@ class Worker:
                 except Exception:
                     log.exception("утренний отчёт")
                 try:
+                    from . import repeat_guard
+                    repeat_guard.tick(conn, self.config)   # повторные чеки: конец блоков, боты, партнёры
+                except Exception:
+                    log.exception("ИИ-модератор повторных чеков")
+                try:
                     from . import p2p
                     p2p.expire(conn)   # P2P: ордер не подтвердили за 15 минут — отменить и разморозить
                 except Exception:

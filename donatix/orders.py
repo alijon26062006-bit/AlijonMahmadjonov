@@ -182,6 +182,11 @@ def create_order(
         raise OrderError(jumuah.MESSAGE, "friday_break", 503)
     if user["status"] != "active":
         raise OrderError("Аккаунт не активирован. Дождитесь одобрения.", "account_inactive", 403)
+    from . import repeat_guard
+    try:   # блок за повторные чеки: новые заказы не принимаем, оплаченные выполняются
+        repeat_guard.check(conn, user["id"])
+    except repeat_guard.HoldError as exc:
+        raise OrderError(str(exc), "account_hold", 403) from None
     product = get_product(conn, product_id)
     if product is None:
         raise OrderError("Товар не найден или недоступен.", "product_not_found", 404)

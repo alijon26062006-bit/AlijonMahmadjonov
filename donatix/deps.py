@@ -415,6 +415,19 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             ctx["tg_login"] = db.get_setting(_c, "shop.bot_username") or ""
         finally:
             _pool.release(_c)
+    ctx["repeat"] = None
+    _me = ctx.get("user")
+    _real = _me is not None and not (isinstance(_me, dict) and _me.get("guest")) and "id" in _me.keys()
+    if request.url.path.startswith("/panel") and _real:
+        from . import repeat_guard   # блок, предупреждение или скорое правило о повторных чеках
+        _rp = db.pool(config.db_path)
+        _rc = _rp.acquire()
+        try:
+            ctx["repeat"] = repeat_guard.banner(_rc, _me["id"])
+        except sqlite3.Error:
+            ctx["repeat"] = None
+        finally:
+            _rp.release(_rc)
     ctx["refund_on"] = False
     if request.url.path.startswith("/panel"):   # пункт «Карта для возврата» — только когда админ включил сбор
         from . import refunds

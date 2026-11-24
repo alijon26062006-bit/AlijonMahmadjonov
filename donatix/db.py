@@ -785,6 +785,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS bank_notices_code ON bank_notices(op_code) WHE
         giveaway.init(conn)   # розыгрыш по промокодам
         from . import race
         race.init(conn)       # гонка в мини-приложении   # карты для возврата остатка, если проект закроется
+        pay_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
+        if "ext_user" not in pay_cols2:   # покупатель партнёра (external_user_id из API) — за повторы отвечает он
+            conn.execute("ALTER TABLE payments ADD COLUMN ext_user TEXT")
+        from . import repeat_guard
+        repeat_guard.migrate(conn)   # ИИ-модератор повторных чеков: страйки, блоки, апелляции, журнал
         conn.execute("PRAGMA optimize")   # статистика для планировщика запросов — чтобы брал индексы
     finally:
         conn.close()
