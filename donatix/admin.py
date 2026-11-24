@@ -904,6 +904,7 @@ def repeat_guard_act(request: Request, act: str = Form(""), id: int = Form(0), o
         try:
             ts = int(datetime.strptime(start.strip(), "%Y-%m-%d").replace(tzinfo=repeat_guard.TZ).timestamp())
             db.set_setting(conn, "repeat.start_ts", str(ts))
+            db.set_setting(conn, "repeat.start_by_admin", "1")   # дату выбрал админ — при обновлении не трогаем
             msg = f"Правило действует с {repeat_guard.when(ts)[:10]}."
         except ValueError:
             msg = "Дата — в формате 2026-12-08."

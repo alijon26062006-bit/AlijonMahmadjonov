@@ -16,7 +16,7 @@
 6. Покупатель партнёра (external_user_id в API) отвечает сам; аккаунт партнёра — только если повторов больше
    5% его заявок за 7 дней (минимум 20): сначала предупреждение и 48 часов.
 7. Апелляция — 48 часов, решает живой модератор. Всё пишется в журнал, админ отменяет одной кнопкой.
-8. Правило действует с даты в настройке repeat.start_ts (при установке — сразу). Раньше этой даты — только отказ.
+8. Правило действует с 24.11.2026 (настройка repeat.start_ts, её можно поменять в админке). Раньше — только отказ.
 
 Субъект нарушения: "u:<id>" — аккаунт Donatix, "x:<id>:<external_user_id>" — покупатель партнёра.
 """
@@ -45,7 +45,7 @@ PARTNER_WINDOW = 7 * DAY
 PARTNER_SHARE = 0.05
 PARTNER_MIN = 20
 PARTNER_FIX = 48 * 3600
-STARTUP_DELAY = 0   # владелец решил: правило действует сразу после обновления
+START_DEFAULT = 1795460400   # 24.11.2026 00:00 (Душанбе) — с этого дня правило действует, так решил владелец
 STRONG = ("sha256", "bank_code")   # точные доказательства — страйк сам
 TZ = timezone(timedelta(hours=5))   # Душанбе
 
@@ -113,8 +113,9 @@ class HoldError(Exception):
 
 def migrate(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
-    if not db.get_setting(conn, "repeat.start_ts"):   # правило вступает в силу сразу после установки
-        db.set_setting(conn, "repeat.start_ts", str(int(time.time()) + STARTUP_DELAY))
+    saved = db.get_setting(conn, "repeat.start_ts")
+    if not saved or (saved.isdigit() and int(saved) > START_DEFAULT and not db.get_setting(conn, "repeat.start_by_admin")):
+        db.set_setting(conn, "repeat.start_ts", str(START_DEFAULT))   # с 24.11.2026; админ может поменять в админке
 
 
 def _now() -> int:
