@@ -17,7 +17,7 @@ import re
 import aiosqlite
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
-from aiogram.filters import Command
+from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery, CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup,
@@ -206,6 +206,11 @@ def prices_kb() -> InlineKeyboardMarkup:
     )
     kb.row(InlineKeyboardButton(text="🏷 Цена продажи вручную",
                                 callback_data="pn:set:star_price_e4"))
+    from app.money import rub_rate
+
+    rate = rub_rate()
+    kb.row(btn(f"₽ Цены в рублях · {f'1 с. = {rate:.2f} ₽' if rate else 'выкл'}",
+               "pn:rub"))
     kb.row(btn("📡 Узнать себестоимость", "pn:cost", style=PRIMARY))
     kb.row(btn("🧮 Применить наценку", "pn:recalc", style=SUCCESS))
     kb.row(InlineKeyboardButton(
@@ -483,6 +488,10 @@ def pay_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for key, (label, _) in PAY_FIELDS.items():
         kb.row(InlineKeyboardButton(text=label, callback_data=f"pn:set:{key}"))
+    from app.services import paymethods
+
+    kb.row(btn(f"🏦 Свои реквизиты, любой банк ({len(paymethods.all_())})",
+               "pn:pml", style=PRIMARY))
     kb.row(btn(("🖼 Пример чека: есть" if runtime.get("ru_example_photo")
                 else "🖼 Пример чека из России"), "pn:ru_photo"))
     kb.row(btn("👁 Как видит клиент", "pn:preview_pay", style=PRIMARY))
@@ -528,6 +537,261 @@ async def cb_pay(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await safe_edit(call, pay_text(), pay_kb())
     await call.answer()
+
+
+# ─────────────────────────────── свои реквизиты: любой банк и номер
+
+PM_LABELS = {"bank": "🏦 Банк", "number": "💳 Номер (карта, счёт, телефон)",
+             "holder": "👤 Получатель", "note": "📝 Примечание"}
+
+
+async def _pm_reload(conn) -> None:
+    from app.services import paymethods
+
+    await paymethods.load(conn)
+
+
+@router.callback_query(F.data == "pn:rub")
+async def cb_rub(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    on = runtime.get("rub_show", "1") != "0"
+    auto = runtime.get("rub_mode", "auto") == "auto"
+    raw = runtime.get("rub_per_tjs") or ""
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🚫 Не показывать рубли" if on else "✅ Показывать рубли",
+               "pn:rub_toggle", style=DANGER if on else SUCCESS))
+    kb.row(btn("🏦 Курс ЦБ России (сам обновляется)", "pn:rub_cbr", style=PRIMARY))
+    kb.row(btn("✍️ Свой курс", "pn:set:rub_per_tjs"))
+    kb.row(btn("‹ К ценам", "pn:prices"))
+    await safe_edit(
+        call,
+        "₽ <b>Цены в рублях</b>\n\n"
+        f"Показ: <b>{'включён' if on else 'выключен'}</b>\n"
+        f"Курс: <b>{('1 с. = ' + raw + ' ₽') if raw else 'ещё не получен'}</b> "
+        f"({'ЦБ России, обновляется сам' if auto else 'свой, бот не трогает'})\n"
+        f"Пример: {fmt(1000)}\n\n"
+        "<blockquote>Рядом с каждой суммой в сомони бот пишет её же в рублях: "
+        "цены, баланс, пополнения. Свой курс удобен, если из России у вас "
+        "переводят по другому курсу.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:rub_toggle")
+async def cb_rub_toggle(call: CallbackQuery, state: FSMContext,
+                        conn: aiosqlite.Connection) -> None:
+    await runtime.set_value(conn, "rub_show",
+                            "0" if runtime.get("rub_show", "1") != "0" else "1")
+    await cb_rub(call, state)
+
+
+@router.callback_query(F.data == "pn:rub_cbr")
+async def cb_rub_cbr(call: CallbackQuery, state: FSMContext,
+                     conn: aiosqlite.Connection) -> None:
+    from app.services import rubrate
+
+    await runtime.set_value(conn, "rub_mode", "auto")
+    rate = await rubrate.refresh(conn)
+    if not rate:
+        await call.answer("ЦБ сейчас не ответил — курс прежний, попробуйте позже.",
+                          show_alert=True)
+    await cb_rub(call, state)
+
+
+@router.callback_query(F.data == "pn:pml")
+async def cb_pm_list(call: CallbackQuery, state: FSMContext) -> None:
+    from app.services import paymethods
+
+    await state.clear()
+    methods = paymethods.all_()
+    kb = InlineKeyboardBuilder()
+    for m in methods:
+        kb.row(btn(f"{'✅' if m['enabled'] else '🚫'} {m['bank']} · {m['number']}"[:60],
+                   f"pn:pmv:{m['id']}"))
+    kb.row(btn("➕ Добавить реквизит", "pn:pmn", style=SUCCESS))
+    kb.row(btn("‹ К реквизитам", "pn:pay"))
+    await safe_edit(
+        call,
+        "🏦 <b>Свои реквизиты</b>\n\n"
+        "<blockquote>Любой банк и любой номер: карта, счёт или телефон. У "
+        "клиента в «Пополнить» каждый — отдельной кнопкой с названием "
+        "банка, рядом с «Душанбе Сити».\n\n"
+        "Сумма с копейками, заявка и «Я оплатил» работают так же. "
+        "Автоплатёж срабатывает только по тому банку, чьи уведомления "
+        "читает юзербот; по остальным оплату подтверждаете вы по чеку.</blockquote>"
+        + ("" if methods else "\n\n<i>Пока ни одного — нажмите «Добавить».</i>"),
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:pmn")
+async def cb_pm_new(call: CallbackQuery, state: FSMContext) -> None:
+    from app.states import PayMethodNew
+
+    await state.set_state(PayMethodNew.bank)
+    await safe_edit(call, "🏦 <b>Новый реквизит — шаг 1 из 4</b>\n\n"
+                          "Название банка — так будет подписана кнопка у клиента. "
+                          "Например <code>Алиф</code>, <code>Эсхата</code>, "
+                          "<code>Амонатбонк</code>:",
+                    back_kb("pn:pml", "❌ Отмена"))
+    await call.answer()
+
+
+@router.message(F.text, StateFilter("PayMethodNew:bank"))
+async def on_pm_bank(message: Message, state: FSMContext) -> None:
+    from app.states import PayMethodNew
+
+    bank = (message.text or "").strip()[:40]
+    if not bank:
+        return
+    await state.update_data(pm_bank=bank)
+    await state.set_state(PayMethodNew.number)
+    await message.answer("💳 <b>Шаг 2 из 4</b>\n\nНомер карты, счёта или телефона — "
+                         "его клиент увидит и сможет скопировать:",
+                         reply_markup=back_kb("pn:pml", "❌ Отмена"))
+
+
+@router.message(F.text, StateFilter("PayMethodNew:number"))
+async def on_pm_number(message: Message, state: FSMContext) -> None:
+    from app.states import PayMethodNew
+
+    number = (message.text or "").strip()[:60]
+    if not number:
+        return
+    await state.update_data(pm_number=number)
+    await state.set_state(PayMethodNew.holder)
+    await message.answer("👤 <b>Шаг 3 из 4</b>\n\nПолучатель — имя, как в банке. "
+                         "<code>-</code> — не показывать:",
+                         reply_markup=back_kb("pn:pml", "❌ Отмена"))
+
+
+@router.message(F.text, StateFilter("PayMethodNew:holder"))
+async def on_pm_holder(message: Message, state: FSMContext) -> None:
+    from app.states import PayMethodNew
+
+    raw = (message.text or "").strip()
+    await state.update_data(pm_holder="" if raw == "-" else raw[:60])
+    await state.set_state(PayMethodNew.note)
+    await message.answer("📝 <b>Шаг 4 из 4</b>\n\nПримечание под реквизитами, "
+                         "например «только через приложение банка». "
+                         "<code>-</code> — без примечания:",
+                         reply_markup=back_kb("pn:pml", "❌ Отмена"))
+
+
+@router.message(F.text, StateFilter("PayMethodNew:note"))
+async def on_pm_note(message: Message, state: FSMContext,
+                     conn: aiosqlite.Connection) -> None:
+    raw = (message.text or "").strip()
+    data = await state.get_data()
+    await state.clear()
+    method_id = await db.add_pay_method(
+        conn, bank=data["pm_bank"], number=data["pm_number"],
+        holder=data.get("pm_holder", ""), note="" if raw == "-" else raw[:300])
+    await _pm_reload(conn)
+    await message.answer(
+        f"✅ <b>Реквизит добавлен</b>: {data['pm_bank']} · <code>{data['pm_number']}</code>\n\n"
+        "Клиенты уже видят его в «Пополнить».",
+        reply_markup=back_kb(f"pn:pmv:{method_id}", "‹ К реквизиту"))
+
+
+def _pm_card(m: dict) -> str:
+    return (f"🏦 <b>{m['bank']}</b> — {'✅ показан клиентам' if m['enabled'] else '🚫 скрыт'}\n"
+            f"<code>{texts.LINE}</code>\n\n"
+            f"├ Номер: <code>{m['number']}</code>\n"
+            f"├ Получатель: {m['holder'] or '<i>не задан</i>'}\n"
+            f"└ Примечание: {m['note'] or '<i>нет</i>'}")
+
+
+@router.callback_query(F.data.startswith("pn:pmv:"))
+async def cb_pm_view(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await _pm_show(call, call.data.rsplit(":", 1)[1])
+
+
+async def _pm_show(call: CallbackQuery, method_id) -> None:
+    from app.services import paymethods
+
+    m = paymethods.get(method_id)
+    if m is None:
+        await call.answer("Реквизит не найден.", show_alert=True)
+        return
+    kb = InlineKeyboardBuilder()
+    for field, label in PM_LABELS.items():
+        kb.row(btn(label, f"pn:pme:{m['id']}:{field}"))
+    kb.row(btn("🚫 Скрыть от клиентов" if m["enabled"] else "✅ Показать клиентам",
+               f"pn:pmt:{m['id']}", style=DANGER if m["enabled"] else SUCCESS))
+    kb.row(btn("🗑 Удалить", f"pn:pmd:{m['id']}", style=DANGER))
+    kb.row(btn("‹ К списку", "pn:pml"))
+    await safe_edit(call, _pm_card(m), kb.as_markup())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pme:"))
+async def cb_pm_edit(call: CallbackQuery, state: FSMContext) -> None:
+    from app.states import PayMethodEdit
+
+    _, _, method_id, field = call.data.split(":")
+    if field not in PM_LABELS:
+        await call.answer()
+        return
+    await state.set_state(PayMethodEdit.value)
+    await state.update_data(pm_id=int(method_id), pm_field=field)
+    hint = "" if field in ("bank", "number") else " <code>-</code> — убрать."
+    await safe_edit(call, f"{PM_LABELS[field]}\n\nПришлите новое значение.{hint}",
+                    back_kb(f"pn:pmv:{method_id}", "❌ Отмена"))
+    await call.answer()
+
+
+@router.message(F.text, StateFilter("PayMethodEdit:value"))
+async def on_pm_edit(message: Message, state: FSMContext,
+                     conn: aiosqlite.Connection) -> None:
+    data = await state.get_data()
+    field, raw = data["pm_field"], (message.text or "").strip()
+    if field in ("bank", "number") and not raw:
+        return
+    value = "" if raw == "-" and field not in ("bank", "number") else raw
+    limit = {"bank": 40, "number": 60, "holder": 60, "note": 300}[field]
+    await db.update_pay_method(conn, data["pm_id"], **{field: value[:limit]})
+    await state.clear()
+    await _pm_reload(conn)
+    await message.answer(f"✅ {PM_LABELS[field]} — сохранено.",
+                         reply_markup=back_kb(f"pn:pmv:{data['pm_id']}", "‹ К реквизиту"))
+
+
+@router.callback_query(F.data.startswith("pn:pmt:"))
+async def cb_pm_toggle(call: CallbackQuery, state: FSMContext,
+                       conn: aiosqlite.Connection) -> None:
+    from app.services import paymethods
+
+    m = paymethods.get(call.data.rsplit(":", 1)[1])
+    if m is None:
+        await call.answer("Реквизит не найден.", show_alert=True)
+        return
+    await db.update_pay_method(conn, m["id"], enabled=0 if m["enabled"] else 1)
+    await _pm_reload(conn)
+    await _pm_show(call, m["id"])
+
+
+@router.callback_query(F.data.startswith("pn:pmd:"))
+async def cb_pm_delete_ask(call: CallbackQuery) -> None:
+    method_id = call.data.rsplit(":", 1)[1]
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🗑 Да, удалить", f"pn:pmdy:{method_id}", style=DANGER))
+    kb.row(btn("‹ Нет", f"pn:pmv:{method_id}"))
+    await safe_edit(call, "Удалить реквизит? Клиенты перестанут его видеть. "
+                          "Уже открытые заявки по нему останутся.", kb.as_markup())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pmdy:"))
+async def cb_pm_delete(call: CallbackQuery, state: FSMContext,
+                       conn: aiosqlite.Connection) -> None:
+    await db.delete_pay_method(conn, int(call.data.rsplit(":", 1)[1]))
+    await _pm_reload(conn)
+    await call.answer("Удалено")
+    await cb_pm_list(call, state)
 
 
 @router.callback_query(F.data == "pn:preview_pay")
@@ -675,6 +939,11 @@ FIELDS["ff_community_key"] = (
     "ключ снимает ограничения:", "text",
 )
 
+FIELDS["rub_per_tjs"] = (
+    "₽ Свой курс рубля",
+    "Сколько рублей в 1 сомони, например <code>9.5</code>. "
+    "<code>-</code> — снова курс ЦБ России:", "text")
+
 FIELDS["donatix_key"] = (
     "🔑 Ключ Donatix",
     "Ключ <code>dx_live_…</code> из кабинета donatix.tj (раздел API). С его "
@@ -698,6 +967,7 @@ FIELDS["glory_region_title"] = (
     "Например <code>СНГ</code>. <code>-</code> — как у Donatix:", "text")
 
 FIELD_PARENT.update({
+    "rub_per_tjs": "pn:rub",
     "glory_price_diram": "pn:glory", "glory_regions": "pn:glory",
     "glory_region_title": "pn:glory",
     "donatix_key": "pn:glory", "glory_margin": "pn:glory",
@@ -778,6 +1048,33 @@ async def on_field_value(
     data = await state.get_data()
     field = data.get("field", "")
     raw = (message.text or "").strip()
+
+    # Свой курс рубля: число; «-» — снова курс ЦБ.
+    if field == "rub_per_tjs":
+        if raw == "-":
+            from app.services import rubrate
+
+            await runtime.set_value(conn, "rub_mode", "auto")
+            await rubrate.refresh(conn)
+            await state.clear()
+            await message.answer("✅ Снова курс ЦБ России.",
+                                 reply_markup=back_kb("pn:rub", "‹ К рублю"))
+            return
+        try:
+            rate = float(raw.replace(",", "."))
+        except ValueError:
+            rate = 0
+        if not 0 < rate < 1000:
+            await message.answer("❌ Введите число, например <code>9.5</code> — "
+                                 "сколько рублей в 1 сомони.")
+            return
+        await runtime.set_value(conn, "rub_per_tjs", f"{rate:.4f}")
+        await runtime.set_value(conn, "rub_mode", "manual")
+        await state.clear()
+        await message.answer(f"✅ Свой курс: 1 с. = <b>{rate:g} ₽</b>. "
+                             f"Пример: {fmt(1000)}",
+                             reply_markup=back_kb("pn:rub", "‹ К рублю"))
+        return
 
     # Своя цена пакета: ключ вида game_price:игра:пакет.
     if field.startswith("game_price:"):

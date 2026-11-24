@@ -23,11 +23,32 @@ def parse(raw: str) -> int | None:
     return int(whole) * 100 + int(frac.ljust(2, "0")) if frac else int(whole) * 100
 
 
+def rub_rate() -> float:
+    """Сколько рублей в 1 сомони. 0 — рубли не показываем."""
+    if runtime.get("rub_show", "1") == "0":
+        return 0.0
+    try:
+        rate = float((runtime.get("rub_per_tjs") or "0").replace(",", "."))
+    except ValueError:
+        return 0.0
+    return rate if rate > 0 else 0.0
+
+
+def rub_suffix(diram: int) -> str:
+    """' / 100 ₽' — та же сумма в рублях, целыми. Пусто, если курса нет."""
+    rate = rub_rate()
+    if not rate:
+        return ""
+    rub = round(diram / 100 * rate)
+    return f" / {rub:,} ₽".replace(",", " ")
+
+
 def fmt(diram: int) -> str:
-    """1250 -> '12.50 с.'"""
+    """1250 -> '12.50 с.' (и ' / 115 ₽', если задан курс рубля)."""
     sign = "-" if diram < 0 else ""
     whole, frac = divmod(abs(diram), 100)
-    return f"{sign}{whole:,}".replace(",", " ") + f".{frac:02d} {settings.currency}"
+    return (f"{sign}{whole:,}".replace(",", " ") + f".{frac:02d} {settings.currency}"
+            + rub_suffix(diram))
 
 
 def fmt_short(diram: int) -> str:
@@ -40,7 +61,8 @@ def fmt_short(diram: int) -> str:
     if frac:
         return fmt(diram)
     sign = "-" if diram < 0 else ""
-    return f"{sign}{whole:,}".replace(",", " ") + f" {settings.currency}"
+    return (f"{sign}{whole:,}".replace(",", " ") + f" {settings.currency}"
+            + rub_suffix(diram))
 
 
 def parse4(raw: str) -> int | None:

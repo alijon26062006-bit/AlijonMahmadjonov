@@ -134,6 +134,9 @@ async def main() -> None:
     # быть заданы через бота, а не в .env.
     await runtime.load(conn)
     await db.load_game_titles(conn)
+    from app.services import paymethods
+
+    await paymethods.load(conn)
 
     if not print_readiness():
         await conn.close()
@@ -262,6 +265,10 @@ async def main() -> None:
     games_task = asyncio.create_task(games_watch(provider, bot))
     # Боты для гильдии: закончили работу — сказать клиенту.
     glory_task = asyncio.create_task(glory.watch_loop(bot))
+    # Курс рубля для цен «10 с. / 95 ₽».
+    from app.services import rubrate
+
+    rub_task = asyncio.create_task(rubrate.loop())
 
     # Поставщик умеет сам сообщать о выдаче. Это не отменяет присмотра
     # выше — отчёт может не дойти, — но с ним клиент узнаёт за секунду,
@@ -290,7 +297,7 @@ async def main() -> None:
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        for task in (pricing_task, games_task, api_task, digest_task, glory_task):
+        for task in (pricing_task, games_task, api_task, digest_task, glory_task, rub_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
