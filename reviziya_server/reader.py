@@ -57,6 +57,13 @@ class PriceReader:
         self.client = anthropic.AsyncAnthropic(api_key=api_key, max_retries=1, timeout=20.0)
         self.model = model
 
+    async def warm_up(self) -> None:
+        """Открывает соединение с Claude заранее, чтобы первый скан не ждал лишнюю секунду."""
+        try:
+            await self.client.models.retrieve(self.model)
+        except Exception as exc:  # не страшно: первый скан просто будет чуть дольше
+            log.info("разогрев не удался: %s", exc)
+
     async def read(self, image_b64: str) -> tuple[int, bool]:
         try:
             response = await self.client.messages.create(

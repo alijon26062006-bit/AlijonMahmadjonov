@@ -53,7 +53,13 @@ main{flex:1;position:relative;min-height:0}
 
 /* camera */
 .cam{flex:1;min-height:0;position:relative;overflow:hidden;background:var(--cam-bg);color:var(--cam-ink)}
-#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 44%;transition:transform .18s}
+.tagbox{position:absolute;border:2px solid var(--lock);border-radius:8px;box-shadow:0 0 0 3px rgba(62,224,143,.22);pointer-events:none;transition:left .12s,top .12s,width .12s,height .12s}
+.sent{position:absolute;left:12px;top:54px;width:84px;max-height:84px;object-fit:contain;border-radius:10px;border:2px solid var(--cam-ink);background:var(--cam-bg);box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.zoomctl{position:absolute;right:10px;top:50%;transform:translateY(-70%);display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.zoomctl button{width:44px;height:40px;border-radius:12px;background:var(--cam-btn);color:var(--cam-ink);font-weight:700;font-size:13.5px;backdrop-filter:blur(8px)}
+.zoomctl button.on{background:var(--cam-ink);color:var(--cam-bg)}
+.zoomctl span{font-size:11.5px;font-weight:700;color:var(--cam-bg);background:var(--lock);padding:3px 7px;border-radius:8px;white-space:nowrap}
 .ret{position:absolute;left:50%;top:44%;width:min(72%,300px);aspect-ratio:1/.82;transform:translate(-50%,-50%);border-radius:22px;box-shadow:0 0 0 999px rgba(6,8,18,.38);transition:transform .2s}
 .cam.idle .ret{box-shadow:none}
 .ret i{position:absolute;width:34px;height:34px;border:4px solid var(--cam-ink);transition:border-color .15s}
@@ -218,7 +224,9 @@ main{flex:1;position:relative;min-height:0}
       <div class="cam idle" id="cam">
         <video id="video" playsinline muted autoplay></video>
         <div class="ret" id="ret"><i></i><i></i><i></i><i></i><div class="laser"></div></div>
+        <div class="tagbox" id="tagbox" hidden></div>
         <div class="flash" id="flash"></div>
+        <img class="sent" id="sent" alt="Что отправлено на чтение" hidden>
         <div class="status" aria-live="polite"><b></b><span id="statusText">Камера выключена</span></div>
         <div class="queue" id="queue" hidden></div>
         <div class="toast" id="toast">
@@ -229,6 +237,12 @@ main{flex:1;position:relative;min-height:0}
             <button id="toastYes" type="button" hidden>Верно</button>
             <button id="toastNo" type="button" hidden>Нет</button>
           </span>
+        </div>
+        <div class="zoomctl" id="zoomctl" hidden>
+          <span id="zoomNow" hidden></span>
+          <button type="button" data-z="1" aria-label="Зум 1">1×</button>
+          <button type="button" data-z="2" aria-label="Зум 2">2×</button>
+          <button type="button" data-z="3" aria-label="Зум 3">3×</button>
         </div>
         <div class="camctl" id="camctl" hidden>
           <button id="torch" type="button" hidden>Свет</button>
@@ -325,6 +339,14 @@ main{flex:1;position:relative;min-height:0}
             <button type="button" data-v="careful">Аккуратно</button>
           </div>
           <p>«Сразу» снимает, едва бирка остановилась. «Аккуратно» ждёт дольше и реже снимает лишнее.</p>
+        </div>
+        <div class="card">
+          <h2>Умный зум</h2>
+          <div class="seg" id="segZoom">
+            <button type="button" data-v="on">Включён</button>
+            <button type="button" data-v="off">Выключен</button>
+          </div>
+          <p>Если ценник маленький или далеко, сканер сам его приближает. Кнопки 1×, 2×, 3× на экране сканера задают приближение вручную, двумя пальцами тоже можно.</p>
         </div>
         <div class="card">
           <h2>Звук</h2>

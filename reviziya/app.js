@@ -38,7 +38,7 @@ const LS = {
 };
 const EMPTY = { sum: 0, scans: 0, minuses: 0, voids: 0, avg: null, uid: 0, log: [] };
 let st = SERVER ? { ...EMPTY, log: [] } : Object.assign({ ...EMPTY, log: [] }, LS.get('rev-state', {}));
-const opts = Object.assign({ model: 'claude-haiku-5-5', speed: 'normal', sound: 'on' }, LS.get('rev-opts', {}));
+const opts = Object.assign({ model: 'claude-haiku-5-5', speed: 'normal', sound: 'on', autozoom: 'on', zoom: 1 }, LS.get('rev-opts', {}));
 let apiKey = SERVER ? '' : LS.get('rev-key', '');
 let me = null; // server mode: { id, name, role, status }
 
@@ -285,7 +285,8 @@ async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      // Full HD: a far tag still has enough pixels to read after cropping
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     });
   } catch (e) {
     const n = e && e.name;
@@ -294,22 +295,24 @@ async function startCamera() {
   }
   video.srcObject = stream;
   try { await video.play(); } catch { /* autoplay may need the tap we already have */ }
-  $('start').hidden = true; $('camctl').hidden = false;
+  $('start').hidden = true; $('camctl').hidden = false; $('zoomctl').hidden = false;
   running = true; userPaused = false; resetDetector();
   setMode(''); setStatus('Ищу ценник…');
   const track = stream.getVideoTracks()[0];
   const caps = track.getCapabilities ? track.getCapabilities() : {};
   $('torch').hidden = !caps.torch;
+  if (caps.focusMode && caps.focusMode.includes('continuous')) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  zoomInit(caps);
   try { wake = await navigator.wakeLock.request('screen'); } catch { /* optional */ }
 }
 function startError(msg) {
   const p = $('startText'); p.textContent = msg; p.classList.add('err');
-  $('start').hidden = false; $('camctl').hidden = true; setMode('idle'); setStatus('Камера выключена');
+  $('start').hidden = false; $('camctl').hidden = true; $('zoomctl').hidden = true; setMode('idle'); setStatus('Камера выключена');
 }
 function stopCamera() {
   running = false;
   if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = null; video.srcObject = null;
+  stream = null; video.srcObject = null; video.style.transform = ''; $('tagbox').hidden = true;
   try { wake && wake.release(); } catch { /* ignore */ } wake = null;
 }
 document.addEventListener('visibilitychange', () => {
@@ -333,6 +336,165 @@ $('pause').addEventListener('click', () => {
 });
 $('shot').addEventListener('click', () => { if (running && !pending) capture(); });
 
+/* ---------- smart zoom ---------- */
+// 1. findTag: looks for the tag itself (a light, colourless patch) inside the reticle.
+// 2. The shot is cut tightly around it at full camera resolution, so a small or far tag
+//    reaches Claude large and sharp instead of as a speck in a wide picture.
+// 3. autoZoom: when the tag is small, the camera zooms in by itself; when the tag is gone, it zooms back.
+const zoom = { native: false, min: 1, max: 4, base: 1, value: 1, settleUntil: 0, lastAuto: 0, lastSeen: 0 };
+const clampZoom = (v) => Math.min(zoom.max, Math.max(zoom.min, v));
+function zoomInit(caps) {
+  const z = caps && caps.zoom;
+  zoom.native = !!(z && z.max > z.min);
+  zoom.min = zoom.native ? Math.max(1, z.min) : 1;
+  zoom.max = zoom.native ? Math.min(z.max, 8) : 4;
+  zoom.value = 1; zoom.base = clampZoom(opts.zoom || 1);
+  video.style.transform = '';
+  applyZoom(zoom.base); paintZoom();
+}
+function applyZoom(v) {
+  v = clampZoom(v);
+  if (Math.abs(v - zoom.value) < 0.02) return;
+  zoom.value = v; zoom.settleUntil = performance.now() + (zoom.native ? 450 : 160);
+  det.prev = null; det.still = 0; det.calm = 0; det.ema = 99;
+  if (det.state === 'held') det.rebase = true; // same tag, new picture: do not take it for a new tag
+  if (zoom.native && stream) {
+    stream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: v }] }).catch(() => {
+      zoom.native = false; zoom.max = 4; zoom.value = clampZoom(zoom.value); video.style.transform = 'scale(' + zoom.value + ')';
+    });
+  } else video.style.transform = v > 1 ? 'scale(' + v + ')' : '';
+  paintZoom();
+}
+function setBaseZoom(v) { zoom.base = clampZoom(v); opts.zoom = zoom.base; LS.set('rev-opts', opts); applyZoom(zoom.base); paintZoom(); }
+function paintZoom() {
+  document.querySelectorAll('#zoomctl [data-z]').forEach((b) => {
+    const z = +b.dataset.z; b.hidden = z > zoom.max + 0.01; b.classList.toggle('on', Math.abs(z - zoom.base) < 0.05);
+  });
+  const auto = zoom.value > zoom.base + 0.05, tagEl = $('zoomNow');
+  tagEl.hidden = !auto; tagEl.textContent = 'авто ' + zoom.value.toFixed(1).replace('.', ',') + '×';
+}
+$('zoomctl').addEventListener('click', (ev) => { const b = ev.target.closest('[data-z]'); if (b) setBaseZoom(+b.dataset.z); });
+let pinch = null; // two fingers on the camera picture change the zoom
+cam.addEventListener('touchstart', (ev) => { if (ev.touches.length === 2) pinch = { d: touchDist(ev), z: zoom.base }; }, { passive: true });
+cam.addEventListener('touchmove', (ev) => { if (pinch && ev.touches.length === 2) setBaseZoom(pinch.z * touchDist(ev) / pinch.d); }, { passive: true });
+cam.addEventListener('touchend', () => { pinch = null; }, { passive: true });
+function touchDist(ev) { const a = ev.touches[0], b = ev.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1; }
+
+const B = 48;
+const bcv = document.createElement('canvas'); bcv.width = bcv.height = B;
+const bctx = bcv.getContext('2d', { willReadFrequently: true });
+const bMask = new Uint8Array(B * B), bSeen = new Uint8Array(B * B), bStack = new Int32Array(B * B);
+// Returns the tag as fractions of the reticle crop ({x, y, w, h}), or null when nothing tag-like is there.
+function findTag() {
+  const r = cropRect(); if (!r) return null;
+  bctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, B, B);
+  const d = bctx.getImageData(0, 0, B, B).data, n = B * B;
+  let sum = 0, sq = 0;
+  const lum = new Float32Array(n);
+  for (let i = 0, j = 0; j < n; i += 4, j++) { const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; lum[j] = l; sum += l; sq += l * l; }
+  const mean = sum / n, sd = Math.sqrt(Math.max(0, sq / n - mean * mean));
+  const thr = Math.max(120, mean + 0.45 * sd);
+  for (let i = 0, j = 0; j < n; i += 4, j++) { // paper is light and has almost no colour
+    const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+    bMask[j] = lum[j] > thr && (mx - mn) / (mx || 1) < 0.28 ? 1 : 0; bSeen[j] = 0;
+  }
+  let best = null, bestScore = 0;
+  for (let start = 0; start < n; start++) {
+    if (!bMask[start] || bSeen[start]) continue;
+    let top = 0, area = 0, x0 = B, x1 = 0, y0 = B, y1 = 0;
+    bStack[top++] = start; bSeen[start] = 1;
+    while (top) {
+      const j = bStack[--top], x = j % B, y = (j - x) / B;
+      area++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x > 0 && bMask[j - 1] && !bSeen[j - 1]) { bSeen[j - 1] = 1; bStack[top++] = j - 1; }
+      if (x < B - 1 && bMask[j + 1] && !bSeen[j + 1]) { bSeen[j + 1] = 1; bStack[top++] = j + 1; }
+      if (y > 0 && bMask[j - B] && !bSeen[j - B]) { bSeen[j - B] = 1; bStack[top++] = j - B; }
+      if (y < B - 1 && bMask[j + B] && !bSeen[j + B]) { bSeen[j + B] = 1; bStack[top++] = j + B; }
+    }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    if (area < n * 0.012) continue;                    // a speck
+    if (bw > B * 0.92 && bh > B * 0.92) continue;      // the whole picture is light: a wall or a floor, not a tag
+    if (area / (bw * bh) < 0.45) continue;             // tags are solid patches, not thin streaks
+    const dist = Math.hypot((x0 + x1 + 1) / 2 / B - 0.5, (y0 + y1 + 1) / 2 / B - 0.5);
+    const score = area * (1 - Math.min(0.9, dist * 1.4)); // prefer the big patch near the middle
+    if (score > bestScore) { bestScore = score; best = { x: x0 / B, y: y0 / B, w: bw / B, h: bh / B }; }
+  }
+  return best;
+}
+function showTagBox(tag) { // the thin green box on screen: "this is what I will read"
+  const box = $('tagbox');
+  if (!tag || det.state !== 'armed') { box.hidden = true; return; }
+  const cr = cam.getBoundingClientRect(), rr = ret.getBoundingClientRect();
+  const W = rr.width * (1 + 2 * PAD), H = rr.height * (1 + 2 * PAD);
+  const left = rr.left - cr.left + rr.width / 2 - W / 2, top = rr.top - cr.top + rr.height / 2 - H / 2;
+  box.hidden = false;
+  box.style.left = (left + tag.x * W) + 'px'; box.style.top = (top + tag.y * H) + 'px';
+  box.style.width = (tag.w * W) + 'px'; box.style.height = (tag.h * H) + 'px';
+}
+function autoZoom(tag, t) { // true when the zoom was changed on this check
+  // Only the camera's own zoom adds real detail. Without it the tight cut around the tag
+  // already does the magnifying, and enlarging the picture further would only risk cutting the price off.
+  const prev = zoom.prevTag; zoom.prevTag = tag;
+  const steady = tag && prev && Math.hypot(tag.x + tag.w / 2 - prev.x - prev.w / 2, tag.y + tag.h / 2 - prev.y - prev.h / 2) < 0.12
+    && Math.abs(tag.w - prev.w) < 0.3 * tag.w;
+  zoom.steady = steady ? (zoom.steady || 0) + 1 : 0;
+  if (opts.autozoom !== 'on' || !zoom.native || t - zoom.lastAuto < 700) return false;
+  const top = Math.min(zoom.max, zoom.base * 3);
+  if (tag) {
+    const size = Math.max(tag.w, tag.h * 0.8);
+    const whole = tag.x > 0.03 && tag.y > 0.03 && tag.x + tag.w < 0.97 && tag.y + tag.h < 0.97; // the tag is fully in view
+    if (zoom.steady >= 3 && whole && size < 0.36 && tag.w * tag.h > 0.02 && zoom.value < top - 0.05) { // small and far: come closer
+      zoom.lastAuto = t; zoom.steady = 0; applyZoom(Math.min(top, zoom.value * Math.min(1.8, Math.max(1.2, 0.5 / size)))); setStatus('Приближаю ценник…'); return true;
+    }
+    if ((tag.w > 0.85 || tag.h > 0.9) && zoom.value > zoom.base + 0.05) { zoom.lastAuto = t; applyZoom(Math.max(zoom.base, zoom.value / 1.3)); return true; }
+  } else if (zoom.value > zoom.base + 0.05 && t - zoom.lastSeen > 1800) { // the tag is gone: back to the wide view
+    zoom.lastAuto = t; applyZoom(zoom.base); setStatus('Ищу ценник…'); return true;
+  }
+  return false;
+}
+
+// The frame that goes to Claude: cut around the tag, the sharpest of three taken 70 ms apart.
+const scv = document.createElement('canvas'); scv.width = scv.height = 64;
+const sctx = scv.getContext('2d', { willReadFrequently: true });
+const keep = document.createElement('canvas'); const kctx = keep.getContext('2d');
+function shotRect() {
+  const r = cropRect(); if (!r) return null;
+  const tag = findTag(); if (!tag) return r;
+  const mx = tag.w * 0.18, my = tag.h * 0.18; // a margin, in case the edge of the tag was cut off
+  const x = Math.max(0, tag.x - mx), y = Math.max(0, tag.y - my);
+  const w = Math.min(1 - x, tag.w + 2 * mx), h = Math.min(1 - y, tag.h + 2 * my);
+  return { x: r.x + x * r.w, y: r.y + y * r.h, w: w * r.w, h: h * r.h };
+}
+function sharpness(r) { // how much fine detail the piece has: blurred frames score low
+  sctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, 64, 64);
+  const d = sctx.getImageData(0, 0, 64, 64).data; let s = 0;
+  const g = (i) => d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2];
+  for (let y = 1; y < 63; y++) for (let x = 1; x < 63; x++) { const i = y * 64 + x; s += Math.abs(4 * g(i) - g(i - 1) - g(i + 1) - g(i - 64) - g(i + 64)); }
+  return s;
+}
+async function sharpestShot() {
+  let best = -1;
+  for (let i = 0; i < 3; i++) {
+    const r = shotRect();
+    if (r) {
+      const sharp = sharpness(r);
+      if (sharp > best) {
+        best = sharp;
+        const long = Math.max(r.w, r.h);
+        const k = long > 768 ? 768 / long : long < 384 ? 384 / long : 1; // shrink big pieces, enlarge tiny ones
+        keep.width = Math.round(r.w * k); keep.height = Math.round(r.h * k);
+        kctx.imageSmoothingQuality = 'high';
+        kctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, keep.width, keep.height);
+      }
+    }
+    if (i < 2) await new Promise((res) => setTimeout(res, 70));
+  }
+  if (best < 0) throw new StoreError('other');
+  const url = keep.toDataURL('image/jpeg', 0.78);
+  const seen = $('sent'); seen.src = url; seen.hidden = false; clearTimeout(seen._t); seen._t = setTimeout(() => { seen.hidden = true; }, 2500);
+  return url.split(',')[1];
+}
+
 /* ---------- auto-capture: shoot once when the tag holds still ---------- */
 // The reticle area is shrunk to a tiny grey thumbnail a few times a second.
 // "armed": wait until consecutive thumbnails barely differ, then shoot one frame.
@@ -346,7 +508,7 @@ const SPEED = {
   normal: { still: 5, need: 3, move: 30, gone: 3 },
   careful: { still: 3.5, need: 5, move: 34, gone: 3 },
 };
-const T = 24, MAX_INFLIGHT = 3, MIN_GAP_MS = 600;
+const T = 24, MAX_INFLIGHT = 3, MIN_GAP_MS = 600, PAD = 0.14;
 const tcv = document.createElement('canvas'); tcv.width = tcv.height = T;
 const tctx = tcv.getContext('2d', { willReadFrequently: true });
 const ccv = document.createElement('canvas'); const cctx = ccv.getContext('2d');
@@ -358,9 +520,11 @@ function cropRect() { // reticle (plus a margin) in video pixels; the video is d
   const vw = video.videoWidth, vh = video.videoHeight; if (!vw || !vh) return null;
   const cr = cam.getBoundingClientRect(), rr = ret.getBoundingClientRect();
   const scale = Math.max(cr.width / vw, cr.height / vh);
-  const offX = (vw * scale - cr.width) / 2, offY = (vh * scale - cr.height) / 2, pad = 0.14;
-  let x = (rr.left - cr.left - rr.width * pad + offX) / scale, y = (rr.top - cr.top - rr.height * pad + offY) / scale;
-  let w = rr.width * (1 + 2 * pad) / scale, h = rr.height * (1 + 2 * pad) / scale;
+  const offX = (vw * scale - cr.width) / 2, offY = (vh * scale - cr.height) / 2;
+  const dz = zoom.native ? 1 : zoom.value; // digital zoom: the same reticle covers a smaller piece of the picture
+  const cx = (rr.left + rr.width / 2 - cr.left + offX) / scale, cy = (rr.top + rr.height / 2 - cr.top + offY) / scale;
+  let w = rr.width * (1 + 2 * PAD) / scale / dz, h = rr.height * (1 + 2 * PAD) / scale / dz;
+  let x = cx - w / 2, y = cy - h / 2;
   x = Math.max(0, x); y = Math.max(0, y); w = Math.min(vw - x, w); h = Math.min(vh - y, h);
   return w > 8 && h > 8 ? { x, y, w, h } : null;
 }
@@ -386,8 +550,13 @@ let sheetOpen = false, gated = false;
 function tick() {
   if (!running || userPaused || pending || gated || tab !== 'scan' || sheetOpen || document.hidden) return;
   if (video.readyState < 2) return;
-  const th = thumb(); if (!th) return;
   const p = SPEED[opts.speed] || SPEED.normal, t = performance.now();
+  if (t < zoom.settleUntil) { det.prev = null; return; } // the picture jumps while the zoom changes
+  const th = thumb(); if (!th) return;
+  if (det.rebase) { det.rebase = false; if (det.state === 'held') det.ref = th.g; }
+  const tag = findTag(); showTagBox(tag);
+  if (tag) zoom.lastSeen = t;
+  if (det.state === 'armed' && autoZoom(tag, t)) { det.prev = null; return; }
   if (det.state === 'armed') {
     const d = det.prev ? diff(th.g, det.prev) : 99;
     det.still = d < p.still ? det.still + 1 : 0;
@@ -412,18 +581,14 @@ setInterval(tick, 90);
 function updateQueue() { const q = $('queue'); q.hidden = inflight === 0; q.textContent = 'читаю: ' + inflight; }
 
 function capture() {
-  const r = cropRect(); if (!r || !canRead()) return;
-  const k = Math.min(1, 640 / Math.max(r.w, r.h));
-  ccv.width = Math.round(r.w * k); ccv.height = Math.round(r.h * k);
-  cctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, ccv.width, ccv.height);
-  const b64 = ccv.toDataURL('image/jpeg', 0.72).split(',')[1];
+  if (!cropRect() || !canRead()) return;
   const th = thumb(); if (th) det.ref = th.g;
   det.state = 'held'; det.moved = 0; det.peak = 0; det.lastShot = performance.now();
   kick($('flash'), 'go'); sndShot();
   setMode('held'); setStatus('Снято. Берите следующую');
   inflight++; updateQueue();
   const t0 = performance.now();
-  store.scan(b64).then((r2) => onRead(r2, (performance.now() - t0) / 1000), onReadError)
+  sharpestShot().then((b64) => store.scan(b64)).then((r2) => onRead(r2, (performance.now() - t0) / 1000), onReadError)
     .finally(() => { inflight--; updateQueue(); });
 }
 
@@ -528,7 +693,7 @@ function seg(id, key) {
   box.addEventListener('click', (ev) => { const b = ev.target.closest('[data-v]'); if (!b) return; opts[key] = b.dataset.v; LS.set('rev-opts', opts); paint(); resetDetector(); });
   paint();
 }
-seg('segModel', 'model'); seg('segSpeed', 'speed'); seg('segSound', 'sound');
+seg('segModel', 'model'); seg('segSpeed', 'speed'); seg('segSound', 'sound'); seg('segZoom', 'autozoom');
 
 /* ---------- server mode: who am I, am I allowed in ---------- */
 let gateTimer = 0;

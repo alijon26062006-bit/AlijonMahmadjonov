@@ -25,6 +25,7 @@ async def run() -> None:
     bot = Bot(config.bot_token)
     notifier = Notifier(bot, conn, config.public_url)
     reader = PriceReader(config.anthropic_api_key, config.model)
+    await reader.warm_up()
 
     runner = web.AppRunner(create_app(config, conn, reader, notifier))
     await runner.setup()
