@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0a0c18">
+<title>Ревизия: сканер ценников</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@500;700&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* One phone-width column: live camera on top, the running total shown as a price-gun sticker
+   (white label, two red lines, like the shop's own tags), tab bar at the bottom. */
+:root{
+  --bg:#e8ebf2; --surface:#ffffff; --surface-2:#f1f3f8; --ink:#131933; --mute:#667089; --line:#d4d9e6;
+  --pen:#2438d6; --pen-soft:#e2e6ff;
+  --red:#d3222c; --red-soft:#fde6e8;
+  --plus:#0a8a4f; --plus-soft:#dcf4e8;
+  --label:#ffffff; --label-ink:#131933; --label-red:#e3262f; --label-edge:#cfd4e2;
+  --cam-bg:#0a0c18; --cam-scrim:rgba(8,10,22,.7); --cam-ink:#ffffff; --cam-mute:#c3c8dc; --cam-btn:rgba(255,255,255,.18); --lock:#3ee08f; --skip:#ffc35a;
+  --f-text:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-num:'Martian Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --r:16px;
+  --sl:max(16px,env(safe-area-inset-left,0px)); --sr:max(16px,env(safe-area-inset-right,0px));
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#0c0f1e; --surface:#161a2f; --surface-2:#1f2442; --ink:#eef0fa; --mute:#9199b5; --line:#2b3154;
+  --pen:#8a98ff; --pen-soft:#232a57; --red:#ff656c; --red-soft:#3b1a23; --plus:#3ddc8c; --plus-soft:#12362a;
+  --label:#f7f8fc; --label-edge:#0c0f1e; color-scheme:dark } }
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-text);font-size:15px;line-height:1.35;-webkit-font-smoothing:antialiased;overscroll-behavior:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+button,input{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button:focus-visible,input:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+.num,.sticker,.disp,.key,.fly,.row .a{word-spacing:-.38em}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.gut{padding-left:var(--sl);padding-right:var(--sr)}
+
+.app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;background:var(--bg);position:relative;overflow:hidden}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:9px;background:var(--surface);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:16px;font-weight:700}
+.top p{margin:0;font-size:12.5px;color:var(--mute)}
+.badge{font-size:12.5px;font-weight:600;color:var(--pen);background:var(--pen-soft);padding:6px 10px;border-radius:99px;white-space:nowrap}
+
+main{flex:1;position:relative;min-height:0}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;visibility:hidden;transform:translateY(10px);transition:opacity .2s,transform .2s,visibility 0s .2s}
+.view.on{opacity:1;visibility:visible;transform:none;transition:opacity .2s,transform .2s}
+.scroll{overflow-y:auto;padding-block:16px;display:flex;flex-direction:column;gap:14px;-webkit-overflow-scrolling:touch}
+.scroll>*{flex:none}
+
+/* camera */
+.cam{flex:1;min-height:0;position:relative;overflow:hidden;background:var(--cam-bg);color:var(--cam-ink)}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ret{position:absolute;left:50%;top:44%;width:min(72%,300px);aspect-ratio:1/.82;transform:translate(-50%,-50%);border-radius:22px;box-shadow:0 0 0 999px rgba(6,8,18,.38);transition:transform .2s}
+.cam.idle .ret{box-shadow:none}
+.ret i{position:absolute;width:34px;height:34px;border:4px solid var(--cam-ink);transition:border-color .15s}
+.ret i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-radius:20px 0 0 0}
+.ret i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-radius:0 20px 0 0}
+.ret i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-radius:0 0 0 20px}
+.ret i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-radius:0 0 20px 0}
+.laser{position:absolute;left:10px;right:10px;top:8%;height:3px;border-radius:3px;background:var(--cam-ink);box-shadow:0 0 14px 2px var(--cam-ink);animation:sweep 1.1s ease-in-out infinite alternate}
+.cam.idle .laser,.cam.held .laser,.cam.paused .laser{display:none}
+@keyframes sweep{to{top:90%}}
+.cam.held .ret{transform:translate(-50%,-50%) scale(.96)}
+.cam.held .ret i{border-color:var(--lock)}
+.cam.paused .ret i{border-color:var(--skip)}
+.flash{position:absolute;inset:0;background:var(--cam-ink);opacity:0;pointer-events:none}
+.flash.go{animation:flash .28s}
+@keyframes flash{0%{opacity:.55}100%{opacity:0}}
+.status{position:absolute;top:12px;left:12px;right:12px;margin-inline:auto;width:fit-content;display:flex;align-items:center;gap:8px;background:var(--cam-scrim);padding:8px 14px;border-radius:99px;font-weight:600;font-size:13.5px;backdrop-filter:blur(8px);text-align:center}
+.status b{flex:none;width:9px;height:9px;border-radius:50%;background:var(--cam-ink)}
+.cam.held .status b{background:var(--lock)}
+.cam.paused .status b,.cam.idle .status b{background:var(--skip)}
+.cam:not(.idle):not(.held):not(.paused) .status b{animation:pulse .8s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.queue{position:absolute;top:56px;left:50%;transform:translateX(-50%);font-size:12.5px;font-weight:600;color:var(--cam-mute);background:var(--cam-scrim);padding:4px 10px;border-radius:99px}
+.start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;background:var(--cam-bg)}
+.start p{margin:0;max-width:280px;color:var(--cam-mute);font-size:14px}
+.start .big{height:58px;padding:0 26px;border-radius:var(--r);background:var(--cam-ink);color:var(--cam-bg);font-weight:700;font-size:17px}
+.start .err{color:var(--skip);font-weight:600}
+.camctl{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding-block:10px 12px;background:linear-gradient(transparent,var(--cam-scrim) 55%)}
+.camctl button{height:44px;padding:0 16px;border-radius:13px;background:var(--cam-btn);color:var(--cam-ink);font-weight:600;font-size:14px;backdrop-filter:blur(8px)}
+.camctl button.act{background:var(--cam-ink);color:var(--cam-bg)}
+.camctl button:active{transform:scale(.96)}
+.toast{position:absolute;left:12px;right:12px;bottom:68px;display:flex;align-items:center;gap:12px;background:var(--cam-scrim);backdrop-filter:blur(10px);border:1.5px solid var(--lock);border-radius:18px;padding:11px 14px;transform:translateY(30px);opacity:0;visibility:hidden;transition:transform .28s cubic-bezier(.2,1.2,.3,1),opacity .18s,visibility 0s .18s}
+.toast.on{transform:none;opacity:1;visibility:visible;transition:transform .28s cubic-bezier(.2,1.2,.3,1),opacity .18s}
+.toast.neg{border-color:var(--skip)}
+.tick{flex:none;width:38px;height:38px;border-radius:50%;background:var(--lock);display:grid;place-items:center}
+.toast.neg .tick{background:var(--skip)}
+.tick svg{stroke:var(--cam-bg)}
+.toast .amt{font-size:22px;font-weight:700;color:var(--lock);display:block;line-height:1.1}
+.toast.neg .amt{color:var(--skip)}
+.toast small{font-size:12.5px;color:var(--cam-mute)}
+.toast .tb{margin-left:auto;display:flex;gap:6px}
+.toast .tb button{background:var(--cam-btn);color:var(--cam-ink);padding:10px 12px;border-radius:12px;font-weight:600;font-size:13.5px}
+
+/* price-gun sticker */
+.sticker{position:relative;display:inline-flex;align-items:center;background:var(--label);color:var(--label-ink);border:1px solid var(--label-edge);border-radius:7px;padding:13px 16px;font-family:var(--f-num);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em;box-shadow:0 8px 18px -12px rgba(10,14,40,.55)}
+.sticker::before,.sticker::after{content:"";position:absolute;left:9px;right:9px;height:3px;border-radius:2px;background:var(--label-red)}
+.sticker::before{top:6px}.sticker::after{bottom:6px}
+.sticker.bump{animation:bump .4s}
+.sticker.shake{animation:shake .4s}
+@keyframes bump{35%{transform:scale(1.07) rotate(-1.2deg)}}
+@keyframes shake{20%{transform:translateX(-6px)}50%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
+
+.panel{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:stretch;padding-block:10px;background:var(--surface);border-top:1px solid var(--line)}
+.tot{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cap{font-size:12px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.tot .sticker{font-size:26px;align-self:flex-start}
+.tot .sub{font-size:13px;color:var(--mute)}
+.tot .sub b{color:var(--ink);font-weight:700}
+.minus-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:88px;border-radius:var(--r);background:var(--red-soft);color:var(--red);font-weight:700;font-size:14px}
+.minus-btn:active,.key:active,.go:active,.tabs button:active{transform:scale(.95)}
+.minus-btn svg{stroke:var(--red)}
+
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding-block:5px}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:11.5px;font-weight:600;color:var(--mute);border-radius:12px}
+.tabs svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button.on{color:var(--pen)}
+
+/* my scans */
+.hero{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.hero .sticker{font-size:34px;padding:16px 18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px;color:var(--mute)}
+.chip b{color:var(--ink)}
+.note{margin:0;font-size:13px;color:var(--mute);background:var(--pen-soft);border-radius:12px;padding:10px 12px}
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row.new{animation:rowin .4s}
+@keyframes rowin{from{opacity:0;transform:translateY(-14px);background:var(--plus-soft)}}
+.ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--plus-soft)}
+.ic svg{stroke:var(--plus);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.row.m .ic{background:var(--red-soft)}.row.m .ic svg{stroke:var(--red)}
+.row .t{min-width:0}
+.row .t b{display:block;font-weight:600;font-size:14.5px}
+.row .t small{font-size:12.5px;color:var(--mute)}
+.row .a{font-family:var(--f-num);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;color:var(--plus)}
+.row.m .a{color:var(--red)}
+.row.void .t b,.row.void .a{text-decoration:line-through;color:var(--mute)}
+.row.void .ic{background:var(--surface-2)}.row.void .ic svg{stroke:var(--mute)}
+.row .u,.lnk{font-size:12.5px;font-weight:600;color:var(--pen);padding:7px 9px;border-radius:9px;background:var(--pen-soft)}
+.empty{margin:0;padding:22px 16px;text-align:center;color:var(--mute);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
+.danger{align-self:center;font-size:12.5px;font-weight:600;color:var(--red);background:var(--red-soft);padding:8px 12px;border-radius:9px}
+
+/* settings */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px;font-weight:700}
+.card p{margin:0;font-size:13px;color:var(--mute)}
+.card input{width:100%;height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface-2);padding:0 12px;font-family:var(--f-num);font-size:14px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btn{height:44px;padding:0 16px;border-radius:12px;background:var(--pen);color:var(--surface);font-weight:700;font-size:14px}
+.btn.sec{background:var(--pen-soft);color:var(--pen)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{padding:9px 4px;border-radius:9px;font-size:13px;font-weight:600;color:var(--mute)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(10,14,40,.18)}
+.msg{font-size:13px;font-weight:600}
+.msg.ok{color:var(--plus)}.msg.bad{color:var(--red)}
+
+/* minus sheet */
+.scrim{position:absolute;inset:0;background:rgba(6,8,18,.55);opacity:0;visibility:hidden;transition:opacity .22s,visibility 0s .22s;z-index:5}
+.scrim.on{opacity:1;visibility:visible;transition:opacity .22s}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:24px 24px 0 0;padding-block:10px 18px;transform:translateY(100%);transition:transform .3s cubic-bezier(.2,1,.3,1);display:flex;flex-direction:column;gap:12px}
+.scrim.on .sheet{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
+.sheet h2{margin:0;text-align:center;font-size:17px;font-weight:700}
+.disp{text-align:center;font-family:var(--f-num);font-weight:700;font-size:40px;color:var(--red);letter-spacing:-.03em;min-height:52px}
+.disp.zero{color:var(--mute)}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{height:52px;border-radius:13px;background:var(--surface-2);font-family:var(--f-num);font-weight:700;font-size:20px;display:grid;place-items:center}
+.key svg{stroke:currentColor;fill:none}
+.go{height:54px;border-radius:var(--r);background:var(--red);color:var(--surface);font-weight:700;font-size:16px}
+.go:disabled{opacity:.35}
+
+.fly{position:fixed;z-index:9;pointer-events:none;font-family:var(--f-num);font-weight:700;font-size:20px;color:var(--label-ink);background:var(--label);border-radius:7px;padding:6px 10px;box-shadow:0 0 0 3px var(--lock)}
+
+@media (prefers-reduced-motion: reduce){
+  .laser,.status b{animation:none!important}
+  .view,.toast,.sheet{transition:none}
+  .row.new,.sticker.bump,.sticker.shake,.flash.go{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top gut">
+    <div><h1>Ревизия</h1><p id="who">Сканер ценников</p></div>
+    <span class="badge" id="rate" hidden></span>
+  </header>
+
+  <main>
+    <section class="view on" id="v-scan" aria-label="Сканер">
+      <div class="cam idle" id="cam">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="ret" id="ret"><i></i><i></i><i></i><i></i><div class="laser"></div></div>
+        <div class="flash" id="flash"></div>
+        <div class="status" aria-live="polite"><b></b><span id="statusText">Камера выключена</span></div>
+        <div class="queue" id="queue" hidden></div>
+        <div class="toast" id="toast">
+          <span class="tick"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          <span><span class="amt num" id="toastAmt">+0</span><small id="toastSub"></small></span>
+          <span class="tb">
+            <button id="toastUndo" type="button">Отменить</button>
+            <button id="toastYes" type="button" hidden>Верно</button>
+            <button id="toastNo" type="button" hidden>Нет</button>
+          </span>
+        </div>
+        <div class="camctl" id="camctl" hidden>
+          <button id="torch" type="button" hidden>Свет</button>
+          <button id="shot" type="button">Снять сейчас</button>
+          <button id="pause" type="button">Пауза</button>
+        </div>
+        <div class="start" id="start">
+          <p id="startText">Камера работает всё время. Подносите бирку в рамку, сканер сам её прочитает и прибавит цену.</p>
+          <button class="big" id="startBtn" type="button">Включить камеру</button>
+        </div>
+      </div>
+      <div class="panel gut">
+        <div class="tot">
+          <span class="cap">Моя сумма</span>
+          <span class="sticker" id="stickerScan"><span id="mySum">0</span></span>
+          <span class="sub" id="speed">Скорость появится после первого скана</span>
+        </div>
+        <button class="minus-btn" id="openMinus" type="button">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>Минус
+        </button>
+      </div>
+    </section>
+
+    <section class="view" id="v-mine" aria-label="Мои сканы">
+      <div class="scroll gut">
+        <div class="hero">
+          <span class="cap">Я насчитал</span>
+          <span class="sticker" id="stickerMine"><span id="mySum2">0</span></span>
+          <div class="chips">
+            <span class="chip"><b class="num" id="cScans">0</b> <span id="cScansW">сканов</span></span>
+            <span class="chip"><b class="num" id="cMinus">0</b> минусов</span>
+            <span class="chip"><b class="num" id="cVoid">0</b> отмен</span>
+            <span class="chip">среднее <b class="num" id="cAvg">–</b></span>
+          </div>
+        </div>
+        <p class="note">Фото не сохраняются. Остаётся только цифра, время и сколько секунд читался ценник.</p>
+        <ul class="list" id="log" hidden></ul>
+        <p class="empty" id="logEmpty">Пока пусто. Включите камеру на вкладке «Сканер» и поднесите бирку.</p>
+        <button class="danger" id="reset" type="button" hidden>Обнулить мой счёт</button>
+      </div>
+    </section>
+
+    <section class="view" id="v-set" aria-label="Настройки">
+      <div class="scroll gut">
+        <div class="card">
+          <h2>Ключ Anthropic</h2>
+          <p id="keyState">Ключ не задан. Без него сканер не читает ценники.</p>
+          <input id="keyInput" type="password" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Ключ Anthropic">
+          <div class="btnrow">
+            <button class="btn" id="keySave" type="button">Сохранить и проверить</button>
+            <button class="btn sec" id="keyDel" type="button" hidden>Удалить ключ</button>
+          </div>
+          <span class="msg" id="keyMsg" hidden></span>
+          <p>Ключ хранится только в этом телефоне и уходит только в Anthropic. Это режим для проверки. Сотрудникам ключ не давайте.</p>
+        </div>
+        <div class="card">
+          <h2>Модель</h2>
+          <div class="seg" id="segModel">
+            <button type="button" data-v="claude-haiku-5-5">Быстрая</button>
+            <button type="button" data-v="claude-sonnet-5-5">Точная</button>
+          </div>
+          <p>Быстрая читает ценник быстрее и дешевле. Точную включайте, если быстрая ошибается на рукописных ценах.</p>
+        </div>
+        <div class="card">
+          <h2>Когда снимать</h2>
+          <div class="seg" id="segSpeed">
+            <button type="button" data-v="fast">Сразу</button>
+            <button type="button" data-v="normal">Обычно</button>
+            <button type="button" data-v="careful">Аккуратно</button>
+          </div>
+          <p>«Сразу» снимает, едва бирка остановилась. «Аккуратно» ждёт дольше и реже снимает лишнее.</p>
+        </div>
+        <div class="card">
+          <h2>Звук</h2>
+          <div class="seg" id="segSound">
+            <button type="button" data-v="on">Включён</button>
+            <button type="button" data-v="off">Выключен</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs gut" aria-label="Разделы">
+    <button class="on" data-tab="scan" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2M7 12h10"/></svg>Сканер</button>
+    <button data-tab="mine" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Мои сканы</button>
+    <button data-tab="set" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Настройки</button>
+  </nav>
+
+  <div class="scrim" id="scrim">
+    <div class="sheet gut" role="dialog" aria-label="Вычесть сумму">
+      <div class="grab"></div>
+      <h2>Вычесть сумму</h2>
+      <div class="disp zero" id="disp">−0</div>
+      <div class="keys" id="keys"></div>
+      <button class="go" id="go" type="button" disabled>Вычесть</button>
+    </div>
+  </div>
+</div>
+<script async src="https://telegram.org/js/telegram-web-app.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
