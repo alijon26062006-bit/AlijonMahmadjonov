@@ -312,7 +312,7 @@ function startError(msg) {
 function stopCamera() {
   running = false;
   if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = null; video.srcObject = null; video.style.transform = ''; $('tagbox').hidden = true;
+  stream = null; video.srcObject = null; eyeReset();
   try { wake && wake.release(); } catch { /* ignore */ } wake = null;
 }
 document.addEventListener('visibilitychange', () => {
@@ -349,7 +349,7 @@ function zoomInit(caps) {
   zoom.min = zoom.native ? Math.max(1, z.min) : 1;
   zoom.max = zoom.native ? Math.min(z.max, 8) : 4;
   zoom.value = 1; zoom.base = clampZoom(opts.zoom || 1);
-  video.style.transform = '';
+  eyeReset();
   applyZoom(zoom.base); paintZoom();
 }
 function applyZoom(v) {
@@ -360,9 +360,9 @@ function applyZoom(v) {
   if (det.state === 'held') det.rebase = true; // same tag, new picture: do not take it for a new tag
   if (zoom.native && stream) {
     stream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: v }] }).catch(() => {
-      zoom.native = false; zoom.max = 4; zoom.value = clampZoom(zoom.value); video.style.transform = 'scale(' + zoom.value + ')';
+      zoom.native = false; zoom.max = 4; zoom.value = clampZoom(zoom.value);
     });
-  } else video.style.transform = v > 1 ? 'scale(' + v + ')' : '';
+  }
   paintZoom();
 }
 function setBaseZoom(v) { zoom.base = clampZoom(v); opts.zoom = zoom.base; LS.set('rev-opts', opts); applyZoom(zoom.base); paintZoom(); }
@@ -370,8 +370,6 @@ function paintZoom() {
   document.querySelectorAll('#zoomctl [data-z]').forEach((b) => {
     const z = +b.dataset.z; b.hidden = z > zoom.max + 0.01; b.classList.toggle('on', Math.abs(z - zoom.base) < 0.05);
   });
-  const auto = zoom.value > zoom.base + 0.05, tagEl = $('zoomNow');
-  tagEl.hidden = !auto; tagEl.textContent = 'авто ' + zoom.value.toFixed(1).replace('.', ',') + '×';
 }
 $('zoomctl').addEventListener('click', (ev) => { const b = ev.target.closest('[data-z]'); if (b) setBaseZoom(+b.dataset.z); });
 let pinch = null; // two fingers on the camera picture change the zoom
@@ -385,19 +383,37 @@ const bcv = document.createElement('canvas'); bcv.width = bcv.height = B;
 const bctx = bcv.getContext('2d', { willReadFrequently: true });
 const bMask = new Uint8Array(B * B), bSeen = new Uint8Array(B * B), bStack = new Int32Array(B * B);
 // Returns the tag as fractions of the reticle crop ({x, y, w, h}), or null when nothing tag-like is there.
+// Paper is light and has almost no colour. A white floor or wall next to the tag is light too and can
+// merge with it into one big patch, so the search is repeated with a stricter brightness bar until the
+// tag stands apart: price tags are usually the brightest compact thing in the picture.
+const bLum = new Float32Array(B * B), bSorted = new Float32Array(B * B);
 function findTag() {
   const r = cropRect(); if (!r) return null;
   bctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, B, B);
   const d = bctx.getImageData(0, 0, B, B).data, n = B * B;
   let sum = 0, sq = 0;
-  const lum = new Float32Array(n);
-  for (let i = 0, j = 0; j < n; i += 4, j++) { const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; lum[j] = l; sum += l; sq += l * l; }
-  const mean = sum / n, sd = Math.sqrt(Math.max(0, sq / n - mean * mean));
-  const thr = Math.max(120, mean + 0.45 * sd);
-  for (let i = 0, j = 0; j < n; i += 4, j++) { // paper is light and has almost no colour
+  for (let i = 0, j = 0; j < n; i += 4, j++) {
+    const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
-    bMask[j] = lum[j] > thr && (mx - mn) / (mx || 1) < 0.28 ? 1 : 0; bSeen[j] = 0;
+    bLum[j] = (mx - mn) / (mx || 1) < 0.28 ? l : 0; // coloured pixels can never be paper
+    sum += l; sq += l * l;
   }
+  const mean = sum / n, sd = Math.sqrt(Math.max(0, sq / n - mean * mean));
+  bSorted.set(bLum); bSorted.sort();
+  const pct = (q) => bSorted[Math.min(n - 1, Math.floor(n * q))];
+  const bars = [Math.max(120, mean + 0.45 * sd), pct(0.7), pct(0.8), pct(0.87), pct(0.92)].filter((v, i, a) => v >= 120 && (i === 0 || v > a[i - 1] + 3));
+  let fallback = null;
+  for (const bar of bars) {
+    const tag = brightest(bar);
+    if (!tag) break;
+    if (tag.w * tag.h < 0.42 || tag.w < 0.75 || tag.h < 0.75) return tag; // stands apart from the background
+    if (!fallback) fallback = tag;
+  }
+  return fallback;
+}
+function brightest(bar) { // the best light, solid patch above the brightness bar
+  const n = B * B;
+  for (let j = 0; j < n; j++) { bMask[j] = bLum[j] > bar ? 1 : 0; bSeen[j] = 0; }
   let best = null, bestScore = 0;
   for (let start = 0; start < n; start++) {
     if (!bMask[start] || bSeen[start]) continue;
@@ -414,30 +430,110 @@ function findTag() {
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
     if (area < n * 0.012) continue;                    // a speck
     if (bw > B * 0.92 && bh > B * 0.92) continue;      // the whole picture is light: a wall or a floor, not a tag
-    if (area / (bw * bh) < 0.45) continue;             // tags are solid patches, not thin streaks
+    if (area / (bw * bh) < 0.4) continue;              // tags are solid patches, not thin streaks
     const dist = Math.hypot((x0 + x1 + 1) / 2 / B - 0.5, (y0 + y1 + 1) / 2 / B - 0.5);
     const score = area * (1 - Math.min(0.9, dist * 1.4)); // prefer the big patch near the middle
     if (score > bestScore) { bestScore = score; best = { x: x0 / B, y: y0 / B, w: bw / B, h: bh / B }; }
   }
   return best;
 }
-function showTagBox(tag) { // the thin green box on screen: "this is what I will read"
-  const box = $('tagbox');
-  if (!tag || det.state !== 'armed') { box.hidden = true; return; }
-  const cr = cam.getBoundingClientRect(), rr = ret.getBoundingClientRect();
-  const W = rr.width * (1 + 2 * PAD), H = rr.height * (1 + 2 * PAD);
-  const left = rr.left - cr.left + rr.width / 2 - W / 2, top = rr.top - cr.top + rr.height / 2 - H / 2;
-  box.hidden = false;
-  box.style.left = (left + tag.x * W) + 'px'; box.style.top = (top + tag.y * H) + 'px';
-  box.style.width = (tag.w * W) + 'px'; box.style.height = (tag.h * H) + 'px';
-}
-function autoZoom(tag, t) { // true when the zoom was changed on this check
-  // Only the camera's own zoom adds real detail. Without it the tight cut around the tag
-  // already does the magnifying, and enlarging the picture further would only risk cutting the price off.
+function trackTag(tag) { // how many checks in a row the tag stayed in about the same place
   const prev = zoom.prevTag; zoom.prevTag = tag;
   const steady = tag && prev && Math.hypot(tag.x + tag.w / 2 - prev.x - prev.w / 2, tag.y + tag.h / 2 - prev.y - prev.h / 2) < 0.12
     && Math.abs(tag.w - prev.w) < 0.3 * tag.w;
   zoom.steady = steady ? (zoom.steady || 0) + 1 : 0;
+}
+
+/* ---------- the eye: the picture itself moves in on the tag, like eyes looking closer ---------- */
+// Only what is shown on screen moves. Detection and the shot always use the full camera picture,
+// so the eye can never cut the price off or confuse the double-count protection.
+const EYE_MAX = 4;          // the closest the eye goes, relative to the normal view
+const eye = { mode: 'base', cur: null, target: null, tag: null, lost: 0, raf: 0, last: 0 };
+function geom() {
+  const vw = video.videoWidth, vh = video.videoHeight; if (!vw || !vh) return null;
+  const cr = cam.getBoundingClientRect(), rr = ret.getBoundingClientRect();
+  const scale = Math.max(cr.width / vw, cr.height / vh);
+  const pw = rr.width * (1 + 2 * PAD), ph = rr.height * (1 + 2 * PAD);
+  return {
+    W: cr.width, H: cr.height, scale, offX: (vw * scale - cr.width) / 2, offY: (vh * scale - cr.height) / 2,
+    P: { x: rr.left - cr.left + rr.width / 2 - pw / 2, y: rr.top - cr.top + rr.height / 2 - ph / 2, w: pw, h: ph },
+  };
+}
+function searchOnScreen(g) { // the area the scanner analyses, where it sits on the unmoved picture
+  const r = cropRect(); if (!r) return null;
+  return { x: r.x * g.scale - g.offX, y: r.y * g.scale - g.offY, w: r.w * g.scale, h: r.h * g.scale };
+}
+function viewFor(g, S, tagRect) { // the piece of the picture to stretch over the reticle
+  const A = g.P.w / g.P.h;
+  let cx = S.x + S.w / 2, cy = S.y + S.h / 2, w = S.w;
+  if (tagRect) {
+    const m = 0.14; // a margin round the tag so its edges stay in view
+    let tw = tagRect.w * (1 + 2 * m), th = tagRect.h * (1 + 2 * m);
+    if (tw / th < A) tw = th * A;
+    cx = tagRect.x + tagRect.w / 2; cy = tagRect.y + tagRect.h / 2;
+    w = Math.min(S.w, Math.max(S.w / EYE_MAX, tw));
+    if (S.w / w < 1.3) { w = S.w; cx = S.x + S.w / 2; cy = S.y + S.h / 2; } // the tag is already big: no point moving
+  }
+  return { x: cx - w / 2, y: cy - w / A / 2, w };
+}
+function transformFor(g, V) {
+  const s = g.P.w / V.w;
+  let tx = g.P.x - V.x * s, ty = g.P.y - V.y * s;
+  // never pull the picture away from the screen edge: no empty strips
+  tx = Math.min(0, Math.max(g.W - g.W * s, tx)); ty = Math.min(0, Math.max(g.H - g.H * s, ty));
+  return { s, tx, ty };
+}
+function eyeReset() {
+  eye.mode = 'base'; eye.cur = null; eye.target = null; eye.tag = null; eye.lost = 0;
+  video.style.transform = ''; $('tagbox').hidden = true; $('tagbox').classList.remove('lock');
+}
+function eyeSettled() {
+  if (!eye.cur || !eye.target) return true;
+  return Math.abs(eye.cur.x - eye.target.x) < 2 && Math.abs(eye.cur.y - eye.target.y) < 2 && Math.abs(eye.cur.w - eye.target.w) < 2;
+}
+function eyeUpdate(tag) { // called on every check with what the scanner sees now
+  const g = geom(); if (!g) return;
+  const S = searchOnScreen(g); if (!S) return;
+  if (tag) {
+    eye.lost = 0;
+    eye.tag = { x: S.x + tag.x * S.w, y: S.y + tag.y * S.h, w: tag.w * S.w, h: tag.h * S.h };
+  } else if (++eye.lost >= 4) eye.tag = null; // a few checks of grace: a blink of glare should not jerk the view
+  const wantTag = opts.autozoom === 'on' && eye.tag && (zoom.steady >= 2 || (eye.mode === 'tag' && zoom.steady >= 1) || det.state === 'held');
+  const next = viewFor(g, S, wantTag ? eye.tag : null);
+  let switched = false;
+  if (wantTag && eye.mode !== 'tag') {
+    eye.mode = 'tag'; switched = true; kick($('tagbox'), 'lock');
+    if (det.state === 'armed') setStatus('Вижу ценник…');
+  } else if (!wantTag && eye.mode !== 'base') { eye.mode = 'base'; switched = true; }
+  const t = eye.target;
+  // follow the tag like eyes do, but ignore tiny trembling
+  if (!t || switched || eye.mode === 'base' || Math.hypot(next.x + next.w / 2 - t.x - t.w / 2, next.y + next.w / 2 - t.y - t.w / 2) > t.w * 0.08 || Math.abs(next.w - t.w) > t.w * 0.18) eye.target = next;
+  if (!eye.cur) eye.cur = { ...eye.target };
+  if (!eye.raf) eye.raf = requestAnimationFrame(eyeFrame);
+}
+function eyeFrame(now) {
+  eye.raf = 0;
+  const g = geom(); if (!g || !eye.cur || !eye.target || !running) return;
+  const dt = Math.min(80, now - (eye.last || now)); eye.last = now;
+  const k = reduce ? 1 : 1 - Math.exp(-dt / 95);
+  for (const key of ['x', 'y', 'w']) eye.cur[key] += (eye.target[key] - eye.cur[key]) * k;
+  const { s, tx, ty } = transformFor(g, eye.cur);
+  video.style.transform = s > 1.002 ? 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + s.toFixed(4) + ')' : '';
+  const box = $('tagbox');
+  if (eye.tag) { // the green frame sits on the tag wherever the picture has moved to
+    box.hidden = false; box.classList.toggle('held', det.state === 'held');
+    box.style.left = (eye.tag.x * s + tx) + 'px'; box.style.top = (eye.tag.y * s + ty) + 'px';
+    box.style.width = (eye.tag.w * s) + 'px'; box.style.height = (eye.tag.h * s) + 'px';
+  } else box.hidden = true;
+  $('zoomNow').hidden = s < 1.15 * (zoom.native ? 1 : zoom.base);
+  $('zoomNow').textContent = 'смотрю ' + (s * (zoom.native ? zoom.value : 1)).toFixed(1).replace('.', ',') + '×';
+  if (!eyeSettled() || eye.tag) eye.raf = requestAnimationFrame(eyeFrame);
+  else eye.last = 0;
+}
+
+function autoZoom(tag, t) { // true when the zoom was changed on this check
+  // Only the camera's own zoom adds real detail. Without it the tight cut around the tag
+  // already does the magnifying, and enlarging the picture further would only risk cutting the price off.
   if (opts.autozoom !== 'on' || !zoom.native || t - zoom.lastAuto < 700) return false;
   const top = Math.min(zoom.max, zoom.base * 3);
   if (tag) {
@@ -554,7 +650,7 @@ function tick() {
   if (t < zoom.settleUntil) { det.prev = null; return; } // the picture jumps while the zoom changes
   const th = thumb(); if (!th) return;
   if (det.rebase) { det.rebase = false; if (det.state === 'held') det.ref = th.g; }
-  const tag = findTag(); showTagBox(tag);
+  const tag = findTag(); trackTag(tag); eyeUpdate(tag);
   if (tag) zoom.lastSeen = t;
   if (det.state === 'armed' && autoZoom(tag, t)) { det.prev = null; return; }
   if (det.state === 'armed') {
@@ -564,7 +660,7 @@ function tick() {
     det.ema = det.ema * 0.6 + d * 0.4;
     det.calm = det.ema < p.still * 1.7 ? det.calm + 1 : 0;
     dbg(det.state, d, th.sd);
-    if ((det.still >= p.need || det.calm >= p.need + 4) && th.sd > 10 && inflight < MAX_INFLIGHT && t - det.lastShot > MIN_GAP_MS && t > blockedUntil) {
+    if ((det.still >= p.need || det.calm >= p.need + 4) && th.sd > 10 && (!tag || eyeSettled()) && inflight < MAX_INFLIGHT && t - det.lastShot > MIN_GAP_MS && t > blockedUntil) {
       det.ref = th.g; det.state = 'held'; det.moved = 0; capture();
     }
   } else {
@@ -572,7 +668,7 @@ function tick() {
     det.moved = dr > p.move ? det.moved + 1 : 0;
     det.peak = Math.max(det.peak || 0, dr);
     dbg(det.state, dr, th.sd);
-    if (det.moved >= p.gone) { if (dbgEl) console.log('REARM peak=' + det.peak.toFixed(1) + ' at ' + (performance.now() / 1000).toFixed(1)); rearm(); setMode(''); setStatus(inflight ? 'Читаю… Подносите следующую' : 'Ищу ценник…'); }
+    if (det.moved >= p.gone) { if (dbgEl) console.log('REARM peak=' + det.peak.toFixed(1) + ' at ' + (performance.now() / 1000).toFixed(1)); rearm(); eye.tag = null; eye.lost = 9; setMode(''); setStatus(inflight ? 'Читаю… Подносите следующую' : 'Ищу ценник…'); }
   }
   det.prev = th.g;
 }
@@ -585,7 +681,7 @@ function capture() {
   const th = thumb(); if (th) det.ref = th.g;
   det.state = 'held'; det.moved = 0; det.peak = 0; det.lastShot = performance.now();
   kick($('flash'), 'go'); sndShot();
-  setMode('held'); setStatus('Снято. Берите следующую');
+  setMode('held'); setStatus('Снято. Читаю цену…');
   inflight++; updateQueue();
   const t0 = performance.now();
   sharpestShot().then((b64) => store.scan(b64)).then((r2) => onRead(r2, (performance.now() - t0) / 1000), onReadError)

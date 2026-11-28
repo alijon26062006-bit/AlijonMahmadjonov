@@ -53,8 +53,11 @@ main{flex:1;position:relative;min-height:0}
 
 /* camera */
 .cam{flex:1;min-height:0;position:relative;overflow:hidden;background:var(--cam-bg);color:var(--cam-ink)}
-#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 44%;transition:transform .18s}
-.tagbox{position:absolute;border:2px solid var(--lock);border-radius:8px;box-shadow:0 0 0 3px rgba(62,224,143,.22);pointer-events:none;transition:left .12s,top .12s,width .12s,height .12s}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:0 0;will-change:transform}
+.tagbox{position:absolute;border:2.5px solid var(--lock);border-radius:10px;box-shadow:0 0 0 4px rgba(62,224,143,.25);pointer-events:none}
+.tagbox.held{border-style:dashed}
+.tagbox.lock{animation:lock .38s cubic-bezier(.2,1.3,.4,1)}
+@keyframes lock{from{transform:scale(1.35);opacity:0}}
 .sent{position:absolute;left:12px;top:54px;width:84px;max-height:84px;object-fit:contain;border-radius:10px;border:2px solid var(--cam-ink);background:var(--cam-bg);box-shadow:0 6px 16px rgba(0,0,0,.4)}
 .zoomctl{position:absolute;right:10px;top:50%;transform:translateY(-70%);display:flex;flex-direction:column;gap:6px;align-items:flex-end}
 .zoomctl button{width:44px;height:40px;border-radius:12px;background:var(--cam-btn);color:var(--cam-ink);font-weight:700;font-size:13.5px;backdrop-filter:blur(8px)}
@@ -208,7 +211,7 @@ main{flex:1;position:relative;min-height:0}
 @media (prefers-reduced-motion: reduce){
   .laser,.status b,.live b{animation:none!important}
   .view,.toast,.sheet{transition:none}
-  .row.new,.sticker.bump,.sticker.shake,.flash.go{animation:none}
+  .row.new,.sticker.bump,.sticker.shake,.flash.go,.tagbox.lock{animation:none}
 }
 </style>
 </head>
@@ -346,7 +349,7 @@ main{flex:1;position:relative;min-height:0}
             <button type="button" data-v="on">Включён</button>
             <button type="button" data-v="off">Выключен</button>
           </div>
-          <p>Если ценник маленький или далеко, сканер сам его приближает. Кнопки 1×, 2×, 3× на экране сканера задают приближение вручную, двумя пальцами тоже можно.</p>
+          <p>Сканер, как глаза, сам приближается к найденному ценнику и отдаляется, когда его убрали. Кнопки 1×, 2×, 3× задают обычное приближение вручную, двумя пальцами тоже можно.</p>
         </div>
         <div class="card">
           <h2>Звук</h2>
