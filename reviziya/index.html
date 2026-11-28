@@ -116,7 +116,7 @@ main{flex:1;position:relative;min-height:0}
 .minus-btn:active,.key:active,.go:active,.tabs button:active{transform:scale(.95)}
 .minus-btn svg{stroke:var(--red)}
 
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding-block:5px}
+.tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface);border-top:1px solid var(--line);padding-block:5px}
 .tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:11.5px;font-weight:600;color:var(--mute);border-radius:12px}
 .tabs svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tabs button.on{color:var(--pen)}
@@ -176,10 +176,31 @@ main{flex:1;position:relative;min-height:0}
 .go{height:54px;border-radius:var(--r);background:var(--red);color:var(--surface);font-weight:700;font-size:16px}
 .go:disabled{opacity:.35}
 
+/* admin */
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--plus)}
+.live b{width:8px;height:8px;border-radius:50%;background:var(--plus);animation:pulse 1.2s infinite}
+.staff{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.st{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:26px 1fr auto;gap:4px 10px;align-items:center}
+.st .rk{font-family:var(--f-num);font-weight:700;color:var(--mute);font-size:14px}
+.st .nm{font-weight:700;font-size:15px;min-width:0;overflow-wrap:anywhere}
+.st .nm small{font-weight:400;font-size:12.5px;color:var(--mute);margin-left:6px;white-space:nowrap}
+.st .sm{font-family:var(--f-num);font-weight:700;font-size:15.5px;font-variant-numeric:tabular-nums;text-align:right;word-spacing:-.38em}
+.st .mn{grid-column:2;font-size:12px;color:var(--red)}
+.st .act{grid-column:3;justify-self:end}
+.st .bar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:4px}
+.st .bar i{display:block;height:100%;border-radius:3px;background:var(--pen);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.st.me{border-color:var(--pen)}
+.st.off{opacity:.55}
+.st.ask{grid-template-columns:1fr auto auto}
+.lnk.no{color:var(--red);background:var(--red-soft)}
+.gate{position:absolute;inset:0;z-index:8;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:28px}
+.gate h2{margin:0;font-size:20px}
+.gate p{margin:0;max-width:300px;color:var(--mute)}
+
 .fly{position:fixed;z-index:9;pointer-events:none;font-family:var(--f-num);font-weight:700;font-size:20px;color:var(--label-ink);background:var(--label);border-radius:7px;padding:6px 10px;box-shadow:0 0 0 3px var(--lock)}
 
 @media (prefers-reduced-motion: reduce){
-  .laser,.status b{animation:none!important}
+  .laser,.status b,.live b{animation:none!important}
   .view,.toast,.sheet{transition:none}
   .row.new,.sticker.bump,.sticker.shake,.flash.go{animation:none}
 }
@@ -250,9 +271,34 @@ main{flex:1;position:relative;min-height:0}
       </div>
     </section>
 
+    <section class="view" id="v-admin" aria-label="Админ">
+      <div class="scroll gut">
+        <div class="hero">
+          <span class="cap" id="aTitle">Весь магазин</span>
+          <span class="sticker" id="stickerAll"><span id="allSum">0</span></span>
+          <div class="chips">
+            <span class="chip"><b class="num" id="allScans">0</b> <span id="allScansW">сканов</span></span>
+            <span class="chip">минусы <b class="num" id="allMinus">0</b></span>
+            <span class="live"><b></b>обновляется</span>
+          </div>
+        </div>
+        <div id="pendingBox" hidden>
+          <p class="cap">Ждут допуска</p>
+          <ul class="staff" id="pending"></ul>
+        </div>
+        <ul class="staff" id="staff"></ul>
+        <div class="btnrow">
+          <button class="btn" id="aReport" type="button">Отчёт в Excel</button>
+          <button class="btn sec" id="aNew" type="button">Новая ревизия</button>
+        </div>
+        <span class="msg" id="aMsg" hidden></span>
+        <p class="note">Отчёт придёт файлом в чат с ботом. «Новая ревизия» обнуляет счёт у всех, старые записи остаются в базе.</p>
+      </div>
+    </section>
+
     <section class="view" id="v-set" aria-label="Настройки">
       <div class="scroll gut">
-        <div class="card">
+        <div class="card" data-local>
           <h2>Ключ Anthropic</h2>
           <p id="keyState">Ключ не задан. Без него сканер не читает ценники.</p>
           <input id="keyInput" type="password" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Ключ Anthropic">
@@ -263,7 +309,7 @@ main{flex:1;position:relative;min-height:0}
           <span class="msg" id="keyMsg" hidden></span>
           <p>Ключ хранится только в этом телефоне и уходит только в Anthropic. Это режим для проверки. Сотрудникам ключ не давайте.</p>
         </div>
-        <div class="card">
+        <div class="card" data-local>
           <h2>Модель</h2>
           <div class="seg" id="segModel">
             <button type="button" data-v="claude-haiku-5-5">Быстрая</button>
@@ -294,8 +340,14 @@ main{flex:1;position:relative;min-height:0}
   <nav class="tabs gut" aria-label="Разделы">
     <button class="on" data-tab="scan" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2M7 12h10"/></svg>Сканер</button>
     <button data-tab="mine" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Мои сканы</button>
+    <button data-tab="admin" id="tabAdmin" type="button" hidden><svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Админ</button>
     <button data-tab="set" type="button"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Настройки</button>
   </nav>
+
+  <div class="gate" id="gate" hidden>
+    <h2 id="gateTitle">Заявка отправлена</h2>
+    <p id="gateText">Админ получил сообщение. Как только он вас допустит, сканер откроется сам.</p>
+  </div>
 
   <div class="scrim" id="scrim">
     <div class="sheet gut" role="dialog" aria-label="Вычесть сумму">
